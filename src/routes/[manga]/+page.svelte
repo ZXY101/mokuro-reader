@@ -1,22 +1,27 @@
 <script lang="ts">
-	import Panzoom from '$lib/panzoom/Panzoom.svelte';
 	import { currentManga } from '$lib/catalog';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import Button from '$lib/components/Button.svelte';
+	import { panAlign, Panzoom, zoomOriginal } from '$lib/panzoom';
 
 	const manga = $currentManga;
 </script>
 
 {#if manga}
+	<div>
+		<Button on:click={zoomOriginal}>Reset Zoom</Button>
+	</div>
 	<Panzoom>
 		<img draggable="false" src={manga.cover} alt={manga.title} />
 	</Panzoom>
 {/if}
 
 <style>
-	h2 {
-		z-index: 1;
-		position: fixed;
+	div {
+		position: absolute;
+		bottom: 10px;
 		left: 10px;
+		z-index: 1;
 	}
 </style>
