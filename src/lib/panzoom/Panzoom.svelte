@@ -2,6 +2,8 @@
 	import { initPanzoom } from './util';
 </script>
 
-<div use:initPanzoom>
-	<slot />
+<div>
+	<div use:initPanzoom>
+		<slot />
+	</div>
 </div>

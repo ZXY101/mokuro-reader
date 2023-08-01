@@ -1,34 +1,39 @@
 :root {
 	--background-color: #1b1b20;
 	--font-family: Verdana, Geneva, Tahoma, sans-serif;
-
-	--primary-color: #2e3042;
-	--primary-accent-color: #263447;
-
-	--secondary-color: #dfdfe9;
-	--secondary-accent-color: #adadbb;
-
-	--danger-color: #be3329;
-	--danger-accent-color: #ddaeb2;
-	--danger-active-color: #b69092;
 }
 
  body {
 	background-color: var(--background-color);
-	font-family: Verdana, Geneva, Tahoma, sans-serif;
+	font-family: var(--font-family);
 	color: white;
 	margin: 0;
 	padding: 0;
-	overflow: hidden;
 }
 
 button {
 	border: none;
 	background-color: transparent;
+	color: white;
 }
 
+button:hover {
+	cursor: pointer;
+}
 
+a {
+	text-decoration: inherit;
+    color: inherit;
+    cursor: auto;
+}
 
+a:visited {
+	text-decoration: inherit;
+	color: inherit;
+	cursor: auto;
+}
 
-
+a:hover {
+	cursor: pointer;
+}
 

@@ -3,7 +3,7 @@
 
 	type ButtonType = 'primary' | 'secondary' | 'tertiary' | 'danger';
 
-	export let variant: ButtonType;
+	export let variant: ButtonType = 'primary';
 
 	function getStyles(buttonType: ButtonType) {
 		switch (buttonType) {
