@@ -11,32 +11,92 @@
 		{
 			title: 'Manga name',
 			cover: image1,
-			currentPage: 26,
-			totalPages: 100
+			volumes: [
+				{
+					cover: image1,
+					title: 'Volume 1',
+					currentPage: 0,
+					totalPages: 100
+				},
+				{
+					cover: image1,
+					title: 'Volume 2',
+					currentPage: 0,
+					totalPages: 100
+				}
+			]
 		},
 		{
 			title: 'Another',
 			cover: image2,
-			currentPage: 0,
-			totalPages: 120
+			volumes: [
+				{
+					cover: image2,
+					title: 'Volume 1',
+					currentPage: 0,
+					totalPages: 100
+				},
+				{
+					cover: image2,
+					title: 'Volume 2',
+					currentPage: 0,
+					totalPages: 100
+				}
+			]
 		},
 		{
 			title: 'Awooo',
 			cover: image3,
-			currentPage: 69,
-			totalPages: 96
+			volumes: [
+				{
+					cover: image3,
+					title: 'Volume 1',
+					currentPage: 0,
+					totalPages: 100
+				},
+				{
+					cover: image3,
+					title: 'Volume 2',
+					currentPage: 0,
+					totalPages: 100
+				}
+			]
 		},
 		{
 			title: 'Title',
 			cover: image4,
-			currentPage: 9,
-			totalPages: 59
+			volumes: [
+				{
+					cover: image4,
+					title: 'Volume 1',
+					currentPage: 0,
+					totalPages: 100
+				},
+				{
+					cover: image4,
+					title: 'Volume 2',
+					currentPage: 0,
+					totalPages: 100
+				}
+			]
 		},
 		{
 			title: 'sdhfjksdh',
 			cover: image5,
-			currentPage: 19,
-			totalPages: 200
+			volumes: [
+				{
+					cover: image5,
+					title: 'Volume 1',
+					currentPage: 0,
+					totalPages: 100
+				},
+				{
+					cover: image5,
+					title: 'Volume 2',
+					currentPage: 0,
+					totalPages: 100
+				}
+			]
 		}
 	];
 </script>

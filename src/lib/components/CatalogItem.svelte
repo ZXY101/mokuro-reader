@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { currentManga } from '$lib/catalog';
 	import type { Manga } from '$lib/types/catalog';
-	import Button from './Button.svelte';
-
+	import { navbarTitle } from './NavBar.svelte';
 	export let manga: Manga;
-	const { cover, currentPage, title, totalPages } = manga;
+	const { cover, title } = manga;
 
 	function onClick() {
+		console.log('bruh');
+
+		navbarTitle.set(title);
 		currentManga.set(manga);
 	}
 </script>
@@ -16,7 +17,6 @@
 	<div class="content">
 		{title}
 		<img src={cover} alt={title} />
-		{currentPage} / {totalPages}
 	</div>
 </a>
 

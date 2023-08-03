@@ -41,6 +41,7 @@
 	style:--color={color}
 	style:--background-color={backgroundColor}
 	style:--active={activeColor}
+	{...$$restProps}
 	on:click
 >
 	<slot />

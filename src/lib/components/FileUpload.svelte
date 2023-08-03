@@ -1,0 +1,56 @@
+<script lang="ts">
+	import type { Entry } from '@zip.js/zip.js';
+	import Button from './Button.svelte';
+	import { colors } from '$lib/theme';
+
+	export let accept: string | null | undefined = undefined;
+	export let files: FileList | null | undefined = undefined;
+	export let multiple: boolean | null | undefined = true;
+	export let onUpload: ((files: FileList) => void) | undefined = undefined;
+
+	let input: HTMLInputElement;
+
+	function handleChange() {
+		if (files && onUpload) {
+			onUpload(files);
+		}
+	}
+
+	function onClick() {
+		input.click();
+	}
+
+	function onDrop(event: DragEvent) {
+		const items = event.dataTransfer?.items;
+		// TODO
+	}
+</script>
+
+<input type="file" {multiple} {accept} bind:files bind:this={input} on:change={handleChange} />
+
+<button
+	on:click={onClick}
+	style:--border={colors.secondaryColor}
+	on:dragover|preventDefault
+	on:drop|preventDefault|stopPropagation={onDrop}
+>
+	<p style:color={colors.secondaryColor}><slot>Upload</slot></p>
+</button>
+
+<style>
+	input {
+		display: none;
+	}
+
+	button {
+		width: 500px;
+		height: 100px;
+		border-radius: 12px;
+		border: 2px dashed var(--border);
+	}
+
+	p {
+		font-weight: bold;
+		font-size: 16px;
+	}
+</style>

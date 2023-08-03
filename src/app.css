@@ -13,6 +13,7 @@
 
 button {
 	border: none;
+	font-family: var(--font-family);
 	background-color: transparent;
 	color: white;
 }

@@ -65,8 +65,6 @@ export function panAlign(alignX: PanX, alignY: PanY) {
       break;
   }
 
-  console.log(x, y);
-
   pz?.moveTo(x, y)
 }
 

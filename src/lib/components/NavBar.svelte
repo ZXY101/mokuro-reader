@@ -1,16 +1,51 @@
-<script lang="ts">
-	import { colors } from '$lib/theme';
+<script lang="ts" context="module">
+	export let navbarTitle = writable<string | undefined>(undefined);
+</script>
 
-	export let title: string | undefined = undefined;
+<script lang="ts">
+	import { afterNavigate } from '$app/navigation';
+	import { page } from '$app/stores';
+
+	import { currentManga, currentVolume } from '$lib/catalog';
+
+	import { colors } from '$lib/theme';
+	import { writable } from 'svelte/store';
+	let title: string | undefined = 'Mokuro';
+	let back: string | undefined = undefined;
+
+	afterNavigate(() => {
+		console.log($page?.route.id);
+		window.document.body.classList.remove('reader');
+
+		switch ($page?.route.id) {
+			case '/[manga]':
+				title = $currentManga?.title;
+				back = '/';
+				break;
+			case '/[manga]/[volume]':
+				window.document.body.classList.add('reader');
+				title = $currentVolume?.title;
+				back = '/manga';
+				break;
+			case '/upload':
+				title = 'Upload';
+				back = '/';
+				break;
+			default:
+				title = 'Mokuro';
+				back = undefined;
+				break;
+		}
+	});
 </script>
 
 <nav>
 	<div style:background-color={colors.primaryColor}>
-		{#if title}
-			<a href="/"><h2>Back</h2></a>
+		{#if back}
+			<a href={back}><h2>Back</h2></a>
 			<h2>{title}</h2>
 		{:else}
-			<a href="/"><h2>Mokuro</h2></a>
+			<a href="/"><h2>{title}</h2></a>
 		{/if}
 	</div>
 </nav>

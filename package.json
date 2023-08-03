@@ -29,6 +29,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@zip.js/zip.js": "^2.7.20",
 		"panzoom": "^9.4.3"
 	}
 }

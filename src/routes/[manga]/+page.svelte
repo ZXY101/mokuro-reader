@@ -4,24 +4,30 @@
 	import { onMount } from 'svelte';
 	import Button from '$lib/components/Button.svelte';
 	import { panAlign, Panzoom, zoomOriginal } from '$lib/panzoom';
+	import VolumeItem from '$lib/components/VolumeItem.svelte';
 
 	const manga = $currentManga;
+
+	onMount(() => {
+		if (!manga) {
+			goto('/');
+		}
+	});
 </script>
 
-{#if manga}
-	<div>
-		<Button on:click={zoomOriginal}>Reset Zoom</Button>
-	</div>
-	<Panzoom>
-		<img draggable="false" src={manga.cover} alt={manga.title} />
-	</Panzoom>
-{/if}
+<div>
+	{#if manga}
+		{#each manga.volumes as volume}
+			<VolumeItem {volume} />
+		{/each}
+	{/if}
+</div>
 
 <style>
 	div {
-		position: absolute;
-		bottom: 10px;
-		left: 10px;
-		z-index: 1;
+		display: flex;
+		flex-direction: row;
+		gap: 20px;
+		flex-wrap: wrap;
 	}
 </style>
