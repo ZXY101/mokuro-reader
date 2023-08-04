@@ -1,11 +1,8 @@
-:root {
-	--background-color: #1b1b20;
-	--font-family: Verdana, Geneva, Tahoma, sans-serif;
-}
+@use "variables" as *;
 
- body {
-	background-color: var(--background-color);
-	font-family: var(--font-family);
+body {
+	background-color: $background-color;
+	font-family: $font-family;
 	color: white;
 	margin: 0;
 	padding: 0;
@@ -13,7 +10,7 @@
 
 button {
 	border: none;
-	font-family: var(--font-family);
+	font-family: $font-family;
 	background-color: transparent;
 	color: white;
 }
@@ -24,8 +21,8 @@ button:hover {
 
 a {
 	text-decoration: inherit;
-    color: inherit;
-    cursor: auto;
+	color: inherit;
+	cursor: auto;
 }
 
 a:visited {
@@ -37,4 +34,3 @@ a:visited {
 a:hover {
 	cursor: pointer;
 }
-
