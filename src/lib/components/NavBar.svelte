@@ -8,7 +8,6 @@
 
 	import { currentManga, currentVolume } from '$lib/catalog';
 
-	import { colors } from '$lib/theme';
 	import { writable } from 'svelte/store';
 	let title: string | undefined = 'Mokuro';
 	let back: string | undefined = undefined;
@@ -40,7 +39,7 @@
 </script>
 
 <nav>
-	<div style:background-color={colors.primaryColor}>
+	<div>
 		{#if back}
 			<a href={back}><h2>Back</h2></a>
 			<h2>{title}</h2>
@@ -50,13 +49,14 @@
 	</div>
 </nav>
 
-<style>
+<style lang="scss">
 	nav {
 		position: relative;
 		width: 100%;
 		z-index: 1;
 	}
 	div {
+		background-color: $primary-color;
 		display: flex;
 		flex: 1;
 		justify-content: space-between;

@@ -1,8 +1,4 @@
 <script lang="ts">
-	import type { Entry } from '@zip.js/zip.js';
-	import Button from './Button.svelte';
-	import { colors } from '$lib/theme';
-
 	export let accept: string | null | undefined = undefined;
 	export let files: FileList | null | undefined = undefined;
 	export let multiple: boolean | null | undefined = true;
@@ -30,14 +26,13 @@
 
 <button
 	on:click={onClick}
-	style:--border={colors.secondaryColor}
 	on:dragover|preventDefault
 	on:drop|preventDefault|stopPropagation={onDrop}
 >
-	<p style:color={colors.secondaryColor}><slot>Upload</slot></p>
+	<p><slot>Upload</slot></p>
 </button>
 
-<style>
+<style lang="scss">
 	input {
 		display: none;
 	}
@@ -46,11 +41,12 @@
 		width: 500px;
 		height: 100px;
 		border-radius: 12px;
-		border: 2px dashed var(--border);
+		border: 2px dashed $secondary-color;
 	}
 
 	p {
 		font-weight: bold;
 		font-size: 16px;
+		color: $secondary-color;
 	}
 </style>
