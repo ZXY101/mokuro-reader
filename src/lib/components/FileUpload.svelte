@@ -1,7 +1,5 @@
 <script lang="ts">
-	export let accept: string | null | undefined = undefined;
 	export let files: FileList | null | undefined = undefined;
-	export let multiple: boolean | null | undefined = true;
 	export let onUpload: ((files: FileList) => void) | undefined = undefined;
 
 	let input: HTMLInputElement;
@@ -22,7 +20,7 @@
 	}
 </script>
 
-<input type="file" {multiple} {accept} bind:files bind:this={input} on:change={handleChange} />
+<input type="file" bind:files bind:this={input} on:change={handleChange} {...$$restProps} />
 
 <button
 	on:click={onClick}

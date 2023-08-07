@@ -12,10 +12,7 @@
 	let modal: HTMLDialogElement;
 </script>
 
-<Button variant="primary" on:click={onClick}>Upload</Button>
-<Button variant="secondary" on:click={() => showSnackbar('Snackbar')}>Upload</Button>
-<Button variant="tertiary" on:click={() => modal.showModal()}>Upload</Button>
-<Button variant="danger" on:click={onClick}>Upload</Button>
+<Button variant="secondary" on:click={onClick}>Upload</Button>
 <Modal bind:modal>
 	<div slot="title">Title</div>
 	<div slot="content">
