@@ -1,6 +1,4 @@
 <script lang="ts">
-	import img from '$lib/assets/001.jpg';
-
 	type Block = {
 		box: number[];
 		vertical: boolean;
@@ -10,102 +8,35 @@
 
 	type Page = {
 		version?: string;
-		imgWidth: number;
-		imgHeight: number;
+		img_width: number;
+		img_height: number;
 		blocks: Block[];
 		imgPath: string;
 	};
 
-	let page: Page = {
-		version: '0.1.6',
-		imgWidth: 1078,
-		imgHeight: 1530,
-		blocks: [
-			{
-				box: [924, 167, 948, 380],
-				vertical: true,
-				fontSize: 21.0,
-				lines: ['私も頑張らなくちゃ！']
-			},
-			{
-				box: [584, 242, 610, 397],
-				vertical: true,
-				fontSize: 26.0,
-				lines: ['リョウ先輩！']
-			},
-			{
-				box: [895, 474, 943, 687],
-				vertical: true,
-				fontSize: 20.0,
-				lines: ['私のギターの練習', 'みてもらえませんか！']
-			},
-			{
-				box: [898, 787, 947, 979],
-				vertical: true,
-				fontSize: 21.0,
-				lines: ['ぼっちに教えて', 'もらってるじゃん？']
-			},
-			{
-				box: [708, 796, 783, 936],
-				vertical: true,
-				fontSize: 20.0,
-				lines: ['〜〜っ', 'もっと練習', 'したいんです！！']
-			},
-			{
-				box: [663, 832, 701, 971],
-				vertical: true,
-				fontSize: 20.0,
-				lines: ['後藤さんだって', '？の練習あるし．．．']
-			},
-			{
-				box: [568, 800, 616, 1011],
-				vertical: true,
-				fontSize: 20.0,
-				lines: ['ちょっと喜多ちゃん', '急にどうしちゃったの']
-			},
-			{
-				box: [874, 1122, 951, 1380],
-				vertical: true,
-				fontSize: 22.0,
-				lines: ['まさか結束パンドの', 'ギター同士で血で血を洗う', 'パート争いを．．．']
-			},
-			{
-				box: [636, 1135, 682, 1256],
-				vertical: true,
-				fontSize: 20.0,
-				lines: ['ちょっと', '結束してよ〜']
-			},
-			{
-				box: [560, 1240, 590, 1381],
-				vertical: true,
-				fontSize: 27.0,
-				lines: ['違います！！']
-			}
-		],
-		imgPath: '049.jpg'
-	};
+	export let page: Page;
 
 	let bold = false;
 
 	$: fontWeight = bold ? 'bold' : '400';
 
-	console.log(bold);
-
 	function clamp(x: number, min: number, max: number) {
 		return Math.min(Math.max(x, min), max);
 	}
 
-	const { blocks, imgHeight, imgPath, imgWidth } = page;
-	const area = imgWidth * imgHeight;
+	console.log(page);
 
-	const textBoxes = blocks.map((block) => {
+	$: textBoxes = page.blocks.map((block) => {
+		const { img_height, img_width } = page;
 		const { box, fontSize, lines, vertical } = block;
+
 		let [_xmin, _ymin, _xmax, _ymax] = box;
 
-		const xmin = clamp(_xmin, 0, imgWidth);
-		const ymin = clamp(_ymin, 0, imgHeight);
-		const xmax = clamp(_xmax, 0, imgWidth);
-		const ymax = clamp(_ymax, 0, imgHeight);
+		const xmin = clamp(_xmin, 0, img_width);
+		const ymin = clamp(_ymin, 0, img_height);
+		const xmax = clamp(_xmax, 0, img_width);
+		const ymax = clamp(_ymax, 0, img_height);
+		console.log('ymax', img_width);
 
 		const width = xmax - xmin;
 		const height = ymax - ymin;
@@ -120,11 +51,11 @@
 			lines
 		};
 
-		console.log(textBox);
-
 		return textBox;
 	});
-	let src = `/src/lib/assets/${imgPath}`;
+	console.log(textBoxes);
+
+	export let src;
 </script>
 
 <div style:--bold={fontWeight}>
@@ -132,7 +63,7 @@
 		<label>Bold</label>
 		<input bind:checked={bold} type="checkbox" placeholder="????" />
 	</div>
-	<img draggable="false" {src} alt="Page 1" />
+	<img draggable="false" src={URL.createObjectURL(src)} alt="img" />
 	{#each textBoxes as { left, top, width, height, lines, fontSize, writingMode }}
 		<div
 			class="text-box"

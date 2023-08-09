@@ -2,8 +2,6 @@
 	import { currentManga } from '$lib/catalog';
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
-	import Button from '$lib/components/Button.svelte';
-	import { panAlign, Panzoom, zoomOriginal } from '$lib/panzoom';
 	import VolumeItem from '$lib/components/VolumeItem.svelte';
 
 	const manga = $currentManga;
@@ -17,7 +15,7 @@
 
 <div>
 	{#if manga}
-		{#each manga.volumes as volume}
+		{#each manga as volume}
 			<VolumeItem {volume} />
 		{/each}
 	{/if}

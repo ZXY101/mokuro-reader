@@ -18,12 +18,12 @@
 
 		switch ($page?.route.id) {
 			case '/[manga]':
-				title = $currentManga?.title;
+				title = $currentManga?.[0].mokuroData.title;
 				back = '/';
 				break;
 			case '/[manga]/[volume]':
 				window.document.body.classList.add('reader');
-				title = $currentVolume?.title;
+				title = $currentVolume?.volumeName;
 				back = '/manga';
 				break;
 			case '/upload':

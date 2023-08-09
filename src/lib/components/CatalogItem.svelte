@@ -1,22 +1,20 @@
 <script lang="ts">
 	import { currentManga } from '$lib/catalog';
-	import type { Manga } from '$lib/types/catalog';
-	import { navbarTitle } from './NavBar.svelte';
-	export let manga: Manga;
-	const { cover, title } = manga;
+	import type { Volume } from '$lib/upload';
+	export let manga: Volume[];
+	const { volumeName, files, mokuroData } = manga[0];
 
 	function onClick() {
-		console.log('bruh');
-
-		navbarTitle.set(title);
 		currentManga.set(manga);
 	}
 </script>
 
-<a href={title} on:click={onClick}>
+<a href={volumeName} on:click={onClick}>
 	<div class="content">
-		{title}
-		<img src={cover} alt={title} />
+		{mokuroData.title}
+		{#if files}
+			<img src={URL.createObjectURL(Object.values(files)[0])} alt="img" />
+		{/if}
 	</div>
 </a>
 

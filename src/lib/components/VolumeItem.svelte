@@ -1,22 +1,22 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/stores';
-	import { currentManga, currentVolume } from '$lib/catalog';
-	import type { Volume } from '$lib/types/catalog';
+	import { currentVolume } from '$lib/catalog';
+	import type { Volume } from '$lib/upload';
 
 	export let volume: Volume;
-	const { cover, title, currentPage, totalPages } = volume;
+	const { volumeName, files } = volume;
 
 	function onClick() {
 		currentVolume.set(volume);
 	}
 </script>
 
-<a href={`${$page.params.manga}/${title}`} on:click={onClick}>
+<a href={`${$page.params.manga}/${volumeName}`} on:click={onClick}>
 	<div class="content">
-		{title}
-		<img src={cover} alt={title} />
-		{currentPage} / {totalPages}
+		{volumeName}
+		{#if files}
+			<img src={URL.createObjectURL(Object.values(files)[0])} alt="img" />
+		{/if}
 	</div>
 </a>
 

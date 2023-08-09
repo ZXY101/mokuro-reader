@@ -1,3 +1,4 @@
+import { db } from "$lib/catalog/db";
 import { requestPersistentStorage } from "$lib/util/upload";
 import { BlobReader, ZipReader } from "@zip.js/zip.js";
 
@@ -83,6 +84,6 @@ export async function processFiles(fileList: FileList) {
   if (vols.length > 0) {
     await requestPersistentStorage();
     await processVolumes(vols)
-    return vols;
+    await db.catalog.put({ manga: vols })
   }
 }
