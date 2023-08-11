@@ -12,7 +12,7 @@
 
 <!-- Note:  webkitdirectory is not fully supported and does not work on mobile -->
 <FileUpload {onUpload} webkitdirectory>Upload directory</FileUpload>
-<FileUpload {onUpload} accept=".mokuro,.zip,.cbz,.rar" multiple>Upload files</FileUpload>
+<FileUpload {onUpload} accept=".mokuro,.zip,.cbz" multiple>Upload files</FileUpload>
 
 {#await promise}
 	<h2>Loading...</h2>

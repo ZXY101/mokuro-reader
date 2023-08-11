@@ -9,8 +9,6 @@
 		if (!volume) {
 			goto('/');
 		} else {
-			console.log('???');
-
 			window.document.body.classList.add('reader');
 		}
 	});

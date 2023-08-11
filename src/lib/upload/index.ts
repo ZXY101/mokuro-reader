@@ -46,7 +46,7 @@ function getDetails(file: File) {
 
 export async function processFiles(fileList: FileList) {
   const files = [...fileList]
-  const zipTypes = ['zip', 'rar', 'cbz']
+  const zipTypes = ['zip', 'cbz']
   const volumes: Record<string, Volume> = {};
 
   for (const file of files) {

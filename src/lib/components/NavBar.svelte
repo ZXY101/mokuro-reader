@@ -13,7 +13,6 @@
 	let back: string | undefined = undefined;
 
 	afterNavigate(() => {
-		console.log($page?.route.id);
 		window.document.body.classList.remove('reader');
 
 		switch ($page?.route.id) {

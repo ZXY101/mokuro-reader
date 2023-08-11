@@ -11,8 +11,6 @@
 		return Math.min(Math.max(x, min), max);
 	}
 
-	console.log(page);
-
 	$: textBoxes = page.blocks.map((block) => {
 		const { img_height, img_width } = page;
 		const { box, font_size, lines, vertical } = block;
@@ -23,7 +21,6 @@
 		const ymin = clamp(_ymin, 0, img_height);
 		const xmax = clamp(_xmax, 0, img_width);
 		const ymax = clamp(_ymax, 0, img_height);
-		console.log('ymax', img_width);
 
 		const width = xmax - xmin;
 		const height = ymax - ymin;
@@ -40,7 +37,6 @@
 
 		return textBox;
 	});
-	console.log(textBoxes);
 
 	export let src;
 </script>
