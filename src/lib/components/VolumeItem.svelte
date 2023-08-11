@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { currentVolume } from '$lib/catalog';
-	import type { Volume } from '$lib/upload';
+	import type { Volume } from '$lib/types';
 
 	export let volume: Volume;
 	const { volumeName, files } = volume;

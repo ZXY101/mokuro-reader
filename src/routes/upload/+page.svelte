@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { db } from '$lib/catalog/db';
-	import Button from '$lib/components/Button.svelte';
 	import Catalog from '$lib/components/Catalog.svelte';
 	import FileUpload from '$lib/components/FileUpload.svelte';
 	import { processFiles } from '$lib/upload';

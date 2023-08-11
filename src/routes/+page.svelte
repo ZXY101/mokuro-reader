@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { db } from '$lib/catalog/db';
-	import { catalog } from '$lib/catalog/test';
 	import Button from '$lib/components/Button.svelte';
 	import Catalog from '$lib/components/Catalog.svelte';
 	import Modal from '$lib/components/Modal.svelte';

@@ -1,18 +1,5 @@
 <script lang="ts">
-	type Block = {
-		box: number[];
-		vertical: boolean;
-		fontSize: number;
-		lines: string[];
-	};
-
-	type Page = {
-		version?: string;
-		img_width: number;
-		img_height: number;
-		blocks: Block[];
-		imgPath: string;
-	};
+	import type { Page } from '$lib/types';
 
 	export let page: Page;
 
@@ -28,7 +15,7 @@
 
 	$: textBoxes = page.blocks.map((block) => {
 		const { img_height, img_width } = page;
-		const { box, fontSize, lines, vertical } = block;
+		const { box, font_size, lines, vertical } = block;
 
 		let [_xmin, _ymin, _xmax, _ymax] = box;
 
@@ -46,7 +33,7 @@
 			top: `${ymin}px`,
 			width: `${width}px`,
 			height: `${height}px`,
-			fontSize: `${fontSize}px`,
+			fontSize: `${font_size}px`,
 			writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
 			lines
 		};

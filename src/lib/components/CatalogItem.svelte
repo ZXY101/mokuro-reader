@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { currentManga } from '$lib/catalog';
-	import type { Volume } from '$lib/upload';
+	import type { Volume } from '$lib/types';
 	export let manga: Volume[];
 	const { volumeName, files, mokuroData } = manga[0];
 

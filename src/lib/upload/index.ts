@@ -1,19 +1,29 @@
 import { db } from "$lib/catalog/db";
+import type { Volume } from "$lib/types";
+import { showSnackbar } from "$lib/util/snackbar";
 import { requestPersistentStorage } from "$lib/util/upload";
-import { BlobReader, ZipReader } from "@zip.js/zip.js";
-
-export type Volume = {
-  mokuroData: any;
-  volumeName: string;
-  archiveFile?: File | undefined;
-  files?: Record<string, File>;
-}
+import { BlobReader, ZipReader, BlobWriter, getMimeType } from "@zip.js/zip.js";
 
 export async function unzipManga(file: File) {
   const zipFileReader = new BlobReader(file);
   const zipReader = new ZipReader(zipFileReader);
 
-  return await zipReader.getEntries()
+  const entries = await zipReader.getEntries()
+  const unzippedFiles: Record<string, File> = {};
+
+
+  for (const entry of entries) {
+    const mime = getMimeType(entry.filename);
+    if (mime === 'image/jpeg' || mime === 'image/png') {
+      const blob = await entry.getData?.(new BlobWriter(mime))
+      if (blob) {
+        const file = new File([blob], entry.filename, { type: mime })
+        unzippedFiles[entry.filename] = file
+      }
+    }
+  }
+
+  return unzippedFiles;
 }
 
 function getDetails(file: File) {
@@ -26,11 +36,13 @@ function getDetails(file: File) {
 }
 
 
-export function processVolumes(volumes: Volume[]) {
-  volumes.map(({ mokuroData, volumeName, archiveFile, files }) => {
-    console.log(mokuroData, volumeName, archiveFile, files);
-  })
-}
+// export async function processVolumes(volumes: Volume[]) {
+//   for (const { mokuroData, volumeName, archiveFile, files } of volumes) {
+//     const { title_uuid } = mokuroData
+//   }
+
+
+// }
 
 export async function processFiles(fileList: FileList) {
   const files = [...fileList]
@@ -71,10 +83,13 @@ export async function processFiles(fileList: FileList) {
     }
 
     if (zipTypes.includes(ext)) {
+      const unzippedFiles = await unzipManga(file)
+
       volumes[filename] = {
         ...volumes[filename],
-        archiveFile: file
+        files: unzippedFiles
       }
+
       continue;
     }
   }
@@ -82,8 +97,25 @@ export async function processFiles(fileList: FileList) {
   const vols = Object.values(volumes);
 
   if (vols.length > 0) {
-    await requestPersistentStorage();
-    await processVolumes(vols)
-    await db.catalog.put({ manga: vols })
+    const valid = vols.map((vol) => {
+      const { files, mokuroData, volumeName } = vol
+      if (!mokuroData || !volumeName) {
+        showSnackbar('Missing .mokuro file')
+        return false;
+      }
+
+      if (!files) {
+        showSnackbar('Missing image files')
+        return false;
+      }
+
+      return true
+    })
+
+    if (!valid.includes(false)) {
+      await requestPersistentStorage();
+      await db.catalog.put({ id: vols[0].mokuroData.title_uuid, manga: vols })
+      showSnackbar('Catalog updated successfully')
+    }
   }
 }

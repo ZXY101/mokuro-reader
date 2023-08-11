@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { catalog } from '$lib/catalog/test';
+	import { catalog } from '$lib/catalog';
 	import CatalogItem from './CatalogItem.svelte';
 </script>
 
