@@ -114,7 +114,21 @@ export async function processFiles(fileList: FileList) {
 
     if (!valid.includes(false)) {
       await requestPersistentStorage();
-      await db.catalog.put({ id: vols[0].mokuroData.title_uuid, manga: vols })
+
+      const key = vols[0].mokuroData.title_uuid;
+      const existingCatalog = await db.catalog.get(key);
+
+      if (existingCatalog) {
+        const filtered = vols.filter((vol) => {
+          return !existingCatalog.manga.some(manga => {
+            return manga.mokuroData.volume_uuid === vol.mokuroData.volume_uuid
+          })
+        })
+        await db.catalog.update(key, { manga: [...existingCatalog.manga, ...filtered] })
+      } else {
+        await db.catalog.put({ id: key, manga: vols })
+      }
+
       showSnackbar('Catalog updated successfully')
     }
   }

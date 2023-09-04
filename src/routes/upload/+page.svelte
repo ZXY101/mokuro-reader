@@ -16,5 +16,6 @@
 
 {#await promise}
 	<h2>Loading...</h2>
+{:then}
+	<Catalog />
 {/await}
-<Catalog />
