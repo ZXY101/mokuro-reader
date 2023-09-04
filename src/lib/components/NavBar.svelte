@@ -1,72 +1,43 @@
-<script lang="ts" context="module">
-	export let navbarTitle = writable<string | undefined>(undefined);
-</script>
-
 <script lang="ts">
+	import { Navbar, NavBrand, Modal, Button } from 'flowbite-svelte';
+	import { UserSettingsSolid, UploadSolid } from 'flowbite-svelte-icons';
+	import FileUpload from './FileUpload.svelte';
+	import { processFiles } from '$lib/upload';
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
 
-	import { currentManga, currentVolume } from '$lib/catalog';
-	import SettingsIcon from '$lib/assets/svgs/settings-svgrepo-com.svg';
+	let promise: Promise<void>;
+	let modal = false;
+	let isReader = false;
 
-	import { writable } from 'svelte/store';
-	let title: string | undefined = 'Mokuro';
-	let back: string | undefined = undefined;
+	async function onUpload(files: FileList) {
+		promise = processFiles(files).then(() => {
+			modal = false;
+		});
+	}
 
 	afterNavigate(() => {
-		window.document.body.classList.remove('reader');
-
-		switch ($page?.route.id) {
-			case '/[manga]':
-				title = $currentManga?.[0].mokuroData.title;
-				back = '/';
-				break;
-			case '/[manga]/[volume]':
-				window.document.body.classList.add('reader');
-				title = $currentVolume?.volumeName;
-				back = '/manga';
-				break;
-			case '/upload':
-				title = 'Upload';
-				back = '/';
-				break;
-			default:
-				title = 'Mokuro';
-				back = undefined;
-				break;
-		}
+		isReader = $page.route.id === '/[manga]/[volume]';
 	});
 </script>
 
-<nav>
-	<div>
-		{#if back}
-			<a href={back}><h2>Back</h2></a>
-			<h2>{title}</h2>
-		{:else}
-			<a href="/"><h2>{title}</h2></a>
-		{/if}
-		<img src={SettingsIcon} alt="settings" />
-	</div>
-</nav>
+<div class="relative z-10">
+	<Navbar hidden={isReader}>
+		<NavBrand href="/">
+			<span class="text-xl font-semibold dark:text-white">Mokuro</span>
+		</NavBrand>
+		<div class="flex md:order-2 gap-5">
+			<UserSettingsSolid class="hover:text-cyan-300" />
+			<UploadSolid class="hover:text-cyan-300" on:click={() => (modal = true)} />
+		</div>
+	</Navbar>
+</div>
 
-<style lang="scss">
-	img {
-		width: 32px;
-		fill: #000;
-	}
-	nav {
-		position: relative;
-		width: 100%;
-		z-index: 1;
-	}
-	div {
-		background-color: $primary-color;
-		display: flex;
-		flex: 1;
-		justify-content: space-between;
-		padding: 0 10px 0 10px;
-		align-items: center;
-		z-index: 1;
-	}
-</style>
+<Modal title="Upload" bind:open={modal} outsideclose>
+	{#await promise}
+		<h2 class="justify-center flex">Loading...</h2>
+	{:then}
+		<FileUpload {onUpload} webkitdirectory>Upload directory</FileUpload>
+		<FileUpload {onUpload} accept=".mokuro,.zip,.cbz" multiple>Upload files</FileUpload>
+	{/await}
+</Modal>

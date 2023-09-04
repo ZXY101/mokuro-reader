@@ -36,7 +36,7 @@
 	}
 
 	button {
-		width: 500px;
+		width: 100%;
 		height: 100px;
 		border-radius: 12px;
 		border: 2px dashed $secondary-color;

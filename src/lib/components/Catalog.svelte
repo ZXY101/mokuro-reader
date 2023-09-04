@@ -4,16 +4,20 @@
 </script>
 
 {#if $catalog && $catalog.length > 0}
-	<div class="container">
-		{#each $catalog as { manga }}
-			<CatalogItem {manga} />
-		{/each}
-	</div>
+	{#if $catalog.length > 0}
+		<div class="container">
+			{#each $catalog as { manga }}
+				<CatalogItem {manga} />
+			{/each}
+		</div>
+	{:else}
+		<div class="empty-state">
+			<p>Your catalog is currently empty.</p>
+			<a href="upload">Add manga</a>
+		</div>
+	{/if}
 {:else}
-	<div class="empty-state">
-		<p>Your catalog is currently empty.</p>
-		<a href="upload">Add manga</a>
-	</div>
+	<p>Loading...</p>
 {/if}
 
 <style lang="scss">
