@@ -7,6 +7,7 @@
 	import { page } from '$app/stores';
 
 	import { currentManga, currentVolume } from '$lib/catalog';
+	import SettingsIcon from '$lib/assets/svgs/settings-svgrepo-com.svg';
 
 	import { writable } from 'svelte/store';
 	let title: string | undefined = 'Mokuro';
@@ -45,10 +46,15 @@
 		{:else}
 			<a href="/"><h2>{title}</h2></a>
 		{/if}
+		<img src={SettingsIcon} alt="settings" />
 	</div>
 </nav>
 
 <style lang="scss">
+	img {
+		width: 32px;
+		fill: #000;
+	}
 	nav {
 		position: relative;
 		width: 100%;
