@@ -23,6 +23,7 @@
 	import { afterNavigate } from '$app/navigation';
 	import { page } from '$app/stores';
 	import { sineIn } from 'svelte/easing';
+	import { settingsStore, updateSetting } from '$lib/settings';
 
 	let transitionParams = {
 		x: 320,
@@ -32,7 +33,7 @@
 
 	let promise: Promise<void>;
 	let modal = false;
-	let drawer = true;
+	let drawer = false;
 	let isReader = true;
 
 	async function onUpload(files: FileList) {
@@ -51,6 +52,14 @@
 		{ value: 'us', name: 'auto' },
 		{ value: 'ca', name: 'Canada' },
 		{ value: 'fr', name: 'France' }
+	];
+
+	$: toggles = [
+		{ key: 'rightToLeft', text: 'Right to left', value: $settingsStore.rightToLeft },
+		{ key: 'singlePageView', text: 'Single page view', value: $settingsStore.singlePageView },
+		{ key: 'textEditable', text: 'Editable text', value: $settingsStore.textEditable },
+		{ key: 'textBoxBorders', text: 'Text box borders', value: $settingsStore.textBoxBorders },
+		{ key: 'displayOCR', text: 'OCR enabled', value: $settingsStore.displayOCR }
 	];
 </script>
 
@@ -87,13 +96,11 @@
 		<CloseButton on:click={() => (drawer = true)} class="mb-4 dark:text-white" />
 	</div>
 	<div class="flex flex-col gap-5">
-		<Toggle size="small">Right to left</Toggle>
-		<Toggle size="small">Display two pages</Toggle>
-		<Toggle size="small">First page is cover</Toggle>
-		<Toggle size="small">OCR enabled</Toggle>
-		<Toggle size="small">Display box outlines</Toggle>
-		<Toggle size="small">Editable text</Toggle>
-		<Toggle size="small">Toggle boxes on click</Toggle>
+		{#each toggles as { key, text, value }}
+			<Toggle size="small" checked={value} on:change={() => updateSetting(key, !value)}
+				>{text}</Toggle
+			>
+		{/each}
 		<div>
 			<Label>Fontsize:</Label>
 			<Select items={countries} bind:value={selected} />
