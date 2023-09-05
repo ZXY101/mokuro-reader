@@ -2,6 +2,8 @@
 	import type { Page } from '$lib/types';
 
 	export let page: Page;
+	export let left: () => void;
+	export let right: () => void;
 
 	let bold = false;
 
@@ -38,14 +40,10 @@
 		return textBox;
 	});
 
-	export let src;
+	export let src: Blob;
 </script>
 
-<div style:--bold={fontWeight}>
-	<div class="bold">
-		<label>Bold</label>
-		<input bind:checked={bold} type="checkbox" placeholder="????" />
-	</div>
+<div>
 	<img draggable="false" src={URL.createObjectURL(src)} alt="img" />
 	{#each textBoxes as { left, top, width, height, lines, fontSize, writingMode }}
 		<div
@@ -63,20 +61,22 @@
 		</div>
 		<div />
 	{/each}
+	<button
+		on:click={left}
+		class={`left-0 top-0 absolute h-full w-[200%]`}
+		style:margin-left={page.img_width * -2 + 'px'}
+	/>
+	<button
+		on:click={right}
+		class={`right-0 top-0 absolute h-full w-[200%]`}
+		style:margin-right={page.img_width * -2 + 'px'}
+	/>
 </div>
 
 <style>
 	div {
 		position: relative;
 		margin: 0 auto;
-	}
-
-	.bold {
-		position: absolute;
-		color: #000;
-		right: 10px;
-		bottom: 10px;
-		z-index: 99;
 	}
 
 	.text-box {
