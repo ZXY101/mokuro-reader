@@ -35,17 +35,7 @@ function getDetails(file: File) {
   }
 }
 
-
-// export async function processVolumes(volumes: Volume[]) {
-//   for (const { mokuroData, volumeName, archiveFile, files } of volumes) {
-//     const { title_uuid } = mokuroData
-//   }
-
-
-// }
-
-export async function processFiles(fileList: FileList) {
-  const files = [...fileList]
+export async function processFiles(files: File[]) {
   const zipTypes = ['zip', 'cbz']
   const volumes: Record<string, Volume> = {};
 
@@ -64,7 +54,10 @@ export async function processFiles(fileList: FileList) {
       continue;
     }
 
-    if (type === 'image/jpeg' || type === 'image/png') {
+    const mimeType = type || getMimeType(file.name)
+
+    if (mimeType === 'image/jpeg' || mimeType === 'image/png') {
+
       if (webkitRelativePath) {
         const imageName = webkitRelativePath.split('/').at(-1)
         const vol = webkitRelativePath.split('/').at(-2)

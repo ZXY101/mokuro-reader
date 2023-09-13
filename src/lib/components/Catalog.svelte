@@ -3,7 +3,7 @@
 	import CatalogItem from './CatalogItem.svelte';
 </script>
 
-{#if $catalog && $catalog.length > 0}
+{#if $catalog}
 	{#if $catalog.length > 0}
 		<div class="container">
 			{#each $catalog as { manga }}
@@ -13,7 +13,6 @@
 	{:else}
 		<div class="empty-state">
 			<p>Your catalog is currently empty.</p>
-			<a href="upload">Add manga</a>
 		</div>
 	{/if}
 {:else}

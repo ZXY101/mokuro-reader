@@ -7,7 +7,16 @@
 	import { ExclamationCircleOutline } from 'flowbite-svelte-icons';
 	import { db } from '$lib/catalog/db';
 
-	const manga = $currentManga;
+	const manga = $currentManga?.sort((a, b) => {
+		if (a.volumeName < b.volumeName) {
+			return -1;
+		}
+		if (a.volumeName > b.volumeName) {
+			return 1;
+		}
+		return 0;
+	});
+
 	let popupModal = false;
 
 	onMount(() => {
