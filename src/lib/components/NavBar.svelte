@@ -12,6 +12,12 @@
 
 	afterNavigate(() => {
 		isReader = $page.route.id === '/[manga]/[volume]';
+
+		if (isReader) {
+			window.document.body.classList.add('reader');
+		} else {
+			window.document.body.classList.remove('reader');
+		}
 	});
 </script>
 
