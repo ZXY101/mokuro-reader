@@ -6,7 +6,7 @@
 	let promise: Promise<void>;
 
 	async function onUpload(files: FileList) {
-		promise = processFiles(files);
+		promise = processFiles([...files]);
 	}
 </script>
 
