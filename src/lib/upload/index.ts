@@ -35,16 +35,47 @@ function getDetails(file: File) {
   }
 }
 
+async function getFile(fileEntry: FileSystemFileEntry) {
+  try {
+    return new Promise<File>((resolve, reject) => fileEntry.file(resolve, reject));
+  } catch (err) {
+    console.log(err);
+  }
+}
+
+export async function scanFiles(item: FileSystemEntry, files: Promise<File | undefined>[]) {
+  if (item.isDirectory) {
+    const directoryReader = (item as FileSystemDirectoryEntry).createReader();
+    await new Promise<void>((resolve) => {
+      directoryReader.readEntries(async (entries) => {
+        for (const entry of entries) {
+          if (entry.isFile) {
+            files.push(getFile(entry as FileSystemFileEntry))
+          } else {
+            await scanFiles(entry, files);
+          }
+        }
+        resolve()
+      });
+    });
+  }
+}
+
 export async function processFiles(files: File[]) {
   const zipTypes = ['zip', 'cbz']
   const volumes: Record<string, Volume> = {};
+  const mangas: string[] = [];
 
   for (const file of files) {
     const { ext, filename } = getDetails(file)
     const { type, webkitRelativePath } = file
 
     if (ext === 'mokuro') {
-      const mokuroData = JSON.parse(await file.text())
+      const mokuroData: Volume['mokuroData'] = JSON.parse(await file.text())
+
+      if (!mangas.includes(mokuroData.title_uuid)) {
+        mangas.push(mokuroData.title_uuid)
+      }
 
       volumes[filename] = {
         ...volumes[filename],
@@ -108,18 +139,20 @@ export async function processFiles(files: File[]) {
     if (!valid.includes(false)) {
       await requestPersistentStorage();
 
-      const key = vols[0].mokuroData.title_uuid;
-      const existingCatalog = await db.catalog.get(key);
+      for (const key of mangas) {
+        const existingCatalog = await db.catalog.get(key);
 
-      if (existingCatalog) {
         const filtered = vols.filter((vol) => {
-          return !existingCatalog.manga.some(manga => {
+          return !existingCatalog?.manga.some(manga => {
             return manga.mokuroData.volume_uuid === vol.mokuroData.volume_uuid
-          })
+          }) && key === vol.mokuroData.title_uuid
         })
-        await db.catalog.update(key, { manga: [...existingCatalog.manga, ...filtered] })
-      } else {
-        await db.catalog.put({ id: key, manga: vols })
+
+        if (existingCatalog) {
+          await db.catalog.update(key, { manga: [...existingCatalog.manga, ...filtered] })
+        } else {
+          await db.catalog.put({ id: key, manga: filtered })
+        }
       }
 
       showSnackbar('Catalog updated successfully')

@@ -3,7 +3,8 @@
 	import FileUpload from './FileUpload.svelte';
 	import { processFiles } from '$lib/upload';
 	import { onMount } from 'svelte';
-	import { formatBytes, scanFiles } from '$lib/util/upload';
+	import { scanFiles } from '$lib/upload';
+	import { formatBytes } from '$lib/util/upload';
 
 	export let open = false;
 
@@ -49,15 +50,15 @@
 		if (event?.dataTransfer?.items) {
 			for (const item of [...event.dataTransfer.items]) {
 				const entry = item.webkitGetAsEntry();
-				if (entry && entry.isDirectory) {
-					await scanFiles(entry, filePromises);
-				}
-
-				if (item.kind === 'file') {
-					const file = item.getAsFile();
-					if (file) {
-						draggedFiles.push(file);
-						draggedFiles = draggedFiles;
+				if (item.kind === 'file' && entry) {
+					if (entry.isDirectory) {
+						await scanFiles(entry, filePromises);
+					} else {
+						const file = item.getAsFile();
+						if (file) {
+							draggedFiles.push(file);
+							draggedFiles = draggedFiles;
+						}
 					}
 				}
 			}
