@@ -26,10 +26,10 @@ const defaultSettings: Settings = {
 const stored = browser ? window.localStorage.getItem('settings') : undefined
 const initialSettings: Settings = stored && browser ? JSON.parse(stored) : defaultSettings
 
-export const settingsStore = writable<Settings>(initialSettings);
+export const settings = writable<Settings>(initialSettings);
 
 export function updateSetting(key: string, value: any) {
-  settingsStore.update((settings) => {
+  settings.update((settings) => {
     return {
       ...settings,
       [key]: value
@@ -38,10 +38,10 @@ export function updateSetting(key: string, value: any) {
 }
 
 export function resetSettings() {
-  settingsStore.set(defaultSettings);
+  settings.set(defaultSettings);
 }
 
-settingsStore.subscribe((settings) => {
+settings.subscribe((settings) => {
   if (browser) {
     window.localStorage.setItem('settings', JSON.stringify(settings))
   }

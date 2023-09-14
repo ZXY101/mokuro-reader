@@ -2,7 +2,7 @@
 	import { Drawer, CloseButton, Toggle, Select, Input, Label, Button } from 'flowbite-svelte';
 	import { UserSettingsSolid } from 'flowbite-svelte-icons';
 	import { sineIn } from 'svelte/easing';
-	import { resetSettings, settingsStore, updateSetting } from '$lib/settings';
+	import { resetSettings, settings, updateSetting } from '$lib/settings';
 	import { promptConfirmation } from '$lib/util';
 
 	let transitionParams = {
@@ -22,12 +22,12 @@
 	];
 
 	$: toggles = [
-		{ key: 'rightToLeft', text: 'Right to left', value: $settingsStore.rightToLeft },
-		{ key: 'singlePageView', text: 'Single page view', value: $settingsStore.singlePageView },
-		{ key: 'textEditable', text: 'Editable text', value: $settingsStore.textEditable },
-		{ key: 'textBoxBorders', text: 'Text box borders', value: $settingsStore.textBoxBorders },
-		{ key: 'displayOCR', text: 'OCR enabled', value: $settingsStore.displayOCR },
-		{ key: 'boldFont', text: 'Bold font', value: $settingsStore.boldFont }
+		{ key: 'rightToLeft', text: 'Right to left', value: $settings.rightToLeft },
+		{ key: 'singlePageView', text: 'Single page view', value: $settings.singlePageView },
+		{ key: 'textEditable', text: 'Editable text', value: $settings.textEditable },
+		{ key: 'textBoxBorders', text: 'Text box borders', value: $settings.textBoxBorders },
+		{ key: 'displayOCR', text: 'OCR enabled', value: $settings.displayOCR },
+		{ key: 'boldFont', text: 'Bold font', value: $settings.boldFont }
 	];
 
 	function onChange(event: Event) {
@@ -66,7 +66,7 @@
 		</div>
 		<div>
 			<Label>Background color:</Label>
-			<Input type="color" on:change={onChange} value={$settingsStore.backgroundColor} />
+			<Input type="color" on:change={onChange} value={$settings.backgroundColor} />
 		</div>
 		<Button outline on:click={onReset}>Reset</Button>
 	</div>

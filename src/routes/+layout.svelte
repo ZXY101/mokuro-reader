@@ -3,10 +3,10 @@
 	import NavBar from '$lib/components/NavBar.svelte';
 	import Snackbar from '$lib/components/Snackbar.svelte';
 	import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';
-	import { settingsStore } from '$lib/settings';
+	import { settings } from '$lib/settings';
 </script>
 
-<div class="h-screen text-white" style:background-color={$settingsStore.backgroundColor}>
+<div class="h-screen text-white" style:background-color={$settings.backgroundColor}>
 	<NavBar />
 	<Snackbar />
 	<ConfirmationPopup />

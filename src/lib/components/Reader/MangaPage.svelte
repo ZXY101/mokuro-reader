@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { settingsStore } from '$lib/settings';
+	import { settings } from '$lib/settings';
 	import type { Page } from '$lib/types';
 	import { clamp } from '$lib/util';
 
@@ -7,7 +7,7 @@
 	export let left: () => void;
 	export let right: () => void;
 
-	$: fontWeight = $settingsStore.boldFont ? 'bold' : '400';
+	$: fontWeight = $settings.boldFont ? 'bold' : '400';
 
 	$: textBoxes = page.blocks.map((block) => {
 		const { img_height, img_width } = page;
