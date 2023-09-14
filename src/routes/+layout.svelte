@@ -6,7 +6,7 @@
 	import { settings } from '$lib/settings';
 </script>
 
-<div class="h-screen text-white" style:background-color={$settings.backgroundColor}>
+<div class="h-full min-h-screen text-white" style:background-color={$settings.backgroundColor}>
 	<NavBar />
 	<Snackbar />
 	<ConfirmationPopup />
