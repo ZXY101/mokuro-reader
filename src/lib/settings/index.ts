@@ -15,7 +15,7 @@ type Settings = {
 const defaultSettings: Settings = {
   zoomMode: 'keep',
   rightToLeft: true,
-  singlePageView: false,
+  singlePageView: true,
   displayOCR: true,
   textEditable: false,
   textBoxBorders: false,

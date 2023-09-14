@@ -36,13 +36,17 @@
 	}
 </script>
 
-<div class="float-right"><Button outline color="red" on:click={onDelete}>Delete manga</Button></div>
-<div class="volumes">
-	{#if manga}
-		{#each manga as volume}
-			<VolumeItem {volume} />
-		{/each}
-	{/if}
+<div class="p-2">
+	<div class="float-right">
+		<Button outline color="red" on:click={onDelete}>Delete manga</Button>
+	</div>
+	<div class="volumes">
+		{#if manga}
+			{#each manga as volume}
+				<VolumeItem {volume} />
+			{/each}
+		{/if}
+	</div>
 </div>
 
 <Modal bind:open={popupModal} size="xs" autoclose>

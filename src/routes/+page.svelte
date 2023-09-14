@@ -2,4 +2,4 @@
 	import Catalog from '$lib/components/Catalog.svelte';
 </script>
 
-<Catalog />
+<div class="p-2"><Catalog /></div>
