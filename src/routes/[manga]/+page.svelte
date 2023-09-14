@@ -34,11 +34,11 @@
 	}
 </script>
 
-<div class="p-2">
-	<div class="float-right">
-		<Button outline color="red" on:click={onDelete}>Delete manga</Button>
+<div class="p-2 flex flex-col gap-5">
+	<div class="sm:block flex-col flex">
+		<Button outline color="red" class="float-right" on:click={onDelete}>Delete manga</Button>
 	</div>
-	<div class="volumes">
+	<div class="flex flex-row gap-5 flex-wrap">
 		{#if manga}
 			{#each manga as volume}
 				<VolumeItem {volume} />
@@ -46,12 +46,3 @@
 		{/if}
 	</div>
 </div>
-
-<style>
-	.volumes {
-		display: flex;
-		flex-direction: row;
-		gap: 20px;
-		flex-wrap: wrap;
-	}
-</style>

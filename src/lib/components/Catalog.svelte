@@ -12,31 +12,21 @@
 
 {#if $catalog}
 	{#if $catalog.length > 0}
-		<Button outline color="red" class="float-right" on:click={onClear}>Clear catalog</Button>
-		<div class="container">
-			{#each $catalog as { id, manga } (id)}
-				<CatalogItem {manga} />
-			{/each}
+		<div class="flex flex-col gap-5">
+			<div class="sm:block flex-col flex">
+				<Button outline color="red" class="float-right" on:click={onClear}>Clear catalog</Button>
+			</div>
+			<div class="flex flex-row gap-5 flex-wrap">
+				{#each $catalog as { id, manga } (id)}
+					<CatalogItem {manga} />
+				{/each}
+			</div>
 		</div>
 	{:else}
-		<div class="empty-state">
+		<div class="text-center p-20">
 			<p>Your catalog is currently empty.</p>
 		</div>
 	{/if}
 {:else}
 	<p>Loading...</p>
 {/if}
-
-<style>
-	.container {
-		display: flex;
-		flex-direction: row;
-		gap: 20px;
-		flex-wrap: wrap;
-	}
-
-	.empty-state {
-		text-align: center;
-		padding: 20px;
-	}
-</style>
