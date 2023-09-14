@@ -5,6 +5,7 @@
 	import { onMount } from 'svelte';
 	import { scanFiles } from '$lib/upload';
 	import { formatBytes } from '$lib/util/upload';
+	import { catalog } from '$lib/catalog';
 
 	export let open = false;
 
@@ -40,8 +41,11 @@
 
 	let filePromises: Promise<File>[];
 	let draggedFiles: File[] | undefined;
+	let loading = false;
+	$: disabled = loading || (!draggedFiles && !files);
 
 	const dropHandle = async (event: DragEvent) => {
+		loading = true;
 		draggedFiles = [];
 		filePromises = [];
 		event.preventDefault();
@@ -70,6 +74,8 @@
 				}
 			}
 		}
+
+		loading = false;
 	};
 
 	let defaultStyle =
@@ -125,6 +131,8 @@
 					Upload {draggedFiles.length} hih
 					{draggedFiles.length > 1 ? 'files' : 'file'}?
 				</p>
+			{:else if loading}
+				<Spinner />
 			{:else}
 				<p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
 					Drag and drop / <FileUpload bind:files accept=".mokuro,.zip,.cbz" multiple
@@ -137,9 +145,8 @@
 
 		<p class=" text-sm text-gray-500 dark:text-gray-400 text-center">{storageSpace}</p>
 		<div class="flex flex-1 flex-col gap-2">
-			<Button outline on:click={reset} disabled={!files && !draggedFiles} color="dark">Reset</Button
-			>
-			<Button outline on:click={onUpload} disabled={!files && !draggedFiles}>Upload</Button>
+			<Button outline on:click={reset} {disabled} color="dark">Reset</Button>
+			<Button outline on:click={onUpload} {disabled}>Upload</Button>
 		</div>
 	{/await}
 </Modal>

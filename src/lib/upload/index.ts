@@ -151,7 +151,7 @@ export async function processFiles(files: File[]) {
         if (existingCatalog) {
           await db.catalog.update(key, { manga: [...existingCatalog.manga, ...filtered] })
         } else {
-          await db.catalog.put({ id: key, manga: filtered })
+          await db.catalog.add({ id: key, manga: filtered })
         }
       }
 

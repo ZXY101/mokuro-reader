@@ -38,8 +38,6 @@ export function updateSetting(key: string, value: any) {
 }
 
 export function resetSettings() {
-  console.log('br', defaultSettings);
-
   settingsStore.set(defaultSettings);
 }
 

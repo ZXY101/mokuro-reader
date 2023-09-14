@@ -14,7 +14,7 @@
 	{#if $catalog.length > 0}
 		<Button outline color="red" class="float-right" on:click={onClear}>Clear catalog</Button>
 		<div class="container">
-			{#each $catalog as { manga }}
+			{#each $catalog as { id, manga } (id)}
 				<CatalogItem {manga} />
 			{/each}
 		</div>
@@ -38,9 +38,5 @@
 	.empty-state {
 		text-align: center;
 		padding: 20px;
-	}
-
-	a {
-		color: $secondary-accent-color;
 	}
 </style>
