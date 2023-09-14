@@ -3,6 +3,7 @@
 	import { UserSettingsSolid } from 'flowbite-svelte-icons';
 	import { sineIn } from 'svelte/easing';
 	import { resetSettings, settingsStore, updateSetting } from '$lib/settings';
+	import { promptConfirmation } from '$lib/util';
 
 	let transitionParams = {
 		x: 320,
@@ -32,6 +33,11 @@
 	function onChange(event: Event) {
 		updateSetting('backgroundColor', (event.target as HTMLInputElement).value);
 	}
+
+	function onReset() {
+		hidden = true;
+		promptConfirmation('Restore default settings?', resetSettings);
+	}
 </script>
 
 <Drawer
@@ -40,7 +46,7 @@
 	width="lg:w-1/4 md:w-1/2 w-full"
 	{transitionParams}
 	bind:hidden
-	id="sidebar1"
+	id="settings"
 >
 	<div class="flex items-center">
 		<h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold">
@@ -62,6 +68,6 @@
 			<Label>Background color:</Label>
 			<Input type="color" on:change={onChange} value={$settingsStore.backgroundColor} />
 		</div>
-		<Button outline on:click={resetSettings}>Reset</Button>
+		<Button outline on:click={onReset}>Reset</Button>
 	</div>
 </Drawer>

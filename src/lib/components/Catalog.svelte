@@ -27,7 +27,7 @@
 	<p>Loading...</p>
 {/if}
 
-<style lang="scss">
+<style>
 	.container {
 		display: flex;
 		flex-direction: row;
