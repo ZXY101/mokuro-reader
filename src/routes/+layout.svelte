@@ -11,9 +11,3 @@
 <div>
 	<slot />
 </div>
-
-<style>
-	div {
-		padding: 10px;
-	}
-</style>

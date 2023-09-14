@@ -33,7 +33,7 @@
 	</Navbar>
 	{#if isReader}
 		<UserSettingsSolid
-			class="hover:text-primary-700 absolute right-5 top-5 opacity-10 hover:opacity-100"
+			class="hover:text-primary-700 absolute right-5 top-5 opacity-50 hover:opacity-100"
 			on:click={() => (settingsHidden = false)}
 		/>
 	{/if}

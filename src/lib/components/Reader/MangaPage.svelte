@@ -1,17 +1,13 @@
 <script lang="ts">
+	import { settingsStore } from '$lib/settings';
 	import type { Page } from '$lib/types';
+	import { clamp } from '$lib/util';
 
 	export let page: Page;
 	export let left: () => void;
 	export let right: () => void;
 
-	let bold = false;
-
-	$: fontWeight = bold ? 'bold' : '400';
-
-	function clamp(x: number, min: number, max: number) {
-		return Math.min(Math.max(x, min), max);
-	}
+	$: fontWeight = $settingsStore.boldFont ? 'bold' : '400';
 
 	$: textBoxes = page.blocks.map((block) => {
 		const { img_height, img_width } = page;
@@ -43,8 +39,12 @@
 	export let src: Blob;
 </script>
 
-<div>
-	<img draggable="false" src={URL.createObjectURL(src)} alt="img" />
+<div
+	draggable="false"
+	style:width={`${page.img_width}px`}
+	style:height={`${page.img_height}px`}
+	style:background-image={`url(${URL.createObjectURL(src)})`}
+>
 	{#each textBoxes as { left, top, width, height, lines, fontSize, writingMode }}
 		<div
 			class="text-box"
@@ -54,6 +54,7 @@
 			style:top
 			style:font-size={fontSize}
 			style:writing-mode={writingMode}
+			style:font-weight={fontWeight}
 		>
 			{#each lines as line}
 				<p>{line}</p>

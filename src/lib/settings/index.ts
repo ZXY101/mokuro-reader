@@ -8,6 +8,8 @@ type Settings = {
   textEditable: boolean;
   textBoxBorders: boolean;
   displayOCR: boolean;
+  boldFont: boolean;
+  backgroundColor: string;
 };
 
 const defaultSettings: Settings = {
@@ -16,7 +18,9 @@ const defaultSettings: Settings = {
   singlePageView: false,
   displayOCR: true,
   textEditable: false,
-  textBoxBorders: false
+  textBoxBorders: false,
+  boldFont: false,
+  backgroundColor: '#0d0d0f'
 }
 
 const stored = browser ? window.localStorage.getItem('settings') : undefined
@@ -34,6 +38,8 @@ export function updateSetting(key: string, value: any) {
 }
 
 export function resetSettings() {
+  console.log('br', defaultSettings);
+
   settingsStore.set(defaultSettings);
 }
 

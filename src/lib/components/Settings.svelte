@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { Drawer, CloseButton, Toggle, Select, Input, Label } from 'flowbite-svelte';
+	import { Drawer, CloseButton, Toggle, Select, Input, Label, Button } from 'flowbite-svelte';
 	import { UserSettingsSolid } from 'flowbite-svelte-icons';
 	import { sineIn } from 'svelte/easing';
-	import { settingsStore, updateSetting } from '$lib/settings';
+	import { resetSettings, settingsStore, updateSetting } from '$lib/settings';
 
 	let transitionParams = {
 		x: 320,
@@ -25,8 +25,13 @@
 		{ key: 'singlePageView', text: 'Single page view', value: $settingsStore.singlePageView },
 		{ key: 'textEditable', text: 'Editable text', value: $settingsStore.textEditable },
 		{ key: 'textBoxBorders', text: 'Text box borders', value: $settingsStore.textBoxBorders },
-		{ key: 'displayOCR', text: 'OCR enabled', value: $settingsStore.displayOCR }
+		{ key: 'displayOCR', text: 'OCR enabled', value: $settingsStore.displayOCR },
+		{ key: 'boldFont', text: 'Bold font', value: $settingsStore.boldFont }
 	];
+
+	function onChange(event: Event) {
+		updateSetting('backgroundColor', (event.target as HTMLInputElement).value);
+	}
 </script>
 
 <Drawer
@@ -55,7 +60,8 @@
 		</div>
 		<div>
 			<Label>Background color:</Label>
-			<Input type="color" />
+			<Input type="color" on:change={onChange} value={$settingsStore.backgroundColor} />
 		</div>
+		<Button outline on:click={resetSettings}>Reset</Button>
 	</div>
 </Drawer>

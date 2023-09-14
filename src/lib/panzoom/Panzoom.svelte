@@ -2,15 +2,6 @@
 	import { initPanzoom } from './util';
 </script>
 
-<div>
-	<div class="container" use:initPanzoom>
-		<slot />
-	</div>
+<div use:initPanzoom>
+	<slot />
 </div>
-
-<style>
-	.container {
-		display: flex;
-		justify-content: center;
-	}
-</style>
