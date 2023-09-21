@@ -19,7 +19,7 @@ export function updateProgress(volume: string, value: number) {
 
 progress.subscribe((progress) => {
   if (browser) {
-    window.localStorage.setItem('progress', JSON.stringify(progress))
+    window.localStorage.setItem('progress', progress ? JSON.stringify(progress) : '')
   }
 })
 
