@@ -5,6 +5,7 @@
 	import { page } from '$app/stores';
 	import Settings from './Settings.svelte';
 	import UploadModal from './UploadModal.svelte';
+	import { settings } from '$lib/settings';
 
 	let settingsHidden = true;
 	let uploadModalOpen = false;
@@ -32,10 +33,14 @@
 		</div>
 	</Navbar>
 	{#if isReader}
-		<UserSettingsSolid
-			class="hover:text-primary-700 absolute right-5 top-5 opacity-50 hover:opacity-100"
+		<button
 			on:click={() => (settingsHidden = false)}
-		/>
+			class="hover:text-primary-700 fixed opacity-50 hover:opacity-100 right-10 top-5 p-10 m-[-2.5rem]"
+		>
+			<div style:background-color={$settings.backgroundColor} class="absolute">
+				<UserSettingsSolid class="mix-blend-difference" />
+			</div>
+		</button>
 	{/if}
 </div>
 

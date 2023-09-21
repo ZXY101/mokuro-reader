@@ -3,6 +3,7 @@
 	import { UserSettingsSolid } from 'flowbite-svelte-icons';
 	import { sineIn } from 'svelte/easing';
 	import { resetSettings, settings, updateSetting } from '$lib/settings';
+	import type { SettingsKey } from '$lib/settings';
 	import { promptConfirmation } from '$lib/util';
 
 	let transitionParams = {
@@ -13,25 +14,42 @@
 
 	export let hidden = true;
 
-	let selected = 'us';
+	let selected = 'auto';
 
-	let countries = [
-		{ value: 'us', name: 'auto' },
-		{ value: 'ca', name: 'Canada' },
-		{ value: 'fr', name: 'France' }
+	let fontSizes = [
+		{ value: 'auto', name: 'auto' },
+		{ value: '9', name: '9' },
+		{ value: '10', name: '10' },
+		{ value: '11', name: '11' },
+		{ value: '12', name: '12' },
+		{ value: '14', name: '14' },
+		{ value: '16', name: '16' },
+		{ value: '18', name: '18' },
+		{ value: '20', name: '20' },
+		{ value: '24', name: '24' },
+		{ value: '32', name: '32' },
+		{ value: '40', name: '40' },
+		{ value: '48', name: '48' },
+		{ value: '60', name: '60' }
 	];
 
 	$: toggles = [
 		{ key: 'rightToLeft', text: 'Right to left', value: $settings.rightToLeft },
 		{ key: 'singlePageView', text: 'Single page view', value: $settings.singlePageView },
+		{ key: 'hasCover', text: 'First page is cover', value: $settings.hasCover },
 		{ key: 'textEditable', text: 'Editable text', value: $settings.textEditable },
 		{ key: 'textBoxBorders', text: 'Text box borders', value: $settings.textBoxBorders },
 		{ key: 'displayOCR', text: 'OCR enabled', value: $settings.displayOCR },
-		{ key: 'boldFont', text: 'Bold font', value: $settings.boldFont }
-	];
+		{ key: 'boldFont', text: 'Bold font', value: $settings.boldFont },
+		{ key: 'pageNum', text: 'Show page number', value: $settings.pageNum }
+	] as { key: SettingsKey; text: string; value: any }[];
 
-	function onChange(event: Event) {
+	function onBackgroundColor(event: Event) {
 		updateSetting('backgroundColor', (event.target as HTMLInputElement).value);
+	}
+
+	function onFontSize(event: Event) {
+		updateSetting('fontSize', (event.target as HTMLInputElement).value);
 	}
 
 	function onReset() {
@@ -62,11 +80,11 @@
 		{/each}
 		<div>
 			<Label>Fontsize:</Label>
-			<Select items={countries} bind:value={selected} />
+			<Select items={fontSizes} bind:value={selected} on:change={onFontSize} />
 		</div>
 		<div>
 			<Label>Background color:</Label>
-			<Input type="color" on:change={onChange} value={$settings.backgroundColor} />
+			<Input type="color" on:change={onBackgroundColor} value={$settings.backgroundColor} />
 		</div>
 		<Button outline on:click={onReset}>Reset</Button>
 	</div>

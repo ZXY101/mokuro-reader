@@ -10,7 +10,7 @@ export type Page = {
   img_width: number;
   img_height: number;
   blocks: Block[];
-  imgPath: string;
+  img_path: string;
 };
 
 export type MokuroData = {
