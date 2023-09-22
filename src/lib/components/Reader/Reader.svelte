@@ -112,11 +112,11 @@
   <button
     on:mousedown={mouseDown}
     on:mouseup={left}
-    class="left-0 top-0 absolute h-full w-[50px] hover:bg-slate-400 opacity-[0.01]"
+    class="left-0 top-0 absolute h-full w-10 hover:bg-slate-400 opacity-[0.01]"
   />
   <button
     on:mousedown={mouseDown}
     on:mouseup={right}
-    class="right-0 top-0 absolute h-full w-[50px] hover:bg-slate-400 opacity-[0.01]"
+    class="right-0 top-0 absolute h-full w-10 hover:bg-slate-400 opacity-[0.01]"
   />
 {/if}

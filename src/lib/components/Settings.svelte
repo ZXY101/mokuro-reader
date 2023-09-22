@@ -87,7 +87,7 @@
       <Label>On page zoom:</Label>
       <Select
         items={zoomModes}
-        bind:value={zoomModeValue}
+        value={zoomModeValue}
         on:change={(e) => onSelectChange(e, 'zoomDefault')}
       />
     </div>
@@ -100,7 +100,7 @@
       <Label>Fontsize:</Label>
       <Select
         items={fontSizes}
-        bind:value={fontSizeValue}
+        value={fontSizeValue}
         on:change={(e) => onSelectChange(e, 'fontSize')}
       />
     </div>
