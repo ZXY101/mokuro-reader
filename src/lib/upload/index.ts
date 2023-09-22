@@ -1,24 +1,23 @@
-import { db } from "$lib/catalog/db";
-import type { Volume } from "$lib/types";
-import { showSnackbar } from "$lib/util/snackbar";
-import { requestPersistentStorage } from "$lib/util/upload";
-import { BlobReader, ZipReader, BlobWriter, getMimeType } from "@zip.js/zip.js";
+import { db } from '$lib/catalog/db';
+import type { Volume } from '$lib/types';
+import { showSnackbar } from '$lib/util/snackbar';
+import { requestPersistentStorage } from '$lib/util/upload';
+import { BlobReader, ZipReader, BlobWriter, getMimeType } from '@zip.js/zip.js';
 
 export async function unzipManga(file: File) {
   const zipFileReader = new BlobReader(file);
   const zipReader = new ZipReader(zipFileReader);
 
-  const entries = await zipReader.getEntries()
+  const entries = await zipReader.getEntries();
   const unzippedFiles: Record<string, File> = {};
-
 
   for (const entry of entries) {
     const mime = getMimeType(entry.filename);
     if (mime === 'image/jpeg' || mime === 'image/png') {
-      const blob = await entry.getData?.(new BlobWriter(mime))
+      const blob = await entry.getData?.(new BlobWriter(mime));
       if (blob) {
-        const file = new File([blob], entry.filename, { type: mime })
-        unzippedFiles[entry.filename] = file
+        const file = new File([blob], entry.filename, { type: mime });
+        unzippedFiles[entry.filename] = file;
       }
     }
   }
@@ -32,7 +31,7 @@ function getDetails(file: File) {
   return {
     filename,
     ext
-  }
+  };
 }
 
 async function getFile(fileEntry: FileSystemFileEntry) {
@@ -50,31 +49,31 @@ export async function scanFiles(item: FileSystemEntry, files: Promise<File | und
       directoryReader.readEntries(async (entries) => {
         for (const entry of entries) {
           if (entry.isFile) {
-            files.push(getFile(entry as FileSystemFileEntry))
+            files.push(getFile(entry as FileSystemFileEntry));
           } else {
             await scanFiles(entry, files);
           }
         }
-        resolve()
+        resolve();
       });
     });
   }
 }
 
 export async function processFiles(files: File[]) {
-  const zipTypes = ['zip', 'cbz']
+  const zipTypes = ['zip', 'cbz'];
   const volumes: Record<string, Volume> = {};
   const mangas: string[] = [];
 
   for (const file of files) {
-    const { ext, filename } = getDetails(file)
-    const { type, webkitRelativePath } = file
+    const { ext, filename } = getDetails(file);
+    const { type, webkitRelativePath } = file;
 
     if (ext === 'mokuro') {
-      const mokuroData: Volume['mokuroData'] = JSON.parse(await file.text())
+      const mokuroData: Volume['mokuroData'] = JSON.parse(await file.text());
 
       if (!mangas.includes(mokuroData.title_uuid)) {
-        mangas.push(mokuroData.title_uuid)
+        mangas.push(mokuroData.title_uuid);
       }
 
       volumes[filename] = {
@@ -85,21 +84,20 @@ export async function processFiles(files: File[]) {
       continue;
     }
 
-    const mimeType = type || getMimeType(file.name)
+    const mimeType = type || getMimeType(file.name);
 
     if (mimeType === 'image/jpeg' || mimeType === 'image/png') {
-
       if (webkitRelativePath) {
-        const imageName = webkitRelativePath.split('/').at(-1)
-        const vol = webkitRelativePath.split('/').at(-2)
+        const imageName = webkitRelativePath.split('/').at(-1);
+        const vol = webkitRelativePath.split('/').at(-2);
 
         if (vol && imageName) {
           volumes[vol] = {
             ...volumes[vol],
             files: {
               ...volumes[vol]?.files,
-              [imageName]: file,
-            },
+              [imageName]: file
+            }
           };
         }
       }
@@ -107,12 +105,12 @@ export async function processFiles(files: File[]) {
     }
 
     if (zipTypes.includes(ext)) {
-      const unzippedFiles = await unzipManga(file)
+      const unzippedFiles = await unzipManga(file);
 
       volumes[filename] = {
         ...volumes[filename],
         files: unzippedFiles
-      }
+      };
 
       continue;
     }
@@ -122,19 +120,19 @@ export async function processFiles(files: File[]) {
 
   if (vols.length > 0) {
     const valid = vols.map((vol) => {
-      const { files, mokuroData, volumeName } = vol
+      const { files, mokuroData, volumeName } = vol;
       if (!mokuroData || !volumeName) {
-        showSnackbar('Missing .mokuro file')
+        showSnackbar('Missing .mokuro file');
         return false;
       }
 
       if (!files) {
-        showSnackbar('Missing image files')
+        showSnackbar('Missing image files');
         return false;
       }
 
-      return true
-    })
+      return true;
+    });
 
     if (!valid.includes(false)) {
       await requestPersistentStorage();
@@ -143,19 +141,21 @@ export async function processFiles(files: File[]) {
         const existingCatalog = await db.catalog.get(key);
 
         const filtered = vols.filter((vol) => {
-          return !existingCatalog?.manga.some(manga => {
-            return manga.mokuroData.volume_uuid === vol.mokuroData.volume_uuid
-          }) && key === vol.mokuroData.title_uuid
-        })
+          return (
+            !existingCatalog?.manga.some((manga) => {
+              return manga.mokuroData.volume_uuid === vol.mokuroData.volume_uuid;
+            }) && key === vol.mokuroData.title_uuid
+          );
+        });
 
         if (existingCatalog) {
-          await db.catalog.update(key, { manga: [...existingCatalog.manga, ...filtered] })
+          await db.catalog.update(key, { manga: [...existingCatalog.manga, ...filtered] });
         } else {
-          await db.catalog.add({ id: key, manga: filtered })
+          await db.catalog.add({ id: key, manga: filtered });
         }
       }
 
-      showSnackbar('Catalog updated successfully')
+      showSnackbar('Catalog updated successfully');
     }
   }
 }

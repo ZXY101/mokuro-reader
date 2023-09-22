@@ -1,27 +1,29 @@
-import { browser } from "$app/environment";
-import { zoomDefault } from "$lib/panzoom";
-import { writable } from "svelte/store";
+import { browser } from '$app/environment';
+import { zoomDefault } from '$lib/panzoom';
+import { writable } from 'svelte/store';
 
-export type FontSize = 'auto' |
-  '9' |
-  '10' |
-  '11' |
-  '12' |
-  '14' |
-  '16' |
-  '18' |
-  '20' |
-  '24' |
-  '32' |
-  '40' |
-  '48' |
-  '60'
+export type FontSize =
+  | 'auto'
+  | '9'
+  | '10'
+  | '11'
+  | '12'
+  | '14'
+  | '16'
+  | '18'
+  | '20'
+  | '24'
+  | '32'
+  | '40'
+  | '48'
+  | '60';
 
-export type ZoomModes = 'zoomFitToScreen' |
-  'zoomFitToWidth' |
-  'zoomOriginal' |
-  'keepZoom' |
-  'keepZoomStart'
+export type ZoomModes =
+  | 'zoomFitToScreen'
+  | 'zoomFitToWidth'
+  | 'zoomOriginal'
+  | 'keepZoom'
+  | 'keepZoomStart';
 
 export type Settings = {
   rightToLeft: boolean;
@@ -37,7 +39,7 @@ export type Settings = {
   zoomDefault: ZoomModes;
 };
 
-export type SettingsKey = keyof Settings
+export type SettingsKey = keyof Settings;
 
 const defaultSettings: Settings = {
   rightToLeft: true,
@@ -51,12 +53,12 @@ const defaultSettings: Settings = {
   backgroundColor: '#0d0d0f',
   fontSize: 'auto',
   zoomDefault: 'zoomFitToScreen'
-}
+};
 
-const stored = browser ? window.localStorage.getItem('settings') : undefined
-const initialSettings: Settings = stored && browser ? JSON.parse(stored) : defaultSettings
+const stored = browser ? window.localStorage.getItem('settings') : undefined;
+const initialSettings: Settings = stored && browser ? JSON.parse(stored) : defaultSettings;
 
-export * from './progress'
+export * from './progress';
 
 export const settings = writable<Settings>(initialSettings);
 
@@ -76,7 +78,6 @@ export function resetSettings() {
 
 settings.subscribe((settings) => {
   if (browser) {
-    window.localStorage.setItem('settings', JSON.stringify(settings))
+    window.localStorage.setItem('settings', JSON.stringify(settings));
   }
-})
-
+});

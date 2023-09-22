@@ -20,10 +20,10 @@ export type MokuroData = {
   volume: string;
   volume_uuid: string;
   pages: Page[];
-}
+};
 
 export type Volume = {
   mokuroData: MokuroData;
   volumeName: string;
   files: Record<string, File>;
-}
+};

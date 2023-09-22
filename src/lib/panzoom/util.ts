@@ -37,20 +37,20 @@ export function initPanzoom(node: HTMLElement) {
     }
   });
 
-  panzoomStore.set(pz)
+  panzoomStore.set(pz);
 }
 
-type PanX = 'left' | 'center' | 'right'
-type PanY = 'top' | 'center' | 'bottom'
+type PanX = 'left' | 'center' | 'right';
+type PanY = 'top' | 'center' | 'bottom';
 
 export function panAlign(alignX: PanX, alignY: PanY) {
   if (!pz || !container) {
-    return
+    return;
   }
 
   const { scale } = pz.getTransform();
-  const { innerWidth, innerHeight } = window
-  const { offsetWidth, offsetHeight } = container
+  const { innerWidth, innerHeight } = window;
+  const { offsetWidth, offsetHeight } = container;
 
   let x = 0;
   let y = 0;
@@ -63,7 +63,7 @@ export function panAlign(alignX: PanX, alignY: PanY) {
       x = (innerWidth - offsetWidth * scale) / 2;
       break;
     case 'right':
-      x = (innerWidth - offsetWidth * scale);
+      x = innerWidth - offsetWidth * scale;
       break;
   }
 
@@ -75,11 +75,11 @@ export function panAlign(alignX: PanX, alignY: PanY) {
       y = (innerHeight - offsetHeight * scale) / 2;
       break;
     case 'bottom':
-      y = (innerHeight - offsetHeight * scale);
+      y = innerHeight - offsetHeight * scale;
       break;
   }
 
-  pz?.moveTo(x, y)
+  pz?.moveTo(x, y);
 }
 
 export function zoomOriginal() {
@@ -90,12 +90,11 @@ export function zoomOriginal() {
 
 export function zoomFitToWidth() {
   if (!pz || !container) {
-    return
+    return;
   }
-  const { innerWidth } = window
+  const { innerWidth } = window;
 
-  const scale =
-    (1 / pz.getTransform().scale) * (innerWidth / container.offsetWidth);
+  const scale = (1 / pz.getTransform().scale) * (innerWidth / container.offsetWidth);
 
   pz.moveTo(0, 0);
   pz.zoomTo(0, 0, scale);
@@ -104,13 +103,12 @@ export function zoomFitToWidth() {
 
 export function zoomFitToScreen() {
   if (!pz || !container) {
-    return
+    return;
   }
-  const { innerWidth, innerHeight } = window
+  const { innerWidth, innerHeight } = window;
   const scaleX = innerWidth / container.offsetWidth;
   const scaleY = innerHeight / container.offsetHeight;
-  const scale =
-    (1 / pz.getTransform().scale) * Math.min(scaleX, scaleY);
+  const scale = (1 / pz.getTransform().scale) * Math.min(scaleX, scaleY);
   pz.moveTo(0, 0);
   pz.zoomTo(0, 0, scale);
   panAlign('center', 'center');
@@ -121,7 +119,7 @@ export function keepZoomStart() {
 }
 
 export function zoomDefault() {
-  const zoomDefault = get(settings).zoomDefault
+  const zoomDefault = get(settings).zoomDefault;
   switch (zoomDefault) {
     case 'zoomFitToScreen':
       zoomFitToScreen();

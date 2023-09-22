@@ -1,2 +1,2 @@
-export * from './util'
-export {default as Panzoom} from './Panzoom.svelte'
+export * from './util';
+export { default as Panzoom } from './Panzoom.svelte';

@@ -1,4 +1,4 @@
-import { writable } from "svelte/store";
+import { writable } from 'svelte/store';
 
 type ConfirmationPopup = {
   open: boolean;
@@ -14,4 +14,3 @@ export function promptConfirmation(message: string, onConfirm?: () => void) {
     onConfirm
   });
 }
-

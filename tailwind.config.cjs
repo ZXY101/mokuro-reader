@@ -1,13 +1,17 @@
 /** @type {import('tailwindcss').Config}*/
 const config = {
-	content: ['./src/**/*.{html,js,svelte,ts}', './node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}', './node_modules/flowbite-svelte-icons/**/*.{html,js,svelte,ts}'],
+  content: [
+    './src/**/*.{html,js,svelte,ts}',
+    './node_modules/flowbite-svelte/**/*.{html,js,svelte,ts}',
+    './node_modules/flowbite-svelte-icons/**/*.{html,js,svelte,ts}'
+  ],
 
-	theme: {
+  theme: {
     fontFamily: {
-      'sans': 'Verdana, Geneva, Tahoma, sans-serif'
+      sans: 'Verdana, Geneva, Tahoma, sans-serif'
     },
-		extend: {
-			colors: {
+    extend: {
+      colors: {
         primary: {
           50: '#FFF5F2',
           100: '#FFF1EE',
@@ -21,12 +25,12 @@ const config = {
           900: '#A5371B'
         }
       }
-		}
-	},
+    }
+  },
 
-	plugins: [require('flowbite/plugin')],
+  plugins: [require('flowbite/plugin')],
 
-  darkMode: 'class',
+  darkMode: 'class'
 };
 
 module.exports = config;

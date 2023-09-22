@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { currentVolume } from '$lib/catalog';
-	import { onMount } from 'svelte';
-	import { goto } from '$app/navigation';
+  import { currentVolume } from '$lib/catalog';
+  import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
 
-	const volume = $currentVolume;
+  const volume = $currentVolume;
 
-	onMount(() => {
-		if (!volume) {
-			goto('/');
-		}
-	});
+  onMount(() => {
+    if (!volume) {
+      goto('/');
+    }
+  });
 </script>
 
 <slot />
 
 <style>
-	:global(body.reader) {
-		overflow: hidden !important;
-	}
+  :global(body.reader) {
+    overflow: hidden !important;
+  }
 </style>

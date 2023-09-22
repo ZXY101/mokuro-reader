@@ -1,7 +1,7 @@
 <script lang="ts">
-	import { initPanzoom } from './util';
+  import { initPanzoom } from './util';
 </script>
 
 <div use:initPanzoom>
-	<slot />
+  <slot />
 </div>
