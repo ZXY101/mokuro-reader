@@ -6,14 +6,17 @@
   import { Input, Popover, Range } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
   import { ChervonDoubleLeftSolid, ChervonDoubleRightSolid } from 'flowbite-svelte-icons';
-  import { onMount } from 'svelte';
+  import { afterUpdate } from 'svelte';
 
   const volume = $currentVolume;
   const pages = volume?.mokuroData.pages;
 
   $: page = $progress?.[volume?.mokuroData.volume_uuid || 0] || 1;
   $: index = page - 1;
-  $: navAmount = $settings.singlePageView ? 1 : 2;
+  $: navAmount =
+    $settings.singlePageView || ($settings.hasCover && !$settings.singlePageView && index === 0)
+      ? 1
+      : 2;
 
   let start: Date;
 
@@ -41,8 +44,35 @@
     }
   }
 
+  $: showSecondPage = () => {
+    if (!pages) {
+      return false;
+    }
+
+    if ($settings.singlePageView || index + 1 >= pages.length) {
+      return false;
+    }
+
+    if (index === 0 && $settings.hasCover) {
+      return false;
+    }
+
+    return true;
+  };
+
   $: manualPage = page;
   $: pageDisplay = `${page}/${pages?.length}`;
+
+  let hasCoverSetting = $settings.hasCover;
+
+  $: {
+    if ($settings.hasCover !== hasCoverSetting) {
+      hasCoverSetting = $settings.hasCover;
+      if (index > 0) {
+        index--;
+      }
+    }
+  }
 
   function onInputClick(this: any) {
     this.select();
@@ -52,7 +82,7 @@
     changePage(manualPage, true);
   }
 
-  onMount(() => {
+  afterUpdate(() => {
     zoomDefault();
   });
 </script>
@@ -101,8 +131,8 @@
         on:mousedown={mouseDown}
         on:mouseup={right}
       />
-      <div class="flex flex-row">
-        {#if !$settings.singlePageView && index + 1 < pages.length}
+      <div class="flex flex-row" class:flex-row-reverse={!$settings.rightToLeft}>
+        {#if showSecondPage()}
           <MangaPage page={pages[index + 1]} src={Object.values(volume?.files)[index + 1]} />
         {/if}
         <MangaPage page={pages[index]} src={Object.values(volume?.files)[index]} />
