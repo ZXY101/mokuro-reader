@@ -1,7 +1,9 @@
 <script lang="ts">
-  import { clamp } from '$lib/util';
+  import { clamp, showSnackbar } from '$lib/util';
   import type { Page } from '$lib/types';
   import { settings } from '$lib/settings';
+  import { CirclePlusSolid } from 'flowbite-svelte-icons';
+  import { getLastCardInfo } from '$lib/anki-connect';
 
   export let page: Page;
 
@@ -36,6 +38,12 @@
   $: display = $settings.displayOCR ? 'block' : 'none';
   $: border = $settings.textBoxBorders ? '1px solid red' : 'none';
   $: contenteditable = $settings.textEditable;
+
+  async function onUpdateCard() {
+    const res = await getLastCardInfo();
+
+    showSnackbar(res.fields.Word.value);
+  }
 </script>
 
 {#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`text-box-${index}`)}
@@ -52,6 +60,11 @@
     style:border
     {contenteditable}
   >
+    {#if $settings.ankiConnectSettings.enabled}
+      <button class="absolute -m-8 opacity-0 hover:block p-4" on:click={onUpdateCard}>
+        <CirclePlusSolid class="text-primary-500 hover:text-primary-600" />
+      </button>
+    {/if}
     {#each lines as line}
       <p>{line}</p>
     {/each}
@@ -85,6 +98,10 @@
     margin: 0;
     background-color: rgb(255, 255, 255);
     font-weight: var(--bold);
+  }
+
+  .text-box:hover button {
+    opacity: 100;
   }
 
   .text-box:focus p,
