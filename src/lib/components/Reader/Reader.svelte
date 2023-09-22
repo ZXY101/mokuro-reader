@@ -39,6 +39,9 @@
     const clickDuration = ingoreTimeOut ? 0 : end.getTime() - start?.getTime();
 
     if (pages && volume && clickDuration < 200) {
+      if (showSecondPage() && page + 1 === pages.length && newPage > page) {
+        return;
+      }
       updateProgress(volume.mokuroData.volume_uuid, clamp(newPage, 1, pages?.length));
       zoomDefault();
     }
@@ -61,15 +64,17 @@
   };
 
   $: manualPage = page;
-  $: pageDisplay = `${page}/${pages?.length}`;
+  $: pageDisplay = showSecondPage()
+    ? `${page},${page + 1} / ${pages?.length}`
+    : `${page} / ${pages?.length}`;
 
   let hasCoverSetting = $settings.hasCover;
 
   $: {
     if ($settings.hasCover !== hasCoverSetting) {
       hasCoverSetting = $settings.hasCover;
-      if (index > 0) {
-        index--;
+      if (page > 1) {
+        page--;
       }
     }
   }
