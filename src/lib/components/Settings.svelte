@@ -5,6 +5,7 @@
 	import { resetSettings, settings, updateSetting } from '$lib/settings';
 	import type { SettingsKey } from '$lib/settings';
 	import { promptConfirmation } from '$lib/util';
+	import { zoomDefault } from '$lib/panzoom';
 
 	let transitionParams = {
 		x: 320,
@@ -14,7 +15,16 @@
 
 	export let hidden = true;
 
-	let selected = 'auto';
+	$: zoomModeValue = $settings.zoomDefault;
+	$: fontSizeValue = $settings.fontSize;
+
+	let zoomModes = [
+		{ value: 'zoomFitToScreen', name: 'Fit to screen' },
+		{ value: 'zoomFitToWidth', name: 'Fit to width' },
+		{ value: 'zoomOriginal', name: 'Original size' },
+		{ value: 'keepZoom', name: 'Keep zoom' },
+		{ value: 'keepZoomStart', name: 'Keep zoom, pan to top' }
+	];
 
 	let fontSizes = [
 		{ value: 'auto', name: 'auto' },
@@ -48,8 +58,8 @@
 		updateSetting('backgroundColor', (event.target as HTMLInputElement).value);
 	}
 
-	function onFontSize(event: Event) {
-		updateSetting('fontSize', (event.target as HTMLInputElement).value);
+	function onSelectChange(event: Event, setting: SettingsKey) {
+		updateSetting(setting, (event.target as HTMLInputElement).value);
 	}
 
 	function onReset() {
@@ -73,6 +83,14 @@
 		<CloseButton on:click={() => (hidden = true)} class="mb-4 dark:text-white" />
 	</div>
 	<div class="flex flex-col gap-5">
+		<div>
+			<Label>On page zoom:</Label>
+			<Select
+				items={zoomModes}
+				bind:value={zoomModeValue}
+				on:change={(e) => onSelectChange(e, 'zoomDefault')}
+			/>
+		</div>
 		{#each toggles as { key, text, value }}
 			<Toggle size="small" checked={value} on:change={() => updateSetting(key, !value)}
 				>{text}</Toggle
@@ -80,7 +98,11 @@
 		{/each}
 		<div>
 			<Label>Fontsize:</Label>
-			<Select items={fontSizes} bind:value={selected} on:change={onFontSize} />
+			<Select
+				items={fontSizes}
+				bind:value={fontSizeValue}
+				on:change={(e) => onSelectChange(e, 'fontSize')}
+			/>
 		</div>
 		<div>
 			<Label>Background color:</Label>

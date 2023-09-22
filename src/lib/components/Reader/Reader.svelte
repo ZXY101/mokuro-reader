@@ -1,11 +1,23 @@
 <script lang="ts">
 	import { currentVolume } from '$lib/catalog';
-	import { Panzoom, zoomFitToScreen, zoomFitToWidth, zoomOriginal } from '$lib/panzoom';
+	import {
+		Panzoom,
+		keepZoomStart,
+		zoomDefault,
+		zoomFitToScreen,
+		zoomFitToWidth,
+		zoomOriginal
+	} from '$lib/panzoom';
 	import { progress, settings, updateProgress } from '$lib/settings';
 	import { clamp } from '$lib/util';
 	import { Button, Input, Popover, Range } from 'flowbite-svelte';
 	import MangaPage from './MangaPage.svelte';
-	import { ChervonDoubleLeftSolid, ChervonDoubleRightSolid } from 'flowbite-svelte-icons';
+	import {
+		ChervonDoubleLeftSolid,
+		ChervonDoubleRightSolid,
+		ChevronLeftSolid
+	} from 'flowbite-svelte-icons';
+	import { onMount } from 'svelte';
 
 	const volume = $currentVolume;
 	const pages = volume?.mokuroData.pages;
@@ -30,11 +42,13 @@
 		changePage(newPage);
 	}
 
-	function changePage(newPage: number) {
+	function changePage(newPage: number, ingoreTimeOut = false) {
 		const end = new Date();
-		const clickDuration = end.getTime() - start.getTime();
+		const clickDuration = ingoreTimeOut ? 0 : end.getTime() - start?.getTime();
+
 		if (pages && volume && clickDuration < 200) {
 			updateProgress(volume.mokuroData.volume_uuid, clamp(newPage, 1, pages?.length));
+			zoomDefault();
 		}
 	}
 
@@ -46,15 +60,23 @@
 	}
 
 	function onManualPageChange() {
-		page = clamp(manualPage, 1, pages!.length);
+		changePage(manualPage, true);
 	}
+
+	onMount(() => {
+		zoomDefault();
+	});
 </script>
 
+<svelte:window on:resize={zoomDefault} />
 {#if volume && pages}
 	<Popover placement="bottom-end" trigger="click" triggeredBy="#page-num" class="z-20">
 		<div class="flex flex-col gap-3">
 			<div class="flex flex-row items-center gap-5 z-10">
-				<ChervonDoubleLeftSolid on:click={() => (page = 1)} class="hover:text-primary-600" />
+				<ChervonDoubleLeftSolid
+					on:click={() => changePage($settings.rightToLeft ? pages.length : 1, true)}
+					class="hover:text-primary-600"
+				/>
 				<Input
 					type="number"
 					size="sm"
@@ -64,17 +86,11 @@
 					on:change={onManualPageChange}
 				/>
 				<ChervonDoubleRightSolid
-					on:click={() => (page = pages.length)}
+					on:click={() => changePage($settings.rightToLeft ? 1 : pages.length, true)}
 					class="hover:text-primary-600"
 				/>
 			</div>
-			<Range
-				min={1}
-				max={pages.length}
-				size="sm"
-				bind:value={manualPage}
-				on:change={onManualPageChange}
-			/>
+			<Range min={1} max={pages.length} bind:value={manualPage} on:change={onManualPageChange} />
 		</div>
 	</Popover>
 	<button
@@ -84,29 +100,34 @@
 	>
 		{pageDisplay}
 	</button>
-	<Panzoom>
-		<div class="flex flex-row justify-center">
-			{#if !$settings.singlePageView && index + 1 < pages.length}
-				<MangaPage page={pages[index + 1]} src={Object.values(volume?.files)[index + 1]} />
-			{/if}
-			<MangaPage page={pages[index]} src={Object.values(volume?.files)[index]} />
-		</div>
-	</Panzoom>
+	<div class="flex">
+		<Panzoom>
+			<button
+				class="h-full fixed -left-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01] justify-items-center"
+				on:mousedown={mouseDown}
+				on:mouseup={left}
+			/>
+			<button
+				class="h-full fixed -right-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
+				on:mousedown={mouseDown}
+				on:mouseup={right}
+			/>
+			<div class="flex flex-row">
+				{#if !$settings.singlePageView && index + 1 < pages.length}
+					<MangaPage page={pages[index + 1]} src={Object.values(volume?.files)[index + 1]} />
+				{/if}
+				<MangaPage page={pages[index]} src={Object.values(volume?.files)[index]} />
+			</div>
+		</Panzoom>
+	</div>
 	<button
-		style:width={'10%'}
 		on:mousedown={mouseDown}
 		on:mouseup={left}
-		class="left-0 top-0 absolute h-full"
+		class="left-0 top-0 absolute h-full w-[50px] hover:bg-slate-400 opacity-[0.01]"
 	/>
 	<button
-		style:width={'10%'}
 		on:mousedown={mouseDown}
 		on:mouseup={right}
-		class="right-0 top-0 absolute h-full"
+		class="right-0 top-0 absolute h-full w-[50px] hover:bg-slate-400 opacity-[0.01]"
 	/>
-	<div class="absolute left-5 bottom-5">
-		<Button on:click={zoomOriginal}>zoomOriginal</Button>
-		<Button on:click={zoomFitToWidth}>zoomFitToWidth</Button>
-		<Button on:click={zoomFitToScreen}>zoomFitToScreen</Button>
-	</div>
 {/if}

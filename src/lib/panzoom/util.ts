@@ -1,6 +1,7 @@
+import { settings, type ZoomModes } from '$lib/settings';
 import panzoom from 'panzoom';
 import type { PanZoom } from 'panzoom';
-import { writable } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 
 let pz: PanZoom | undefined;
 let container: HTMLElement | undefined;
@@ -95,6 +96,7 @@ export function zoomFitToWidth() {
 
   const scale =
     (1 / pz.getTransform().scale) * (innerWidth / container.offsetWidth);
+
   pz.moveTo(0, 0);
   pz.zoomTo(0, 0, scale);
   panAlign('center', 'top');
@@ -114,16 +116,24 @@ export function zoomFitToScreen() {
   panAlign('center', 'center');
 }
 
-export function zoomDefault(zoomDefault: any) {
+export function keepZoomStart() {
+  panAlign('center', 'top');
+}
+
+export function zoomDefault() {
+  const zoomDefault = get(settings).zoomDefault
   switch (zoomDefault) {
-    case 'fit to screen':
+    case 'zoomFitToScreen':
       zoomFitToScreen();
-      break;
-    case 'fit to width':
+      return;
+    case 'zoomFitToWidth':
       zoomFitToWidth();
-      break;
-    case 'original size':
+      return;
+    case 'zoomOriginal':
       zoomOriginal();
-      break;
+      return;
+    case 'keepZoomStart':
+      keepZoomStart();
+      return;
   }
 }

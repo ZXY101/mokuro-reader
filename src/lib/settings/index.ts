@@ -1,7 +1,8 @@
 import { browser } from "$app/environment";
+import { zoomDefault } from "$lib/panzoom";
 import { writable } from "svelte/store";
 
-type FontSize = 'auto' |
+export type FontSize = 'auto' |
   '9' |
   '10' |
   '11' |
@@ -16,8 +17,13 @@ type FontSize = 'auto' |
   '48' |
   '60'
 
-type Settings = {
-  zoomMode: 'keep' | 'something'
+export type ZoomModes = 'zoomFitToScreen' |
+  'zoomFitToWidth' |
+  'zoomOriginal' |
+  'keepZoom' |
+  'keepZoomStart'
+
+export type Settings = {
   rightToLeft: boolean;
   singlePageView: boolean;
   textEditable: boolean;
@@ -28,12 +34,12 @@ type Settings = {
   hasCover: boolean;
   backgroundColor: string;
   fontSize: FontSize;
+  zoomDefault: ZoomModes;
 };
 
 export type SettingsKey = keyof Settings
 
 const defaultSettings: Settings = {
-  zoomMode: 'keep',
   rightToLeft: true,
   singlePageView: true,
   hasCover: false,
@@ -43,7 +49,8 @@ const defaultSettings: Settings = {
   boldFont: false,
   pageNum: true,
   backgroundColor: '#0d0d0f',
-  fontSize: 'auto'
+  fontSize: 'auto',
+  zoomDefault: 'zoomFitToScreen'
 }
 
 const stored = browser ? window.localStorage.getItem('settings') : undefined
