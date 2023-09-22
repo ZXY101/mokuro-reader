@@ -67,6 +67,7 @@ export function updateSetting(key: SettingsKey, value: any) {
       [key]: value
     };
   });
+  zoomDefault();
 }
 
 export function resetSettings() {
