@@ -3,7 +3,7 @@
   import { UserSettingsSolid, UploadSolid } from 'flowbite-svelte-icons';
   import { afterNavigate } from '$app/navigation';
   import { page } from '$app/stores';
-  import Settings from './Settings.svelte';
+  import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
   import { settings } from '$lib/settings';
 
