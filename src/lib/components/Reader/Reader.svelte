@@ -73,7 +73,7 @@
   $: {
     if ($settings.hasCover !== hasCoverSetting) {
       hasCoverSetting = $settings.hasCover;
-      if (page > 1) {
+      if (page > 1 && !$settings.singlePageView) {
         page--;
       }
     }
