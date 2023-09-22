@@ -20,7 +20,20 @@ export function initPanzoom(node: HTMLElement) {
       return nodeName === 'P';
     },
     beforeWheel: (e) => e.altKey,
-    onTouch: (e) => e.touches.length > 1
+    onTouch: (e) => e.touches.length > 1,
+    // Panzoom typing is wrong here
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-expect-error
+    filterKey: (e: any) => {
+      if (
+        e.key === 'ArrowLeft' ||
+        e.key === 'ArrowRight' ||
+        e.key === 'ArrowUp' ||
+        e.key === 'ArrowDown'
+      ) {
+        return true;
+      }
+    }
   });
 
   panzoomStore.set(pz)
@@ -72,4 +85,45 @@ export function zoomOriginal() {
   pz?.moveTo(0, 0);
   pz?.zoomTo(0, 0, 1 / pz.getTransform().scale);
   panAlign('center', 'center');
+}
+
+export function zoomFitToWidth() {
+  if (!pz || !container) {
+    return
+  }
+  const { innerWidth } = window
+
+  const scale =
+    (1 / pz.getTransform().scale) * (innerWidth / container.offsetWidth);
+  pz.moveTo(0, 0);
+  pz.zoomTo(0, 0, scale);
+  panAlign('center', 'top');
+}
+
+export function zoomFitToScreen() {
+  if (!pz || !container) {
+    return
+  }
+  const { innerWidth, innerHeight } = window
+  const scaleX = innerWidth / container.offsetWidth;
+  const scaleY = innerHeight / container.offsetHeight;
+  const scale =
+    (1 / pz.getTransform().scale) * Math.min(scaleX, scaleY);
+  pz.moveTo(0, 0);
+  pz.zoomTo(0, 0, scale);
+  panAlign('center', 'center');
+}
+
+export function zoomDefault(zoomDefault: any) {
+  switch (zoomDefault) {
+    case 'fit to screen':
+      zoomFitToScreen();
+      break;
+    case 'fit to width':
+      zoomFitToWidth();
+      break;
+    case 'original size':
+      zoomOriginal();
+      break;
+  }
 }

@@ -11,6 +11,10 @@
 	let uploadModalOpen = false;
 	let isReader = false;
 
+	function openSettings() {
+		settingsHidden = false;
+	}
+
 	afterNavigate(() => {
 		isReader = $page.route.id === '/[manga]/[volume]';
 
@@ -28,13 +32,13 @@
 			<span class="text-xl font-semibold dark:text-white">Mokuro</span>
 		</NavBrand>
 		<div class="flex md:order-2 gap-5">
-			<UserSettingsSolid class="hover:text-primary-700" on:click={() => (settingsHidden = false)} />
+			<UserSettingsSolid class="hover:text-primary-700" on:click={openSettings} />
 			<UploadSolid class="hover:text-primary-700" on:click={() => (uploadModalOpen = true)} />
 		</div>
 	</Navbar>
 	{#if isReader}
 		<button
-			on:click={() => (settingsHidden = false)}
+			on:click={openSettings}
 			class="hover:text-primary-700 fixed opacity-50 hover:opacity-100 right-10 top-5 p-10 m-[-2.5rem]"
 		>
 			<div style:background-color={$settings.backgroundColor} class="absolute">
