@@ -38,6 +38,10 @@ export function initPanzoom(node: HTMLElement) {
   });
 
   panzoomStore.set(pz);
+
+
+  pz.on('pan', () => keepInBounds())
+  pz.on('zoom', () => keepInBounds())
 }
 
 type PanX = 'left' | 'center' | 'right';
@@ -133,5 +137,58 @@ export function zoomDefault() {
     case 'keepZoomStart':
       keepZoomStart();
       return;
+  }
+}
+
+export function keepInBounds() {
+  if (!pz || !container) {
+    return
+  }
+
+  const { mobile } = get(settings)
+
+  if (!mobile) {
+    return
+  }
+
+  const transform = pz.getTransform();
+
+  const { x, y, scale } = transform;
+  const { innerWidth, innerHeight } = window
+
+  const width = container.offsetWidth * scale;
+  const height = container.offsetHeight * scale;
+
+  const marginX = innerWidth * 0.01;
+  const marginY = innerHeight * 0.01;
+
+  let minX = innerWidth - width - marginX;
+  let maxX = marginX;
+  let minY = innerHeight - height - marginY;
+  let maxY = marginY;
+
+  if (width + 2 * marginX <= innerWidth) {
+    minX = marginX;
+    maxX = innerWidth - width - marginX;
+  }
+
+  if (height + 2 * marginY <= innerHeight) {
+    minY = marginY;
+    maxY = innerHeight - height - marginY;
+  }
+
+  if (x < minX) {
+    transform.x = minX;
+
+  }
+  if (x > maxX) {
+    transform.x = maxX;
+  }
+
+  if (y < minY) {
+    transform.y = minY;
+  }
+  if (y > maxY) {
+    transform.y = maxY;
   }
 }

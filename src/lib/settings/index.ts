@@ -34,6 +34,7 @@ export type Settings = {
   boldFont: boolean;
   pageNum: boolean;
   hasCover: boolean;
+  mobile: boolean;
   backgroundColor: string;
   fontSize: FontSize;
   zoomDefault: ZoomModes;
@@ -63,6 +64,7 @@ const defaultSettings: Settings = {
   textBoxBorders: false,
   boldFont: false,
   pageNum: true,
+  mobile: false,
   backgroundColor: '#0d0d0f',
   fontSize: 'auto',
   zoomDefault: 'zoomFitToScreen',
