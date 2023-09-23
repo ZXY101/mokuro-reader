@@ -29,10 +29,10 @@
     draggedFiles = undefined;
   }
 
-  let storageSpace = 'Loading...';
+  let storageSpace = '';
 
   onMount(() => {
-    navigator.storage.estimate().then(({ usage, quota }) => {
+    navigator?.storage?.estimate().then(({ usage, quota }) => {
       if (usage && quota) {
         storageSpace = `Storage: ${formatBytes(usage)} / ${formatBytes(quota)}`;
       }
