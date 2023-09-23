@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Accordion, AccordionItem, Label, Toggle, Input } from 'flowbite-svelte';
+  import { AccordionItem } from 'flowbite-svelte';
   import ReaderSelects from './ReaderSelects.svelte';
   import ReaderToggles from './ReaderToggles.svelte';
   import { page } from '$app/stores';

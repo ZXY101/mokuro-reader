@@ -61,7 +61,7 @@ export async function scanFiles(item: FileSystemEntry, files: Promise<File | und
 }
 
 export async function processFiles(files: File[]) {
-  const zipTypes = ['zip', 'cbz'];
+  const zipTypes = ['zip', 'cbz', 'ZIP', 'CBZ'];
   const volumes: Record<string, Volume> = {};
   const mangas: string[] = [];
 

@@ -6,6 +6,7 @@
   import { promptConfirmation } from '$lib/util';
   import AnkiConnectSettings from './AnkiConnectSettings.svelte';
   import ReaderSettings from './ReaderSettings.svelte';
+  import Profiles from './Profiles.svelte';
 
   let transitionParams = {
     x: 320,
@@ -43,6 +44,7 @@
     <Accordion flush>
       <ReaderSettings />
       <AnkiConnectSettings />
+      <Profiles />
     </Accordion>
     <div class="flex flex-col gap-2">
       <Button outline on:click={onReset}>Reset</Button>
