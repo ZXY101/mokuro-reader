@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { clamp, showSnackbar } from '$lib/util';
+  import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
   import { settings } from '$lib/settings';
-  import { CirclePlusSolid } from 'flowbite-svelte-icons';
-  import { getLastCardInfo } from '$lib/anki-connect';
+  import { updateLastCard } from '$lib/anki-connect';
 
   export let page: Page;
+  export let src: File;
 
   $: textBoxes = page.blocks.map((block) => {
     const { img_height, img_width } = page;
@@ -39,15 +39,17 @@
   $: border = $settings.textBoxBorders ? '1px solid red' : 'none';
   $: contenteditable = $settings.textEditable;
 
-  async function onUpdateCard() {
-    const res = await getLastCardInfo();
-
-    showSnackbar(res.fields.Word.value);
+  async function onUpdateCard(lines: string[]) {
+    if ($settings.ankiConnectSettings.enabled) {
+      promptConfirmation('Add image to last created anki card?', () =>
+        updateLastCard(src, lines.join(' '))
+      );
+    }
   }
 </script>
 
 {#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`text-box-${index}`)}
-  <div
+  <button
     class="text-box"
     style:width
     style:height
@@ -58,17 +60,13 @@
     style:font-weight={fontWeight}
     style:display
     style:border
+    on:dblclick={() => onUpdateCard(lines)}
     {contenteditable}
   >
-    {#if $settings.ankiConnectSettings.enabled}
-      <button class="absolute -m-8 opacity-0 hover:block p-4" on:click={onUpdateCard}>
-        <CirclePlusSolid class="text-primary-500 hover:text-primary-600" />
-      </button>
-    {/if}
     {#each lines as line}
       <p>{line}</p>
     {/each}
-  </div>
+  </button>
 {/each}
 
 <style>
@@ -98,10 +96,6 @@
     margin: 0;
     background-color: rgb(255, 255, 255);
     font-weight: var(--bold);
-  }
-
-  .text-box:hover button {
-    opacity: 100;
   }
 
   .text-box:focus p,

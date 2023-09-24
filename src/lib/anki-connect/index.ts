@@ -1,4 +1,6 @@
+import { settings } from "$lib/settings";
 import { showSnackbar } from "$lib/util"
+import { get } from "svelte/store";
 
 export async function ankiConnect(action: string, params: Record<string, any>) {
 
@@ -40,8 +42,85 @@ export function getCardAgeInMin(id: number) {
   return Math.floor((Date.now() - id) / 60000);
 }
 
-export async function updateLastCard() {
+async function blobToBase64(blob: Blob) {
+  return new Promise<string | null>((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function imageToWebp(source: File) {
+  const image = await createImageBitmap(source);
+  const canvas = new OffscreenCanvas(image.width, image.height);
+  const context = canvas.getContext("2d");
+
+  if (context) {
+    context.drawImage(image, 0, 0);
+    const blob = await canvas.convertToBlob({ type: 'image/webp' });
+    image.close();
+
+    return await blobToBase64(blob);
+  }
+}
+
+export async function updateLastCard(image: File, sentence: string) {
+  const {
+    overwriteImage,
+    enabled,
+    cropImage,
+    grabSentence,
+    pictureField,
+    sentenceField
+  } = get(settings).ankiConnectSettings;
+
+  if (!enabled) {
+    return
+  }
+
+  showSnackbar('Updating last card...', 10000)
+
   const id = await getLastCardId()
 
-  return Math.floor((Date.now() - id) / 60000);
+  if (getCardAgeInMin(id) >= 5) {
+    showSnackbar('Error: Card created over 5 minutes ago');
+    return;
+  }
+
+  const fields: Record<string, any> = {};
+
+  if (grabSentence) {
+    fields[sentenceField] = sentence;
+  }
+
+  if (overwriteImage) {
+    fields[pictureField] = ''
+  }
+
+  if (cropImage) {
+    console.log('image cropping here');
+  }
+
+  const picture = await imageToWebp(image)
+
+
+  if (picture) {
+    ankiConnect('updateNoteFields', {
+      note: {
+        id,
+        fields,
+        picture: {
+          filename: `_${id}.webp`,
+          data: picture.split(';base64,')[1],
+          fields: [pictureField],
+        },
+      },
+    }).then(() => {
+      showSnackbar('Card updated!')
+    }).catch((e) => {
+      showSnackbar(e)
+    })
+  } else {
+    showSnackbar('Something went wrong')
+  }
 }

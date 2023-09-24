@@ -4,6 +4,10 @@ import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { BlobReader, ZipReader, BlobWriter, getMimeType } from '@zip.js/zip.js';
 
+const zipTypes = ['zip', 'cbz', 'ZIP', 'CBZ'];
+const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+
+
 export async function unzipManga(file: File) {
   const zipFileReader = new BlobReader(file);
   const zipReader = new ZipReader(zipFileReader);
@@ -13,7 +17,7 @@ export async function unzipManga(file: File) {
 
   for (const entry of entries) {
     const mime = getMimeType(entry.filename);
-    if (mime === 'image/jpeg' || mime === 'image/png') {
+    if (imageTypes.includes(mime)) {
       const blob = await entry.getData?.(new BlobWriter(mime));
       if (blob) {
         const file = new File([blob], entry.filename, { type: mime });
@@ -61,7 +65,6 @@ export async function scanFiles(item: FileSystemEntry, files: Promise<File | und
 }
 
 export async function processFiles(files: File[]) {
-  const zipTypes = ['zip', 'cbz', 'ZIP', 'CBZ'];
   const volumes: Record<string, Volume> = {};
   const mangas: string[] = [];
 
@@ -86,7 +89,7 @@ export async function processFiles(files: File[]) {
 
     const mimeType = type || getMimeType(file.name);
 
-    if (mimeType === 'image/jpeg' || mimeType === 'image/png') {
+    if (imageTypes.includes(mimeType)) {
       if (webkitRelativePath) {
         const imageName = webkitRelativePath.split('/').at(-1);
         const vol = webkitRelativePath.split('/').at(-2);
