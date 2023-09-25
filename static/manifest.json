@@ -1,0 +1,11 @@
+{
+  "name": "Mokuro Reader",
+  "short_name": "Mokuro",
+  "icons": [],
+  "start_url": "/",
+  "background_color": "#0d0d0f",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#0d0d0f",
+  "description": "Reader for Mokuro processed manga"
+}
