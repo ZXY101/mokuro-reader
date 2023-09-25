@@ -6,6 +6,7 @@
   import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
   import { settings } from '$lib/settings';
+  import Icon from '$lib/assets/icon.webp';
 
   let settingsHidden = true;
   let uploadModalOpen = false;
@@ -29,7 +30,10 @@
 <div class="relative z-10">
   <Navbar hidden={isReader}>
     <NavBrand href="/">
-      <span class="text-xl font-semibold dark:text-white">Mokuro</span>
+      <div class="flex flex-row gap-2 items-center">
+        <img src={Icon} alt="icon" class="w-[32px] h-[32px]" />
+        <span class="text-xl font-semibold dark:text-white">Mokuro</span>
+      </div>
     </NavBrand>
     <div class="flex md:order-2 gap-5">
       <UserSettingsSolid class="hover:text-primary-700" on:click={openSettings} />
