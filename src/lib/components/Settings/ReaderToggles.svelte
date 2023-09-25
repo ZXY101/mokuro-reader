@@ -11,6 +11,7 @@
     { key: 'displayOCR', text: 'OCR enabled', value: $settings.displayOCR },
     { key: 'boldFont', text: 'Bold font', value: $settings.boldFont },
     { key: 'pageNum', text: 'Show page number', value: $settings.pageNum },
+    { key: 'charCount', text: 'Show character count', value: $settings.charCount },
     { key: 'mobile', text: 'Mobile', value: $settings.mobile }
   ] as { key: SettingsKey; text: string; value: any }[];
 </script>

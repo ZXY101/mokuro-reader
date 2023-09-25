@@ -5,8 +5,13 @@
   import { clamp } from '$lib/util';
   import { Input, Popover, Range } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
-  import { ChervonDoubleLeftSolid, ChervonDoubleRightSolid } from 'flowbite-svelte-icons';
-  import { afterUpdate } from 'svelte';
+  import {
+    ChervonDoubleLeftSolid,
+    ChervonDoubleRightSolid,
+    ChevronLeftSolid,
+    ChevronRightSolid
+  } from 'flowbite-svelte-icons';
+  import { afterUpdate, onMount } from 'svelte';
   import Cropper from './Cropper.svelte';
 
   const volume = $currentVolume;
@@ -45,6 +50,7 @@
       }
       updateProgress(volume.mokuroData.volume_uuid, clamp(newPage, 1, pages?.length));
       zoomDefault();
+      updateCharacterCount(clamp(newPage, 1, pages?.length));
     }
   }
 
@@ -69,6 +75,8 @@
     ? `${page},${page + 1} / ${pages?.length}`
     : `${page} / ${pages?.length}`;
 
+  $: charDisplay = `${charCount} / ${maxCharCount}`;
+
   let hasCoverSetting = $settings.hasCover;
 
   $: {
@@ -90,6 +98,12 @@
 
   afterUpdate(() => {
     zoomDefault();
+    updateCharacterCount(page);
+  });
+
+  onMount(() => {
+    getMaxCharCount();
+    updateCharacterCount(page);
   });
 
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
@@ -124,6 +138,39 @@
         break;
     }
   }
+
+  let charCount = 0;
+
+  function updateCharacterCount(currentPage: number) {
+    charCount = 0;
+    if (pages && $settings.charCount) {
+      for (let i = 0; i < currentPage; i++) {
+        const blocks = pages[i].blocks;
+        blocks.forEach((block) => {
+          block.lines.forEach((line) => {
+            charCount += line.length;
+          });
+        });
+      }
+    }
+  }
+
+  let maxCharCount = 0;
+
+  function getMaxCharCount() {
+    if (pages) {
+      for (let i = 0; i < pages.length; i++) {
+        const blocks = pages[i].blocks;
+        blocks.forEach((block) => {
+          block.lines.forEach((line) => {
+            maxCharCount += line.length;
+          });
+        });
+      }
+    }
+
+    return maxCharCount;
+  }
 </script>
 
 <svelte:window on:resize={zoomDefault} on:keyup|preventDefault={handleShortcuts} />
@@ -136,6 +183,7 @@
           on:click={() => changePage($settings.rightToLeft ? pages.length : 1, true)}
           class="hover:text-primary-600"
         />
+        <ChevronLeftSolid on:click={(e) => left(e, true)} class="hover:text-primary-600" />
         <Input
           type="number"
           size="sm"
@@ -144,6 +192,7 @@
           on:click={onInputClick}
           on:change={onManualPageChange}
         />
+        <ChevronRightSolid on:click={(e) => right(e, true)} class="hover:text-primary-600" />
         <ChervonDoubleRightSolid
           on:click={() => changePage($settings.rightToLeft ? 1 : pages.length, true)}
           class="hover:text-primary-600"
@@ -152,12 +201,9 @@
       <Range min={1} max={pages.length} bind:value={manualPage} on:change={onManualPageChange} />
     </div>
   </Popover>
-  <button
-    class="absolute opacity-50 left-5 top-5 z-10 mix-blend-difference"
-    class:hidden={!$settings.pageNum}
-    id="page-num"
-  >
-    {pageDisplay}
+  <button class="absolute opacity-50 left-5 top-5 z-10 mix-blend-difference" id="page-num">
+    <p class="text-left" class:hidden={!$settings.charCount}>{charDisplay}</p>
+    <p class="text-left" class:hidden={!$settings.pageNum}>{pageDisplay}</p>
   </button>
   <div class="flex">
     <Panzoom>

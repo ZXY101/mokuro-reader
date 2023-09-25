@@ -33,6 +33,7 @@ export type Settings = {
   displayOCR: boolean;
   boldFont: boolean;
   pageNum: boolean;
+  charCount: boolean;
   hasCover: boolean;
   mobile: boolean;
   backgroundColor: string;
@@ -64,6 +65,7 @@ const defaultSettings: Settings = {
   textBoxBorders: false,
   boldFont: false,
   pageNum: true,
+  charCount: false,
   mobile: false,
   backgroundColor: '#0d0d0f',
   fontSize: 'auto',
