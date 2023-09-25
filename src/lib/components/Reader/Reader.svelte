@@ -7,6 +7,7 @@
   import MangaPage from './MangaPage.svelte';
   import { ChervonDoubleLeftSolid, ChervonDoubleRightSolid } from 'flowbite-svelte-icons';
   import { afterUpdate } from 'svelte';
+  import Cropper from './Cropper.svelte';
 
   const volume = $currentVolume;
   const pages = volume?.mokuroData.pages;
@@ -94,6 +95,7 @@
 
 <svelte:window on:resize={zoomDefault} />
 {#if volume && pages}
+  <Cropper />
   <Popover placement="bottom-end" trigger="click" triggeredBy="#page-num" class="z-20">
     <div class="flex flex-col gap-3">
       <div class="flex flex-row items-center gap-5 z-10">

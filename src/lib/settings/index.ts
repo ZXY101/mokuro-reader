@@ -34,25 +34,48 @@ export type Settings = {
   boldFont: boolean;
   pageNum: boolean;
   hasCover: boolean;
+  mobile: boolean;
   backgroundColor: string;
   fontSize: FontSize;
   zoomDefault: ZoomModes;
+  ankiConnectSettings: AnkiConnectSettings;
 };
 
 export type SettingsKey = keyof Settings;
 
+export type AnkiConnectSettings = {
+  enabled: boolean;
+  pictureField: string;
+  sentenceField: string;
+  cropImage: boolean;
+  overwriteImage: boolean;
+  grabSentence: boolean;
+}
+
+export type AnkiSettingsKey = keyof AnkiConnectSettings;
+
+
 const defaultSettings: Settings = {
   rightToLeft: true,
-  singlePageView: true,
+  singlePageView: false,
   hasCover: false,
   displayOCR: true,
   textEditable: false,
   textBoxBorders: false,
   boldFont: false,
   pageNum: true,
+  mobile: false,
   backgroundColor: '#0d0d0f',
   fontSize: 'auto',
-  zoomDefault: 'zoomFitToScreen'
+  zoomDefault: 'zoomFitToScreen',
+  ankiConnectSettings: {
+    enabled: false,
+    cropImage: false,
+    grabSentence: false,
+    overwriteImage: true,
+    pictureField: 'Picture',
+    sentenceField: 'Sentence'
+  }
 };
 
 const stored = browser ? window.localStorage.getItem('settings') : undefined;
@@ -70,6 +93,18 @@ export function updateSetting(key: SettingsKey, value: any) {
     };
   });
   zoomDefault();
+}
+
+export function updateAnkiSetting(key: AnkiSettingsKey, value: any) {
+  settings.update((settings) => {
+    return {
+      ...settings,
+      ankiConnectSettings: {
+        ...settings.ankiConnectSettings,
+        [key]: value
+      }
+    };
+  });
 }
 
 export function resetSettings() {

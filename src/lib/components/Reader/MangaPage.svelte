@@ -3,7 +3,7 @@
   import TextBoxes from './TextBoxes.svelte';
 
   export let page: Page;
-  export let src: Blob;
+  export let src: File;
 </script>
 
 <div
@@ -13,5 +13,5 @@
   style:background-image={`url(${URL.createObjectURL(src)})`}
   class="relative"
 >
-  <TextBoxes {page} />
+  <TextBoxes {page} {src} />
 </div>

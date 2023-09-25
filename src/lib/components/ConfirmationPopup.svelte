@@ -8,7 +8,9 @@
 
   onMount(() => {
     confirmationPopupStore.subscribe((value) => {
-      open = Boolean(value);
+      if (value) {
+        open = value.open;
+      }
     });
   });
 </script>

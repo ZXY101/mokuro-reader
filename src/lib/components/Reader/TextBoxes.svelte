@@ -1,9 +1,11 @@
 <script lang="ts">
-  import { clamp } from '$lib/util';
+  import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
   import { settings } from '$lib/settings';
+  import { imageToWebp, showCropper, updateLastCard } from '$lib/anki-connect';
 
   export let page: Page;
+  export let src: File;
 
   $: textBoxes = page.blocks.map((block) => {
     const { img_height, img_width } = page;
@@ -36,10 +38,24 @@
   $: display = $settings.displayOCR ? 'block' : 'none';
   $: border = $settings.textBoxBorders ? '1px solid red' : 'none';
   $: contenteditable = $settings.textEditable;
+
+  async function onUpdateCard(lines: string[]) {
+    if ($settings.ankiConnectSettings.enabled) {
+      const sentence = lines.join(' ');
+      if ($settings.ankiConnectSettings.cropImage) {
+        showCropper(URL.createObjectURL(src), sentence);
+      } else {
+        promptConfirmation('Add image to last created anki card?', async () => {
+          const imageData = await imageToWebp(src);
+          updateLastCard(imageData, sentence);
+        });
+      }
+    }
+  }
 </script>
 
 {#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`text-box-${index}`)}
-  <div
+  <button
     class="text-box"
     style:width
     style:height
@@ -50,12 +66,13 @@
     style:font-weight={fontWeight}
     style:display
     style:border
+    on:dblclick={() => onUpdateCard(lines)}
     {contenteditable}
   >
     {#each lines as line}
       <p>{line}</p>
     {/each}
-  </div>
+  </button>
 {/each}
 
 <style>
@@ -67,14 +84,12 @@
     font-size: 16pt;
     white-space: nowrap;
     border: 1px solid rgba(0, 0, 0, 0);
-    z-index: 1000;
   }
 
   .text-box:focus,
   .text-box:hover {
     background: rgb(255, 255, 255);
     border: 1px solid rgba(0, 0, 0, 0);
-    z-index: 999 !important;
   }
 
   .text-box p {
