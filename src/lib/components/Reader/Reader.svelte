@@ -1,6 +1,6 @@
 <script lang="ts">
   import { currentVolume } from '$lib/catalog';
-  import { Panzoom, zoomDefault } from '$lib/panzoom';
+  import { Panzoom, toggleFullScreen, zoomDefault } from '$lib/panzoom';
   import { progress, settings, updateProgress } from '$lib/settings';
   import { clamp } from '$lib/util';
   import { Input, Popover, Range } from 'flowbite-svelte';
@@ -25,14 +25,14 @@
     start = new Date();
   }
 
-  function left() {
+  function left(_e: any, ingoreTimeOut?: boolean) {
     const newPage = $settings.rightToLeft ? page + navAmount : page - navAmount;
-    changePage(newPage);
+    changePage(newPage, ingoreTimeOut);
   }
 
-  function right() {
+  function right(_e: any, ingoreTimeOut?: boolean) {
     const newPage = $settings.rightToLeft ? page - navAmount : page + navAmount;
-    changePage(newPage);
+    changePage(newPage, ingoreTimeOut);
   }
 
   function changePage(newPage: number, ingoreTimeOut = false) {
@@ -91,9 +91,42 @@
   afterUpdate(() => {
     zoomDefault();
   });
+
+  function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
+    switch (event.code) {
+      case 'ArrowLeft':
+      case 'ArrowUp':
+      case 'PageUp':
+        left(event, true);
+        return;
+      case 'ArrowRight':
+      case 'ArrowDown':
+      case 'PageDown':
+        right(event, true);
+        return;
+      case 'Home':
+        changePage(1, true);
+        return;
+      case 'End':
+        if (pages) {
+          changePage(pages.length, true);
+        }
+        return;
+      case 'Space':
+        if (pages && page + 1 <= pages.length) {
+          changePage(page + 1, true);
+        }
+        return;
+      case 'KeyF':
+        toggleFullScreen();
+        return;
+      default:
+        break;
+    }
+  }
 </script>
 
-<svelte:window on:resize={zoomDefault} />
+<svelte:window on:resize={zoomDefault} on:keyup|preventDefault={handleShortcuts} />
 {#if volume && pages}
   <Cropper />
   <Popover placement="bottom-end" trigger="click" triggeredBy="#page-num" class="z-20">
