@@ -2,9 +2,9 @@ import { settings } from "$lib/settings";
 import { showSnackbar } from "$lib/util"
 import { get } from "svelte/store";
 
+export * from './cropper'
+
 export async function ankiConnect(action: string, params: Record<string, any>) {
-
-
   try {
     const res = await fetch('http://127.0.0.1:8765', {
       method: 'POST',
@@ -42,7 +42,7 @@ export function getCardAgeInMin(id: number) {
   return Math.floor((Date.now() - id) / 60000);
 }
 
-async function blobToBase64(blob: Blob) {
+export async function blobToBase64(blob: Blob) {
   return new Promise<string | null>((resolve) => {
     const reader = new FileReader();
     reader.onloadend = () => resolve(reader.result as string);
@@ -64,11 +64,10 @@ export async function imageToWebp(source: File) {
   }
 }
 
-export async function updateLastCard(image: File, sentence: string) {
+export async function updateLastCard(imageData: string | null | undefined, sentence: string) {
   const {
     overwriteImage,
     enabled,
-    cropImage,
     grabSentence,
     pictureField,
     sentenceField
@@ -97,21 +96,14 @@ export async function updateLastCard(image: File, sentence: string) {
     fields[pictureField] = ''
   }
 
-  if (cropImage) {
-    console.log('image cropping here');
-  }
-
-  const picture = await imageToWebp(image)
-
-
-  if (picture) {
+  if (imageData) {
     ankiConnect('updateNoteFields', {
       note: {
         id,
         fields,
         picture: {
           filename: `_${id}.webp`,
-          data: picture.split(';base64,')[1],
+          data: imageData.split(';base64,')[1],
           fields: [pictureField],
         },
       },

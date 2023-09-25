@@ -2,7 +2,7 @@
   import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
   import { settings } from '$lib/settings';
-  import { updateLastCard } from '$lib/anki-connect';
+  import { imageToWebp, showCropper, updateLastCard } from '$lib/anki-connect';
 
   export let page: Page;
   export let src: File;
@@ -41,9 +41,15 @@
 
   async function onUpdateCard(lines: string[]) {
     if ($settings.ankiConnectSettings.enabled) {
-      promptConfirmation('Add image to last created anki card?', () =>
-        updateLastCard(src, lines.join(' '))
-      );
+      const sentence = lines.join(' ');
+      if ($settings.ankiConnectSettings.cropImage) {
+        showCropper(URL.createObjectURL(src), sentence);
+      } else {
+        promptConfirmation('Add image to last created anki card?', async () => {
+          const imageData = await imageToWebp(src);
+          updateLastCard(imageData, sentence);
+        });
+      }
     }
   }
 </script>
@@ -78,14 +84,12 @@
     font-size: 16pt;
     white-space: nowrap;
     border: 1px solid rgba(0, 0, 0, 0);
-    z-index: 1000;
   }
 
   .text-box:focus,
   .text-box:hover {
     background: rgb(255, 255, 255);
     border: 1px solid rgba(0, 0, 0, 0);
-    z-index: 999 !important;
   }
 
   .text-box p {
