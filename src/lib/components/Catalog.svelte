@@ -16,7 +16,7 @@
       <div class="sm:block flex-col flex">
         <Button outline color="red" class="float-right" on:click={onClear}>Clear catalog</Button>
       </div>
-      <div class="flex flex-row gap-5 flex-wrap">
+      <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
         {#each $catalog as { id, manga } (id)}
           <CatalogItem {manga} />
         {/each}

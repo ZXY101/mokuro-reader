@@ -38,7 +38,7 @@
   <div class="sm:block flex-col flex">
     <Button outline color="red" class="float-right" on:click={onDelete}>Delete manga</Button>
   </div>
-  <div class="flex flex-row gap-5 flex-wrap">
+  <div class="flex sm:flex-row flex-col justify-center sm:justify-start gap-5 flex-wrap">
     {#if manga}
       {#each manga as volume}
         <VolumeItem {volume} />

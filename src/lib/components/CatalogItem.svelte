@@ -10,7 +10,7 @@
 </script>
 
 <a href={volumeName} on:click={onClick}>
-  <div class="flex flex-col gap-[5px] text-center">
+  <div class="flex flex-col gap-[5px] text-center items-center">
     {mokuroData.title}
     {#if files}
       <img
