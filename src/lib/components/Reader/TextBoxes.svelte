@@ -62,16 +62,17 @@
     style:left
     style:top
     style:font-size={fontSize}
-    style:writing-mode={writingMode}
     style:font-weight={fontWeight}
     style:display
     style:border
     on:dblclick={() => onUpdateCard(lines)}
     {contenteditable}
   >
-    {#each lines as line}
-      <p>{line}</p>
-    {/each}
+    <div style:writing-mode={writingMode}>
+      {#each lines as line}
+        <p>{line}</p>
+      {/each}
+    </div>
   </button>
 {/each}
 
