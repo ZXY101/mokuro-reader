@@ -67,7 +67,7 @@ const defaultSettings: Settings = {
   pageNum: true,
   charCount: false,
   mobile: false,
-  backgroundColor: '#0d0d0f',
+  backgroundColor: '#030712',
   fontSize: 'auto',
   zoomDefault: 'zoomFitToScreen',
   ankiConnectSettings: {

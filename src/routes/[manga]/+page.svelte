@@ -36,7 +36,7 @@
   <title>{manga?.[0].mokuroData.title || 'Manga'}</title>
 </svelte:head>
 {#if manga}
-  <div class="p-5 flex flex-col gap-5">
+  <div class="p-2 flex flex-col gap-5">
     <div class="flex flex-row justify-between">
       <div class="flex flex-col">
         <h3 class="font-bold">{manga[0].mokuroData.title}</h3>
