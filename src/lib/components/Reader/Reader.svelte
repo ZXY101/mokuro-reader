@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { currentVolume } from '$lib/catalog';
+  import { catalog } from '$lib/catalog';
   import { Panzoom, toggleFullScreen, zoomDefault } from '$lib/panzoom';
   import { progress, settings, updateProgress } from '$lib/settings';
   import { clamp } from '$lib/util';
-  import { Input, Popover, Range } from 'flowbite-svelte';
+  import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
   import {
     ChervonDoubleLeftSolid,
@@ -13,9 +13,13 @@
   } from 'flowbite-svelte-icons';
   import { afterUpdate, onMount } from 'svelte';
   import Cropper from './Cropper.svelte';
+  import { page as pageStore } from '$app/stores';
 
-  const volume = $currentVolume;
-  const pages = volume?.mokuroData.pages;
+  $: volume = $catalog
+    ?.find((item) => item.id === $pageStore.params.manga)
+    ?.manga.find((item) => item.mokuroData.volume_uuid === $pageStore.params.volume);
+
+  $: pages = volume?.mokuroData.pages;
 
   $: page = $progress?.[volume?.mokuroData.volume_uuid || 0] || 1;
   $: index = page - 1;
@@ -102,7 +106,6 @@
   });
 
   onMount(() => {
-    getMaxCharCount();
     updateCharacterCount(page);
   });
 
@@ -143,7 +146,7 @@
 
   function updateCharacterCount(currentPage: number) {
     charCount = 0;
-    if (pages && $settings.charCount) {
+    if (pages && pages.length > 0 && $settings.charCount) {
       for (let i = 0; i < currentPage; i++) {
         const blocks = pages[i].blocks;
         blocks.forEach((block) => {
@@ -157,8 +160,10 @@
 
   let maxCharCount = 0;
 
+  $: pages?.length, getMaxCharCount();
+
   function getMaxCharCount() {
-    if (pages) {
+    if (pages && pages.length > 0) {
       for (let i = 0; i < pages.length; i++) {
         const blocks = pages[i].blocks;
         blocks.forEach((block) => {
@@ -174,6 +179,9 @@
 </script>
 
 <svelte:window on:resize={zoomDefault} on:keyup|preventDefault={handleShortcuts} />
+<svelte:head>
+  <title>{volume?.mokuroData.volume || 'Volume'}</title>
+</svelte:head>
 {#if volume && pages}
   <Cropper />
   <Popover placement="bottom-end" trigger="click" triggeredBy="#page-num" class="z-20">
@@ -235,4 +243,8 @@
     on:mouseup={right}
     class="right-0 top-0 absolute h-full w-10 hover:bg-slate-400 opacity-[0.01]"
   />
+{:else}
+  <div class="fixed z-50 left-1/2 top-1/2">
+    <Spinner />
+  </div>
 {/if}

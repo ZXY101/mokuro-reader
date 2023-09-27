@@ -1,17 +1,3 @@
-<script lang="ts">
-  import { currentVolume } from '$lib/catalog';
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-
-  const volume = $currentVolume;
-
-  onMount(() => {
-    if (!volume) {
-      goto('/');
-    }
-  });
-</script>
-
 <slot />
 
 <style>

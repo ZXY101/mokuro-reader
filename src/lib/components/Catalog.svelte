@@ -1,24 +1,14 @@
 <script lang="ts">
   import { catalog } from '$lib/catalog';
-  import { Button } from 'flowbite-svelte';
   import CatalogItem from './CatalogItem.svelte';
-  import { promptConfirmation } from '$lib/util';
-  import { db } from '$lib/catalog/db';
-
-  function onClear() {
-    promptConfirmation('Are you sure you want to clear your catalog?', () => db.catalog.clear());
-  }
 </script>
 
 {#if $catalog}
   {#if $catalog.length > 0}
     <div class="flex flex-col gap-5">
-      <div class="sm:block flex-col flex">
-        <Button outline color="red" class="float-right" on:click={onClear}>Clear catalog</Button>
-      </div>
       <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
-        {#each $catalog as { id, manga } (id)}
-          <CatalogItem {manga} />
+        {#each $catalog as { id } (id)}
+          <CatalogItem {id} />
         {/each}
       </div>
     </div>

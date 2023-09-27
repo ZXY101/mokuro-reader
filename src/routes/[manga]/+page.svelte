@@ -1,13 +1,15 @@
 <script lang="ts">
-  import { currentManga } from '$lib/catalog';
+  import { catalog } from '$lib/catalog';
   import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
   import VolumeItem from '$lib/components/VolumeItem.svelte';
-  import { Button } from 'flowbite-svelte';
+  import { Button, Listgroup } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
   import { promptConfirmation } from '$lib/util';
+  import { page } from '$app/stores';
+  import type { Volume } from '$lib/types';
+  import { onMount } from 'svelte';
 
-  const manga = $currentManga?.sort((a, b) => {
+  function sortManga(a: Volume, b: Volume) {
     if (a.volumeName < b.volumeName) {
       return -1;
     }
@@ -15,13 +17,9 @@
       return 1;
     }
     return 0;
-  });
+  }
 
-  onMount(() => {
-    if (!manga) {
-      goto('/');
-    }
-  });
+  $: manga = $catalog?.find((item) => item.id === $page.params.manga)?.manga.sort(sortManga);
 
   async function confirmDelete() {
     const title = manga?.[0].mokuroData.title_uuid;
@@ -34,15 +32,22 @@
   }
 </script>
 
-<div class="p-2 flex flex-col gap-5">
-  <div class="sm:block flex-col flex">
-    <Button outline color="red" class="float-right" on:click={onDelete}>Delete manga</Button>
+<svelte:head>
+  <title>{manga?.[0].mokuroData.title || 'Manga'}</title>
+</svelte:head>
+{#if manga}
+  <div class="p-5 flex flex-col gap-5">
+    <div class="flex flex-row justify-between">
+      <div class="flex flex-col">
+        <h3 class="font-bold">{manga[0].mokuroData.title}</h3>
+        <p>Volumes: {manga.length}</p>
+      </div>
+      <div><Button color="alternative" on:click={onDelete}>Remove manga</Button></div>
+    </div>
+    <Listgroup items={manga} let:item active class="flex-1 h-full w-full">
+      <VolumeItem {item} />
+    </Listgroup>
   </div>
-  <div class="flex sm:flex-row flex-col justify-center sm:justify-start gap-5 flex-wrap">
-    {#if manga}
-      {#each manga as volume}
-        <VolumeItem {volume} />
-      {/each}
-    {/if}
-  </div>
-</div>
+{:else}
+  <div class="flex justify-center p-16">Manga not found</div>
+{/if}

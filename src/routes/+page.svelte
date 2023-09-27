@@ -2,6 +2,10 @@
   import Catalog from '$lib/components/Catalog.svelte';
 </script>
 
-<div class="p-2">
+<svelte:head>
+  <title>Mokuro</title>
+</svelte:head>
+
+<div class="p-5">
   <Catalog />
 </div>
