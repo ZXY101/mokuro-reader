@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { zoomDefault } from '$lib/panzoom';
-import { writable } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 
 export type FontSize =
   | 'auto'
@@ -55,7 +55,6 @@ export type AnkiConnectSettings = {
 
 export type AnkiSettingsKey = keyof AnkiConnectSettings;
 
-
 const defaultSettings: Settings = {
   rightToLeft: true,
   singlePageView: false,
@@ -80,40 +79,94 @@ const defaultSettings: Settings = {
   }
 };
 
-const stored = browser ? window.localStorage.getItem('settings') : undefined;
-const initialSettings: Settings = stored && browser ? JSON.parse(stored) : defaultSettings;
+type Profiles = Record<string, Settings>
 
+const defaultProfiles: Profiles = {
+  Default: defaultSettings
+}
 
-export const settings = writable<Settings>(initialSettings);
+const storedProfiles = browser ? window.localStorage.getItem('profiles') : undefined;
+const initialProfiles: Profiles = storedProfiles && browser ? JSON.parse(storedProfiles) : defaultProfiles;
+export const profiles = writable<Profiles>(initialProfiles);
+
+const storedCurrentProfile = browser ? window.localStorage.getItem('currentProfile') || 'Default' : 'Default';
+export const currentProfile = writable(storedCurrentProfile)
+
+profiles.subscribe((profiles) => {
+  if (browser) {
+    window.localStorage.setItem('profiles', JSON.stringify(profiles));
+  }
+});
+
+currentProfile.subscribe((currentProfile) => {
+  if (browser) {
+    window.localStorage.setItem('currentProfile', currentProfile);
+  }
+});
+
+export const settings = derived([profiles, currentProfile], ([profiles, currentProfile]) => {
+  return profiles[currentProfile]
+});
 
 export function updateSetting(key: SettingsKey, value: any) {
-  settings.update((settings) => {
+  profiles.update((profiles) => {
     return {
-      ...settings,
-      [key]: value
+      ...profiles,
+      [get(currentProfile)]: {
+        ...profiles[get(currentProfile)],
+        [key]: value
+      }
     };
   });
   zoomDefault();
 }
 
 export function updateAnkiSetting(key: AnkiSettingsKey, value: any) {
-  settings.update((settings) => {
+  profiles.update((profiles) => {
     return {
-      ...settings,
-      ankiConnectSettings: {
-        ...settings.ankiConnectSettings,
-        [key]: value
+      ...profiles,
+      [get(currentProfile)]: {
+        ...profiles[get(currentProfile)],
+        ankiConnectSettings: {
+          ...profiles[get(currentProfile)].ankiConnectSettings,
+          [key]: value
+        }
       }
+
     };
   });
 }
 
 export function resetSettings() {
-  settings.set(defaultSettings);
+  profiles.update((profiles) => {
+    return {
+      ...profiles,
+      [get(currentProfile)]: defaultSettings
+    }
+  });
 }
 
-settings.subscribe((settings) => {
-  if (browser) {
-    window.localStorage.setItem('settings', JSON.stringify(settings));
+export function createProfile(profileId: string) {
+  profiles.update((profiles) => {
+    return {
+      ...profiles,
+      [profileId]: defaultSettings
+    }
+  })
+}
+
+export function deleteProfile(profileId: string) {
+  if (get(currentProfile) === profileId) {
+    currentProfile.set('Default');
   }
-});
+
+  profiles.update((profiles) => {
+    delete profiles[profileId]
+    return profiles
+  })
+}
+
+
+export function changeProfile(profileId: string) {
+  currentProfile.set(profileId)
+}

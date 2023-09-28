@@ -1,15 +1,18 @@
 <script lang="ts">
   import { db } from '$lib/catalog/db';
+  import { changeProfile, currentProfile, profiles } from '$lib/settings';
   import { promptConfirmation } from '$lib/util';
   import { AccordionItem, Button, Select } from 'flowbite-svelte';
 
-  let profiles = [
-    { value: 'default', name: 'Default' },
-    { value: 'profile1', name: 'Profile 1' },
-    { value: 'profile2', name: 'Porfile 2' }
-  ];
+  $: items = Object.keys($profiles).map((id) => {
+    return { value: id, name: id };
+  });
 
-  let profile = 'default';
+  let profile = $currentProfile;
+
+  function onChange() {
+    changeProfile(profile);
+  }
 
   function onClear() {
     promptConfirmation('Are you sure you want to clear your catalog?', () => db.catalog.clear());
@@ -20,7 +23,7 @@
   <span slot="header">Profile</span>
   <div class="flex flex-col gap-5">
     <div class="flex flex-col gap-2">
-      <Select items={profiles} value={profile} />
+      <Select {items} bind:value={profile} on:change={onChange} />
       <Button size="sm" outline color="dark">Manage profiles</Button>
     </div>
     <Button on:click={onClear} outline color="red">Clear catalog</Button>
