@@ -166,6 +166,28 @@ export function deleteProfile(profileId: string) {
   })
 }
 
+export function renameProfile(oldName: string, newName: string) {
+  if (get(currentProfile) === oldName) {
+    currentProfile.set('Default');
+  }
+
+  profiles.update((profiles) => {
+    delete Object.assign(profiles, { [newName]: profiles[oldName] })[oldName];
+    return profiles
+  })
+}
+
+export function copyProfile(profileToCopy: string, newName: string) {
+  profiles.update((profiles) => {
+    return {
+      ...profiles,
+      [newName]: {
+        ...profiles[profileToCopy]
+      }
+    }
+  })
+}
+
 
 export function changeProfile(profileId: string) {
   currentProfile.set(profileId)

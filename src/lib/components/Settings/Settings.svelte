@@ -6,7 +6,7 @@
   import { promptConfirmation } from '$lib/util';
   import AnkiConnectSettings from './AnkiConnectSettings.svelte';
   import ReaderSettings from './Reader/ReaderSettings.svelte';
-  import Profiles from './Profiles.svelte';
+  import Profiles from './Profiles/Profiles.svelte';
 
   let transitionParams = {
     x: 320,
