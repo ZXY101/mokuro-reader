@@ -2,10 +2,10 @@
   import { AccordionItem } from 'flowbite-svelte';
   import ReaderSelects from './ReaderSelects.svelte';
   import ReaderToggles from './ReaderToggles.svelte';
-  import { page } from '$app/stores';
+  import { isReader } from '$lib/util';
 </script>
 
-<AccordionItem open={$page.route.id === '/[manga]/[volume]'}>
+<AccordionItem>
   <span slot="header">Reader</span>
   <div class="flex flex-col gap-5">
     <ReaderSelects />

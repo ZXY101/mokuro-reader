@@ -16,6 +16,8 @@
   import { page as pageStore } from '$app/stores';
   import SettingsButton from './SettingsButton.svelte';
 
+  // TODO: Refactor this whole mess
+
   $: volume = $catalog
     ?.find((item) => item.id === $pageStore.params.manga)
     ?.manga.find((item) => item.mokuroData.volume_uuid === $pageStore.params.volume);
