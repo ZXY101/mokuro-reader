@@ -1,6 +1,7 @@
 <script lang="ts">
   import { catalog } from '$lib/catalog';
   import CatalogItem from './CatalogItem.svelte';
+  import Loader from './Loader.svelte';
 </script>
 
 {#if $catalog}
@@ -18,5 +19,5 @@
     </div>
   {/if}
 {:else}
-  <p>Loading...</p>
+  <Loader>Fetching catalog...</Loader>
 {/if}
