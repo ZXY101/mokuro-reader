@@ -5,7 +5,7 @@
   import { isReader } from '$lib/util';
 </script>
 
-<AccordionItem>
+<AccordionItem open={isReader()}>
   <span slot="header">Reader</span>
   <div class="flex flex-col gap-5">
     <ReaderSelects />
