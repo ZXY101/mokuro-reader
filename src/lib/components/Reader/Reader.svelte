@@ -14,6 +14,7 @@
   import { afterUpdate, onMount } from 'svelte';
   import Cropper from './Cropper.svelte';
   import { page as pageStore } from '$app/stores';
+  import SettingsButton from './SettingsButton.svelte';
 
   $: volume = $catalog
     ?.find((item) => item.id === $pageStore.params.manga)
@@ -182,6 +183,7 @@
 <svelte:head>
   <title>{volume?.mokuroData.volume || 'Volume'}</title>
 </svelte:head>
+<SettingsButton />
 {#if volume && pages}
   <Cropper />
   <Popover placement="bottom-end" trigger="click" triggeredBy="#page-num" class="z-20">
