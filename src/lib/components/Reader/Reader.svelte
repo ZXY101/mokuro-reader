@@ -206,7 +206,6 @@
         <Input
           type="number"
           size="sm"
-          defaultClass="select-all"
           bind:value={manualPage}
           on:click={onInputClick}
           on:change={onManualPageChange}
