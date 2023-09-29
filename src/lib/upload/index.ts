@@ -30,17 +30,31 @@ export async function unzipManga(file: File) {
 }
 
 function getDetails(file: File) {
-  const [filename, ext] = file.name.split('.');
+  const { webkitRelativePath, name } = file
+  const [filename, ext] = name.split('.');
+  let path = filename
+
+  if (webkitRelativePath) {
+    path = webkitRelativePath.split('.')[0]
+  }
 
   return {
     filename,
-    ext
+    ext,
+    path
   };
 }
 
 async function getFile(fileEntry: FileSystemFileEntry) {
   try {
-    return new Promise<File>((resolve, reject) => fileEntry.file(resolve, reject));
+    return new Promise<File>((resolve, reject) => fileEntry.file((file) => {
+      if (!file.webkitRelativePath) {
+        Object.defineProperty(file, 'webkitRelativePath', {
+          value: fileEntry.fullPath.substring(1)
+        })
+      }
+      resolve(file)
+    }, reject));
   } catch (err) {
     console.log(err);
   }
@@ -69,8 +83,7 @@ export async function processFiles(files: File[]) {
   const mangas: string[] = [];
 
   for (const file of files) {
-    const { ext, filename } = getDetails(file);
-    const { type, webkitRelativePath } = file;
+    const { ext, filename, path } = getDetails(file);
 
     if (ext === 'mokuro') {
       const mokuroData: Volume['mokuroData'] = JSON.parse(await file.text());
@@ -79,20 +92,33 @@ export async function processFiles(files: File[]) {
         mangas.push(mokuroData.title_uuid);
       }
 
-      volumes[filename] = {
-        ...volumes[filename],
+
+      volumes[path] = {
+        ...volumes[path],
         mokuroData,
         volumeName: filename
       };
       continue;
     }
+  }
+
+
+  for (const file of files) {
+    const { ext, path } = getDetails(file);
+    const { type, webkitRelativePath } = file;
 
     const mimeType = type || getMimeType(file.name);
 
     if (imageTypes.includes(mimeType)) {
       if (webkitRelativePath) {
         const imageName = webkitRelativePath.split('/').at(-1);
-        const vol = webkitRelativePath.split('/').at(-2);
+        let vol = ''
+
+        Object.keys(volumes).forEach((key) => {
+          if (webkitRelativePath.startsWith(key)) {
+            vol = key
+          }
+        })
 
         if (vol && imageName) {
           volumes[vol] = {
@@ -110,8 +136,8 @@ export async function processFiles(files: File[]) {
     if (zipTypes.includes(ext)) {
       const unzippedFiles = await unzipManga(file);
 
-      volumes[filename] = {
-        ...volumes[filename],
+      volumes[path] = {
+        ...volumes[path],
         files: unzippedFiles
       };
 
@@ -124,6 +150,7 @@ export async function processFiles(files: File[]) {
   if (vols.length > 0) {
     const valid = vols.map((vol) => {
       const { files, mokuroData, volumeName } = vol;
+
       if (!mokuroData || !volumeName) {
         showSnackbar('Missing .mokuro file');
         return false;

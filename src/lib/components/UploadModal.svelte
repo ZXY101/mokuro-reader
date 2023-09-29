@@ -5,7 +5,6 @@
   import { onMount } from 'svelte';
   import { scanFiles } from '$lib/upload';
   import { formatBytes } from '$lib/util/upload';
-  import { catalog } from '$lib/catalog';
 
   export let open = false;
 
