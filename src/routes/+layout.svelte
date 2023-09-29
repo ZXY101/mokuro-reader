@@ -6,7 +6,7 @@
   import { settings } from '$lib/settings';
 </script>
 
-<div class=" h-full min-h-[100svh] text-white" style:background-color={$settings.backgroundColor}>
+<div class=" h-full min-h-[100svh] text-white">
   <NavBar />
   <slot />
   <Snackbar />

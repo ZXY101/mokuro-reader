@@ -1,5 +1,6 @@
 <script lang="ts">
   import { catalog } from '$lib/catalog';
+  import { P } from 'flowbite-svelte';
 
   export let id: string;
 
@@ -8,15 +9,15 @@
 
 {#if manga}
   <a href={id}>
-    <div class="flex flex-col gap-[5px] text-center items-center">
-      {manga.mokuroData.title}
+    <div class="flex flex-col gap-[5px] text-center items-center bg-slate-900 pb-1">
       {#if manga.files}
         <img
           src={URL.createObjectURL(Object.values(manga.files)[0])}
           alt="img"
-          class="object-contain w-[250px] h-[350px] bg-black border-gray-900 border"
+          class="object-contain sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border"
         />
       {/if}
+      <p class="font-semibold">{manga.mokuroData.title}</p>
     </div>
   </a>
 {/if}

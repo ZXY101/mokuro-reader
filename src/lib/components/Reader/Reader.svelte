@@ -22,7 +22,7 @@
     ?.find((item) => item.id === $pageStore.params.manga)
     ?.manga.find((item) => item.mokuroData.volume_uuid === $pageStore.params.volume);
 
-  $: pages = volume?.mokuroData.pages;
+  $: pages = volume?.mokuroData.pages || [];
 
   $: page = $progress?.[volume?.mokuroData.volume_uuid || 0] || 1;
   $: index = page - 1;
@@ -166,6 +166,8 @@
   $: pages?.length, getMaxCharCount();
 
   function getMaxCharCount() {
+    maxCharCount = 0;
+
     if (pages && pages.length > 0) {
       for (let i = 0; i < pages.length; i++) {
         const blocks = pages[i].blocks;
@@ -188,14 +190,19 @@
 <SettingsButton />
 {#if volume && pages}
   <Cropper />
-  <Popover placement="bottom-end" trigger="click" triggeredBy="#page-num" class="z-20">
+  <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full">
     <div class="flex flex-col gap-3">
       <div class="flex flex-row items-center gap-5 z-10">
         <ChervonDoubleLeftSolid
           on:click={() => changePage($settings.rightToLeft ? pages.length : 1, true)}
           class="hover:text-primary-600"
+          size="sm"
         />
-        <ChevronLeftSolid on:click={(e) => left(e, true)} class="hover:text-primary-600" />
+        <ChevronLeftSolid
+          on:click={(e) => left(e, true)}
+          class="hover:text-primary-600"
+          size="sm"
+        />
         <Input
           type="number"
           size="sm"
@@ -204,10 +211,15 @@
           on:click={onInputClick}
           on:change={onManualPageChange}
         />
-        <ChevronRightSolid on:click={(e) => right(e, true)} class="hover:text-primary-600" />
+        <ChevronRightSolid
+          on:click={(e) => right(e, true)}
+          class="hover:text-primary-600"
+          size="sm"
+        />
         <ChervonDoubleRightSolid
           on:click={() => changePage($settings.rightToLeft ? 1 : pages.length, true)}
           class="hover:text-primary-600"
+          size="sm"
         />
       </div>
       <Range min={1} max={pages.length} bind:value={manualPage} on:change={onManualPageChange} />
@@ -217,7 +229,7 @@
     <p class="text-left" class:hidden={!$settings.charCount}>{charDisplay}</p>
     <p class="text-left" class:hidden={!$settings.pageNum}>{pageDisplay}</p>
   </button>
-  <div class="flex">
+  <div class="flex" style:background-color={$settings.backgroundColor}>
     <Panzoom>
       <button
         class="h-full fixed -left-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01] justify-items-center"
