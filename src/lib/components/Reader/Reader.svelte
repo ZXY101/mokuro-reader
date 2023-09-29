@@ -190,7 +190,7 @@
 <SettingsButton />
 {#if volume && pages}
   <Cropper />
-  <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full">
+  <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
     <div class="flex flex-col gap-3">
       <div class="flex flex-row items-center gap-5 z-10">
         <ChervonDoubleLeftSolid
@@ -221,7 +221,16 @@
           size="sm"
         />
       </div>
-      <Range min={1} max={pages.length} bind:value={manualPage} on:change={onManualPageChange} />
+      <div style:direction={$settings.rightToLeft ? 'rtl' : 'ltr'}>
+        <Range
+          min={1}
+          max={pages.length}
+          bind:value={manualPage}
+          on:change={onManualPageChange}
+          cla
+          defaultClass=""
+        />
+      </div>
     </div>
   </Popover>
   <button class="absolute opacity-50 left-5 top-5 z-10 mix-blend-difference" id="page-num">
