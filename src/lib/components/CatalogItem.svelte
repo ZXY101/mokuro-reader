@@ -9,7 +9,9 @@
 
 {#if manga}
   <a href={id}>
-    <div class="flex flex-col gap-[5px] text-center items-center bg-slate-900 pb-1">
+    <div
+      class="flex flex-col gap-[5px] text-center items-center bg-slate-900 pb-1 bg-opacity-50 border border-slate-950"
+    >
       {#if manga.files}
         <img
           src={URL.createObjectURL(Object.values(manga.files)[0])}
