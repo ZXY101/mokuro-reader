@@ -1,12 +1,11 @@
 <script lang="ts">
   import type { Page } from '$lib/types';
-  import { onMount } from 'svelte';
   import TextBoxes from './TextBoxes.svelte';
 
   export let page: Page;
   export let src: File;
 
-  $: url = `url(${URL.createObjectURL(src)})`;
+  $: url = src ? `url(${URL.createObjectURL(src)})` : '';
 </script>
 
 <div

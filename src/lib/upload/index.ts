@@ -64,16 +64,24 @@ export async function scanFiles(item: FileSystemEntry, files: Promise<File | und
   if (item.isDirectory) {
     const directoryReader = (item as FileSystemDirectoryEntry).createReader();
     await new Promise<void>((resolve) => {
-      directoryReader.readEntries(async (entries) => {
-        for (const entry of entries) {
-          if (entry.isFile) {
-            files.push(getFile(entry as FileSystemFileEntry));
+      function readEntries() {
+        directoryReader.readEntries(async (entries) => {
+          if (entries.length > 0) {
+            for (const entry of entries) {
+              if (entry.isFile) {
+                files.push(getFile(entry as FileSystemFileEntry));
+              } else {
+                await scanFiles(entry, files);
+              }
+            }
+            readEntries()
           } else {
-            await scanFiles(entry, files);
+            resolve();
           }
-        }
-        resolve();
-      });
+        });
+      }
+
+      readEntries()
     });
   }
 }
@@ -187,5 +195,7 @@ export async function processFiles(files: File[]) {
 
       showSnackbar('Catalog updated successfully');
     }
+  } else {
+    showSnackbar('Missing .mokuro file');
   }
 }
