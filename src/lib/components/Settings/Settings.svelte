@@ -7,6 +7,7 @@
   import AnkiConnectSettings from './AnkiConnectSettings.svelte';
   import ReaderSettings from './Reader/ReaderSettings.svelte';
   import Profiles from './Profiles/Profiles.svelte';
+  import CatalogSettings from './CatalogSettings.svelte';
 
   let transitionParams = {
     x: 320,
@@ -45,6 +46,7 @@
       <ReaderSettings />
       <AnkiConnectSettings />
       <Profiles />
+      <CatalogSettings />
     </Accordion>
     <div class="flex flex-col gap-2">
       <Button outline on:click={onReset}>Reset</Button>

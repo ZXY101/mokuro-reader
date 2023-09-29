@@ -30,11 +30,3 @@
     </div>
   </div>
 </AccordionItem>
-
-<!-- import { db } from '$lib/catalog/db';
-import { promptConfirmation } from '$lib/util';
-
-function onClear() {
-  promptConfirmation('Are you sure you want to clear your catalog?', () => db.catalog.clear());
-}
-<Button on:click={onClear} outline color="red">Clear catalog</Button> -->
