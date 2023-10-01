@@ -31,7 +31,9 @@ export async function unzipManga(file: File) {
 
 function getDetails(file: File) {
   const { webkitRelativePath, name } = file
-  const [filename, ext] = name.split('.');
+  const split = name.split('.');
+  const ext = split.pop()
+  const filename = split.join('.');
   let path = filename
 
   if (webkitRelativePath) {
