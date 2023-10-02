@@ -1,8 +1,14 @@
 <script lang="ts">
   import { catalog } from '$lib/catalog';
-  import { Panzoom, toggleFullScreen, zoomDefault } from '$lib/panzoom';
+  import {
+    Panzoom,
+    panzoomStore,
+    toggleFullScreen,
+    zoomDefault,
+    zoomFitToScreen
+  } from '$lib/panzoom';
   import { progress, settings, updateProgress } from '$lib/settings';
-  import { clamp } from '$lib/util';
+  import { clamp, debounce } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
   import {
@@ -181,9 +187,64 @@
 
     return maxCharCount;
   }
+
+  let startX = 0;
+  let startY = 0;
+
+  function handleTouchStart(event: TouchEvent) {
+    if ($settings.mobile) {
+      const { clientX, clientY } = event.touches[0];
+
+      startX = clientX;
+      startY = clientY;
+    }
+  }
+
+  function handlePointerUp(event: TouchEvent) {
+    if ($settings.mobile) {
+      debounce(() => {
+        if (event.touches.length === 0) {
+          const { clientX, clientY } = event.changedTouches[0];
+
+          const distanceX = clientX - startX;
+          const distanceY = clientY - startY;
+
+          const isSwipe = distanceY < 200 && distanceY > 200 * -1;
+
+          if (isSwipe) {
+            const swipeThreshold = Math.abs(($settings.swipeThreshold / 100) * window.innerWidth);
+
+            if (distanceX > swipeThreshold) {
+              left(event, true);
+            } else if (distanceX < swipeThreshold * -1) {
+              right(event, true);
+            }
+          }
+        }
+      });
+    }
+  }
+
+  function onDoubleTap(event: MouseEvent) {
+    if ($panzoomStore && $settings.mobile) {
+      const { clientX, clientY } = event;
+      const { scale } = $panzoomStore.getTransform();
+
+      if (scale < 0.5) {
+        $panzoomStore.zoomTo(clientX, clientY, 3);
+      } else {
+        zoomFitToScreen();
+      }
+    }
+  }
 </script>
 
-<svelte:window on:resize={zoomDefault} on:keyup|preventDefault={handleShortcuts} />
+<svelte:window
+  on:resize={zoomDefault}
+  on:keyup|preventDefault={handleShortcuts}
+  on:touchstart={handleTouchStart}
+  on:touchend={handlePointerUp}
+/>
 <svelte:head>
   <title>{volume?.mokuroData.volume || 'Volume'}</title>
 </svelte:head>
@@ -227,7 +288,6 @@
           max={pages.length}
           bind:value={manualPage}
           on:change={onManualPageChange}
-          cla
           defaultClass=""
         />
       </div>
@@ -239,17 +299,35 @@
   </button>
   <div class="flex" style:background-color={$settings.backgroundColor}>
     <Panzoom>
-      <button
-        class="h-full fixed -left-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01] justify-items-center"
-        on:mousedown={mouseDown}
-        on:mouseup={left}
-      />
-      <button
-        class="h-full fixed -right-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
-        on:mousedown={mouseDown}
-        on:mouseup={right}
-      />
-      <div class="flex flex-row" class:flex-row-reverse={!$settings.rightToLeft}>
+      {#if !$settings.mobile}
+        <button
+          class="h-full fixed -left-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
+          on:mousedown={mouseDown}
+          on:mouseup={left}
+        />
+        <button
+          class="h-full fixed -right-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
+          on:mousedown={mouseDown}
+          on:mouseup={right}
+        />
+      {:else}
+        <button
+          class="h-screen fixed top-full left-0 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
+          on:mousedown={mouseDown}
+          on:mouseup={left}
+        />
+        <button
+          class="h-screen fixed top-full right-0 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
+          on:mousedown={mouseDown}
+          on:mouseup={right}
+        />
+      {/if}
+      <div
+        class="flex flex-row"
+        class:flex-row-reverse={!$settings.rightToLeft}
+        on:dblclick={onDoubleTap}
+        role="none"
+      >
         {#if showSecondPage()}
           <MangaPage page={pages[index + 1]} src={Object.values(volume?.files)[index + 1]} />
         {/if}
@@ -257,16 +335,18 @@
       </div>
     </Panzoom>
   </div>
-  <button
-    on:mousedown={mouseDown}
-    on:mouseup={left}
-    class="left-0 top-0 absolute h-full w-10 hover:bg-slate-400 opacity-[0.01]"
-  />
-  <button
-    on:mousedown={mouseDown}
-    on:mouseup={right}
-    class="right-0 top-0 absolute h-full w-10 hover:bg-slate-400 opacity-[0.01]"
-  />
+  {#if !$settings.mobile}
+    <button
+      on:mousedown={mouseDown}
+      on:mouseup={left}
+      class="left-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
+    />
+    <button
+      on:mousedown={mouseDown}
+      on:mouseup={right}
+      class="right-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
+    />
+  {/if}
 {:else}
   <div class="fixed z-50 left-1/2 top-1/2">
     <Spinner />

@@ -167,14 +167,23 @@ export function keepInBounds() {
   let minY = innerHeight - height - marginY;
   let maxY = marginY;
 
+  let forceCenterY = false;
+
   if (width + 2 * marginX <= innerWidth) {
     minX = marginX;
     maxX = innerWidth - width - marginX;
+  } else {
+    minX = innerWidth - width - marginX;
+    maxX = marginX;
   }
 
   if (height + 2 * marginY <= innerHeight) {
     minY = marginY;
     maxY = innerHeight - height - marginY;
+    forceCenterY = true;
+  } else {
+    minY = innerHeight - height - marginY;
+    maxY = marginY;
   }
 
   if (x < minX) {
@@ -185,11 +194,15 @@ export function keepInBounds() {
     transform.x = maxX;
   }
 
-  if (y < minY) {
-    transform.y = minY;
-  }
-  if (y > maxY) {
-    transform.y = maxY;
+  if (forceCenterY) {
+    transform.y = innerHeight / 2 - height / 2;
+  } else {
+    if (y < minY) {
+      transform.y = minY;
+    }
+    if (y > maxY) {
+      transform.y = maxY;
+    }
   }
 }
 

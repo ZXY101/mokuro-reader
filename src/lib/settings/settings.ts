@@ -37,6 +37,7 @@ export type Settings = {
   hasCover: boolean;
   mobile: boolean;
   backgroundColor: string;
+  swipeThreshold: number;
   fontSize: FontSize;
   zoomDefault: ZoomModes;
   ankiConnectSettings: AnkiConnectSettings;
@@ -67,6 +68,7 @@ const defaultSettings: Settings = {
   charCount: false,
   mobile: false,
   backgroundColor: '#030712',
+  swipeThreshold: 50,
   fontSize: 'auto',
   zoomDefault: 'zoomFitToScreen',
   ankiConnectSettings: {

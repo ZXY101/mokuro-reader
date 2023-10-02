@@ -55,7 +55,7 @@
 </script>
 
 {#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`text-box-${index}`)}
-  <button
+  <div
     class="text-box"
     style:width
     style:height
@@ -65,15 +65,15 @@
     style:font-weight={fontWeight}
     style:display
     style:border
+    style:writing-mode={writingMode}
+    role="none"
     on:dblclick={() => onUpdateCard(lines)}
     {contenteditable}
   >
-    <div style:writing-mode={writingMode}>
-      {#each lines as line}
-        <p>{line}</p>
-      {/each}
-    </div>
-  </button>
+    {#each lines as line}
+      <p>{line}</p>
+    {/each}
+  </div>
 {/each}
 
 <style>
@@ -85,6 +85,7 @@
     font-size: 16pt;
     white-space: nowrap;
     border: 1px solid rgba(0, 0, 0, 0);
+    z-index: 11;
   }
 
   .text-box:focus,
@@ -101,6 +102,7 @@
     margin: 0;
     background-color: rgb(255, 255, 255);
     font-weight: var(--bold);
+    z-index: 11;
   }
 
   .text-box:focus p,

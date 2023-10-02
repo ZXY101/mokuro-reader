@@ -32,7 +32,7 @@ export async function unzipManga(file: File) {
 function getDetails(file: File) {
   const { webkitRelativePath, name } = file
   const split = name.split('.');
-  const ext = split.pop()
+  const ext = split.pop();
   const filename = split.join('.');
   let path = filename
 
@@ -143,7 +143,7 @@ export async function processFiles(files: File[]) {
       continue;
     }
 
-    if (zipTypes.includes(ext)) {
+    if (ext && zipTypes.includes(ext)) {
       const unzippedFiles = await unzipManga(file);
 
       volumes[path] = {
