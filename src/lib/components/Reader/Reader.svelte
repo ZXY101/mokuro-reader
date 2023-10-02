@@ -190,10 +190,12 @@
 
   let startX = 0;
   let startY = 0;
+  let touchStart: Date;
 
   function handleTouchStart(event: TouchEvent) {
     if ($settings.mobile) {
       const { clientX, clientY } = event.touches[0];
+      touchStart = new Date();
 
       startX = clientX;
       startY = clientY;
@@ -211,7 +213,10 @@
 
           const isSwipe = distanceY < 200 && distanceY > 200 * -1;
 
-          if (isSwipe) {
+          const end = new Date();
+          const touchDuration = end.getTime() - touchStart?.getTime();
+
+          if (isSwipe && touchDuration < 500) {
             const swipeThreshold = Math.abs(($settings.swipeThreshold / 100) * window.innerWidth);
 
             if (distanceX > swipeThreshold) {

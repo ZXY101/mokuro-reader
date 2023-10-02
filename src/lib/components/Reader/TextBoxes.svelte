@@ -52,6 +52,13 @@
       }
     }
   }
+
+  function onContextMenu(event: Event, lines: string[]) {
+    if ($settings.ankiConnectSettings.enabled) {
+      event.preventDefault();
+      onUpdateCard(lines);
+    }
+  }
 </script>
 
 {#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`text-box-${index}`)}
@@ -67,6 +74,7 @@
     style:border
     style:writing-mode={writingMode}
     role="none"
+    on:contextmenu={(e) => onContextMenu(e, lines)}
     on:dblclick={() => onUpdateCard(lines)}
     {contenteditable}
   >
