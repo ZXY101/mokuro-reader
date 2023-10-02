@@ -31,7 +31,7 @@
     const items = getItems(html);
     message = 'Downloading images...';
 
-    const imageTypes = ['.jpg', '.png', '.webp'];
+    const imageTypes = ['.jpg', '.jpeg', '.png', '.webp'];
 
     for (const item of items) {
       if (imageTypes.includes('.' + item.pathname.split('.').at(-1) || '')) {
