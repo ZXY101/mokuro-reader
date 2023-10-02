@@ -4,6 +4,8 @@ import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { BlobReader, ZipReader, BlobWriter, getMimeType } from '@zip.js/zip.js';
 
+export * from './web-import'
+
 const zipTypes = ['zip', 'cbz', 'ZIP', 'CBZ'];
 const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 

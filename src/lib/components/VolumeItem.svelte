@@ -24,7 +24,7 @@
       class="flex flex-row gap-5 items-center justify-between w-full"
     >
       <div>
-        <p class="font-semibold" class:text-white={!isComplete}>{volumeName}</p>
+        <p class="font-semibold" class:text-white={!isComplete}>{decodeURI(volumeName)}</p>
         <p>{progressDisplay}</p>
       </div>
       {#if isComplete}
