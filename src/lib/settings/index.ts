@@ -1,2 +1,2 @@
-export * from './progress'
+export * from './volume-data'
 export * from './settings'

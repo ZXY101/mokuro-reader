@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { page } from '$app/stores';
   import { progress } from '$lib/settings';
   import type { Volume } from '$lib/types';

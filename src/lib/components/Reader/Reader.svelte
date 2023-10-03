@@ -62,7 +62,13 @@
       if (showSecondPage() && page + 1 === pages.length && newPage > page) {
         return;
       }
-      updateProgress(volume.mokuroData.volume_uuid, clamp(newPage, 1, pages?.length));
+      const pageClamped = clamp(newPage, 1, pages?.length);
+      updateProgress(
+        volume.mokuroData.volume_uuid,
+        pageClamped,
+        getCharCount(pages, pageClamped) || 0,
+        pageClamped === pages.length
+      );
       zoomDefault();
     }
   }
