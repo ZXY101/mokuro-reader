@@ -44,6 +44,17 @@ export function initializeVolume(volume: string) {
   });
 }
 
+export function deleteVolume(volume: string) {
+  volumes.update((prev) => {
+    delete prev[volume]
+    return prev
+  })
+}
+
+export function clearVolumes() {
+  volumes.set({});
+}
+
 export function updateProgress(volume: string, progress: number, chars: number, completed = false) {
   volumes.update((prev) => {
     return {

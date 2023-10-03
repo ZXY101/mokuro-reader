@@ -3,9 +3,15 @@
   import { db } from '$lib/catalog/db';
   import { promptConfirmation } from '$lib/util';
   import { goto } from '$app/navigation';
+  import { clearVolumes } from '$lib/settings';
+
+  function onConfirm() {
+    clearVolumes();
+    db.catalog.clear();
+  }
 
   function onClear() {
-    promptConfirmation('Are you sure you want to clear your catalog?', () => db.catalog.clear());
+    promptConfirmation('Are you sure you want to clear your catalog?', onConfirm);
     goto('/');
   }
 </script>

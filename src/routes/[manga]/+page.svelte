@@ -7,7 +7,7 @@
   import { promptConfirmation } from '$lib/util';
   import { page } from '$app/stores';
   import type { Volume } from '$lib/types';
-  import { onMount } from 'svelte';
+  import { deleteVolume } from '$lib/settings';
 
   function sortManga(a: Volume, b: Volume) {
     if (a.volumeName < b.volumeName) {
@@ -23,6 +23,11 @@
 
   async function confirmDelete() {
     const title = manga?.[0].mokuroData.title_uuid;
+    manga?.forEach((vol) => {
+      const volId = vol.mokuroData.volume_uuid;
+      deleteVolume(volId);
+    });
+
     await db.catalog.delete(title);
     goto('/');
   }
