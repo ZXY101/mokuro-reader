@@ -21,6 +21,7 @@
   import Cropper from './Cropper.svelte';
   import { page as pageStore } from '$app/stores';
   import SettingsButton from './SettingsButton.svelte';
+  import { getCharCount } from '$lib/util/count-chars';
 
   // TODO: Refactor this whole mess
 
@@ -63,7 +64,6 @@
       }
       updateProgress(volume.mokuroData.volume_uuid, clamp(newPage, 1, pages?.length));
       zoomDefault();
-      updateCharacterCount(clamp(newPage, 1, pages?.length));
     }
   }
 
@@ -111,11 +111,6 @@
 
   afterUpdate(() => {
     zoomDefault();
-    updateCharacterCount(page);
-  });
-
-  onMount(() => {
-    updateCharacterCount(page);
   });
 
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
@@ -151,42 +146,8 @@
     }
   }
 
-  let charCount = 0;
-
-  function updateCharacterCount(currentPage: number) {
-    charCount = 0;
-    if (pages && pages.length > 0 && $settings.charCount) {
-      for (let i = 0; i < currentPage; i++) {
-        const blocks = pages[i].blocks;
-        blocks.forEach((block) => {
-          block.lines.forEach((line) => {
-            charCount += line.length;
-          });
-        });
-      }
-    }
-  }
-
-  let maxCharCount = 0;
-
-  $: pages?.length, getMaxCharCount();
-
-  function getMaxCharCount() {
-    maxCharCount = 0;
-
-    if (pages && pages.length > 0) {
-      for (let i = 0; i < pages.length; i++) {
-        const blocks = pages[i].blocks;
-        blocks.forEach((block) => {
-          block.lines.forEach((line) => {
-            maxCharCount += line.length;
-          });
-        });
-      }
-    }
-
-    return maxCharCount;
-  }
+  $: charCount = $settings.charCount ? getCharCount(pages, page) : 0;
+  $: maxCharCount = getCharCount(pages);
 
   let startX = 0;
   let startY = 0;
