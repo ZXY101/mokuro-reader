@@ -3,7 +3,8 @@
   import { page } from '$app/stores';
   import Loader from '$lib/components/Loader.svelte';
   import { getItems, processFiles } from '$lib/upload';
-  import { Button } from 'flowbite-svelte';
+  import { promptConfirmation, showSnackbar } from '$lib/util';
+  import { onMount } from 'svelte';
   export const BASE_URL = 'https://www.mokuro.moe/manga';
 
   const manga = $page.url.searchParams.get('manga');
@@ -11,12 +12,10 @@
   const url = `${BASE_URL}/${manga}/${volume}`;
 
   let message = 'Loading...';
-  let loading = false;
 
   let files: File[] = [];
 
   async function onImport() {
-    loading = true;
     const mokuroRes = await fetch(url + '.mokuro');
     const mokuroBlob = await mokuroRes.blob();
     const mokuroFile = new File([mokuroBlob], volume + '.mokuro', { type: mokuroBlob.type });
@@ -51,14 +50,22 @@
     console.log(files);
 
     processFiles(files).then(() => {
-      goto('/');
+      goto('/', { replaceState: true });
     });
-    loading = true;
   }
+
+  function onCancel() {
+    goto('/', { replaceState: true });
+  }
+
+  onMount(() => {
+    if (!manga || !volume) {
+      showSnackbar('Something went wrong');
+      onCancel();
+    } else {
+      promptConfirmation(`Import ${decodeURI(volume || '')} into catalog?`, onImport, onCancel);
+    }
+  });
 </script>
 
-{#if loading}
-  <Loader>{message}</Loader>
-{:else}
-  <Button on:click={onImport}>Import {decodeURI(volume || '')} into catalog?</Button>
-{/if}
+<Loader>{message}</Loader>
