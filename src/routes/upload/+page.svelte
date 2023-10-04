@@ -16,7 +16,7 @@
   let files: File[] = [];
 
   async function onImport() {
-    const mokuroRes = await fetch(url + '.mokuro');
+    const mokuroRes = await fetch(url + '.mokuro', { cache: 'no-store' });
     const mokuroBlob = await mokuroRes.blob();
     const mokuroFile = new File([mokuroBlob], volume + '.mokuro', { type: mokuroBlob.type });
 
@@ -47,7 +47,6 @@
     files.push(mokuroFile);
     files = files;
     message = 'Adding to catalog...';
-    console.log(files);
 
     processFiles(files).then(() => {
       goto('/', { replaceState: true });
