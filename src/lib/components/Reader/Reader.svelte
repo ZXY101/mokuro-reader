@@ -271,29 +271,26 @@
   </button>
   <div class="flex" style:background-color={$settings.backgroundColor}>
     <Panzoom>
-      {#if !$settings.mobile}
-        <button
-          class="h-full fixed -left-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
-          on:mousedown={mouseDown}
-          on:mouseup={left}
-        />
-        <button
-          class="h-full fixed -right-1/2 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
-          on:mousedown={mouseDown}
-          on:mouseup={right}
-        />
-      {:else}
-        <button
-          class="h-screen fixed top-full left-0 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
-          on:mousedown={mouseDown}
-          on:mouseup={left}
-        />
-        <button
-          class="h-screen fixed top-full right-0 z-10 w-1/2 hover:bg-slate-400 opacity-[0.01]"
-          on:mousedown={mouseDown}
-          on:mouseup={right}
-        />
-      {/if}
+      <button
+        class="h-full fixed -left-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+        on:mousedown={mouseDown}
+        on:mouseup={left}
+      />
+      <button
+        class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+        on:mousedown={mouseDown}
+        on:mouseup={right}
+      />
+      <button
+        class="h-screen fixed top-full -left-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
+        on:mousedown={mouseDown}
+        on:mouseup={left}
+      />
+      <button
+        class="h-screen fixed top-full -right-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
+        on:mousedown={mouseDown}
+        on:mouseup={right}
+      />
       <div
         class="flex flex-row"
         class:flex-row-reverse={!$settings.rightToLeft}
