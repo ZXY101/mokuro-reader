@@ -83,7 +83,9 @@ export function panAlign(alignX: PanX, alignY: PanY) {
       break;
   }
 
-  pz?.moveTo(x, y);
+  pz.pause();
+  pz.moveTo(x, y);
+  pz.resume();
 }
 
 export function zoomOriginal() {

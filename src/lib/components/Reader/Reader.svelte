@@ -120,7 +120,9 @@
   });
 
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
-    switch (event.code) {
+    const action = event.code || event.key;
+
+    switch (action) {
       case 'ArrowLeft':
       case 'ArrowUp':
       case 'PageUp':
@@ -213,7 +215,7 @@
 
 <svelte:window
   on:resize={zoomDefault}
-  on:keyup|preventDefault={handleShortcuts}
+  on:keyup={handleShortcuts}
   on:touchstart={handleTouchStart}
   on:touchend={handlePointerUp}
 />
