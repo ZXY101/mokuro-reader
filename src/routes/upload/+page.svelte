@@ -4,6 +4,7 @@
   import Loader from '$lib/components/Loader.svelte';
   import { getItems, processFiles } from '$lib/upload';
   import { promptConfirmation, showSnackbar } from '$lib/util';
+  import { P, Progressbar } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   export const BASE_URL = 'https://www.mokuro.moe/manga';
 
@@ -14,6 +15,11 @@
   let message = 'Loading...';
 
   let files: File[] = [];
+
+  let completed = 0;
+  let max = 0;
+
+  $: progress = Math.floor((completed / max) * 100).toString();
 
   async function onImport() {
     const mokuroRes = await fetch(url + '.mokuro', { cache: 'no-store' });
@@ -32,6 +38,8 @@
 
     const imageTypes = ['.jpg', '.jpeg', '.png', '.webp'];
 
+    max = items.length;
+
     for (const item of items) {
       if (imageTypes.includes('.' + item.pathname.split('.').at(-1) || '')) {
         const image = await fetch(url + item.pathname);
@@ -43,6 +51,7 @@
 
         files.push(file);
       }
+      completed++;
     }
     files.push(mokuroFile);
     files = files;
@@ -67,4 +76,12 @@
   });
 </script>
 
-<Loader>{message}</Loader>
+<div>
+  <Loader>
+    {message}
+    {#if completed && progress !== '100'}
+      <P>{completed} / {max}</P>
+      <Progressbar {progress} />
+    {/if}
+  </Loader>
+</div>
