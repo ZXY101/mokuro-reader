@@ -3,9 +3,6 @@
   import { Toggle } from 'flowbite-svelte';
 
   $: toggles = [
-    { key: 'rightToLeft', text: 'Right to left', value: $settings.rightToLeft },
-    { key: 'singlePageView', text: 'Single page view', value: $settings.singlePageView },
-    { key: 'hasCover', text: 'First page is cover', value: $settings.hasCover },
     { key: 'textEditable', text: 'Editable text', value: $settings.textEditable },
     { key: 'textBoxBorders', text: 'Text box borders', value: $settings.textBoxBorders },
     { key: 'displayOCR', text: 'OCR enabled', value: $settings.displayOCR },

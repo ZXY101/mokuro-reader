@@ -2,22 +2,28 @@
   import { volumes } from '$lib/settings';
   import { AccordionItem, P } from 'flowbite-svelte';
 
-  $: completed = Object.values($volumes).reduce((total: number, { completed }) => {
-    if (completed) {
-      total++;
-    }
-    return total;
-  }, 0);
+  $: completed = $volumes
+    ? Object.values($volumes).reduce((total: number, { completed }) => {
+        if (completed) {
+          total++;
+        }
+        return total;
+      }, 0)
+    : 0;
 
-  $: pagesRead = Object.values($volumes).reduce((total: number, { progress }) => {
-    total += progress;
-    return total;
-  }, 0);
+  $: pagesRead = $volumes
+    ? Object.values($volumes).reduce((total: number, { progress }) => {
+        total += progress;
+        return total;
+      }, 0)
+    : 0;
 
-  $: charsRead = Object.values($volumes).reduce((total: number, { chars }) => {
-    total += chars;
-    return total;
-  }, 0);
+  $: charsRead = $volumes
+    ? Object.values($volumes).reduce((total: number, { chars }) => {
+        total += chars;
+        return total;
+      }, 0)
+    : 0;
 </script>
 
 <AccordionItem>

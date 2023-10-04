@@ -25,26 +25,6 @@ export type ZoomModes =
   | 'keepZoom'
   | 'keepZoomStart';
 
-export type Settings = {
-  rightToLeft: boolean;
-  singlePageView: boolean;
-  textEditable: boolean;
-  textBoxBorders: boolean;
-  displayOCR: boolean;
-  boldFont: boolean;
-  pageNum: boolean;
-  charCount: boolean;
-  hasCover: boolean;
-  mobile: boolean;
-  backgroundColor: string;
-  swipeThreshold: number;
-  fontSize: FontSize;
-  zoomDefault: ZoomModes;
-  ankiConnectSettings: AnkiConnectSettings;
-};
-
-export type SettingsKey = keyof Settings;
-
 export type AnkiConnectSettings = {
   enabled: boolean;
   pictureField: string;
@@ -54,12 +34,35 @@ export type AnkiConnectSettings = {
   grabSentence: boolean;
 }
 
+export type VolumeDefaults = {
+  rightToLeft: boolean;
+  singlePageView: boolean;
+  hasCover: boolean;
+}
+
+export type Settings = {
+  textEditable: boolean;
+  textBoxBorders: boolean;
+  displayOCR: boolean;
+  boldFont: boolean;
+  pageNum: boolean;
+  charCount: boolean;
+  mobile: boolean;
+  backgroundColor: string;
+  swipeThreshold: number;
+  fontSize: FontSize;
+  zoomDefault: ZoomModes;
+  volumeDefaults: VolumeDefaults;
+  ankiConnectSettings: AnkiConnectSettings;
+};
+
+export type SettingsKey = keyof Settings;
+
 export type AnkiSettingsKey = keyof AnkiConnectSettings;
 
+export type VolumeDefaultsKey = keyof VolumeDefaults;
+
 const defaultSettings: Settings = {
-  rightToLeft: true,
-  singlePageView: false,
-  hasCover: false,
   displayOCR: true,
   textEditable: false,
   textBoxBorders: false,
@@ -71,6 +74,11 @@ const defaultSettings: Settings = {
   swipeThreshold: 50,
   fontSize: 'auto',
   zoomDefault: 'zoomFitToScreen',
+  volumeDefaults: {
+    singlePageView: false,
+    rightToLeft: true,
+    hasCover: false
+  },
   ankiConnectSettings: {
     enabled: false,
     cropImage: false,
@@ -120,7 +128,22 @@ export function updateSetting(key: SettingsKey, value: any) {
       }
     };
   });
-  zoomDefault();
+}
+
+export function updateVolumeDefaults(key: VolumeDefaultsKey, value: any) {
+  profiles.update((profiles) => {
+    return {
+      ...profiles,
+      [get(currentProfile)]: {
+        ...profiles[get(currentProfile)],
+        volumeDefaults: {
+          ...profiles[get(currentProfile)].volumeDefaults,
+          [key]: value
+        }
+      }
+
+    };
+  });
 }
 
 export function updateAnkiSetting(key: AnkiSettingsKey, value: any) {

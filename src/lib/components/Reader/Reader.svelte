@@ -7,7 +7,7 @@
     zoomDefault,
     zoomFitToScreen
   } from '$lib/panzoom';
-  import { progress, settings, updateProgress } from '$lib/settings';
+  import { progress, settings, updateProgress, type VolumeSettings } from '$lib/settings';
   import { clamp, debounce } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
@@ -24,6 +24,7 @@
   import { getCharCount } from '$lib/util/count-chars';
 
   // TODO: Refactor this whole mess
+  export let volumeSettings: VolumeSettings;
 
   $: volume = $catalog
     ?.find((item) => item.id === $pageStore.params.manga)
@@ -34,7 +35,8 @@
   $: page = $progress?.[volume?.mokuroData.volume_uuid || 0] || 1;
   $: index = page - 1;
   $: navAmount =
-    $settings.singlePageView || ($settings.hasCover && !$settings.singlePageView && index === 0)
+    volumeSettings.singlePageView ||
+    (volumeSettings.hasCover && !volumeSettings.singlePageView && index === 0)
       ? 1
       : 2;
 
@@ -45,12 +47,12 @@
   }
 
   function left(_e: any, ingoreTimeOut?: boolean) {
-    const newPage = $settings.rightToLeft ? page + navAmount : page - navAmount;
+    const newPage = volumeSettings.rightToLeft ? page + navAmount : page - navAmount;
     changePage(newPage, ingoreTimeOut);
   }
 
   function right(_e: any, ingoreTimeOut?: boolean) {
-    const newPage = $settings.rightToLeft ? page - navAmount : page + navAmount;
+    const newPage = volumeSettings.rightToLeft ? page - navAmount : page + navAmount;
     changePage(newPage, ingoreTimeOut);
   }
 
@@ -78,11 +80,11 @@
       return false;
     }
 
-    if ($settings.singlePageView || index + 1 >= pages.length) {
+    if (volumeSettings.singlePageView || index + 1 >= pages.length) {
       return false;
     }
 
-    if (index === 0 && $settings.hasCover) {
+    if (index === 0 && volumeSettings.hasCover) {
       return false;
     }
 
@@ -96,12 +98,12 @@
 
   $: charDisplay = `${charCount} / ${maxCharCount}`;
 
-  let hasCoverSetting = $settings.hasCover;
+  let hasCoverSetting = volumeSettings.hasCover;
 
   $: {
-    if ($settings.hasCover !== hasCoverSetting) {
-      hasCoverSetting = $settings.hasCover;
-      if (page > 1 && !$settings.singlePageView) {
+    if (volumeSettings.hasCover !== hasCoverSetting) {
+      hasCoverSetting = volumeSettings.hasCover;
+      if (page > 1 && !volumeSettings.singlePageView) {
         page--;
       }
     }
@@ -229,7 +231,7 @@
     <div class="flex flex-col gap-3">
       <div class="flex flex-row items-center gap-5 z-10">
         <ChervonDoubleLeftSolid
-          on:click={() => changePage($settings.rightToLeft ? pages.length : 1, true)}
+          on:click={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}
           class="hover:text-primary-600"
           size="sm"
         />
@@ -251,12 +253,12 @@
           size="sm"
         />
         <ChervonDoubleRightSolid
-          on:click={() => changePage($settings.rightToLeft ? 1 : pages.length, true)}
+          on:click={() => changePage(volumeSettings.rightToLeft ? 1 : pages.length, true)}
           class="hover:text-primary-600"
           size="sm"
         />
       </div>
-      <div style:direction={$settings.rightToLeft ? 'rtl' : 'ltr'}>
+      <div style:direction={volumeSettings.rightToLeft ? 'rtl' : 'ltr'}>
         <Range
           min={1}
           max={pages.length}
@@ -295,7 +297,7 @@
       />
       <div
         class="flex flex-row"
-        class:flex-row-reverse={!$settings.rightToLeft}
+        class:flex-row-reverse={!volumeSettings.rightToLeft}
         on:dblclick={onDoubleTap}
         role="none"
       >

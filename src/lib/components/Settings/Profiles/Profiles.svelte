@@ -1,8 +1,9 @@
 <script lang="ts">
   import { changeProfile, currentProfile, profiles } from '$lib/settings';
-
-  import { AccordionItem, Button, Listgroup, Modal, Select } from 'flowbite-svelte';
+  import { AccordionItem, Button, Select } from 'flowbite-svelte';
   import ManageProfilesModal from './ManageProfilesModal.svelte';
+
+  export let onClose: () => void;
 
   $: items = Object.keys($profiles).map((id) => {
     return { value: id, name: id };
@@ -12,6 +13,7 @@
 
   function onChange() {
     changeProfile(profile);
+    onClose();
   }
 
   let manageModalOpen = false;

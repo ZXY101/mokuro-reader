@@ -3,12 +3,14 @@
   import { UserSettingsSolid } from 'flowbite-svelte-icons';
   import { sineIn } from 'svelte/easing';
   import { resetSettings } from '$lib/settings';
-  import { promptConfirmation } from '$lib/util';
+  import { isReader, promptConfirmation } from '$lib/util';
   import AnkiConnectSettings from './AnkiConnectSettings.svelte';
   import ReaderSettings from './Reader/ReaderSettings.svelte';
   import Profiles from './Profiles/Profiles.svelte';
   import CatalogSettings from './CatalogSettings.svelte';
   import Stats from './Stats.svelte';
+  import VolumeDefaults from './Volume/VolumeDefaults.svelte';
+  import VolumeSettings from './Volume/VolumeSettings.svelte';
 
   let transitionParams = {
     x: 320,
@@ -44,9 +46,14 @@
   </div>
   <div class="flex flex-col gap-5">
     <Accordion flush>
+      {#if isReader()}
+        <VolumeSettings />
+      {:else}
+        <VolumeDefaults />
+      {/if}
+      <Profiles {onClose} />
       <ReaderSettings />
       <AnkiConnectSettings />
-      <Profiles />
       <CatalogSettings />
       <Stats />
     </Accordion>

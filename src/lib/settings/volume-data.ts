@@ -1,12 +1,15 @@
 import { browser } from '$app/environment';
 import { derived, get, writable } from 'svelte/store';
 import { settings } from './settings';
+import { zoomDefault } from '$lib/panzoom';
 
-type VolumeSettings = {
+export type VolumeSettings = {
   rightToLeft: boolean;
   singlePageView: boolean;
   hasCover: boolean;
 }
+
+export type VolumeSettingsKey = keyof VolumeSettings;
 
 type Progress = Record<string, number> | undefined;
 
@@ -26,7 +29,7 @@ const initial: Volumes = stored && browser ? JSON.parse(stored) : undefined;
 export const volumes = writable<Volumes>(initial);
 
 export function initializeVolume(volume: string) {
-  const { hasCover, rightToLeft, singlePageView } = get(settings)
+  const { hasCover, rightToLeft, singlePageView } = get(settings).volumeDefaults
   volumes.update((prev) => {
     return {
       ...prev,
@@ -86,3 +89,31 @@ export const progress = derived(volumes, ($volumes) => {
 
   return progress
 })
+
+export const volumeSettings = derived(volumes, ($volumes) => {
+  const settings: Record<string, VolumeSettings> = {}
+
+  if ($volumes) {
+    Object.keys($volumes).forEach((key) => {
+      settings[key] = $volumes[key].settings
+    });
+  }
+
+  return settings
+})
+
+export function updateVolumeSetting(volume: string, key: VolumeSettingsKey, value: any) {
+  volumes.update((prev) => {
+    return {
+      ...prev,
+      [volume]: {
+        ...prev[volume],
+        settings: {
+          ...prev[volume].settings,
+          [key]: value
+        }
+      }
+    };
+  });
+  zoomDefault();
+}

@@ -1,8 +1,7 @@
 <script lang="ts">
-  import { AccordionItem, Label, Range } from 'flowbite-svelte';
+  import { AccordionItem, Button, Label, Range } from 'flowbite-svelte';
   import ReaderSelects from './ReaderSelects.svelte';
   import ReaderToggles from './ReaderToggles.svelte';
-  import { isReader } from '$lib/util';
   import { settings, updateSetting } from '$lib/settings';
 
   let value = $settings.swipeThreshold;
@@ -11,7 +10,7 @@
   }
 </script>
 
-<AccordionItem open={isReader()}>
+<AccordionItem>
   <span slot="header">Reader</span>
   <div class="flex flex-col gap-5">
     <ReaderSelects />
