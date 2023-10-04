@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import Reader from '$lib/components/Reader/Reader.svelte';
-  import { initializeVolume, volumeSettings, volumes } from '$lib/settings';
+  import { initializeVolume, startCount, volumeSettings, volumes } from '$lib/settings';
   import { onMount } from 'svelte';
 
   const volumeId = $page.params.volume;
@@ -10,6 +10,12 @@
     if (!$volumes?.[volumeId]) {
       initializeVolume(volumeId);
     }
+
+    const count = startCount(volumeId);
+
+    return () => {
+      clearInterval(count);
+    };
   });
 </script>
 

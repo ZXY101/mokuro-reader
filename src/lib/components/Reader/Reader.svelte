@@ -17,7 +17,6 @@
     ChevronLeftSolid,
     ChevronRightSolid
   } from 'flowbite-svelte-icons';
-  import { afterUpdate, onMount } from 'svelte';
   import Cropper from './Cropper.svelte';
   import { page as pageStore } from '$app/stores';
   import SettingsButton from './SettingsButton.svelte';
@@ -98,17 +97,6 @@
 
   $: charDisplay = `${charCount} / ${maxCharCount}`;
 
-  let hasCoverSetting = volumeSettings.hasCover;
-
-  $: {
-    if (volumeSettings.hasCover !== hasCoverSetting) {
-      hasCoverSetting = volumeSettings.hasCover;
-      if (page > 1 && !volumeSettings.singlePageView) {
-        page--;
-      }
-    }
-  }
-
   function onInputClick(this: any) {
     this.select();
   }
@@ -116,10 +104,6 @@
   function onManualPageChange() {
     changePage(manualPage, true);
   }
-
-  afterUpdate(() => {
-    zoomDefault();
-  });
 
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
     const action = event.code || event.key;

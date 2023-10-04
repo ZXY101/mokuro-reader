@@ -24,6 +24,13 @@
         return total;
       }, 0)
     : 0;
+
+  $: minutesRead = $volumes
+    ? Object.values($volumes).reduce((total: number, { timeReadInMinutes }) => {
+        total += timeReadInMinutes;
+        return total;
+      }, 0)
+    : 0;
 </script>
 
 <AccordionItem>
@@ -32,5 +39,6 @@
     <p>Completed volumes: {completed}</p>
     <p>Pages read: {pagesRead}</p>
     <p>Characters read: {charsRead}</p>
+    <p>Minutes read: {minutesRead}</p>
   </div>
 </AccordionItem>

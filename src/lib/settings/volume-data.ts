@@ -16,8 +16,9 @@ type Progress = Record<string, number> | undefined;
 type VolumeData = {
   progress: number;
   chars: number;
-  settings: VolumeSettings;
   completed: boolean;
+  timeReadInMinutes: number,
+  settings: VolumeSettings;
 }
 
 type Volumes = Record<string, VolumeData>;
@@ -37,6 +38,7 @@ export function initializeVolume(volume: string) {
         chars: 0,
         completed: false,
         progress: 0,
+        timeReadInMinutes: 0,
         settings: {
           hasCover,
           rightToLeft,
@@ -58,18 +60,32 @@ export function clearVolumes() {
   volumes.set({});
 }
 
-export function updateProgress(volume: string, progress: number, chars: number, completed = false) {
+export function updateProgress(volume: string, progress: number, chars?: number, completed = false) {
   volumes.update((prev) => {
     return {
       ...prev,
       [volume]: {
         ...prev?.[volume],
         progress,
-        chars,
+        chars: chars || prev?.[volume].chars,
         completed
       }
     };
   });
+}
+
+export function startCount(volume: string) {
+  return setInterval(() => {
+    volumes.update((prev) => {
+      return {
+        ...prev,
+        [volume]: {
+          ...prev?.[volume],
+          timeReadInMinutes: prev?.[volume].timeReadInMinutes + 1
+        }
+      };
+    });
+  }, 60 * 1000)
 }
 
 volumes.subscribe((volumes) => {

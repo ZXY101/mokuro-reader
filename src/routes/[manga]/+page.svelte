@@ -7,7 +7,7 @@
   import { promptConfirmation } from '$lib/util';
   import { page } from '$app/stores';
   import type { Volume } from '$lib/types';
-  import { deleteVolume } from '$lib/settings';
+  import { deleteVolume, volumes } from '$lib/settings';
 
   function sortManga(a: Volume, b: Volume) {
     if (a.volumeName < b.volumeName) {
@@ -20,6 +20,23 @@
   }
 
   $: manga = $catalog?.find((item) => item.id === $page.params.manga)?.manga.sort(sortManga);
+
+  $: stats = manga
+    ?.map((vol) => vol.mokuroData.volume_uuid)
+    ?.reduce(
+      (stats: any, volumeId) => {
+        const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
+        const chars = $volumes[volumeId]?.chars || 0;
+        const completed = $volumes[volumeId]?.completed || 0;
+
+        stats.timeReadInMinutes = stats.timeReadInMinutes + timeReadInMinutes;
+        stats.chars = stats.chars + chars;
+        stats.completed = stats.completed + completed;
+
+        return stats;
+      },
+      { timeReadInMinutes: 0, chars: 0, completed: 0 }
+    );
 
   async function confirmDelete() {
     const title = manga?.[0].mokuroData.title_uuid;
@@ -43,11 +60,17 @@
 {#if manga}
   <div class="p-2 flex flex-col gap-5">
     <div class="flex flex-row justify-between">
-      <div class="flex flex-col">
+      <div class="flex flex-col gap-2">
         <h3 class="font-bold">{manga[0].mokuroData.title}</h3>
-        <p>Volumes: {manga.length}</p>
+        <div class="flex flex-col gap-0 sm:flex-row sm:gap-5">
+          <p>Volumes: {stats.completed} / {manga.length}</p>
+          <p>Characters read: {stats.chars}</p>
+          <p>Minutes read: {stats.timeReadInMinutes}</p>
+        </div>
       </div>
-      <div><Button color="alternative" on:click={onDelete}>Remove manga</Button></div>
+      <div>
+        <Button color="alternative" on:click={onDelete}>Remove manga</Button>
+      </div>
     </div>
     <Listgroup items={manga} let:item active class="flex-1 h-full w-full">
       <VolumeItem {item} />
