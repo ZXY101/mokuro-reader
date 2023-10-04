@@ -25,7 +25,7 @@ type Volumes = Record<string, VolumeData>;
 
 
 const stored = browser ? window.localStorage.getItem('volumes') : undefined;
-const initial: Volumes = stored && browser ? JSON.parse(stored) : undefined;
+const initial: Volumes = stored && browser ? JSON.parse(stored) : {};
 
 export const volumes = writable<Volumes>(initial);
 
