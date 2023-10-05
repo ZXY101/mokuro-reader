@@ -7,7 +7,7 @@
     renameProfile
   } from '$lib/settings';
   import { promptConfirmation, showSnackbar } from '$lib/util';
-  import { Listgroup, ListgroupItem, Modal, Input, Popover } from 'flowbite-svelte';
+  import { Listgroup, ListgroupItem, Modal, Input } from 'flowbite-svelte';
   import {
     CirclePlusSolid,
     CopySolid,
