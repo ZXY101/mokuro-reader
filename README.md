@@ -2,6 +2,7 @@
 
 An online reader, gallery and stat tracker for [mokuro](https://github.com/kha-white/mokuro) processed manga.
 
+https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-25b17dea3060
 
 ## Features:
 - Stat tracking (volumes read, pages read, characters read & minutes read)
