@@ -11,6 +11,7 @@
   import Stats from './Stats.svelte';
   import VolumeDefaults from './Volume/VolumeDefaults.svelte';
   import VolumeSettings from './Volume/VolumeSettings.svelte';
+  import About from './About.svelte';
 
   let transitionParams = {
     x: 320,
@@ -56,6 +57,7 @@
       <AnkiConnectSettings />
       <CatalogSettings />
       <Stats />
+      <About />
     </Accordion>
     <div class="flex flex-col gap-2">
       <Button outline on:click={onReset}>Reset</Button>

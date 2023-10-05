@@ -1,6 +1,6 @@
 <script lang="ts">
   import { settings, updateAnkiSetting } from '$lib/settings';
-  import { AccordionItem, Label, Toggle, Input } from 'flowbite-svelte';
+  import { AccordionItem, Label, Toggle, Input, Helper } from 'flowbite-svelte';
 
   $: disabled = !$settings.ankiConnectSettings.enabled;
 
@@ -16,6 +16,11 @@
 <AccordionItem>
   <span slot="header">Anki Connect</span>
   <div class="flex flex-col gap-5">
+    <Helper
+      >For anki connect integration to work, you must add the reader to your anki connect <code
+        class="text-primary-500">webCorsOriginList</code
+      > list</Helper
+    >
     <div>
       <Toggle bind:checked={enabled} on:change={() => updateAnkiSetting('enabled', enabled)}
         >AnkiConnect Integration Enabled</Toggle
