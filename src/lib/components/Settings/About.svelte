@@ -48,7 +48,7 @@
     </p>
     <Helper
       >Created by <A href="https://github.com/ZXY101">ZXY101</A> & <A
-        class="https://github.com/kha-white/mokuro">kha-white</A
+        href="https://github.com/kha-white">kha-white</A
       ></Helper
     >
   </div>
