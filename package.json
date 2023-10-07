@@ -36,6 +36,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@vercel/analytics": "^1.1.0",
     "@zip.js/zip.js": "^2.7.20",
     "dexie": "^4.0.1-alpha.25",
     "panzoom": "^9.4.3",

@@ -1,9 +1,13 @@
 <script lang="ts">
   import '../app.postcss';
+  import { dev } from '$app/environment';
+  import { inject } from '@vercel/analytics';
+
   import NavBar from '$lib/components/NavBar.svelte';
   import Snackbar from '$lib/components/Snackbar.svelte';
   import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';
-  import { settings } from '$lib/settings';
+
+  inject({ mode: dev ? 'development' : 'production' });
 </script>
 
 <div class=" h-full min-h-[100svh] text-white">
