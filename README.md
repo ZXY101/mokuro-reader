@@ -21,7 +21,7 @@ As of the moment base mokuro does not generate the `.mokuro` file, you need to i
 pip install git+https://github.com/kha-white/mokuro.git@web-reader
 ```
 
-Once installed and your manga is processed, import it your manga to the reader.
+Once installed and your manga is processed, import your manga into the reader.
 
 ## Development:
 
@@ -33,7 +33,7 @@ cd mokuro-reader
 
 Install dependencies:
 ```bash
-npm run install
+npm install
 ```
 
 Start the dev server:
