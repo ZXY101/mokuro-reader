@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/stores';
   import { settings, updateAnkiSetting } from '$lib/settings';
   import { AccordionItem, Label, Toggle, Input, Helper } from 'flowbite-svelte';
 
@@ -17,10 +18,13 @@
   <span slot="header">Anki Connect</span>
   <div class="flex flex-col gap-5">
     <Helper
-      >For anki connect integration to work, you must add the reader to your anki connect <code
-        class="text-primary-500">webCorsOriginList</code
+      >For anki connect integration to work, you must add the reader (<code class="text-primary-500">{$page.url.origin}</code>) to your anki connect <b
+        class="text-primary-500">webCorsOriginList</b
       > list</Helper
     >
+    <Helper>
+      To trigger the anki connect integration, double click or right click (long press on mobile) any text box.
+    </Helper>
     <div>
       <Toggle bind:checked={enabled} on:change={() => updateAnkiSetting('enabled', enabled)}
         >AnkiConnect Integration Enabled</Toggle
