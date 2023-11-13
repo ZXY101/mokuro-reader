@@ -190,8 +190,8 @@
       const { clientX, clientY } = event;
       const { scale } = $panzoomStore.getTransform();
 
-      if (scale < 0.5) {
-        $panzoomStore.zoomTo(clientX, clientY, 3);
+      if (scale < 0.6) {
+        $panzoomStore.zoomTo(clientX, clientY, 1.5);
       } else {
         zoomFitToScreen();
       }
