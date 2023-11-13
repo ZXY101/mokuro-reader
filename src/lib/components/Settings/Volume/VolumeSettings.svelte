@@ -1,6 +1,6 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { toggleFullScreen, zoomDefault } from '$lib/panzoom';
+  import { zoomDefault } from '$lib/panzoom';
   import {
     updateProgress,
     updateVolumeSetting,
@@ -8,7 +8,7 @@
     volumeSettings,
     type VolumeSettingsKey
   } from '$lib/settings';
-  import { AccordionItem, Button, Helper, Toggle } from 'flowbite-svelte';
+  import { AccordionItem, Helper, Toggle } from 'flowbite-svelte';
 
   const volumeId = $page.params.volume;
 
@@ -37,6 +37,5 @@
     {#each toggles as { key, text, value }}
       <Toggle size="small" checked={value} on:change={() => onChange(key, value)}>{text}</Toggle>
     {/each}
-    <Button color="alternative" on:click={toggleFullScreen}>Toggle fullscreen</Button>
   </div>
 </AccordionItem>

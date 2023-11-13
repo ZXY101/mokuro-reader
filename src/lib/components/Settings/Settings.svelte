@@ -12,6 +12,7 @@
   import VolumeDefaults from './Volume/VolumeDefaults.svelte';
   import VolumeSettings from './Volume/VolumeSettings.svelte';
   import About from './About.svelte';
+  import QuickAccess from './QuickAccess.svelte';
 
   let transitionParams = {
     x: 320,
@@ -47,6 +48,7 @@
   </div>
   <div class="flex flex-col gap-5">
     <Accordion flush>
+      <QuickAccess />
       {#if isReader()}
         <VolumeSettings />
       {:else}
