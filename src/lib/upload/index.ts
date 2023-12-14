@@ -107,16 +107,11 @@ export async function processFiles(_files: File[]) {
   const mangas: string[] = [];
 
   const files = _files.sort((a, b) => {
-    if (a.name < b.name) {
-      return -1;
-    }
-
-    if (a.name > b.name) {
-      return 1;
-    }
-
-    return 0;
-  });
+    return a.name.localeCompare(b.name, undefined, {
+      numeric: true,
+      sensitivity: 'base'
+    });
+  })
 
   for (const file of files) {
     const { ext, filename, path } = getDetails(file);
