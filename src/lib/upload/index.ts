@@ -102,9 +102,21 @@ export async function scanFiles(item: FileSystemEntry, files: Promise<File | und
   }
 }
 
-export async function processFiles(files: File[]) {
+export async function processFiles(_files: File[]) {
   const volumes: Record<string, Volume> = {};
   const mangas: string[] = [];
+
+  const files = _files.sort((a, b) => {
+    if (a.name < b.name) {
+      return -1;
+    }
+
+    if (a.name > b.name) {
+      return 1;
+    }
+
+    return 0;
+  });
 
   for (const file of files) {
     const { ext, filename, path } = getDetails(file);
