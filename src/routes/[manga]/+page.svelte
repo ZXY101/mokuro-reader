@@ -2,9 +2,9 @@
   import { catalog } from '$lib/catalog';
   import { goto } from '$app/navigation';
   import VolumeItem from '$lib/components/VolumeItem.svelte';
-  import { Button, Listgroup } from 'flowbite-svelte';
+  import { Button, Listgroup, Progressbar, Spinner } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
-  import { promptConfirmation } from '$lib/util';
+  import { promptConfirmation, zipManga } from '$lib/util';
   import { page } from '$app/stores';
   import type { Volume } from '$lib/types';
   import { deleteVolume, volumes } from '$lib/settings';
@@ -38,6 +38,8 @@
       { timeReadInMinutes: 0, chars: 0, completed: 0 }
     );
 
+  $: loading = false;
+
   async function confirmDelete() {
     const title = manga?.[0].mokuroData.title_uuid;
     manga?.forEach((vol) => {
@@ -51,6 +53,13 @@
 
   function onDelete() {
     promptConfirmation('Are you sure you want to delete this manga?', confirmDelete);
+  }
+
+  async function onExtract() {
+    if (manga) {
+      loading = true;
+      loading = await zipManga(manga);
+    }
   }
 </script>
 
@@ -70,6 +79,9 @@
       </div>
       <div>
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
+        <Button color="light" on:click={onExtract} disabled={loading}>
+          {loading ? 'Extracting...' : 'Extract manga'}
+        </Button>
       </div>
     </div>
     <Listgroup items={manga} let:item active class="flex-1 h-full w-full">

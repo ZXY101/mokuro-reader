@@ -1,6 +1,5 @@
 <script lang="ts">
   import { catalog } from '$lib/catalog';
-  import { P } from 'flowbite-svelte';
 
   export let id: string;
 
