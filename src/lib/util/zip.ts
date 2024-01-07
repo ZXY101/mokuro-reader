@@ -22,7 +22,7 @@ async function zipVolumes(manga: Volume[]) {
 
 
     volumeZips.push({
-      zipName: volume.volumeName,
+      zipName: decodeURI(volume.volumeName),
       zipBlob: await zipWriter.close(),
       mokuroData: JSON.stringify(volume.mokuroData)
     });
