@@ -2,7 +2,7 @@
   import { catalog } from '$lib/catalog';
   import { goto } from '$app/navigation';
   import VolumeItem from '$lib/components/VolumeItem.svelte';
-  import { Button, Listgroup, Progressbar, Spinner } from 'flowbite-svelte';
+  import { Button, Listgroup } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga } from '$lib/util';
   import { page } from '$app/stores';
@@ -77,7 +77,7 @@
           <p>Minutes read: {stats.timeReadInMinutes}</p>
         </div>
       </div>
-      <div>
+      <div class="sm:block flex-col flex gap-2">
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
         <Button color="light" on:click={onExtract} disabled={loading}>
           {loading ? 'Extracting...' : 'Extract manga'}

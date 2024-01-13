@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/stores';
   import { progress } from '$lib/settings';
   import type { Volume } from '$lib/types';
   import { ListgroupItem } from 'flowbite-svelte';
@@ -16,7 +15,7 @@
   $: isComplete = currentPage === volume.mokuroData.pages.length;
 </script>
 
-<a href={`${$page.params.manga}/${mokuroData.volume_uuid}`} class="h-full w-full">
+<a href={`${mokuroData.title_uuid}/${mokuroData.volume_uuid}`} class="h-full w-full">
   <ListgroupItem>
     <div
       class:text-green-400={isComplete}
