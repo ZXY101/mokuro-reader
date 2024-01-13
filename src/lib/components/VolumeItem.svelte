@@ -17,11 +17,7 @@
 </script>
 
 {#if $page.params.manga}
-  <a
-    data-sveltekit-replacestate
-    href={`/${$page.params.manga}/${mokuroData.volume_uuid}`}
-    class="h-full w-full"
-  >
+  <a href={`/${$page.params.manga}/${mokuroData.volume_uuid}`} class="h-full w-full">
     <ListgroupItem>
       <div
         class:text-green-400={isComplete}
