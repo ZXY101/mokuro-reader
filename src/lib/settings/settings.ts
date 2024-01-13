@@ -1,5 +1,4 @@
 import { browser } from '$app/environment';
-import { zoomDefault } from '$lib/panzoom';
 import { derived, get, writable } from 'svelte/store';
 
 export type FontSize =
