@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/stores';
   import { progress } from '$lib/settings';
   import type { Volume } from '$lib/types';
   import { ListgroupItem } from 'flowbite-svelte';
@@ -15,19 +16,25 @@
   $: isComplete = currentPage === volume.mokuroData.pages.length;
 </script>
 
-<a href={`${mokuroData.title_uuid}/${mokuroData.volume_uuid}`} class="h-full w-full">
-  <ListgroupItem>
-    <div
-      class:text-green-400={isComplete}
-      class="flex flex-row gap-5 items-center justify-between w-full"
-    >
-      <div>
-        <p class="font-semibold" class:text-white={!isComplete}>{decodeURI(volumeName)}</p>
-        <p>{progressDisplay}</p>
+{#if $page.params.manga}
+  <a
+    data-sveltekit-replacestate
+    href={`/${$page.params.manga}/${mokuroData.volume_uuid}`}
+    class="h-full w-full"
+  >
+    <ListgroupItem>
+      <div
+        class:text-green-400={isComplete}
+        class="flex flex-row gap-5 items-center justify-between w-full"
+      >
+        <div>
+          <p class="font-semibold" class:text-white={!isComplete}>{decodeURI(volumeName)}</p>
+          <p>{progressDisplay}</p>
+        </div>
+        {#if isComplete}
+          <CheckCircleSolid />
+        {/if}
       </div>
-      {#if isComplete}
-        <CheckCircleSolid />
-      {/if}
-    </div>
-  </ListgroupItem>
-</a>
+    </ListgroupItem>
+  </a>
+{/if}
