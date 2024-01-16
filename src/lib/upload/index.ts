@@ -13,22 +13,17 @@ const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 export async function unzipManga(file: File) {
   const zipFileReader = new BlobReader(file);
   const zipReader = new ZipReader(zipFileReader);
-  
+
   const entries = await zipReader.getEntries();
   const unzippedFiles: Record<string, File> = {};
 
   const sortedEntries = entries.sort((a, b) => {
-    if (a.filename < b.filename) {
-      return -1;
-    }
-
-    if (a.filename > b.filename) {
-      return 1;
-    }
-
-    return 0;
+    return a.filename.localeCompare(b.filename, undefined, {
+      numeric: true,
+      sensitivity: 'base'
+    });
   })
-  
+
   for (const entry of sortedEntries) {
     const mime = getMimeType(entry.filename);
     if (imageTypes.includes(mime)) {
@@ -39,7 +34,7 @@ export async function unzipManga(file: File) {
       }
     }
   }
-  
+
   return unzippedFiles;
 }
 
