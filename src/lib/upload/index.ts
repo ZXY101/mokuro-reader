@@ -101,8 +101,9 @@ export async function processFiles(_files: File[]) {
   const volumes: Record<string, Volume> = {};
   const mangas: string[] = [];
 
+
   const files = _files.sort((a, b) => {
-    return a.name.localeCompare(b.name, undefined, {
+    return decodeURI(a.name).localeCompare(decodeURI(b.name), undefined, {
       numeric: true,
       sensitivity: 'base'
     });
