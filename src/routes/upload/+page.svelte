@@ -41,7 +41,8 @@
     max = items.length;
 
     for (const item of items) {
-      if (imageTypes.includes('.' + item.pathname.split('.').at(-1) || '')) {
+      const itemFileExtension = ('.' + item.pathname.split('.').at(-1)).toLowerCase();
+      if (imageTypes.includes(itemFileExtension || '')) {
         const image = await fetch(url + item.pathname);
         const blob = await image.blob();
         const file = new File([blob], item.pathname.substring(1));
