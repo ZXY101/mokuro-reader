@@ -11,7 +11,7 @@ export async function zipManga(manga: Volume[]) {
 
   const promises = manga.map((volume) => {
     const imagePromises = Object.values(volume.files).map((file) => {
-      return zipWriter.add(file.name, new BlobReader(file))
+      return zipWriter.add(`${volume.volumeName}/${file.name}`, new BlobReader(file))
     })
 
     return [

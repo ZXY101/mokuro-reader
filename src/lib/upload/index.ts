@@ -31,10 +31,11 @@ export async function unzipManga(file: File) {
     if (imageTypes.includes(mime) || isMokuroFile) {
       const blob = await entry.getData?.(new BlobWriter(mime));
       if (blob) {
-        const file = new File([blob], entry.filename, { type: mime });
+        const fileName = entry.filename.split('/').pop() || entry.filename;
+        const file = new File([blob], fileName, { type: mime });
         if (!file.webkitRelativePath) {
           Object.defineProperty(file, 'webkitRelativePath', {
-            value: file.name
+            value: entry.filename
           })
         }
         unzippedFiles[entry.filename] = file;
