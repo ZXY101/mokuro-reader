@@ -1,15 +1,8 @@
 <script lang="ts">
   import { READER_VERSION } from '$lib/consts';
-  import { showSnackbar } from '$lib/util';
+  import { toClipboard } from '$lib/util';
   import { A, AccordionItem, Badge, Helper, Span } from 'flowbite-svelte';
   import { GithubSolid } from 'flowbite-svelte-icons';
-
-  function toClipboard() {
-    navigator.clipboard.writeText(
-      'pip install git+https://github.com/kha-white/mokuro.git@web-reader'
-    );
-    showSnackbar('Copied to clipboard');
-  }
 </script>
 
 <AccordionItem>
@@ -38,7 +31,7 @@
       </p>
       <div role="none" on:click={toClipboard}>
         <code class="text-primary-600 bg-slate-900"
-          >pip install git+https://github.com/kha-white/mokuro.git@web-reader</code
+          >pip3 install git+https://github.com/kha-white/mokuro.git@web-reader</code
         >
       </div>
     </div>

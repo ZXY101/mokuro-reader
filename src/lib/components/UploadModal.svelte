@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { Button, Dropzone, Modal, Spinner } from 'flowbite-svelte';
+  import { Button, Dropzone, Modal, Spinner, Accordion, AccordionItem } from 'flowbite-svelte';
   import FileUpload from './FileUpload.svelte';
   import { processFiles } from '$lib/upload';
   import { onMount } from 'svelte';
   import { scanFiles } from '$lib/upload';
   import { formatBytes } from '$lib/util/upload';
+  import { toClipboard } from '$lib/util';
 
   export let open = false;
 
@@ -90,6 +91,33 @@
     <h2 class="justify-center flex">Loading...</h2>
     <div class="text-center"><Spinner /></div>
   {:then}
+    <Accordion flush>
+      <AccordionItem>
+        <span slot="header">What to upload?</span>
+        <div class="flex flex-col gap-5">
+          <div>
+            <p>
+              Firstly, ensure that you process your manga with the <b>0.2.0-beta.6</b> of mokuro, you
+              can install it by running the following command:
+            </p>
+            <div role="none" on:click={toClipboard}>
+              <code class="text-primary-600 bg-slate-900"
+                >pip3 install git+https://github.com/kha-white/mokuro.git@web-reader</code
+              >
+            </div>
+          </div>
+          <p>
+            This will generate a <code>.mokuro</code> file for each volume processed, upload your
+            manga along with the <code>.mokuro</code> files.
+          </p>
+          <p>
+            On mobile, uploading via directory is not supported so you will need to zip your manga
+            first and then upload it via
+            <code class="text-primary-600 bg-slate-900">choose files</code>.
+          </p>
+        </div>
+      </AccordionItem>
+    </Accordion>
     <Dropzone
       id="dropzone"
       on:drop={dropHandle}
@@ -141,7 +169,6 @@
         </p>
       {/if}
     </Dropzone>
-
     <p class=" text-sm text-gray-500 dark:text-gray-400 text-center">{storageSpace}</p>
     <div class="flex flex-1 flex-col gap-2">
       <Button outline on:click={reset} {disabled} color="dark">Reset</Button>

@@ -1,5 +1,6 @@
 import { page } from "$app/stores";
 import { get } from "svelte/store";
+import { showSnackbar } from "./snackbar";
 
 export function clamp(num: number, min: number, max: number) {
   return Math.min(Math.max(num, min), max);
@@ -22,4 +23,11 @@ export function debounce(func: () => void, timeout = 50) {
     clearTimeout(timer);
     timer = undefined;
   }
+}
+
+export function toClipboard() {
+  navigator.clipboard.writeText(
+    'pip3 install git+https://github.com/kha-white/mokuro.git@web-reader'
+  );
+  showSnackbar('Copied to clipboard');
 }
