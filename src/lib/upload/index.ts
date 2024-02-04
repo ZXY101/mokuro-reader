@@ -26,10 +26,17 @@ export async function unzipManga(file: File) {
 
   for (const entry of sortedEntries) {
     const mime = getMimeType(entry.filename);
-    if (imageTypes.includes(mime)) {
+    const isMokuroFile = entry.filename.split('.').pop() === 'mokuro'
+
+    if (imageTypes.includes(mime) || isMokuroFile) {
       const blob = await entry.getData?.(new BlobWriter(mime));
       if (blob) {
         const file = new File([blob], entry.filename, { type: mime });
+        if (!file.webkitRelativePath) {
+          Object.defineProperty(file, 'webkitRelativePath', {
+            value: file.name
+          })
+        }
         unzippedFiles[entry.filename] = file;
       }
     }
@@ -161,6 +168,11 @@ export async function processFiles(_files: File[]) {
 
     if (ext && zipTypes.includes(ext)) {
       const unzippedFiles = await unzipManga(file);
+
+      if (files.length === 1) {
+        processFiles(Object.values(unzippedFiles))
+        return;
+      }
 
       volumes[path] = {
         ...volumes[path],

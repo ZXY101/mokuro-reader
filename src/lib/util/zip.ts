@@ -6,40 +6,17 @@ import {
   ZipWriter,
 } from "@zip.js/zip.js";
 
-async function zipVolumes(manga: Volume[]) {
-  const volumeZips = []
+export async function zipManga(manga: Volume[]) {
+  const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
 
-  for (const volume of manga) {
-    const files = Object.values(volume.files);
-    const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
-
-    const promises = files.map((file) => {
+  const promises = manga.map((volume) => {
+    const imagePromises = Object.values(volume.files).map((file) => {
       return zipWriter.add(file.name, new BlobReader(file))
     })
 
-
-    await Promise.all(promises);
-
-
-    volumeZips.push({
-      zipName: decodeURI(volume.volumeName),
-      zipBlob: await zipWriter.close(),
-      mokuroData: JSON.stringify(volume.mokuroData)
-    });
-  }
-
-  return volumeZips;
-}
-
-export async function zipManga(manga: Volume[]) {
-  const volumeZips = await zipVolumes(manga)
-  const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
-
-
-  const promises = volumeZips.map((volumeZip) => {
     return [
-      zipWriter.add(`${volumeZip.zipName}.mokuro`, new TextReader(volumeZip.mokuroData)),
-      zipWriter.add(`${volumeZip.zipName}.zip`, new BlobReader(volumeZip.zipBlob))
+      zipWriter.add(`${volume.volumeName}.mokuro`, new TextReader(JSON.stringify(volume.mokuroData))),
+      ...imagePromises,
     ]
   })
 
