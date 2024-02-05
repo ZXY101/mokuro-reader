@@ -1,12 +1,27 @@
 <script lang="ts">
-  import { volumeStats } from '$lib/settings';
+  import { startCount, volumeStats } from '$lib/settings';
 
-  export let active = true;
+  export let count: number | undefined;
+  export let volumeId: string;
+
+  $: active = Boolean(count);
+
+  function onClick() {
+    if (count) {
+      clearInterval(count);
+      count = undefined;
+    } else {
+      count = startCount(volumeId);
+    }
+  }
 </script>
 
-<div
+<button
   class:text-primary-700={!active}
   class="mix-blend-difference z-10 fixed opacity-50 right-20 top-5 p-10 m-[-2.5rem]"
+  on:click={onClick}
 >
-  <p>{active ? 'Timer active' : 'Timer idle'} | Minutes read: {$volumeStats?.timeReadInMinutes}</p>
-</div>
+  <p>
+    {active ? 'Active' : 'Paused'} | Minutes read: {$volumeStats?.timeReadInMinutes}
+  </p>
+</button>
