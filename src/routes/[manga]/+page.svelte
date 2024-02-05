@@ -7,7 +7,7 @@
   import { promptConfirmation, zipManga } from '$lib/util';
   import { page } from '$app/stores';
   import type { Volume } from '$lib/types';
-  import { deleteVolume, volumes } from '$lib/settings';
+  import { deleteVolume, mangaStats, volumes } from '$lib/settings';
 
   function sortManga(a: Volume, b: Volume) {
     if (a.volumeName < b.volumeName) {
@@ -66,15 +66,15 @@
 <svelte:head>
   <title>{manga?.[0].mokuroData.title || 'Manga'}</title>
 </svelte:head>
-{#if manga}
+{#if manga && $mangaStats}
   <div class="p-2 flex flex-col gap-5">
     <div class="flex flex-row justify-between">
       <div class="flex flex-col gap-2">
         <h3 class="font-bold">{manga[0].mokuroData.title}</h3>
         <div class="flex flex-col gap-0 sm:flex-row sm:gap-5">
-          <p>Volumes: {stats.completed} / {manga.length}</p>
-          <p>Characters read: {stats.chars}</p>
-          <p>Minutes read: {stats.timeReadInMinutes}</p>
+          <p>Volumes: {$mangaStats.completed} / {manga.length}</p>
+          <p>Characters read: {$mangaStats.chars}</p>
+          <p>Minutes read: {$mangaStats.timeReadInMinutes}</p>
         </div>
       </div>
       <div class="sm:block flex-col flex gap-2">

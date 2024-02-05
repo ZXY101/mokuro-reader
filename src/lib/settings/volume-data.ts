@@ -2,6 +2,8 @@ import { browser } from '$app/environment';
 import { derived, get, writable } from 'svelte/store';
 import { settings } from './settings';
 import { zoomDefault } from '$lib/panzoom';
+import { page } from '$app/stores';
+import { manga, volume } from '$lib/catalog';
 
 export type VolumeSettings = {
   rightToLeft: boolean;
@@ -19,6 +21,13 @@ type VolumeData = {
   completed: boolean;
   timeReadInMinutes: number,
   settings: VolumeSettings;
+}
+
+type TotalStats = {
+  completed: number;
+  pagesRead: number;
+  charsRead: number;
+  minutesRead: number;
 }
 
 type Volumes = Record<string, VolumeData>;
@@ -133,3 +142,50 @@ export function updateVolumeSetting(volume: string, key: VolumeSettingsKey, valu
   });
   zoomDefault();
 }
+
+export const totalStats = derived([volumes, page], ([$volumes, $page]) => {
+  if ($page && $volumes) {
+    return Object.values($volumes).reduce<TotalStats>((stats, { chars, completed, timeReadInMinutes, progress }) => {
+      if (completed) {
+        stats.completed++;
+      }
+
+      stats.pagesRead += progress;
+      stats.minutesRead += timeReadInMinutes;
+      stats.charsRead += chars
+
+      return stats;
+    }, {
+      charsRead: 0,
+      completed: 0,
+      pagesRead: 0,
+      minutesRead: 0
+    })
+  }
+})
+
+export const mangaStats = derived([manga, volumes], ([$manga, $volumes]) => {
+  if ($manga && $volumes) {
+    return $manga.map((vol) => vol.mokuroData.volume_uuid).reduce(
+      (stats: any, volumeId) => {
+        const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
+        const chars = $volumes[volumeId]?.chars || 0;
+        const completed = $volumes[volumeId]?.completed || 0;
+
+        stats.timeReadInMinutes = stats.timeReadInMinutes + timeReadInMinutes;
+        stats.chars = stats.chars + chars;
+        stats.completed = stats.completed + completed;
+
+        return stats;
+      },
+      { timeReadInMinutes: 0, chars: 0, completed: 0 }
+    );
+  }
+});
+
+export const volumeStats = derived([volume, volumes], ([$volume, $volumes]) => {
+  if ($volume && $volumes) {
+    const { chars, completed, timeReadInMinutes, progress } = $volumes[$volume.mokuroData.volume_uuid]
+    return { chars, completed, timeReadInMinutes, progress }
+  }
+});
