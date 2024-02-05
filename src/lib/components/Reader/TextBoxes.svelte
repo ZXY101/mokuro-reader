@@ -7,32 +7,38 @@
   export let page: Page;
   export let src: File;
 
-  $: textBoxes = page.blocks.map((block) => {
-    const { img_height, img_width } = page;
-    const { box, font_size, lines, vertical } = block;
+  $: textBoxes = page.blocks
+    .map((block) => {
+      const { img_height, img_width } = page;
+      const { box, font_size, lines, vertical } = block;
 
-    let [_xmin, _ymin, _xmax, _ymax] = box;
+      let [_xmin, _ymin, _xmax, _ymax] = box;
 
-    const xmin = clamp(_xmin, 0, img_width);
-    const ymin = clamp(_ymin, 0, img_height);
-    const xmax = clamp(_xmax, 0, img_width);
-    const ymax = clamp(_ymax, 0, img_height);
+      const xmin = clamp(_xmin, 0, img_width);
+      const ymin = clamp(_ymin, 0, img_height);
+      const xmax = clamp(_xmax, 0, img_width);
+      const ymax = clamp(_ymax, 0, img_height);
 
-    const width = xmax - xmin;
-    const height = ymax - ymin;
+      const width = xmax - xmin;
+      const height = ymax - ymin;
+      const area = width * height;
 
-    const textBox = {
-      left: `${xmin}px`,
-      top: `${ymin}px`,
-      width: `${width}px`,
-      height: `${height}px`,
-      fontSize: $settings.fontSize === 'auto' ? `${font_size}px` : `${$settings.fontSize}pt`,
-      writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
-      lines
-    };
+      const textBox = {
+        left: `${xmin}px`,
+        top: `${ymin}px`,
+        width: `${width}px`,
+        height: `${height}px`,
+        fontSize: $settings.fontSize === 'auto' ? `${font_size}px` : `${$settings.fontSize}pt`,
+        writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
+        lines,
+        area
+      };
 
-    return textBox;
-  });
+      return textBox;
+    })
+    .sort(({ area: a }, { area: b }) => {
+      return a - b;
+    });
 
   $: fontWeight = $settings.boldFont ? 'bold' : '400';
   $: display = $settings.displayOCR ? 'block' : 'none';
