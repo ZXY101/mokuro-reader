@@ -9,9 +9,18 @@
 
   $: url = src ? `url(${URL.createObjectURL(src)})` : '';
 
+  let legacy: HTMLElement | null;
+
   onMount(() => {
+    legacy = document.getElementById('popupAbout');
     zoomDefault();
   });
+
+  $: {
+    if (legacy) {
+      legacy.style.backgroundImage = url;
+    }
+  }
 </script>
 
 <div

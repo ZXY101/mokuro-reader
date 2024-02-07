@@ -67,9 +67,9 @@
   }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`text-box-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`textBox-${index}`)}
   <div
-    class="text-box"
+    class="textBox"
     style:width
     style:height
     style:left
@@ -91,7 +91,7 @@
 {/each}
 
 <style>
-  .text-box {
+  .textBox {
     color: black;
     padding: 0;
     position: absolute;
@@ -102,13 +102,13 @@
     z-index: 11;
   }
 
-  .text-box:focus,
-  .text-box:hover {
+  .textBox:focus,
+  .textBox:hover {
     background: rgb(255, 255, 255);
     border: 1px solid rgba(0, 0, 0, 0);
   }
 
-  .text-box p {
+  .textBox p {
     display: none;
     white-space: nowrap;
     letter-spacing: 0.1em;
@@ -119,8 +119,8 @@
     z-index: 11;
   }
 
-  .text-box:focus p,
-  .text-box:hover p {
+  .textBox:focus p,
+  .textBox:hover p {
     display: table;
   }
 </style>
