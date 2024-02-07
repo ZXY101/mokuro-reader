@@ -21,6 +21,7 @@
   import { page as pageStore } from '$app/stores';
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
+  import { afterUpdate } from 'svelte';
 
   // TODO: Refactor this whole mess
   export let volumeSettings: VolumeSettings;
@@ -68,7 +69,7 @@
         volume.mokuroData.volume_uuid,
         pageClamped,
         getCharCount(pages, pageClamped) || 0,
-        pageClamped === pages.length
+        pageClamped === pages.length || pageClamped === pages.length - 1
       );
       zoomDefault();
     }
@@ -112,12 +113,12 @@
       case 'ArrowLeft':
       case 'ArrowUp':
       case 'PageUp':
-        left(event, true);
+        changePage(page - navAmount, true);
         return;
       case 'ArrowRight':
       case 'ArrowDown':
       case 'PageDown':
-        right(event, true);
+        changePage(page + navAmount, true);
         return;
       case 'Home':
         changePage(1, true);
@@ -197,6 +198,10 @@
       }
     }
   }
+
+  afterUpdate(() => {
+    zoomDefault();
+  });
 </script>
 
 <svelte:window

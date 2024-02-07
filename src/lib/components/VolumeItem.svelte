@@ -12,8 +12,12 @@
   const { volumeName, mokuroData } = volume as Volume;
 
   $: currentPage = $progress?.[volume?.mokuroData.volume_uuid || 0] || 1;
-  $: progressDisplay = `${currentPage} / ${volume.mokuroData.pages.length}`;
-  $: isComplete = currentPage === volume.mokuroData.pages.length;
+  $: progressDisplay = `${
+    currentPage === volume.mokuroData.pages.length - 1 ? currentPage + 1 : currentPage
+  } / ${volume.mokuroData.pages.length}`;
+  $: isComplete =
+    currentPage === volume.mokuroData.pages.length ||
+    currentPage === volume.mokuroData.pages.length - 1;
 </script>
 
 {#if $page.params.manga}
