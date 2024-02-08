@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '$lib/types';
-  import { afterUpdate, onMount } from 'svelte';
+  import { afterUpdate, onMount, onDestroy } from 'svelte';
   import TextBoxes from './TextBoxes.svelte';
   import { zoomDefault } from '$lib/panzoom';
 
@@ -11,6 +11,12 @@
 
   onMount(() => {
     zoomDefault();
+
+    return () => {
+      setTimeout(() => {
+        zoomDefault();
+      }, 10);
+    };
   });
 
   afterUpdate(() => {
