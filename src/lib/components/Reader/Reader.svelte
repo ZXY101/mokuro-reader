@@ -202,21 +202,6 @@
       }
     }
   }
-
-  let shouldUpdate = false;
-
-  function handleUpdate() {
-    shouldUpdate = true;
-  }
-
-  $: volumeSettings.singlePageView && handleUpdate();
-
-  afterUpdate(() => {
-    if (shouldUpdate) {
-      shouldUpdate = false;
-      zoomDefault();
-    }
-  });
 </script>
 
 <svelte:window

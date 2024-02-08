@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '$lib/types';
-  import { afterUpdate, onMount } from 'svelte';
+  import { afterUpdate, onMount, onDestroy } from 'svelte';
   import TextBoxes from './TextBoxes.svelte';
   import { zoomDefault } from '$lib/panzoom';
 
@@ -14,6 +14,12 @@
   onMount(() => {
     legacy = document.getElementById('popupAbout');
     zoomDefault();
+
+    return () => {
+      setTimeout(() => {
+        zoomDefault();
+      }, 10);
+    };
   });
 
   $: {
