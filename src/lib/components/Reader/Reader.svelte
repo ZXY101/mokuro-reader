@@ -111,11 +111,15 @@
 
     switch (action) {
       case 'ArrowLeft':
+        left(event, true);
+        return;
       case 'ArrowUp':
       case 'PageUp':
         changePage(page - navAmount, true);
         return;
       case 'ArrowRight':
+        right(event, true);
+        return;
       case 'ArrowDown':
       case 'PageDown':
         changePage(page + navAmount, true);
