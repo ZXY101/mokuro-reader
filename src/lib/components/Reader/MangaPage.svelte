@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Page } from '$lib/types';
-  import { onMount } from 'svelte';
+  import { afterUpdate, onMount } from 'svelte';
   import TextBoxes from './TextBoxes.svelte';
   import { zoomDefault } from '$lib/panzoom';
 
@@ -10,6 +10,10 @@
   $: url = src ? `url(${URL.createObjectURL(src)})` : '';
 
   onMount(() => {
+    zoomDefault();
+  });
+
+  afterUpdate(() => {
     zoomDefault();
   });
 </script>

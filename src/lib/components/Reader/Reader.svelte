@@ -199,8 +199,19 @@
     }
   }
 
+  let shouldUpdate = false;
+
+  function handleUpdate() {
+    shouldUpdate = true;
+  }
+
+  $: volumeSettings.singlePageView && handleUpdate();
+
   afterUpdate(() => {
-    zoomDefault();
+    if (shouldUpdate) {
+      shouldUpdate = false;
+      zoomDefault();
+    }
   });
 </script>
 
