@@ -45,6 +45,8 @@
   $: border = $settings.textBoxBorders ? '1px solid red' : 'none';
   $: contenteditable = $settings.textEditable;
 
+  $: triggerMethod = $settings.ankiConnectSettings.triggerMethod || 'both';
+
   async function onUpdateCard(lines: string[]) {
     if ($settings.ankiConnectSettings.enabled) {
       const sentence = lines.join(' ');
@@ -60,7 +62,14 @@
   }
 
   function onContextMenu(event: Event, lines: string[]) {
-    if ($settings.ankiConnectSettings.enabled) {
+    if (triggerMethod === 'both' || triggerMethod === 'rightClick') {
+      event.preventDefault();
+      onUpdateCard(lines);
+    }
+  }
+
+  function onDoubleTap(event: Event, lines: string[]) {
+    if (triggerMethod === 'both' || triggerMethod === 'doubleTap') {
       event.preventDefault();
       onUpdateCard(lines);
     }
@@ -81,7 +90,7 @@
     style:writing-mode={writingMode}
     role="none"
     on:contextmenu={(e) => onContextMenu(e, lines)}
-    on:dblclick={() => onUpdateCard(lines)}
+    on:dblclick={(e) => onDoubleTap(e, lines)}
     {contenteditable}
   >
     {#each lines as line}

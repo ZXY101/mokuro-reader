@@ -31,6 +31,7 @@ export type AnkiConnectSettings = {
   cropImage: boolean;
   overwriteImage: boolean;
   grabSentence: boolean;
+  triggerMethod: 'rightClick' | 'doubleTap' | 'both'
 }
 
 export type VolumeDefaults = {
@@ -90,7 +91,8 @@ const defaultSettings: Settings = {
     grabSentence: false,
     overwriteImage: true,
     pictureField: 'Picture',
-    sentenceField: 'Sentence'
+    sentenceField: 'Sentence',
+    triggerMethod: 'both'
   }
 };
 

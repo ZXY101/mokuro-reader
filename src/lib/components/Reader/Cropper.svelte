@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { afterNavigate } from '$app/navigation';
+  import { afterNavigate, beforeNavigate } from '$app/navigation';
   import { cropperStore, getCroppedImg, updateLastCard, type Pixels } from '$lib/anki-connect';
   import { settings } from '$lib/settings';
   import { Button, Modal, Spinner } from 'flowbite-svelte';
@@ -12,6 +12,13 @@
 
   afterNavigate(() => {
     close();
+  });
+
+  beforeNavigate((nav) => {
+    if (open) {
+      nav.cancel();
+      close();
+    }
   });
 
   onMount(() => {
@@ -28,7 +35,7 @@
   }
 
   async function onCrop() {
-    if ($cropperStore?.image && $cropperStore?.sentence && pixels) {
+    if ($cropperStore?.image && pixels) {
       loading = true;
       const imageData = await getCroppedImg($cropperStore.image, pixels);
       updateLastCard(imageData, $cropperStore.sentence);
