@@ -13,6 +13,7 @@
   import VolumeSettings from './Volume/VolumeSettings.svelte';
   import About from './About.svelte';
   import QuickAccess from './QuickAccess.svelte';
+  import { beforeNavigate } from '$app/navigation';
 
   let transitionParams = {
     x: 320,
@@ -30,6 +31,13 @@
   function onClose() {
     hidden = true;
   }
+
+  beforeNavigate((nav) => {
+    if (!hidden) {
+      nav.cancel();
+      hidden = true;
+    }
+  });
 </script>
 
 <Drawer

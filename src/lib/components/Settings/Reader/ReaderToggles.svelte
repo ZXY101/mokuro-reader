@@ -10,7 +10,8 @@
     { key: 'pageNum', text: 'Show page number', value: $settings.pageNum },
     { key: 'charCount', text: 'Show character count', value: $settings.charCount },
     { key: 'mobile', text: 'Mobile', value: $settings.mobile },
-    { key: 'showTimer', text: 'Show timer', value: $settings.showTimer }
+    { key: 'showTimer', text: 'Show timer', value: $settings.showTimer },
+    { key: 'quickActions', text: 'Show quick actions', value: $settings.quickActions }
   ] as { key: SettingsKey; text: string; value: any }[];
 </script>
 

@@ -3,13 +3,13 @@
   import { AccordionItem, Helper, Toggle } from 'flowbite-svelte';
 
   $: toggles = [
-    { key: 'rightToLeft', text: 'Right to left', value: $settings.volumeDefaults.rightToLeft },
+    { key: 'rightToLeft', text: 'Right to left', value: $settings.volumeDefaults?.rightToLeft },
     {
       key: 'singlePageView',
       text: 'Single page view',
-      value: $settings.volumeDefaults.singlePageView
+      value: $settings.volumeDefaults?.singlePageView
     },
-    { key: 'hasCover', text: 'First page is cover', value: $settings.volumeDefaults.hasCover }
+    { key: 'hasCover', text: 'First page is cover', value: $settings.volumeDefaults?.hasCover }
   ] as { key: VolumeDefaultsKey; text: string; value: any }[];
 </script>
 

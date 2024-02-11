@@ -21,7 +21,7 @@
   import { page as pageStore } from '$app/stores';
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
-  import { afterUpdate } from 'svelte';
+  import QuickActions from './QuickActions.svelte';
 
   // TODO: Refactor this whole mess
   export let volumeSettings: VolumeSettings;
@@ -196,7 +196,7 @@
       const { scale } = $panzoomStore.getTransform();
 
       if (scale < 0.6) {
-        $panzoomStore.zoomTo(clientX, clientY, 1.5);
+        $panzoomStore.zoomTo(clientX, clientY, 1.4);
       } else {
         zoomFitToScreen();
       }
@@ -213,8 +213,9 @@
 <svelte:head>
   <title>{volume?.mokuroData.volume || 'Volume'}</title>
 </svelte:head>
-<SettingsButton />
 {#if volume && pages}
+  <QuickActions {left} {right} src={Object.values(volume?.files)[index]} />
+  <SettingsButton />
   <Cropper />
   <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
     <div class="flex flex-col gap-3">
@@ -266,11 +267,13 @@
     <Panzoom>
       <button
         class="h-full fixed -left-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+        style:margin-left={`${$settings.edgeButtonWidth}px`}
         on:mousedown={mouseDown}
         on:mouseup={left}
       />
       <button
         class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+        style:margin-right={`${$settings.edgeButtonWidth}px`}
         on:mousedown={mouseDown}
         on:mouseup={right}
       />

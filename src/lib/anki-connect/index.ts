@@ -64,7 +64,7 @@ export async function imageToWebp(source: File) {
   }
 }
 
-export async function updateLastCard(imageData: string | null | undefined, sentence: string) {
+export async function updateLastCard(imageData: string | null | undefined, sentence?: string) {
   const {
     overwriteImage,
     enabled,
@@ -88,7 +88,7 @@ export async function updateLastCard(imageData: string | null | undefined, sente
 
   const fields: Record<string, any> = {};
 
-  if (grabSentence) {
+  if (grabSentence && sentence) {
     fields[sentenceField] = sentence;
   }
 

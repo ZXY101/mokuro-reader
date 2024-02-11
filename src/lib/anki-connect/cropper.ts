@@ -10,7 +10,7 @@ type CropperModal = {
 
 export const cropperStore = writable<CropperModal | undefined>(undefined);
 
-export function showCropper(image: string, sentence: string) {
+export function showCropper(image: string, sentence?: string) {
   cropperStore.set({
     open: true,
     image,

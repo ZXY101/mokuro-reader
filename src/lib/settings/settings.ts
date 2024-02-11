@@ -49,7 +49,9 @@ export type Settings = {
   mobile: boolean;
   backgroundColor: string;
   swipeThreshold: number;
+  edgeButtonWidth: number;
   showTimer: boolean;
+  quickActions: boolean;
   fontSize: FontSize;
   zoomDefault: ZoomModes;
   volumeDefaults: VolumeDefaults;
@@ -72,7 +74,9 @@ const defaultSettings: Settings = {
   mobile: false,
   backgroundColor: '#030712',
   swipeThreshold: 50,
+  edgeButtonWidth: 10,
   showTimer: false,
+  quickActions: true,
   fontSize: 'auto',
   zoomDefault: 'zoomFitToScreen',
   volumeDefaults: {

@@ -4,9 +4,14 @@
   import ReaderToggles from './ReaderToggles.svelte';
   import { settings, updateSetting } from '$lib/settings';
 
-  let value = $settings.swipeThreshold;
-  function onChange() {
-    updateSetting('swipeThreshold', value);
+  let swipeThresholdValue = $settings.swipeThreshold;
+  let edgeButtonWidthValue = $settings.edgeButtonWidth;
+  function onSwipeChange() {
+    updateSetting('swipeThreshold', swipeThresholdValue);
+  }
+
+  function onWidthChange() {
+    updateSetting('edgeButtonWidth', edgeButtonWidthValue);
   }
 </script>
 
@@ -18,7 +23,17 @@
     <ReaderToggles />
     <div>
       <Label>Swipe threshold</Label>
-      <Range on:change={onChange} min={20} max={90} disabled={!$settings.mobile} bind:value />
+      <Range
+        on:change={onSwipeChange}
+        min={20}
+        max={90}
+        disabled={!$settings.mobile}
+        bind:value={swipeThresholdValue}
+      />
+    </div>
+    <div>
+      <Label>Edge button width</Label>
+      <Range on:change={onWidthChange} min={1} max={100} bind:value={edgeButtonWidthValue} />
     </div>
   </div>
 </AccordionItem>
