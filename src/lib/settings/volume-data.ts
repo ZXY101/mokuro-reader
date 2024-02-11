@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 import { derived, get, writable } from 'svelte/store';
-import { settings } from './settings';
+import { settings, updateSetting, } from './settings';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
 import { manga, volume } from '$lib/catalog';
@@ -39,7 +39,17 @@ const initial: Volumes = stored && browser ? JSON.parse(stored) : {};
 export const volumes = writable<Volumes>(initial);
 
 export function initializeVolume(volume: string) {
-  const { hasCover, rightToLeft, singlePageView } = get(settings).volumeDefaults
+  const volumeDefaults = get(settings).volumeDefaults;
+
+  if (!volumeDefaults) {
+    updateSetting('volumeDefaults', {
+      singlePageView: false,
+      rightToLeft: true,
+      hasCover: false
+    })
+  }
+
+  const { hasCover, rightToLeft, singlePageView } = volumeDefaults
   volumes.update((prev) => {
     return {
       ...prev,
