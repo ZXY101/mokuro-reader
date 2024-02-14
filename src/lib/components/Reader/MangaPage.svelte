@@ -9,7 +9,10 @@
 
   $: url = src ? `url(${URL.createObjectURL(src)})` : '';
 
+  let legacy: HTMLElement | null;
+
   onMount(() => {
+    legacy = document.getElementById('popupAbout');
     zoomDefault();
 
     return () => {
@@ -18,6 +21,12 @@
       }, 10);
     };
   });
+
+  $: {
+    if (legacy) {
+      legacy.style.backgroundImage = url;
+    }
+  }
 
   afterUpdate(() => {
     zoomDefault();
