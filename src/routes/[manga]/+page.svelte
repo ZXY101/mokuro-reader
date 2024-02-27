@@ -10,13 +10,7 @@
   import { deleteVolume, mangaStats, volumes } from '$lib/settings';
 
   function sortManga(a: Volume, b: Volume) {
-    if (a.volumeName < b.volumeName) {
-      return -1;
-    }
-    if (a.volumeName > b.volumeName) {
-      return 1;
-    }
-    return 0;
+    return a.mokuroData.title.localeCompare(b.mokuroData.title);
   }
 
   $: manga = $catalog?.find((item) => item.id === $page.params.manga)?.manga.sort(sortManga);
