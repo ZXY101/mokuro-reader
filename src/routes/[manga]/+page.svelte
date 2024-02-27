@@ -21,23 +21,6 @@
 
   $: manga = $catalog?.find((item) => item.id === $page.params.manga)?.manga.sort(sortManga);
 
-  $: stats = manga
-    ?.map((vol) => vol.mokuroData.volume_uuid)
-    ?.reduce(
-      (stats: any, volumeId) => {
-        const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
-        const chars = $volumes[volumeId]?.chars || 0;
-        const completed = $volumes[volumeId]?.completed || 0;
-
-        stats.timeReadInMinutes = stats.timeReadInMinutes + timeReadInMinutes;
-        stats.chars = stats.chars + chars;
-        stats.completed = stats.completed + completed;
-
-        return stats;
-      },
-      { timeReadInMinutes: 0, chars: 0, completed: 0 }
-    );
-
   $: loading = false;
 
   async function confirmDelete() {
@@ -84,8 +67,10 @@
         </Button>
       </div>
     </div>
-    <Listgroup items={manga} let:item active class="flex-1 h-full w-full">
-      <VolumeItem {item} />
+    <Listgroup active class="flex-1 h-full w-full">
+      {#each manga as volume (volume.mokuroData.volume_uuid)}
+        <VolumeItem {volume} />
+      {/each}
     </Listgroup>
   </div>
 {:else}
