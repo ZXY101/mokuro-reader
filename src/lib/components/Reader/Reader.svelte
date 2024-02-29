@@ -122,6 +122,7 @@
         return;
       case 'ArrowDown':
       case 'PageDown':
+      case 'Space':
         changePage(page + navAmount, true);
         return;
       case 'Home':
@@ -130,11 +131,6 @@
       case 'End':
         if (pages) {
           changePage(pages.length, true);
-        }
-        return;
-      case 'Space':
-        if (pages && page + 1 <= pages.length) {
-          changePage(page + 1, true);
         }
         return;
       case 'KeyF':
