@@ -12,7 +12,8 @@ import type { Page } from "$lib/types";
 export function countChars(line: string) {
   const isNotJapaneseRegex = /[^0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu
   const cleaned = line.replace(isNotJapaneseRegex, '')
-  return cleaned.length;
+
+  return Array.from(cleaned).length;
 }
 
 export function getCharCount(pages: Page[], currentPage?: number) {

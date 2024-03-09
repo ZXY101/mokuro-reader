@@ -56,7 +56,7 @@
   </div>
   <div class="flex flex-col gap-5">
     <Accordion flush>
-      <QuickAccess />
+      <QuickAccess bind:hidden />
       {#if isReader()}
         <VolumeSettings />
       {:else}

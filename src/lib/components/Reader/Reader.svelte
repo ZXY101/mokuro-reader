@@ -8,7 +8,7 @@
     zoomFitToScreen
   } from '$lib/panzoom';
   import { progress, settings, updateProgress, type VolumeSettings } from '$lib/settings';
-  import { clamp, debounce } from '$lib/util';
+  import { clamp, debounce, fireExstaticEvent } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
   import {
@@ -22,6 +22,7 @@
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
+  import { beforeNavigate } from '$app/navigation';
 
   // TODO: Refactor this whole mess
   export let volumeSettings: VolumeSettings;
@@ -65,10 +66,12 @@
         return;
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
+      const charCount = getCharCount(pages, pageClamped) || 0;
+
       updateProgress(
         volume.mokuroData.volume_uuid,
         pageClamped,
-        getCharCount(pages, pageClamped) || 0,
+        charCount,
         pageClamped === pages.length || pageClamped === pages.length - 1
       );
       zoomDefault();
@@ -198,6 +201,28 @@
       }
     }
   }
+
+  $: {
+    if (volume) {
+      fireExstaticEvent('mokuro-reader:page.change', {
+        title: volume.mokuroData.title,
+        volumeName: volume.mokuroData.volume,
+        currentCharCount: charCount || 0,
+        currentPageNum: page
+      });
+    }
+  }
+
+  beforeNavigate(() => {
+    if (volume) {
+      fireExstaticEvent('mokuro-reader:reader.closed', {
+        title: volume.mokuroData.title,
+        volumeName: volume.mokuroData.volume,
+        currentCharCount: charCount || 0,
+        currentPageNum: page
+      });
+    }
+  });
 </script>
 
 <svelte:window
