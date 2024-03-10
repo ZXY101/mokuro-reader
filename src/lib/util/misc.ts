@@ -40,7 +40,7 @@ type ExtaticPayload = {
   totalCharCount: number;
   currentPage: number;
   totalPages: number;
-  currentlineCount: number;
+  currentLineCount: number;
   totalLineCount: number;
 }
 

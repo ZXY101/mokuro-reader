@@ -214,7 +214,7 @@
         currentPage: page,
         totalPages: pages.length,
         totalCharCount: maxCharCount || 0,
-        currentlineCount: lineCount,
+        currentLineCount: lineCount,
         totalLineCount
       });
     }
@@ -231,7 +231,7 @@
         currentPage: page,
         totalPages: pages.length,
         totalCharCount: maxCharCount || 0,
-        currentlineCount: lineCount,
+        currentLineCount: lineCount,
         totalLineCount
       });
     }
