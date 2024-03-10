@@ -66,7 +66,7 @@
         return;
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
-      const charCount = getCharCount(pages, pageClamped) || 0;
+      const { charCount } = getCharCount(pages, pageClamped);
 
       updateProgress(
         volume.mokuroData.volume_uuid,
@@ -144,8 +144,9 @@
     }
   }
 
-  $: charCount = $settings.charCount ? getCharCount(pages, page) : 0;
-  $: maxCharCount = getCharCount(pages);
+  $: charCount = $settings.charCount ? getCharCount(pages, page).charCount : 0;
+  $: maxCharCount = getCharCount(pages).charCount;
+  $: totalLineCount = getCharCount(pages).lineCount;
 
   let startX = 0;
   let startY = 0;
@@ -204,26 +205,34 @@
 
   $: {
     if (volume) {
+      const { charCount, lineCount } = getCharCount(pages, page);
+
       fireExstaticEvent('mokuro-reader:page.change', {
         title: volume.mokuroData.title,
         volumeName: volume.mokuroData.volume,
-        currentCharCount: getCharCount(pages, page) || 0,
+        currentCharCount: charCount,
         currentPage: page,
         totalPages: pages.length,
-        totalCharCount: maxCharCount || 0
+        totalCharCount: maxCharCount || 0,
+        currentlineCount: lineCount,
+        totalLineCount
       });
     }
   }
 
   beforeNavigate(() => {
     if (volume) {
+      const { charCount, lineCount } = getCharCount(pages, page);
+
       fireExstaticEvent('mokuro-reader:reader.closed', {
         title: volume.mokuroData.title,
         volumeName: volume.mokuroData.volume,
-        currentCharCount: getCharCount(pages, page) || 0,
+        currentCharCount: charCount,
         currentPage: page,
         totalPages: pages.length,
-        totalCharCount: maxCharCount || 0
+        totalCharCount: maxCharCount || 0,
+        currentlineCount: lineCount,
+        totalLineCount
       });
     }
   });

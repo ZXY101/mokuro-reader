@@ -17,20 +17,23 @@ export function countChars(line: string) {
 }
 
 export function getCharCount(pages: Page[], currentPage?: number) {
+  let charCount = 0;
+  let lineCount = 0;
+
   if (pages && pages.length > 0) {
     const max = currentPage || pages.length
-    let charCount = 0;
 
     for (let i = 0; i < max; i++) {
       const blocks = pages[i].blocks;
 
       blocks.forEach((block) => {
+        lineCount += block.lines.length;
         block.lines.forEach((line) => {
           charCount += countChars(line);
         });
       });
     }
-
-    return charCount;
   }
+
+  return { charCount, lineCount };
 }

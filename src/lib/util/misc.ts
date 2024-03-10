@@ -39,7 +39,9 @@ type ExtaticPayload = {
   currentCharCount: number;
   totalCharCount: number;
   currentPage: number;
-  totalPages: number
+  totalPages: number;
+  currentlineCount: number;
+  totalLineCount: number;
 }
 
 type ExtaticEvent = 'mokuro-reader:page.change' | 'mokuro-reader:reader.closed'
