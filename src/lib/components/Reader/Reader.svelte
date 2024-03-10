@@ -326,6 +326,7 @@
         class:flex-row-reverse={!volumeSettings.rightToLeft}
         on:dblclick={onDoubleTap}
         role="none"
+        id="manga-panel"
       >
         {#if showSecondPage()}
           <MangaPage page={pages[index + 1]} src={Object.values(volume?.files)[index + 1]} />
