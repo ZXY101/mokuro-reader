@@ -207,8 +207,10 @@
       fireExstaticEvent('mokuro-reader:page.change', {
         title: volume.mokuroData.title,
         volumeName: volume.mokuroData.volume,
-        currentCharCount: charCount || 0,
-        currentPageNum: page
+        currentCharCount: getCharCount(pages, page) || 0,
+        currentPage: page,
+        totalPages: pages.length,
+        totalCharCount: maxCharCount || 0
       });
     }
   }
@@ -218,8 +220,10 @@
       fireExstaticEvent('mokuro-reader:reader.closed', {
         title: volume.mokuroData.title,
         volumeName: volume.mokuroData.volume,
-        currentCharCount: charCount || 0,
-        currentPageNum: page
+        currentCharCount: getCharCount(pages, page) || 0,
+        currentPage: page,
+        totalPages: pages.length,
+        totalCharCount: maxCharCount || 0
       });
     }
   });
