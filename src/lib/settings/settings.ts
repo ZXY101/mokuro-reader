@@ -47,6 +47,7 @@ export type Settings = {
   boldFont: boolean;
   pageNum: boolean;
   charCount: boolean;
+  bounds: boolean;
   mobile: boolean;
   backgroundColor: string;
   swipeThreshold: number;
@@ -73,6 +74,7 @@ const defaultSettings: Settings = {
   pageNum: true,
   charCount: false,
   mobile: false,
+  bounds: false,
   backgroundColor: '#030712',
   swipeThreshold: 50,
   edgeButtonWidth: 10,

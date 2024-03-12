@@ -147,9 +147,9 @@ export function keepInBounds() {
     return
   }
 
-  const { mobile } = get(settings)
+  const { mobile, bounds } = get(settings)
 
-  if (!mobile) {
+  if (!mobile && !bounds) {
     return
   }
 
@@ -161,7 +161,7 @@ export function keepInBounds() {
   const width = container.offsetWidth * scale;
   const height = container.offsetHeight * scale;
 
-  const marginX = innerWidth * 0.01;
+  const marginX = innerWidth * 0.001;
   const marginY = innerHeight * 0.01;
 
   let minX = innerWidth - width - marginX;
@@ -190,7 +190,6 @@ export function keepInBounds() {
 
   if (x < minX) {
     transform.x = minX;
-
   }
   if (x > maxX) {
     transform.x = maxX;
