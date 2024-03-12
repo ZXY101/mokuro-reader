@@ -37,7 +37,7 @@
       return textBox;
     })
     .sort(({ area: a }, { area: b }) => {
-      return a - b;
+      return b - a;
     });
 
   $: fontWeight = $settings.boldFont ? 'bold' : '400';
