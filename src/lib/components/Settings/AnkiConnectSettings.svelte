@@ -18,7 +18,8 @@
   const triggerOptions = [
     { value: 'rightClick', name: 'Right click (long press on mobile)' },
     { value: 'doubleTap', name: 'Double tap' },
-    { value: 'both', name: 'Both' }
+    { value: 'both', name: 'Both' },
+    { value: 'neither', name: 'Neither' }
   ];
 </script>
 

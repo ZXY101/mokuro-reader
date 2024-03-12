@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { zoomFitToScreen } from '$lib/panzoom';
+  import { toggleFullScreen, zoomFitToScreen } from '$lib/panzoom';
   import { SpeedDial, SpeedDialButton } from 'flowbite-svelte';
   import { settings } from '$lib/settings';
   import {
     ArrowLeftOutline,
     ArrowRightOutline,
+    CompressOutline,
     ImageOutline,
     ZoomOutOutline
   } from 'flowbite-svelte-icons';
@@ -13,7 +14,8 @@
 
   export let left: (_e: any, ingoreTimeOut?: boolean) => void;
   export let right: (_e: any, ingoreTimeOut?: boolean) => void;
-  export let src: File;
+  export let src1: File;
+  export let src2: File | undefined;
 
   let open = false;
 
@@ -32,8 +34,8 @@
     open = false;
   }
 
-  async function onUpdateCard() {
-    if ($settings.ankiConnectSettings.enabled) {
+  async function onUpdateCard(src: File | undefined) {
+    if ($settings.ankiConnectSettings.enabled && src) {
       if ($settings.ankiConnectSettings.cropImage) {
         showCropper(URL.createObjectURL(src));
       } else {
@@ -52,15 +54,22 @@
     tooltip="none"
     trigger="click"
     defaultClass="absolute end-3 bottom-3 z-50"
-    outline
-    color="dark"
+    color="transparent"
     bind:open
   >
     {#if $settings.ankiConnectSettings.enabled}
-      <SpeedDialButton on:click={onUpdateCard}>
+      <SpeedDialButton name={src2 ? '1' : undefined} on:click={() => onUpdateCard(src1)}>
         <ImageOutline />
       </SpeedDialButton>
     {/if}
+    {#if $settings.ankiConnectSettings.enabled && src2}
+      <SpeedDialButton name="2" on:click={() => onUpdateCard(src2)}>
+        <ImageOutline />
+      </SpeedDialButton>
+    {/if}
+    <SpeedDialButton on:click={toggleFullScreen}>
+      <CompressOutline />
+    </SpeedDialButton>
     <SpeedDialButton on:click={handleZoom}>
       <ZoomOutOutline />
     </SpeedDialButton>

@@ -248,7 +248,12 @@
   <title>{volume?.mokuroData.volume || 'Volume'}</title>
 </svelte:head>
 {#if volume && pages}
-  <QuickActions {left} {right} src={Object.values(volume?.files)[index]} />
+  <QuickActions
+    {left}
+    {right}
+    src1={Object.values(volume?.files)[index]}
+    src2={!volumeSettings.singlePageView ? Object.values(volume?.files)[index + 1] : undefined}
+  />
   <SettingsButton />
   <Cropper />
   <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
