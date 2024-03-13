@@ -77,7 +77,7 @@ const defaultSettings: Settings = {
   bounds: false,
   backgroundColor: '#030712',
   swipeThreshold: 50,
-  edgeButtonWidth: 10,
+  edgeButtonWidth: 40,
   showTimer: false,
   quickActions: true,
   fontSize: 'auto',

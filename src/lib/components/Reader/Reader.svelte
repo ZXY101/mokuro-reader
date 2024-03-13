@@ -345,11 +345,13 @@
       on:mousedown={mouseDown}
       on:mouseup={left}
       class="left-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
+      style:width={`${$settings.edgeButtonWidth}px`}
     />
     <button
       on:mousedown={mouseDown}
       on:mouseup={right}
       class="right-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
+      style:width={`${$settings.edgeButtonWidth}px`}
     />
   {/if}
 {:else}
