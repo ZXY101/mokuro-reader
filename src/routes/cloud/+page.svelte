@@ -203,17 +203,17 @@
   }
 </script>
 
-<div class="p-10 h-[90svh]">
+<div class="p-2 h-[90svh]">
   {#if loadingMessage}
     <Loader>
       {loadingMessage}
     </Loader>
   {:else if zips}
-    <div class="flex flex-col gap-2">
-      <div class="flex flex-col gap-5">
+    <div class="flex flex-col gap-5">
+      <div class="flex flex-col gap-2">
         <h2 class="text-lg font-semibold text-center">Google Drive:</h2>
         <div
-          class="flex gap-2 justify-center flex-wrap p-5 border rounded-lg border-slate-600 border-opacity-50"
+          class="flex gap-2 justify-center flex-wrap p-2 sm:p-5 border rounded-lg border-slate-600 border-opacity-50"
         >
           {#if zips.length > 0}
             <Listgroup active class="w-full">
@@ -241,7 +241,7 @@
           {/if}
         </div>
       </div>
-      <div class="flex gap-2">
+      <div class="flex flex-col sm:flex-row gap-2">
         <Button color="dark" on:click={() => promptConfirmation('Upload volume data?', onUpload)}>
           Upload volume data
         </Button>
