@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Navbar, NavBrand } from 'flowbite-svelte';
-  import { UserSettingsSolid, UploadSolid } from 'flowbite-svelte-icons';
-  import { afterNavigate } from '$app/navigation';
+  import { UserSettingsSolid, UploadSolid, CloudArrowUpOutline } from 'flowbite-svelte-icons';
+  import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
@@ -37,6 +37,7 @@
     <div class="flex md:order-2 gap-5">
       <UserSettingsSolid class="hover:text-primary-700" on:click={openSettings} />
       <UploadSolid class="hover:text-primary-700" on:click={() => (uploadModalOpen = true)} />
+      <!-- <CloudArrowUpOutline class="hover:text-primary-700" on:click={() => goto('/cloud')} /> -->
     </div>
   </Navbar>
 </div>

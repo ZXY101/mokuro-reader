@@ -14,6 +14,7 @@
   "devDependencies": {
     "@sveltejs/adapter-auto": "^2.0.0",
     "@sveltejs/kit": "^1.20.4",
+    "@types/gapi.client.drive-v3": "^0.0.4",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
     "@typescript-eslint/parser": "^5.45.0",
     "autoprefixer": "^10.4.14",
@@ -36,6 +37,8 @@
   },
   "type": "module",
   "dependencies": {
+    "@types/gapi": "^0.0.47",
+    "@types/google.accounts": "^0.0.14",
     "@vercel/analytics": "^1.1.0",
     "@zip.js/zip.js": "^2.7.20",
     "dexie": "^4.0.1-alpha.25",
