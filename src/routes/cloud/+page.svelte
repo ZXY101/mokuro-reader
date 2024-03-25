@@ -12,7 +12,7 @@
   const API_KEY = import.meta.env.VITE_GDRIVE_API_KEY;
 
   const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-  const SCOPES = 'https://www.googleapis.com/auth/drive.files';
+  const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
   const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
   const READER_FOLDER = 'mokuro-reader';
