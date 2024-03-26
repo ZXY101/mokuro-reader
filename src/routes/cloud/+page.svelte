@@ -310,10 +310,12 @@
             {/each}
           </Listgroup>
         {:else}
-          <p class="text-center">
-            Add your zip files to the <span class="text-primary-700">{READER_FOLDER}</span> folder in
-            your Google Drive.
-          </p>
+          <div class="h-[70svh] items-center justify-center flex">
+            <p class="text-center">
+              Add your zip files to the <span class="text-primary-700">{READER_FOLDER}</span> folder
+              in your Google Drive.
+            </p>
+          </div>
         {/if}
       </div>
     </div>
