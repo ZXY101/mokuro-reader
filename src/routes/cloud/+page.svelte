@@ -248,6 +248,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>Cloud</title>
+</svelte:head>
+
 <div class="p-2 h-[90svh]">
   {#if loadingMessage}
     <Loader>
