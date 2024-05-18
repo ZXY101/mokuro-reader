@@ -37,18 +37,17 @@
   function xhrDownloadFileId(fileId: string) {
     return new Promise<Blob>((resolve, reject) => {
       const { access_token } = gapi.auth.getToken();
-
       const xhr = new XMLHttpRequest();
+
+      completed = 0;
+      totalSize = 0;
 
       xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       xhr.setRequestHeader('Authorization', `Bearer ${access_token}`);
       xhr.responseType = 'blob';
 
-      xhr.onloadstart = () => {
-        completed = 0;
-      };
-
       xhr.onprogress = ({ loaded, total }) => {
+        loadingMessage = '';
         completed = loaded;
         totalSize = total;
       };
@@ -292,9 +291,9 @@
 </svelte:head>
 
 <div class="p-2 h-[90svh]">
-  {#if loadingMessage}
+  {#if loadingMessage || completed > 0}
     <Loader>
-      {#if completed > 0 && completed !== totalSize}
+      {#if completed > 0}
         <P>{formatBytes(completed)} / {formatBytes(totalSize)}</P>
         <Progressbar {progress} />
       {:else}
