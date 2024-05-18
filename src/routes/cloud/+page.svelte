@@ -1,8 +1,8 @@
 <script lang="ts">
   import { processFiles } from '$lib/upload';
   import Loader from '$lib/components/Loader.svelte';
-  import { formatBytes, showSnackbar, uploadFile } from '$lib/util';
-  import { Button, Frame, Listgroup, ListgroupItem } from 'flowbite-svelte';
+  import { showSnackbar, uploadFile } from '$lib/util';
+  import { Button } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { promptConfirmation } from '$lib/util';
   import { GoogleSolid } from 'flowbite-svelte-icons';
@@ -22,70 +22,18 @@
   const type = 'application/json';
 
   let tokenClient: any;
-  let zips: gapi.client.drive.File[];
   let loadingMessage = '';
   let readerFolderId = '';
   let volumeDataId = '';
   let profilesId = '';
-
-  async function fetchZips(folderId: string) {
-    const { result } = await gapi.client.drive.files.list({
-      q: `'${folderId}' in parents and (mimeType='${FOLDER_MIME_TYPE}' or (fileExtension='zip' or fileExtension='cbz'))`,
-      fields: 'files(id, name, mimeType, size)'
-    });
-
-    if (!result.files) return;
-
-    let zipFiles: gapi.client.drive.File[] = [];
-
-    for (const file of result.files) {
-      if (!file.id) continue;
-
-      if (file.mimeType === FOLDER_MIME_TYPE) {
-        zipFiles = [...zipFiles, ...((await fetchZips(file.id)) || [])];
-      } else {
-        zipFiles.push(file);
-      }
-    }
-
-    return zipFiles;
-  }
-
-  async function downloadFile(fileId: string) {
-    loadingMessage = 'Downloading from drive';
-
-    const { body, headers } = await gapi.client.drive.files.get({
-      fileId,
-      alt: 'media'
-    });
-
-    const type = headers?.['Content-Type'] || '';
-
-    const blob = new Blob([new Uint8Array(body.length).map((_, i) => body.charCodeAt(i))], {
-      type
-    });
-
-    const file = new File([blob], fileId + '.zip');
-
-    loadingMessage = 'Adding to catalog';
-
-    await processFiles([file]);
-    loadingMessage = '';
-  }
-
-  function onClick({ id, name }: gapi.client.drive.File) {
-    if (id) {
-      promptConfirmation(`Would you like to download and add ${name} to your collection?`, () => {
-        downloadFile(id);
-      });
-    }
-  }
+  let accessToken = '';
 
   async function connectDrive(resp?: any) {
     if (resp?.error !== undefined) {
       throw resp;
     }
 
+    accessToken = resp?.access_token;
     loadingMessage = 'Connecting to drive';
 
     const { result: readerFolderRes } = await gapi.client.drive.files.list({
@@ -102,7 +50,6 @@
       readerFolderId = createReaderFolderRes.id || '';
     } else {
       const id = readerFolderRes.files?.[0]?.id || '';
-      zips = [...((await fetchZips(id)) || [])];
 
       readerFolderId = id || '';
     }
@@ -126,7 +73,10 @@
     }
 
     loadingMessage = '';
-    showSnackbar('Connected to Google Drive');
+
+    if (accessToken) {
+      showSnackbar('Connected to Google Drive');
+    }
   }
 
   function signIn() {
@@ -143,12 +93,9 @@
         apiKey: API_KEY,
         discoveryDocs: [DISCOVERY_DOC]
       });
-
-      if (gapi.client.getToken() !== null) {
-        loadingMessage = 'Connecting to drive';
-        connectDrive();
-      }
     });
+
+    gapi.load('picker', () => {});
 
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID,
@@ -157,18 +104,57 @@
     });
   });
 
+  function createPicker() {
+    const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+      .setMimeTypes('application/zip,application/x-zip-compressed')
+      .setMode(google.picker.DocsViewMode.LIST)
+      .setIncludeFolders(true)
+      .setParent(readerFolderId);
+
+    const picker = new google.picker.PickerBuilder()
+      .addView(docsView)
+      .setOAuthToken(accessToken)
+      .setAppId(CLIENT_ID)
+      .setDeveloperKey(API_KEY)
+      .enableFeature(google.picker.Feature.NAV_HIDDEN)
+      .setCallback(pickerCallback)
+      .build();
+    picker.setVisible(true);
+  }
+
+  async function pickerCallback(data: google.picker.ResponseObject) {
+    if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+      loadingMessage = 'Downloading from drive';
+      const docs = data[google.picker.Response.DOCUMENTS];
+      const { body, headers } = await gapi.client.drive.files.get({
+        fileId: docs[0].id,
+        alt: 'media'
+      });
+
+      const type = headers?.['Content-Type'] || '';
+
+      const blob = new Blob([new Uint8Array(body.length).map((_, i) => body.charCodeAt(i))], {
+        type
+      });
+
+      const file = new File([blob], docs[0].name);
+
+      await processFiles([file]);
+      loadingMessage = '';
+    }
+  }
+
   async function onUploadVolumeData() {
     const metadata = {
       mimeType: type,
       name: VOLUME_DATA_FILE,
       parents: [volumeDataId ? null : readerFolderId]
     };
-    const { access_token } = gapi.auth.getToken();
 
     loadingMessage = 'Uploading volume data';
 
     const res = await uploadFile({
-      accessToken: access_token,
+      accessToken,
       fileId: volumeDataId,
       metadata,
       localStorageId: 'volumes',
@@ -178,7 +164,9 @@
     volumeDataId = res.id;
     loadingMessage = '';
 
-    showSnackbar('Volume data uploaded');
+    if (volumeDataId) {
+      showSnackbar('Volume data uploaded');
+    }
   }
 
   async function onUploadProfiles() {
@@ -187,12 +175,11 @@
       name: PROFILES_FILE,
       parents: [profilesId ? null : readerFolderId]
     };
-    const { access_token } = gapi.auth.getToken();
 
     loadingMessage = 'Uploading profiles';
 
     const res = await uploadFile({
-      accessToken: access_token,
+      accessToken,
       fileId: profilesId,
       metadata,
       localStorageId: 'profiles',
@@ -202,7 +189,9 @@
     profilesId = res.id;
     loadingMessage = '';
 
-    showSnackbar('Profiles uploaded');
+    if (profilesId) {
+      showSnackbar('Profiles uploaded');
+    }
   }
 
   async function onDownloadVolumeData() {
@@ -257,11 +246,16 @@
     <Loader>
       {loadingMessage}
     </Loader>
-  {:else if zips}
-    <div class="flex flex-col gap-2">
-      <div class="flex justify-between items-center gap-2 flex-col sm:flex-row">
-        <h2 class="text-2xl font-semibold text-center">Google Drive:</h2>
-        <div class="flex flex-col sm:flex-row gap-2 sm:w-auto w-full">
+  {:else if accessToken}
+    <div class="flex justify-between items-center gap-6 flex-col">
+      <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+      <p class="text-center">
+        Add your zipped manga files to the <span class="text-primary-700">{READER_FOLDER}</span> folder
+        in your Google Drive.
+      </p>
+      <div class="flex flex-col gap-4 w-full max-w-3xl">
+        <Button color="blue" on:click={createPicker}>Download manga</Button>
+        <div class="flex-col gap-2 flex">
           <Button
             color="dark"
             on:click={() => promptConfirmation('Upload volume data?', onUploadVolumeData)}
@@ -277,6 +271,8 @@
               Download volume data
             </Button>
           {/if}
+        </div>
+        <div class="flex-col gap-2 flex">
           <Button
             color="dark"
             on:click={() => promptConfirmation('Upload profiles?', onUploadProfiles)}
@@ -294,44 +290,18 @@
           {/if}
         </div>
       </div>
-      <div class="flex gap-2 justify-center flex-wrap">
-        {#if zips.length > 0}
-          <Listgroup active class="w-full">
-            {#each zips as zip}
-              <Frame
-                on:click={() => onClick(zip)}
-                rounded
-                border
-                class="divide-y divide-gray-200 dark:divide-gray-600"
-              >
-                <ListgroupItem normalClass="py-4">
-                  <div class="flex flex-col gap-2">
-                    <h2 class="font-semibold">{zip.name}</h2>
-                    <p>{formatBytes(parseInt(zip.size || '0'))}</p>
-                  </div>
-                </ListgroupItem>
-              </Frame>
-            {/each}
-          </Listgroup>
-        {:else}
-          <div class="h-[70svh] items-center justify-center flex">
-            <p class="text-center">
-              Add your zip files to the <span class="text-primary-700">{READER_FOLDER}</span> folder
-              in your Google Drive.
-            </p>
-          </div>
-        {/if}
-      </div>
     </div>
   {:else}
-    <button
-      class="w-full border rounded-lg border-slate-600 p-10 border-opacity-50 hover:bg-slate-800"
-      on:click={signIn}
-    >
-      <div class="flex sm:flex-row flex-col gap-2 items-center justify-center">
-        <GoogleSolid size="lg" />
-        <h2 class="text-lg">Connect to Google Drive</h2>
-      </div>
-    </button>
+    <div class="flex justify-center pt-0 sm:pt-32">
+      <button
+        class="w-full border rounded-lg border-slate-600 p-10 border-opacity-50 hover:bg-slate-800 max-w-3xl"
+        on:click={signIn}
+      >
+        <div class="flex sm:flex-row flex-col gap-2 items-center justify-center">
+          <GoogleSolid size="lg" />
+          <h2 class="text-lg">Connect to Google Drive</h2>
+        </div>
+      </button>
+    </div>
   {/if}
 </div>
