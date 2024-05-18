@@ -1,8 +1,8 @@
 <script lang="ts">
   import { processFiles } from '$lib/upload';
   import Loader from '$lib/components/Loader.svelte';
-  import { showSnackbar, uploadFile } from '$lib/util';
-  import { Button } from 'flowbite-svelte';
+  import { formatBytes, showSnackbar, uploadFile } from '$lib/util';
+  import { Button, P, Progressbar } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { promptConfirmation } from '$lib/util';
   import { GoogleSolid } from 'flowbite-svelte-icons';
@@ -22,11 +22,62 @@
   const type = 'application/json';
 
   let tokenClient: any;
-  let loadingMessage = '';
+  let accessToken = '';
+
   let readerFolderId = '';
   let volumeDataId = '';
   let profilesId = '';
-  let accessToken = '';
+
+  let loadingMessage = '';
+
+  let completed = 0;
+  let totalSize = 0;
+  $: progress = Math.floor((completed / totalSize) * 100).toString();
+
+  function xhrDownloadFileId(fileId: string) {
+    return new Promise<Blob>((resolve, reject) => {
+      const { access_token } = gapi.auth.getToken();
+
+      const xhr = new XMLHttpRequest();
+
+      xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+      xhr.setRequestHeader('Authorization', `Bearer ${access_token}`);
+      xhr.responseType = 'blob';
+
+      xhr.onloadstart = () => {
+        completed = 0;
+      };
+
+      xhr.onprogress = ({ loaded, total }) => {
+        completed = loaded;
+        totalSize = total;
+      };
+
+      xhr.onabort = (event) => {
+        console.warn(`xhr ${fileId}: download aborted at ${event.loaded} of ${event.total}`);
+        showSnackbar('Download failed');
+        reject(new Error('Download aborted'));
+      };
+
+      xhr.onerror = (event) => {
+        console.error(`xhr ${fileId}: download error at ${event.loaded} of ${event.total}`);
+        showSnackbar('Download failed');
+        reject(new Error('Error downloading file'));
+      };
+
+      xhr.onload = (event) => {
+        resolve(xhr.response);
+      };
+
+      xhr.ontimeout = (event) => {
+        console.warn(`xhr ${fileId}: download timeout after ${event.loaded} of ${event.total}`);
+        showSnackbar('Download timed out');
+        reject(new Error('Timout downloading file'));
+      };
+
+      xhr.send();
+    });
+  }
 
   async function connectDrive(resp?: any) {
     if (resp?.error !== undefined) {
@@ -123,24 +174,23 @@
   }
 
   async function pickerCallback(data: google.picker.ResponseObject) {
-    if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
-      loadingMessage = 'Downloading from drive';
-      const docs = data[google.picker.Response.DOCUMENTS];
-      const { body, headers } = await gapi.client.drive.files.get({
-        fileId: docs[0].id,
-        alt: 'media'
-      });
+    try {
+      if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
+        loadingMessage = 'Downloading from drive...';
+        const docs = data[google.picker.Response.DOCUMENTS];
+        const blob = await xhrDownloadFileId(docs[0].id);
 
-      const type = headers?.['Content-Type'] || '';
+        loadingMessage = 'Adding to catalog...';
 
-      const blob = new Blob([new Uint8Array(body.length).map((_, i) => body.charCodeAt(i))], {
-        type
-      });
+        const file = new File([blob], docs[0].name);
 
-      const file = new File([blob], docs[0].name);
-
-      await processFiles([file]);
+        await processFiles([file]);
+        loadingMessage = '';
+      }
+    } catch (error) {
+      showSnackbar('Something went wrong');
       loadingMessage = '';
+      console.error(error);
     }
   }
 
@@ -244,7 +294,12 @@
 <div class="p-2 h-[90svh]">
   {#if loadingMessage}
     <Loader>
-      {loadingMessage}
+      {#if completed > 0 && completed !== totalSize}
+        <P>{formatBytes(completed)} / {formatBytes(totalSize)}</P>
+        <Progressbar {progress} />
+      {:else}
+        {loadingMessage}
+      {/if}
     </Loader>
   {:else if accessToken}
     <div class="flex justify-between items-center gap-6 flex-col">
