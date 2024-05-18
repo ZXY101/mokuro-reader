@@ -64,7 +64,9 @@
         reject(new Error('Error downloading file'));
       };
 
-      xhr.onload = (event) => {
+      xhr.onload = () => {
+        completed = 0;
+        totalSize = 0;
         resolve(xhr.response);
       };
 
