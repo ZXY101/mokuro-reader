@@ -37,7 +37,7 @@
     <div class="flex md:order-2 gap-5">
       <UserSettingsSolid class="hover:text-primary-700" on:click={openSettings} />
       <UploadSolid class="hover:text-primary-700" on:click={() => (uploadModalOpen = true)} />
-      <!-- <CloudArrowUpOutline class="hover:text-primary-700" on:click={() => goto('/cloud')} /> -->
+      <CloudArrowUpOutline class="hover:text-primary-700" on:click={() => goto('/cloud')} />
     </div>
   </Navbar>
 </div>

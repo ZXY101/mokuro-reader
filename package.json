@@ -39,6 +39,7 @@
   "dependencies": {
     "@types/gapi": "^0.0.47",
     "@types/google.accounts": "^0.0.14",
+    "@types/google.picker": "^0.0.42",
     "@vercel/analytics": "^1.1.0",
     "@zip.js/zip.js": "^2.7.20",
     "dexie": "^4.0.1-alpha.25",
