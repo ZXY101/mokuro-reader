@@ -23,6 +23,7 @@
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
   import { beforeNavigate } from '$app/navigation';
+  import { onMount } from 'svelte';
 
   // TODO: Refactor this whole mess
   export let volumeSettings: VolumeSettings;
@@ -220,7 +221,17 @@
     }
   }
 
+  onMount(() => {
+    if ($settings.defaultFullscreen) {
+      document.documentElement.requestFullscreen();
+    }
+  });
+
   beforeNavigate(() => {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    }
+
     if (volume) {
       const { charCount, lineCount } = getCharCount(pages, page);
 
