@@ -340,6 +340,7 @@
       <div
         class="flex flex-row"
         class:flex-row-reverse={!volumeSettings.rightToLeft}
+        style:filter={`invert(${$settings.invertColors ? 1 : 0})`}
         on:dblclick={onDoubleTap}
         role="none"
         id="manga-panel"
