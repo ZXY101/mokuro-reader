@@ -18,7 +18,9 @@
           class="object-contain sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border"
         />
       {/if}
-      <p class="font-semibold">{manga.mokuroData.title}</p>
+      <p class="font-semibold sm:w-[250px] line-clamp-1">
+        {manga.mokuroData.title}
+      </p>
     </div>
   </a>
 {/if}
