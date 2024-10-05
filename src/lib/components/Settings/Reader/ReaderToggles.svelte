@@ -7,6 +7,7 @@
     { key: 'textEditable', text: 'Editable text', value: $settings.textEditable },
     { key: 'textBoxBorders', text: 'Text box borders', value: $settings.textBoxBorders },
     { key: 'displayOCR', text: 'OCR enabled', value: $settings.displayOCR },
+    { key: 'alwaysShowOCR', text: 'Show OCR by default', value: $settings.alwaysShowOCR },
     { key: 'boldFont', text: 'Bold font', value: $settings.boldFont },
     { key: 'pageNum', text: 'Show page number', value: $settings.pageNum },
     { key: 'charCount', text: 'Show character count', value: $settings.charCount },
