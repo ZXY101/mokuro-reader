@@ -45,6 +45,7 @@ export type Settings = {
   textEditable: boolean;
   textBoxBorders: boolean;
   displayOCR: boolean;
+  alwaysShowOCR: boolean;
   boldFont: boolean;
   pageNum: boolean;
   charCount: boolean;
@@ -71,6 +72,7 @@ export type VolumeDefaultsKey = keyof VolumeDefaults;
 const defaultSettings: Settings = {
   defaultFullscreen: false,
   displayOCR: true,
+  alwaysShowOCR: false,
   textEditable: false,
   textBoxBorders: false,
   boldFont: false,
