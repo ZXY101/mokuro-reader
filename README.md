@@ -10,7 +10,7 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 - Anki connect integration & image cropping
 - Installation and offline support
 
-## Useage:
+## Usage:
 You can find the reader hosted [here](https://reader.mokuro.app/).
 
 To import your manga, process it with mokuro and then upload your manga along with the generated `.mokuro` file.
