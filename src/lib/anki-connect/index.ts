@@ -102,7 +102,7 @@ export async function updateLastCard(imageData: string | null | undefined, sente
         id,
         fields,
         picture: {
-          filename: `${id}.webp`,
+          filename: `mokuro_${id}.webp`,
           data: imageData.split(';base64,')[1],
           fields: [pictureField],
         },
