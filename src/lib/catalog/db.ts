@@ -10,6 +10,7 @@ export interface VolumeEntry {
   pages: Page[];
   files: Record<string, File>;
   thumbnail?: File;
+  thumbnailProcessing?: boolean;
 }
 
 async function generateThumbnail(file: File, maxSize: number = 300): Promise<File> {
@@ -81,21 +82,6 @@ export class CatalogDexie extends Dexie {
       
       for (const entry of oldCatalog) {
         for (const volume of entry.manga) {
-          // Get the first image file when sorted naturally
-          const files = volume.files;
-          const fileNames = Object.keys(files).sort(naturalSort);
-          const firstImageFile = fileNames.length > 0 ? files[fileNames[0]] : null;
-
-          // Generate thumbnail if we have an image
-          let thumbnail: File | undefined;
-          if (firstImageFile) {
-            try {
-              thumbnail = await generateThumbnail(firstImageFile);
-            } catch (error) {
-              console.error('Failed to generate thumbnail:', error);
-            }
-          }
-
           volumes.push({
             version: volume.mokuroData.version,
             title: volume.mokuroData.title,
@@ -103,8 +89,7 @@ export class CatalogDexie extends Dexie {
             volume: volume.mokuroData.volume,
             volume_uuid: volume.mokuroData.volume_uuid,
             pages: volume.mokuroData.pages,
-            files: volume.files,
-            thumbnail
+            files: volume.files
           });
         }
       }
@@ -112,6 +97,62 @@ export class CatalogDexie extends Dexie {
       await tx.table('volumes').bulkAdd(volumes);
     });
   }
+
+  async processThumbnails(batchSize: number = 5): Promise<void> {
+    // Get volumes without thumbnails and not currently being processed
+    const volumes = await this.volumes
+      .where('thumbnail')
+      .equals(undefined)
+      .and(volume => !volume.thumbnailProcessing)
+      .limit(batchSize)
+      .toArray();
+
+    if (volumes.length === 0) return;
+
+    // Process thumbnails in parallel
+    await Promise.all(volumes.map(async (volume) => {
+      // Mark as processing
+      await this.volumes.where('volume_uuid').equals(volume.volume_uuid).modify({ thumbnailProcessing: true });
+
+      try {
+        // Get the first image file when sorted naturally
+        const fileNames = Object.keys(volume.files).sort(naturalSort);
+        const firstImageFile = fileNames.length > 0 ? volume.files[fileNames[0]] : null;
+
+        if (firstImageFile) {
+          const thumbnail = await generateThumbnail(firstImageFile);
+          // Update the volume with the thumbnail
+          await this.volumes.where('volume_uuid').equals(volume.volume_uuid).modify({
+            thumbnail,
+            thumbnailProcessing: false
+          });
+        }
+      } catch (error) {
+        console.error('Failed to generate thumbnail for volume:', volume.volume_uuid, error);
+        // Mark as not processing even if it failed
+        await this.volumes.where('volume_uuid').equals(volume.volume_uuid).modify({ thumbnailProcessing: false });
+      }
+    }));
+
+    // Continue processing remaining volumes
+    await this.processThumbnails(batchSize);
+  }
 }
 
 export const db = new CatalogDexie();
+
+// Start thumbnail processing in the background
+let thumbnailProcessingStarted = false;
+
+export function startThumbnailProcessing(): void {
+  if (thumbnailProcessingStarted) return;
+  thumbnailProcessingStarted = true;
+
+  // Process thumbnails in the background
+  setTimeout(() => {
+    db.processThumbnails().catch(error => {
+      console.error('Error in thumbnail processing:', error);
+      thumbnailProcessingStarted = false; // Allow restart on error
+    });
+  }, 1000); // Start after 1 second delay to let the app initialize
+}
