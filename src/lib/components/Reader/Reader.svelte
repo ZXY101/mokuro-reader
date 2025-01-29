@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { catalog } from '$lib/catalog';
+  import { volumes } from '$lib/catalog';
   import {
     Panzoom,
     panzoomStore,
@@ -28,13 +28,11 @@
   // TODO: Refactor this whole mess
   export let volumeSettings: VolumeSettings;
 
-  $: volume = $catalog
-    ?.find((item) => item.id === $pageStore.params.manga)
-    ?.manga.find((item) => item.mokuroData.volume_uuid === $pageStore.params.volume);
+  $: volume = $volumes?.find(item => item.volume_uuid === $pageStore.params.volume);
 
-  $: pages = volume?.mokuroData.pages || [];
+  $: pages = volume?.pages || [];
 
-  $: page = $progress?.[volume?.mokuroData.volume_uuid || 0] || 1;
+  $: page = $progress?.[volume?.volume_uuid || 0] || 1;
   $: index = page - 1;
   $: navAmount =
     volumeSettings.singlePageView ||
@@ -70,7 +68,7 @@
       const { charCount } = getCharCount(pages, pageClamped);
 
       updateProgress(
-        volume.mokuroData.volume_uuid,
+        volume.volume_uuid,
         pageClamped,
         charCount,
         pageClamped === pages.length || pageClamped === pages.length - 1
@@ -209,8 +207,8 @@
       const { charCount, lineCount } = getCharCount(pages, page);
 
       fireExstaticEvent('mokuro-reader:page.change', {
-        title: volume.mokuroData.title,
-        volumeName: volume.mokuroData.volume,
+        title: volume.title,
+        volumeName: volume.volume,
         currentCharCount: charCount,
         currentPage: page,
         totalPages: pages.length,
@@ -236,8 +234,8 @@
       const { charCount, lineCount } = getCharCount(pages, page);
 
       fireExstaticEvent('mokuro-reader:reader.closed', {
-        title: volume.mokuroData.title,
-        volumeName: volume.mokuroData.volume,
+        title: volume.title,
+        volumeName: volume.volume,
         currentCharCount: charCount,
         currentPage: page,
         totalPages: pages.length,
@@ -256,7 +254,7 @@
   on:touchend={handlePointerUp}
 />
 <svelte:head>
-  <title>{volume?.mokuroData.volume || 'Volume'}</title>
+  <title>{volume?.volume || 'Volume'}</title>
 </svelte:head>
 {#if volume && pages}
   <QuickActions

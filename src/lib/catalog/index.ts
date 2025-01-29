@@ -1,30 +1,31 @@
 import { page } from '$app/stores';
-import { db, type Catalog } from '$lib/catalog/db';
-import type { Volume } from '$lib/types';
+import { db } from '$lib/catalog/db';
+import type { VolumeEntry } from '$lib/types';
 import { liveQuery } from 'dexie';
-import { derived, type Readable } from 'svelte/store';
+import { derived } from 'svelte/store';
 
-export const catalog = liveQuery(() => db.catalog.toArray());
-
-function sortManga(a: Volume, b: Volume) {
-  if (a.volumeName < b.volumeName) {
+function sortVolumes(a: VolumeEntry, b: VolumeEntry) {
+  if (a.volume < b.volume) {
     return -1;
   }
-  if (a.volumeName > b.volumeName) {
+  if (a.volume > b.volume) {
     return 1;
   }
   return 0;
 }
 
+export const volumes = liveQuery(() => db.volumes.toArray());
 
-export const manga = derived([page, catalog as unknown as Readable<Catalog[]>], ([$page, $catalog]) => {
-  if ($page && $catalog) {
-    return $catalog.find((item) => item.id === $page.params.manga)?.manga.sort(sortManga)
+export const titleVolumes = derived([page, volumes], ([$page, $volumes]) => {
+  if ($page && $volumes) {
+    return $volumes
+      .filter(item => item.title_uuid === $page.params.manga)
+      .sort(sortVolumes);
   }
 });
 
-export const volume = derived(([page, manga]), ([$page, $manga]) => {
-  if ($page && $manga) {
-    return $manga.find((item) => item.mokuroData.volume_uuid === $page.params.volume)
+export const currentVolume = derived([page, volumes], ([$page, $volumes]) => {
+  if ($page && $volumes) {
+    return $volumes.find(item => item.volume_uuid === $page.params.volume);
   }
-})
+});
