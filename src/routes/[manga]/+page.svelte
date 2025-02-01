@@ -6,24 +6,24 @@
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga } from '$lib/util';
   import { page } from '$app/stores';
-  import type { Volume } from '$lib/types';
+  import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats, volumes } from '$lib/settings';
 
-  function sortManga(a: Volume, b: Volume) {
-    return a.mokuroData.volume.localeCompare(b.mokuroData.volume, undefined, {
+  function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
+    return a.volume_title.localeCompare(b.volume_title, undefined, {
       numeric: true,
       sensitivity: 'base'
     });
   }
 
-  $: manga = $catalog?.find((item) => item.id === $page.params.manga)?.manga.sort(sortManga);
+  $: manga = $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga);
 
   $: loading = false;
 
   async function confirmDelete() {
-    const title = manga?.[0].mokuroData.title_uuid;
+    const title = manga?.[0].series_uuid;
     manga?.forEach((vol) => {
-      const volId = vol.mokuroData.volume_uuid;
+      const volId = vol.volume_uuid;
       deleteVolume(volId);
     });
 
@@ -44,13 +44,13 @@
 </script>
 
 <svelte:head>
-  <title>{manga?.[0].mokuroData.title || 'Manga'}</title>
+  <title>{manga?.[0].series_title || 'Manga'}</title>
 </svelte:head>
 {#if manga && $mangaStats}
   <div class="p-2 flex flex-col gap-5">
     <div class="flex flex-row justify-between">
       <div class="flex flex-col gap-2">
-        <h3 class="font-bold">{manga[0].mokuroData.title}</h3>
+        <h3 class="font-bold">{manga[0].series_title}</h3>
         <div class="flex flex-col gap-0 sm:flex-row sm:gap-5">
           <p>Volumes: {$mangaStats.completed} / {manga.length}</p>
           <p>Characters read: {$mangaStats.chars}</p>
@@ -65,7 +65,7 @@
       </div>
     </div>
     <Listgroup active class="flex-1 h-full w-full">
-      {#each manga as volume (volume.mokuroData.volume_uuid)}
+      {#each manga as volume (volume.volume_uuid)}
         <VolumeItem {volume} />
       {/each}
     </Listgroup>

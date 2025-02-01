@@ -1,96 +1,58 @@
 import { db } from './db';
-import type { Volume } from '$lib/types';
-import { volumeEntryToVolume } from '$lib/types';
+import type { VolumeMetadata } from '$lib/types';
 
-export interface CatalogTitle {
+export interface Series {
   title: string;
-  title_uuid: string;
-  volumes: Volume[];
+  series_uuid: string;
+  volumes: VolumeMetadata[];
 }
 
 export interface Catalog {
-  titles: CatalogTitle[];
+  series: Series[];
 }
 
-function sortVolumes(a: Volume, b: Volume) {
-  return a.mokuroData.volume.localeCompare(b.mokuroData.volume, undefined, { numeric: true, sensitivity: 'base' });
+function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
+  return a.volume_title.localeCompare(b.volume_title, undefined, { sensitivity: 'base' });
 }
 
-function sortTitles(a: CatalogTitle, b: CatalogTitle) {
+function sortTitles(a: Series, b: Series) {
   return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
 }
 
-export async function getCatalog(): Promise<Catalog> {
-  // Get all volumes from the database
-  const volumeEntries = await db.volumes.toArray();
-
-  // Group volumes by title_uuid
-  const titleMap = new Map<string, CatalogTitle>();
+export function deriveSeriesFromVolumes(volumeEntries: Array<VolumeMetadata>) {
+  // Group volumes by series_uuid
+  const titleMap = new Map<string, Series>();
 
   for (const entry of volumeEntries) {
-    const volume = volumeEntryToVolume(entry);
-    
-    if (!titleMap.has(entry.title_uuid)) {
-      titleMap.set(entry.title_uuid, {
-        title: entry.title,
-        title_uuid: entry.title_uuid,
+    let volumes = titleMap.get(entry.series_uuid);
+    if (volumes === undefined) {
+      volumes = {
+        title: entry.series_title,
+        series_uuid: entry.series_uuid,
         volumes: []
-      });
+      };
+      titleMap.set(entry.series_uuid, volumes);
     }
-
-    titleMap.get(entry.title_uuid)!.volumes.push(volume);
+    volumes.volumes.push(entry);
   }
 
   // Convert map to array and sort everything
   const titles = Array.from(titleMap.values());
-  
+
   // Sort volumes within each title
   for (const title of titles) {
-    title.volumes.sort(sortVolumes);
+    const test = title.volumes.sort(sortVolumes);
+    title.volumes
   }
 
   // Sort titles
   titles.sort(sortTitles);
 
-  return { titles };
+  return { series: titles };
 }
 
-// Create a store that updates when the database changes
-import { derived } from 'svelte/store';
-import { liveQuery } from 'dexie';
-
-// Create a store for all volumes
-const volumesStore = liveQuery(() => db.volumes.toArray());
-
-// Derive the catalog from the volumes store
-export const catalogStore = derived(volumesStore, ($volumes, set) => {
-  if ($volumes) {
-    const titleMap = new Map<string, CatalogTitle>();
-
-    for (const entry of $volumes) {
-      const volume = volumeEntryToVolume(entry);
-      
-      if (!titleMap.has(entry.title_uuid)) {
-        titleMap.set(entry.title_uuid, {
-          title: entry.title,
-          title_uuid: entry.title_uuid,
-          volumes: []
-        });
-      }
-
-      titleMap.get(entry.title_uuid)!.volumes.push(volume);
-    }
-
-    const titles = Array.from(titleMap.values());
-    
-    // Sort volumes within each title
-    for (const title of titles) {
-      title.volumes.sort(sortVolumes);
-    }
-
-    // Sort titles
-    titles.sort(sortTitles);
-
-    set({ titles });
-  }
-});
+export async function getCatalog(): Promise<Catalog> {
+  // Get all volumes from the database
+  const volumeEntries = await db.volumes.toArray();
+  return deriveSeriesFromVolumes(volumeEntries);
+}

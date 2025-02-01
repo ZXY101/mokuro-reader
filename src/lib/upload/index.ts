@@ -1,5 +1,5 @@
 import { db } from '$lib/catalog/db';
-import type { VolumeEntry, MokuroData } from '$lib/types';
+import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { ZipReader, BlobWriter, getMimeType, Uint8ArrayReader } from '@zip.js/zip.js';
@@ -105,7 +105,8 @@ export async function scanFiles(item: FileSystemEntry, files: Promise<File | und
 }
 
 export async function processFiles(_files: File[]) {
-  const volumesByPath: Record<string, Partial<VolumeEntry>> = {};
+  const volumesByPath: Record<string, Partial<VolumeMetadata>> = {};
+  const volumesDataByPath: Record<string, Partial<VolumeData>> = {};
   const titleUuids: string[] = [];
 
   const files = _files.sort((a, b) => {
@@ -120,17 +121,21 @@ export async function processFiles(_files: File[]) {
     const { ext, filename, path } = getDetails(file);
 
     if (ext === 'mokuro') {
-      const mokuroData: MokuroData = JSON.parse(await file.text());
+      const mokuroData = JSON.parse(await file.text());
 
       if (!titleUuids.includes(mokuroData.title_uuid)) {
         titleUuids.push(mokuroData.title_uuid);
       }
 
       volumesByPath[path] = {
-        version: mokuroData.version,
-        title: mokuroData.title,
-        title_uuid: mokuroData.title_uuid,
-        volume: mokuroData.volume,
+        mokuro_version: mokuroData.version,
+        series_title: mokuroData.title,
+        series_uuid: mokuroData.title_uuid,
+        volume_title: mokuroData.volume,
+        volume_uuid: mokuroData.volume_uuid
+      };
+
+      volumesDataByPath[path] = {
         volume_uuid: mokuroData.volume_uuid,
         pages: mokuroData.pages
       };
@@ -150,17 +155,17 @@ export async function processFiles(_files: File[]) {
         const imageName = webkitRelativePath.split('/').at(-1);
         let vol = '';
 
-        Object.keys(volumesByPath).forEach((key) => {
+        Object.keys(volumesDataByPath).forEach((key) => {
           if (webkitRelativePath.startsWith(key)) {
             vol = key;
           }
         });
 
         if (vol && imageName) {
-          volumesByPath[vol] = {
-            ...volumesByPath[vol],
+          volumesDataByPath[vol] = {
+            ...volumesDataByPath[vol],
             files: {
-              ...volumesByPath[vol]?.files,
+              ...volumesDataByPath[vol]?.files,
               [imageName]: file
             }
           };
@@ -173,12 +178,12 @@ export async function processFiles(_files: File[]) {
       const unzippedFiles = await unzipManga(file);
 
       if (files.length === 1) {
-        processFiles(Object.values(unzippedFiles));
+        await processFiles(Object.values(unzippedFiles));
         return;
       }
 
-      volumesByPath[path] = {
-        ...volumesByPath[path],
+      volumesDataByPath[path] = {
+        ...volumesDataByPath[path],
         files: unzippedFiles
       };
 
@@ -186,16 +191,17 @@ export async function processFiles(_files: File[]) {
     }
   }
 
-  const volumes = Object.values(volumesByPath) as VolumeEntry[];
+  const volumes = Object.values(volumesByPath) as VolumeMetadata[];
+  const volumesData = Object.values(volumesDataByPath) as VolumeData[];
 
-  if (volumes.length > 0) {
+  if (volumes.length > 0 && volumesData.length > 0) {
     const valid = volumes.map((vol) => {
-      if (!vol.version || !vol.title || !vol.volume_uuid) {
+      if (!vol.mokuro_version || !vol.series_title || !vol.volume_uuid) {
         showSnackbar('Missing .mokuro file');
         return false;
       }
 
-      if (!vol.files) {
+      if (!volumesData.filter((data) => data.volume_uuid === vol.volume_uuid).length) {
         showSnackbar('Missing image files');
         return false;
       }
@@ -214,7 +220,10 @@ export async function processFiles(_files: File[]) {
           .first();
 
         if (!existingVolume) {
-          await db.volumes.add(volume);
+          await db.transaction('rw', db.volumes, async () => {
+            await db.volumes.add(volume);
+            await db.volumes_data.add(volumesData.filter((data) => data.volume_uuid === volume.volume_uuid)[0]);
+        });
         }
       }
 

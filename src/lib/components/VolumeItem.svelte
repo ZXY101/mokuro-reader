@@ -1,17 +1,18 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { deleteVolume, progress } from '$lib/settings';
-  import type { VolumeEntry } from '$lib/types';
+  import type { VolumeMetadata } from '$lib/types';
   import { promptConfirmation } from '$lib/util';
   import { ListgroupItem, Frame } from 'flowbite-svelte';
   import { CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
 
-  export let volume: VolumeEntry;
+  export let volume: VolumeMetadata;
 
-  const volName = decodeURI(volume.volume);
+  const volName = decodeURI(volume.volume_title);
 
+  $: volume_uuid = volume.volume_uuid;
   $: currentPage = $progress?.[volume.volume_uuid || 0] || 1;
   $: progressDisplay = `${
     currentPage === volume.pages.length - 1 ? currentPage + 1 : currentPage
@@ -29,8 +30,8 @@
 
       // Check if this was the last volume for this title
       const remainingVolumes = await db.volumes
-        .where('title_uuid')
-        .equals(volume.title_uuid)
+        .where('series_uuid')
+        .equals(volume.series_uuid)
         .count();
 
       if (remainingVolumes > 0) {

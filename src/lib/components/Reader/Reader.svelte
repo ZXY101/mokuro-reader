@@ -254,7 +254,7 @@
   on:touchend={handlePointerUp}
 />
 <svelte:head>
-  <title>{volume?.volume || 'Volume'}</title>
+  <title>{volume?.volume_title || 'Volume'}</title>
 </svelte:head>
 {#if volume && pages}
   <QuickActions

@@ -8,15 +8,15 @@
   import CatalogListItem from './CatalogListItem.svelte';
 
   $: sortedCatalog = $catalog
-    ?.sort((a, b) => {
+    .sort((a, b) => {
       if ($miscSettings.gallerySorting === 'ASC') {
-        return a.manga[0].mokuroData.title.localeCompare(b.manga[0].mokuroData.title);
+        return a.title.localeCompare(b.title);
       } else {
-        return b.manga[0].mokuroData.title.localeCompare(a.manga[0].mokuroData.title);
+        return b.title.localeCompare(a.title);
       }
     })
     .filter((item) => {
-      return item.manga[0].mokuroData.title.toLowerCase().indexOf(search.toLowerCase()) !== -1;
+      return item.title.toLowerCase().indexOf(search.toLowerCase()) !== -1;
     });
 
   let search = '';
@@ -61,13 +61,13 @@
       {:else}
         <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
           {#if $miscSettings.galleryLayout === 'grid'}
-            {#each sortedCatalog as { id } (id)}
-              <CatalogItem {id} />
+            {#each sortedCatalog as { series_uuid } (series_uuid)}
+              <CatalogItem {series_uuid} />
             {/each}
           {:else}
             <Listgroup active class="w-full">
-              {#each sortedCatalog as { id } (id)}
-                <CatalogListItem {id} />
+              {#each sortedCatalog as { series_uuid } (series_uuid)}
+                <CatalogListItem {series_uuid} />
               {/each}
             </Listgroup>
           {/if}
