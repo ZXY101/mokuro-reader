@@ -221,9 +221,12 @@ export async function processFiles(_files: File[]) {
 
         if (!existingVolume) {
           await db.transaction('rw', db.volumes, async () => {
-            await db.volumes.add(volume);
-            await db.volumes_data.add(volumesData.filter((data) => data.volume_uuid === volume.volume_uuid)[0]);
-        });
+            await db.volumes.add(volume, volume.volume_uuid);
+          });
+          await db.transaction('rw', db.volumes_data, async () => {
+            const volume_data = volumesData.filter((data) => data.volume_uuid === volume.volume_uuid)[0]
+            await db.volumes_data.add(volume_data, volume_data.volume_uuid);
+          });
         }
       }
 
