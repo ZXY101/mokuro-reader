@@ -231,7 +231,7 @@ export async function processFiles(_files: File[]) {
           });
         }
       }
-      await db.processThumbnails(5);
+      db.processThumbnails(5);
 
       showSnackbar('Volumes added successfully');
     }
