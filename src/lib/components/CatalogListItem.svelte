@@ -4,7 +4,7 @@
 
   export let series_uuid: string;
 
-  $: firstVolume = $volumes?.find((item) => item.series_uuid === series_uuid);
+  $: firstVolume = Object.values($volumes).sort((a,b) => a.volume_title.localeCompare(b.volume_title) ).find((item) => item.series_uuid === series_uuid);
 </script>
 
 {#if firstVolume}
@@ -16,12 +16,6 @@
           {#if firstVolume.thumbnail}
             <img
               src={URL.createObjectURL(firstVolume.thumbnail)}
-              alt="img"
-              class="object-contain w-[50px] h-[70px] bg-black border-gray-900 border"
-            />
-          {:else if firstVolume.files}
-            <img
-              src={URL.createObjectURL(Object.values(firstVolume.files)[0])}
               alt="img"
               class="object-contain w-[50px] h-[70px] bg-black border-gray-900 border"
             />
