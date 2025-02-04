@@ -3,7 +3,7 @@
   import { deleteVolume, progress } from '$lib/settings';
   import type { VolumeMetadata } from '$lib/types';
   import { promptConfirmation } from '$lib/util';
-  import { ListgroupItem, Frame } from 'flowbite-svelte';
+  import { Frame, ListgroupItem } from 'flowbite-svelte';
   import { CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
@@ -50,6 +50,15 @@
       on:click={() => goto(`/${$page.params.manga}/${volume_uuid}`)}
       normalClass="py-4"
     >
+      {#if volume.thumbnail}
+        <img
+          src={URL.createObjectURL(volume.thumbnail)}
+          alt="img"
+          style="margin-right:10px;"
+          class="object-contain w-[50px] h-[70px] bg-black border-gray-900 border"
+
+        />
+      {/if}
       <div
         class:text-green-400={isComplete}
         class="flex flex-row gap-5 items-center justify-between w-full"
