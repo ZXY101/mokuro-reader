@@ -1,24 +1,12 @@
 <script lang="ts">
-  import { currentSeries } from '$lib/catalog';
-  import {
-    Panzoom,
-    panzoomStore,
-    toggleFullScreen,
-    zoomDefault,
-    zoomFitToScreen
-  } from '$lib/panzoom';
+  import { currentSeries, currentVolume, currentVolumeData } from '$lib/catalog';
+  import { Panzoom, panzoomStore, toggleFullScreen, zoomDefault, zoomFitToScreen } from '$lib/panzoom';
   import { progress, settings, updateProgress, type VolumeSettings } from '$lib/settings';
   import { clamp, debounce, fireExstaticEvent } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
-  import {
-    ChervonDoubleLeftSolid,
-    ChervonDoubleRightSolid,
-    ChevronLeftSolid,
-    ChevronRightSolid
-  } from 'flowbite-svelte-icons';
+  import { ChervonDoubleLeftSolid, ChervonDoubleRightSolid, ChevronLeftSolid, ChevronRightSolid } from 'flowbite-svelte-icons';
   import Cropper from './Cropper.svelte';
-  import { currentVolume, currentVolumeData } from '$lib/catalog';
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
@@ -52,7 +40,7 @@
 
   function right(_e: any, ingoreTimeOut?: boolean) {
     const newPage = volumeSettings.rightToLeft ? page - navAmount : page + navAmount;
-    changePage(newPage, ingoreTimeOut)
+    changePage(newPage, ingoreTimeOut);
   }
 
   function changePage(newPage: number, ingoreTimeOut = false) {
@@ -65,18 +53,18 @@
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
       const { charCount } = getCharCount(pages, pageClamped);
-      if(pageClamped === page) {
+      if (pageClamped === page) {
         let seriesVolumes = $currentSeries;
         const currentVolumeIndex = seriesVolumes.findIndex((v) => v.volume_uuid === volume.volume_uuid);
-        if(newPage < 1) {
+        if (newPage < 1) {
           // open previous volume
           const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-          if(previousVolume)goto(`/${volume.series_uuid}/${previousVolume.volume_uuid}`);
+          if (previousVolume) goto(`/${volume.series_uuid}/${previousVolume.volume_uuid}`, { replaceState: true });
           else goto(`/${volume.series_uuid}`);
         } else if (newPage > pages.length) {
           // open next volume
           const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-          if(nextVolume)goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`);
+          if (nextVolume) goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`, { replaceState: true });
           else goto(`/${volume.series_uuid}`);
         }
       }
@@ -151,6 +139,9 @@
         return;
       case 'KeyF':
         toggleFullScreen();
+        return;
+      case 'Escape':
+        goto(`/${volume.series_uuid}`);
         return;
       default:
         break;
