@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { volumes } from '$lib/catalog';
+  import { currentSeries } from '$lib/catalog';
   import {
     Panzoom,
     panzoomStore,
@@ -22,7 +22,7 @@
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
-  import { beforeNavigate } from '$app/navigation';
+  import { beforeNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
 
   // TODO: Refactor this whole mess
@@ -52,7 +52,7 @@
 
   function right(_e: any, ingoreTimeOut?: boolean) {
     const newPage = volumeSettings.rightToLeft ? page - navAmount : page + navAmount;
-    changePage(newPage, ingoreTimeOut);
+    changePage(newPage, ingoreTimeOut)
   }
 
   function changePage(newPage: number, ingoreTimeOut = false) {
@@ -61,11 +61,25 @@
 
     if (pages && volume && clickDuration < 200) {
       if (showSecondPage() && page + 1 === pages.length && newPage > page) {
-        return;
+        return false;
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
       const { charCount } = getCharCount(pages, pageClamped);
-
+      if(pageClamped === page) {
+        let seriesVolumes = $currentSeries;
+        const currentVolumeIndex = seriesVolumes.findIndex((v) => v.volume_uuid === volume.volume_uuid);
+        if(newPage < 1) {
+          // open previous volume
+          const previousVolume = seriesVolumes[currentVolumeIndex - 1];
+          if(previousVolume)goto(`/${volume.series_uuid}/${previousVolume.volume_uuid}`);
+          else goto(`/${volume.series_uuid}`);
+        } else if (newPage > pages.length) {
+          // open next volume
+          const nextVolume = seriesVolumes[currentVolumeIndex + 1];
+          if(nextVolume)goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`);
+          else goto(`/${volume.series_uuid}`);
+        }
+      }
       updateProgress(
         volume.volume_uuid,
         pageClamped,
@@ -73,6 +87,7 @@
         pageClamped === pages.length || pageClamped === pages.length - 1
       );
       zoomDefault();
+      return true;
     }
   }
 
