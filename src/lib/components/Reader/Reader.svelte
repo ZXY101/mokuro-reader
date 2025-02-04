@@ -59,12 +59,12 @@
         if (newPage < 1) {
           // open previous volume
           const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-          if (previousVolume) goto(`/${volume.series_uuid}/${previousVolume.volume_uuid}`, { replaceState: true });
+          if (previousVolume) goto(`/${volume.series_uuid}/${previousVolume.volume_uuid}`, { invalidateAll: true });
           else goto(`/${volume.series_uuid}`);
         } else if (newPage > pages.length) {
           // open next volume
           const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-          if (nextVolume) goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`, { replaceState: true });
+          if (nextVolume) goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`, { invalidateAll: true });
           else goto(`/${volume.series_uuid}`);
         }
       }
