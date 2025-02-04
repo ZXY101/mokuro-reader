@@ -54,7 +54,6 @@ export class CatalogDexie extends Dexie {
 
         await tx.table('volumes').bulkAdd(volumes);
         await tx.table('volumes_data').bulkAdd(volumes_data);
-        isUpgrading.set(false);
       });
     startThumbnailProcessing();
   }
