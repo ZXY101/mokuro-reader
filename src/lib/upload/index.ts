@@ -3,6 +3,8 @@ import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { ZipReader, BlobWriter, getMimeType, Uint8ArrayReader } from '@zip.js/zip.js';
+import { generateThumbnail } from '$lib/catalog/thumbnails';
+import PQueue from 'p-queue';
 
 export * from './web-import'
 
@@ -127,6 +129,7 @@ async function uploadVolumeData(
       .first();
 
     if (!existingVolume) {
+      uploadMetadata.thumbnail = await generateThumbnail(uploadData.files?.[Object.keys(uploadData.files)[0]]);
       await db.transaction('rw', db.volumes, async () => {
         await db.volumes.add(uploadMetadata as VolumeMetadata, uploadMetadata.volume_uuid);
       });
