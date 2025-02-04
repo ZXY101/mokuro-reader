@@ -104,6 +104,55 @@ export async function scanFiles(item: FileSystemEntry, files: Promise<File | und
   }
 }
 
+async function uploadVolumeData(
+  volumesByPath: Record<string, Partial<VolumeMetadata>>,
+  path: string,
+  uploadData: undefined | Partial<VolumeData>
+) {
+  const uploadMetadata = volumesByPath[path];
+  if (
+    uploadData &&
+    uploadMetadata &&
+    uploadMetadata.volume_uuid &&
+    uploadMetadata.mokuro_version &&
+    uploadMetadata.volume_uuid &&
+    uploadMetadata.series_title &&
+    uploadMetadata.volume_title &&
+    uploadMetadata.page_count
+  ) {
+    await requestPersistentStorage();
+    const existingVolume = await db.volumes
+      .where('volume_uuid')
+      .equals(uploadMetadata.volume_uuid)
+      .first();
+
+    if (!existingVolume) {
+      await db.transaction('rw', db.volumes, async () => {
+        await db.volumes.add(uploadMetadata as VolumeMetadata, uploadMetadata.volume_uuid);
+      });
+      await db.transaction('rw', db.volumes_data, async () => {
+        await db.volumes_data.add(uploadData as VolumeData, uploadMetadata.volume_uuid);
+      });
+    }
+  }
+}
+
+async function extractAndUploadVolume(
+  file: File,
+  uploadData: Partial<VolumeData> | undefined,
+  volumesDataByPath: Record<string, Partial<VolumeData>>,
+  path: string,
+  volumesByPath: Record<string, Partial<VolumeMetadata>>
+) {
+  const unzippedFiles = await unzipManga(file);
+
+  uploadData = {
+    ...volumesDataByPath[path],
+    files: unzippedFiles
+  };
+  await uploadVolumeData(volumesByPath, path, uploadData);
+}
+
 export async function processFiles(_files: File[]) {
   const volumesByPath: Record<string, Partial<VolumeMetadata>> = {};
   const volumesDataByPath: Record<string, Partial<VolumeData>> = {};
@@ -145,12 +194,16 @@ export async function processFiles(_files: File[]) {
     }
   }
 
+
   // Second pass: Process image files and archives
   for (const file of files) {
     const { ext, path } = getDetails(file);
     const { type, webkitRelativePath } = file;
+    if (ext?.toLowerCase() === 'mokuro') continue;
 
     const mimeType = type || getMimeType(file.name);
+
+    let uploadData: Partial<VolumeData> | undefined = undefined;
 
     if (imageTypes.includes(mimeType)) {
       if (webkitRelativePath) {
@@ -171,71 +224,23 @@ export async function processFiles(_files: File[]) {
               [imageName]: file
             }
           };
+          if (
+            volumesDataByPath[vol].pages.length === Object.keys(volumesDataByPath[vol].files).length
+          ) {
+            uploadData = volumesDataByPath[vol];
+            volumesDataByPath[vol] = {};
+            await uploadVolumeData(volumesByPath, path, uploadData);
+          } else {
+            continue;
+          }
         }
       }
-      continue;
     }
 
     if (ext && zipTypes.includes(ext)) {
-      const unzippedFiles = await unzipManga(file);
-
-      if (files.length === 1) {
-        await processFiles(Object.values(unzippedFiles));
-        return;
-      }
-
-      volumesDataByPath[path] = {
-        ...volumesDataByPath[path],
-        files: unzippedFiles
-      };
-
-      continue;
+      await extractAndUploadVolume(file, uploadData, volumesDataByPath, path, volumesByPath);
     }
   }
-
-  const volumes = Object.values(volumesByPath) as VolumeMetadata[];
-  const volumesData = Object.values(volumesDataByPath) as VolumeData[];
-
-  if (volumes.length > 0 && volumesData.length > 0) {
-    const valid = volumes.map((vol) => {
-      if (!vol.mokuro_version || !vol.series_title || !vol.volume_uuid) {
-        showSnackbar('Missing .mokuro file');
-        return false;
-      }
-
-      if (!volumesData.filter((data) => data.volume_uuid === vol.volume_uuid).length) {
-        showSnackbar('Missing image files');
-        return false;
-      }
-
-      return true;
-    });
-
-    if (!valid.includes(false)) {
-      await requestPersistentStorage();
-
-      // Add volumes to the database
-      for (const volume of volumes) {
-        const existingVolume = await db.volumes
-          .where('volume_uuid')
-          .equals(volume.volume_uuid)
-          .first();
-
-        if (!existingVolume) {
-          await db.transaction('rw', db.volumes, async () => {
-            await db.volumes.add(volume, volume.volume_uuid);
-          });
-          await db.transaction('rw', db.volumes_data, async () => {
-            const volume_data = volumesData.filter((data) => data.volume_uuid === volume.volume_uuid)[0]
-            await db.volumes_data.add(volume_data, volume_data.volume_uuid);
-          });
-        }
-      }
-      db.processThumbnails(5);
-
-      showSnackbar('Volumes added successfully');
-    }
-  } else {
-    showSnackbar('Missing .mokuro file');
-  }
+  showSnackbar('Files uploaded successfully');
+  db.processThumbnails(5);
 }
