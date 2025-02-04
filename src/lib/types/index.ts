@@ -13,17 +13,19 @@ export type Page = {
   img_path: string;
 };
 
-export type MokuroData = {
-  version: string;
-  title: string;
-  title_uuid: string;
-  volume: string;
+export interface VolumeMetadata {
+  mokuro_version: string;
+  series_title: string;
+  series_uuid: string;
+  volume_title: string;
+  volume_uuid: string;
+  page_count: number;
+  character_count: number;
+  thumbnail?: File;
+}
+
+export interface VolumeData {
   volume_uuid: string;
   pages: Page[];
-};
-
-export type Volume = {
-  mokuroData: MokuroData;
-  volumeName: string;
-  files: Record<string, File>;
-};
+  files?: Record<string, File>;
+}

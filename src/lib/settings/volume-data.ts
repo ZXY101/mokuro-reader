@@ -3,7 +3,7 @@ import { derived, get, writable } from 'svelte/store';
 import { settings, updateSetting, } from './settings';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
-import { manga, volume } from '$lib/catalog';
+import { currentSeries, currentVolume } from '$lib/catalog';
 
 export type VolumeSettings = {
   rightToLeft: boolean;
@@ -174,9 +174,9 @@ export const totalStats = derived([volumes, page], ([$volumes, $page]) => {
   }
 })
 
-export const mangaStats = derived([manga, volumes], ([$manga, $volumes]) => {
-  if ($manga && $volumes) {
-    return $manga.map((vol) => vol.mokuroData.volume_uuid).reduce(
+export const mangaStats = derived([currentSeries, volumes], ([$titleVolumes, $volumes]) => {
+  if ($titleVolumes && $volumes) {
+    return $titleVolumes.map((vol) => vol.volume_uuid).reduce(
       (stats: any, volumeId) => {
         const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
         const chars = $volumes[volumeId]?.chars || 0;
@@ -193,9 +193,10 @@ export const mangaStats = derived([manga, volumes], ([$manga, $volumes]) => {
   }
 });
 
-export const volumeStats = derived([volume, volumes], ([$volume, $volumes]) => {
-  if ($volume && $volumes) {
-    const { chars, completed, timeReadInMinutes, progress } = $volumes[$volume.mokuroData.volume_uuid]
-    return { chars, completed, timeReadInMinutes, progress }
+export const volumeStats = derived([currentVolume, volumes], ([$currentVolume, $volumes]) => {
+  if ($currentVolume && $volumes) {
+    const { chars, completed, timeReadInMinutes, progress } = $volumes[$currentVolume.volume_uuid];
+    return { chars, completed, timeReadInMinutes, progress };
   }
+  return { chars: 0, completed: 0, timeReadInMinutes: 0, progress: 0 };
 });

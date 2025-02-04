@@ -1,30 +1,61 @@
 import { page } from '$app/stores';
-import { db, type Catalog } from '$lib/catalog/db';
-import type { Volume } from '$lib/types';
+import { db } from '$lib/catalog/db';
+import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { liveQuery } from 'dexie';
-import { derived, type Readable } from 'svelte/store';
+import { type Readable, readable } from 'svelte/store';
+import { derived } from 'svelte/store';
+import { deriveSeriesFromVolumes } from '$lib/catalog/catalog';
 
-export const catalog = liveQuery(() => db.catalog.toArray());
-
-function sortManga(a: Volume, b: Volume) {
-  if (a.volumeName < b.volumeName) {
+function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
+  if (a.volume_title < b.volume_title) {
     return -1;
   }
-  if (a.volumeName > b.volumeName) {
+  if (a.volume_title > b.volume_title) {
     return 1;
   }
   return 0;
 }
 
-
-export const manga = derived([page, catalog as unknown as Readable<Catalog[]>], ([$page, $catalog]) => {
-  if ($page && $catalog) {
-    return $catalog.find((item) => item.id === $page.params.manga)?.manga.sort(sortManga)
-  }
+// Single source of truth from the database
+export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
+  const subscription = liveQuery(async () => {
+    const volumesArray = await db.volumes.toArray();
+    return volumesArray.reduce((acc, vol) => {
+      acc[vol.volume_uuid] = vol;
+      return acc;
+    }, {} as Record<string, VolumeMetadata>);
+  }).subscribe({
+    next: (value) => set(value),
+    error: (err) => console.error(err),
+  });
+  return () => subscription.unsubscribe();
 });
 
-export const volume = derived(([page, manga]), ([$page, $manga]) => {
-  if ($page && $manga) {
-    return $manga.find((item) => item.mokuroData.volume_uuid === $page.params.volume)
+// Each derived store needs to be passed as an array if using multiple inputs
+export const catalog = derived([volumes], ([$volumes]) =>
+  deriveSeriesFromVolumes(Object.values($volumes))
+);
+
+export const currentSeries = derived([page, catalog], ([$page, $catalog]) =>
+    ($catalog.find(volume => volume.series_uuid === $page.params.manga)?.volumes || [])
+      .sort(sortVolumes)
+);
+
+export const currentVolume = derived([page, volumes], ([$page, $volumes]) => {
+  if ($page && $volumes) {
+    return $volumes[$page.params.volume];  // Direct lookup instead of find()
   }
-})
+  return undefined;
+});
+
+export const currentVolumeData: Readable<VolumeData | undefined> = derived([currentVolume], ([$currentVolume], set) => {
+  if ($currentVolume) {
+    db.volumes_data.get($currentVolume.volume_uuid).then((data) => {
+      if (data) {
+        set(data as VolumeData);
+      }
+    });
+  } else {
+    set(undefined);
+  }
+});
