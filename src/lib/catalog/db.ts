@@ -1,10 +1,13 @@
 import type { VolumeData, VolumeMetadata } from '$lib/types';
 import Dexie, { type Table } from 'dexie';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
+import { writable } from 'svelte/store';
 
 function naturalSort(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 }
+
+export const isUpgrading = writable(false);
 
 export class CatalogDexie extends Dexie {
   volumes!: Table<VolumeMetadata>;
@@ -25,6 +28,7 @@ export class CatalogDexie extends Dexie {
         catalog: null // Remove old catalog table
       })
       .upgrade(async (tx) => {
+        isUpgrading.set(true);
         const oldCatalog = await tx.table('catalog').toArray();
         const volumes: VolumeMetadata[] = [];
         const volumes_data: VolumeData[] = [];
@@ -50,6 +54,7 @@ export class CatalogDexie extends Dexie {
 
         await tx.table('volumes').bulkAdd(volumes);
         await tx.table('volumes_data').bulkAdd(volumes_data);
+        isUpgrading.set(false);
       });
     startThumbnailProcessing();
   }
