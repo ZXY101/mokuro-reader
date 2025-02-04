@@ -22,14 +22,16 @@
   $: loading = false;
 
   async function confirmDelete() {
-    const title = manga?.[0].series_uuid;
-    manga?.forEach((vol) => {
-      const volId = vol.volume_uuid;
-      deleteVolume(volId);
-    });
-
-    await db.catalog.delete(title);
-    goto('/');
+    const seriesUuid = manga?.[0].series_uuid;
+    if (seriesUuid) {
+      manga?.forEach((vol) => {
+        const volId = vol.volume_uuid;
+        db.volumes_data.where('volume_uuid').equals(vol.volume_uuid).delete();
+        db.volumes.where('volume_uuid').equals(vol.volume_uuid).delete();
+        deleteVolume(volId);
+      });
+      goto('/');
+    }
   }
 
   function onDelete() {

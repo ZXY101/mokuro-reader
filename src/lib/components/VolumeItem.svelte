@@ -26,6 +26,7 @@
 
     promptConfirmation(`Delete ${volName}?`, async () => {
       await db.volumes.where('volume_uuid').equals(volume.volume_uuid).delete();
+      await db.volumes_data.where('volume_uuid').equals(volume.volume_uuid).delete();
       deleteVolume(volume.volume_uuid);
 
       // Check if this was the last volume for this title

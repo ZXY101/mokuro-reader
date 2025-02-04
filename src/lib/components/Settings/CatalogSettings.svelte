@@ -7,7 +7,8 @@
 
   function onConfirm() {
     clearVolumes();
-    db.catalog.clear();
+    db.volumes_data.clear();
+    db.volumes.clear();
   }
 
   function onClear() {
