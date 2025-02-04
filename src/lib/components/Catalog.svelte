@@ -6,6 +6,7 @@
   import { GridOutline, SortOutline, ListOutline } from 'flowbite-svelte-icons';
   import { miscSettings, updateMiscSetting } from '$lib/settings';
   import CatalogListItem from './CatalogListItem.svelte';
+  import { isUpgrading } from '$lib/catalog/db';
 
   $: sortedCatalog = $catalog.sort((a, b) => {
       if ($miscSettings.gallerySorting === 'ASC') {
@@ -75,7 +76,11 @@
     </div>
   {:else}
     <div class="text-center p-20">
-      <p>Your catalog is currently empty.</p>
+      {#if $isUpgrading}
+        <p>Upgrading and optimizing manga catalog... Please wait.</p>
+      {:else}
+        <p>Your catalog is currently empty.</p>
+      {/if}
     </div>
   {/if}
 {:else}
