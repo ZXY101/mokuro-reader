@@ -7,7 +7,8 @@
   import { promptConfirmation, zipManga } from '$lib/util';
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
-  import { deleteVolume, mangaStats, volumes } from '$lib/settings';
+  import { deleteVolume } from '$lib/settings';
+  import { mangaStats} from '$lib/settings';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {

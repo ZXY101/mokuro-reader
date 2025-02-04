@@ -3,7 +3,7 @@
 
   export let series_uuid: string;
 
-  $: firstVolume = $volumes?.find((item) => item.series_uuid === series_uuid);
+  $: firstVolume = Object.values($volumes).find((item) => item.series_uuid === series_uuid);
 </script>
 
 {#if firstVolume}

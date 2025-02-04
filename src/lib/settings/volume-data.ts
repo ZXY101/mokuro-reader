@@ -3,7 +3,7 @@ import { derived, get, writable } from 'svelte/store';
 import { settings, updateSetting, } from './settings';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
-import { titleVolumes, currentVolume } from '$lib/catalog';
+import { currentSeries, currentVolume } from '$lib/catalog';
 
 export type VolumeSettings = {
   rightToLeft: boolean;
@@ -174,7 +174,7 @@ export const totalStats = derived([volumes, page], ([$volumes, $page]) => {
   }
 })
 
-export const mangaStats = derived([titleVolumes, volumes], ([$titleVolumes, $volumes]) => {
+export const mangaStats = derived([currentSeries, volumes], ([$titleVolumes, $volumes]) => {
   if ($titleVolumes && $volumes) {
     return $titleVolumes.map((vol) => vol.volume_uuid).reduce(
       (stats: any, volumeId) => {
@@ -198,4 +198,5 @@ export const volumeStats = derived([currentVolume, volumes], ([$currentVolume, $
     const { chars, completed, timeReadInMinutes, progress } = $volumes[$currentVolume.volume_uuid];
     return { chars, completed, timeReadInMinutes, progress };
   }
+  return { chars: 0, completed: 0, timeReadInMinutes: 0, progress: 0 };
 });

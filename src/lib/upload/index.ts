@@ -131,6 +131,8 @@ export async function processFiles(_files: File[]) {
         mokuro_version: mokuroData.version,
         series_title: mokuroData.title,
         series_uuid: mokuroData.title_uuid,
+        page_count: mokuroData.pages.length,
+        character_count: mokuroData.chars,
         volume_title: mokuroData.volume,
         volume_uuid: mokuroData.volume_uuid
       };

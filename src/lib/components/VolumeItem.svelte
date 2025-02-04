@@ -15,11 +15,11 @@
   $: volume_uuid = volume.volume_uuid;
   $: currentPage = $progress?.[volume.volume_uuid || 0] || 1;
   $: progressDisplay = `${
-    currentPage === volume.pages.length - 1 ? currentPage + 1 : currentPage
-  } / ${volume.pages.length}`;
+    currentPage === volume.page_count - 1 ? currentPage + 1 : currentPage
+  } / ${volume.page_count}`;
   $: isComplete =
-    currentPage === volume.pages.length ||
-    currentPage === volume.pages.length - 1;
+    currentPage === volume.page_count ||
+    currentPage === volume.page_count - 1;
 
   async function onDeleteClicked(e: Event) {
     e.stopPropagation();

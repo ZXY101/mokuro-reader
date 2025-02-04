@@ -19,6 +19,8 @@ export interface VolumeMetadata {
   series_uuid: string;
   volume_title: string;
   volume_uuid: string;
+  page_count: number;
+  character_count: number;
   thumbnail?: File;
 }
 

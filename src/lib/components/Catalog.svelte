@@ -7,8 +7,7 @@
   import { miscSettings, updateMiscSetting } from '$lib/settings';
   import CatalogListItem from './CatalogListItem.svelte';
 
-  $: sortedCatalog = $catalog
-    .sort((a, b) => {
+  $: sortedCatalog = $catalog.sort((a, b) => {
       if ($miscSettings.gallerySorting === 'ASC') {
         return a.title.localeCompare(b.title);
       } else {

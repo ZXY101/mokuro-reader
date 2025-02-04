@@ -1,18 +1,9 @@
-import { db } from './db';
 import type { VolumeMetadata } from '$lib/types';
 
 export interface Series {
   title: string;
   series_uuid: string;
   volumes: VolumeMetadata[];
-}
-
-export interface Catalog {
-  series: Series[];
-}
-
-function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
-  return a.volume_title.localeCompare(b.volume_title, undefined, { sensitivity: 'base' });
 }
 
 function sortTitles(a: Series, b: Series) {
@@ -41,18 +32,11 @@ export function deriveSeriesFromVolumes(volumeEntries: Array<VolumeMetadata>) {
 
   // Sort volumes within each title
   for (const title of titles) {
-    const test = title.volumes.sort(sortVolumes);
     title.volumes
   }
 
   // Sort titles
   titles.sort(sortTitles);
 
-  return { series: titles };
-}
-
-export async function getCatalog(): Promise<Catalog> {
-  // Get all volumes from the database
-  const volumeEntries = await db.volumes.toArray();
-  return deriveSeriesFromVolumes(volumeEntries);
+  return titles ;
 }

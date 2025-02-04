@@ -35,6 +35,8 @@ export class CatalogDexie extends Dexie {
               mokuro_version: volume.mokuroData.version,
               series_title: volume.mokuroData.title,
               series_uuid: volume.mokuroData.title_uuid,
+              page_count: volume.mokuroData.pages.length,
+              character_count: volume.mokuroData.chars,
               volume_title: volume.mokuroData.volume,
               volume_uuid: volume.mokuroData.volume_uuid
             });
@@ -56,7 +58,6 @@ export class CatalogDexie extends Dexie {
     // Get volumes without thumbnails and not currently being processed
     const volumes = await this.volumes
       .filter((volume) => !volume.thumbnail)
-      .and((volume) => !volume.thumbnailProcessing)
       .limit(batchSize)
       .toArray();
 

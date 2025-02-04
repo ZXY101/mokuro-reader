@@ -18,7 +18,7 @@
     ChevronRightSolid
   } from 'flowbite-svelte-icons';
   import Cropper from './Cropper.svelte';
-  import { page as pageStore } from '$app/stores';
+  import { currentVolume, currentVolumeData } from '$lib/catalog';
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
@@ -27,10 +27,9 @@
 
   // TODO: Refactor this whole mess
   export let volumeSettings: VolumeSettings;
-
-  $: volume = $volumes?.find(item => item.volume_uuid === $pageStore.params.volume);
-
-  $: pages = volume?.pages || [];
+  $: volume = $currentVolume;
+  $: volumeData = $currentVolumeData;
+  $: pages = volumeData?.pages || [];
 
   $: page = $progress?.[volume?.volume_uuid || 0] || 1;
   $: index = page - 1;
@@ -207,8 +206,8 @@
       const { charCount, lineCount } = getCharCount(pages, page);
 
       fireExstaticEvent('mokuro-reader:page.change', {
-        title: volume.title,
-        volumeName: volume.volume,
+        title: volume.series_title,
+        volumeName: volume.volume_title,
         currentCharCount: charCount,
         currentPage: page,
         totalPages: pages.length,
@@ -234,8 +233,8 @@
       const { charCount, lineCount } = getCharCount(pages, page);
 
       fireExstaticEvent('mokuro-reader:reader.closed', {
-        title: volume.title,
-        volumeName: volume.volume,
+        title: volume.series_title,
+        volumeName: volume.volume_title,
         currentCharCount: charCount,
         currentPage: page,
         totalPages: pages.length,
@@ -256,12 +255,12 @@
 <svelte:head>
   <title>{volume?.volume_title || 'Volume'}</title>
 </svelte:head>
-{#if volume && pages}
+{#if volume && pages && volumeData}
   <QuickActions
     {left}
     {right}
-    src1={Object.values(volume?.files)[index]}
-    src2={!volumeSettings.singlePageView ? Object.values(volume?.files)[index + 1] : undefined}
+    src1={Object.values(volumeData.files)[index]}
+    src2={!volumeSettings.singlePageView ? Object.values(volumeData.files)[index + 1] : undefined}
   />
   <SettingsButton />
   <Cropper />
@@ -345,9 +344,9 @@
       >
         {#key page}
           {#if showSecondPage()}
-            <MangaPage page={pages[index + 1]} src={Object.values(volume?.files)[index + 1]} />
+            <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} />
           {/if}
-          <MangaPage page={pages[index]} src={Object.values(volume?.files)[index]} />
+          <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} />
         {/key}
       </div>
     </Panzoom>
