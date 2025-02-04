@@ -1,25 +1,33 @@
 <script lang="ts">
   import { volumes } from '$lib/catalog';
+  import { progress } from '$lib/settings';
 
   export let series_uuid: string;
 
-  $: firstVolume = Object.values($volumes).sort((a,b) => a.volume_title.localeCompare(b.volume_title) ).find((item) => item.series_uuid === series_uuid);
+  $: firstUnreadVolume = Object.values($volumes).sort((a, b) => a.volume_title.localeCompare(b.volume_title))
+    .find((item) => (item.series_uuid === series_uuid) && (($progress?.[item.volume_uuid|| 0] || 1) < item.page_count - 1));
+
+  $: firstVolume = Object.values($volumes).sort((a, b) => a.volume_title.localeCompare(b.volume_title)).find((item) => item.series_uuid === series_uuid);
+  $: volume = firstUnreadVolume ?? firstVolume;
+  $: isComplete = !firstUnreadVolume;
+
 </script>
 
-{#if firstVolume}
+{#if volume}
   <a href={series_uuid}>
     <div
+      class:text-green-400={isComplete}
       class="flex flex-col gap-[5px] text-center items-center bg-slate-900 pb-1 bg-opacity-50 border border-slate-950"
     >
-      {#if firstVolume.thumbnail}
+      {#if volume.thumbnail}
         <img
-          src={URL.createObjectURL(firstVolume.thumbnail)}
+          src={URL.createObjectURL(volume.thumbnail)}
           alt="img"
           class="object-contain sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border"
         />
       {/if}
       <p class="font-semibold sm:w-[250px] line-clamp-1">
-        {firstVolume.series_title}
+        {volume.series_title}
       </p>
     </div>
   </a>
