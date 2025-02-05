@@ -18,8 +18,9 @@
     <ListgroupItem>
       <a href={series_uuid} class="h-full w-full">
         <div class="flex justify-between items-center">
-          <p class="font-semibold text-white"
-             class:text-green-400={isComplete}>{volume.series_title}</p>
+          <p class:text-green-400={isComplete}
+             class="font-semibold"
+             >{volume.series_title}</p>
           {#if volume.thumbnail}
             <img
               src={URL.createObjectURL(volume.thumbnail)}
