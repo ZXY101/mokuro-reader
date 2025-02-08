@@ -53,7 +53,7 @@
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
       const { charCount } = getCharCount(pages, pageClamped);
-      if (pageClamped === page) {
+      if (pageClamped !== newPage) {
         let seriesVolumes = $currentSeries;
         const currentVolumeIndex = seriesVolumes.findIndex((v) => v.volume_uuid === volume.volume_uuid);
         if (newPage < 1) {
