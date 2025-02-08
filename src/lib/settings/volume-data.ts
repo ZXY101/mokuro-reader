@@ -15,12 +15,44 @@ export type VolumeSettingsKey = keyof VolumeSettings;
 
 type Progress = Record<string, number> | undefined;
 
-type VolumeData = {
+class VolumeData {
   progress: number;
   chars: number;
   completed: boolean;
-  timeReadInMinutes: number,
+  timeReadInMinutes: number;
   settings: VolumeSettings;
+
+  constructor(data: Partial<VolumeData> = {}) {
+    const volumeDefaults = browser ? JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults : {
+      singlePageView: false,
+      rightToLeft: true,
+      hasCover: false
+    };
+
+    this.progress = data.progress ?? 0;
+    this.chars = data.chars ?? 0;
+    this.completed = data.completed ?? false;
+    this.timeReadInMinutes = data.timeReadInMinutes ?? 0;
+    this.settings = {
+      singlePageView: data.settings?.singlePageView ?? volumeDefaults.singlePageView,
+      rightToLeft: data.settings?.rightToLeft ?? volumeDefaults.rightToLeft,
+      hasCover: data.settings?.hasCover ?? volumeDefaults.hasCover
+    };
+  }
+
+  static fromJSON(json: any): VolumeData {
+    return new VolumeData(json);
+  }
+
+  toJSON() {
+    return {
+      progress: this.progress,
+      chars: this.chars,
+      completed: this.completed,
+      timeReadInMinutes: this.timeReadInMinutes,
+      settings: this.settings
+    };
+  }
 }
 
 type TotalStats = {
@@ -34,36 +66,19 @@ type Volumes = Record<string, VolumeData>;
 
 
 const stored = browser ? window.localStorage.getItem('volumes') : undefined;
-const initial: Volumes = stored && browser ? JSON.parse(stored) : {};
+const initial: Volumes = stored && browser ? 
+  Object.fromEntries(
+    Object.entries(JSON.parse(stored))
+      .map(([key, value]) => [key, new VolumeData(value)])
+  ) : {};
 
 export const volumes = writable<Volumes>(initial);
 
 export function initializeVolume(volume: string) {
-  const volumeDefaults = get(settings).volumeDefaults;
-
-  if (!volumeDefaults) {
-    updateSetting('volumeDefaults', {
-      singlePageView: false,
-      rightToLeft: true,
-      hasCover: false
-    })
-  }
-
-  const { hasCover, rightToLeft, singlePageView } = volumeDefaults
   volumes.update((prev) => {
     return {
       ...prev,
-      [volume]: {
-        chars: 0,
-        completed: false,
-        progress: 0,
-        timeReadInMinutes: 0,
-        settings: {
-          hasCover,
-          rightToLeft,
-          singlePageView
-        }
-      }
+      [volume]: new VolumeData()
     };
   });
 }
@@ -81,14 +96,15 @@ export function clearVolumes() {
 
 export function updateProgress(volume: string, progress: number, chars?: number, completed = false) {
   volumes.update((prev) => {
+    const currentVolume = prev[volume] || new VolumeData();
     return {
       ...prev,
-      [volume]: {
-        ...prev?.[volume],
+      [volume]: new VolumeData({
+        ...currentVolume,
         progress,
-        chars: chars || prev?.[volume].chars,
+        chars: chars ?? currentVolume.chars,
         completed
-      }
+      })
     };
   });
 }
@@ -96,12 +112,13 @@ export function updateProgress(volume: string, progress: number, chars?: number,
 export function startCount(volume: string) {
   return setInterval(() => {
     volumes.update((prev) => {
+      const currentVolume = prev[volume] || new VolumeData();
       return {
         ...prev,
-        [volume]: {
-          ...prev?.[volume],
-          timeReadInMinutes: prev?.[volume].timeReadInMinutes + 1
-        }
+        [volume]: new VolumeData({
+          ...currentVolume,
+          timeReadInMinutes: currentVolume.timeReadInMinutes + 1
+        })
       };
     });
   }, 60 * 1000)
@@ -139,15 +156,16 @@ export const volumeSettings = derived(volumes, ($volumes) => {
 
 export function updateVolumeSetting(volume: string, key: VolumeSettingsKey, value: any) {
   volumes.update((prev) => {
+    const currentVolume = prev[volume] || new VolumeData();
     return {
       ...prev,
-      [volume]: {
-        ...prev[volume],
+      [volume]: new VolumeData({
+        ...currentVolume,
         settings: {
-          ...prev[volume].settings,
+          ...currentVolume.settings,
           [key]: value
         }
-      }
+      })
     };
   });
   zoomDefault();
