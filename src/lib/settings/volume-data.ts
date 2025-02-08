@@ -1,6 +1,5 @@
 import { browser } from '$app/environment';
-import { derived, get, writable } from 'svelte/store';
-import { settings, updateSetting, } from './settings';
+import { derived, writable } from 'svelte/store';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
 import { currentSeries, currentVolume } from '$lib/catalog';
@@ -14,15 +13,22 @@ export type VolumeSettings = {
 export type VolumeSettingsKey = keyof VolumeSettings;
 
 type Progress = Record<string, number> | undefined;
+type VolumeDataJSON = {
+  progress: number;
+  chars: number;
+  completed: boolean;
+  timeReadInMinutes: number,
+  settings: VolumeSettings;
+}
 
-class VolumeData {
+class VolumeData implements VolumeDataJSON {
   progress: number;
   chars: number;
   completed: boolean;
   timeReadInMinutes: number;
   settings: VolumeSettings;
 
-  constructor(data: Partial<VolumeData> = {}) {
+  constructor(data: Partial<VolumeDataJSON> = {}) {
     const volumeDefaults = browser ? JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults ?? {
       singlePageView: false,
       rightToLeft: true,
@@ -81,7 +87,7 @@ const initial: Volumes = stored && browser ? (() => {
   try {
     const parsed = JSON.parse(stored);
     return Object.fromEntries(
-      Object.entries(parsed).map(([key, value]) => [key, new VolumeData(value)])
+      Object.entries(parsed).map(([key, value]) => [key, new VolumeData(value as Partial<VolumeDataJSON>)])
     );
   } catch {
     return {};
@@ -146,7 +152,7 @@ volumes.subscribe((volumes) => {
       Object.fromEntries(
         Object.entries(volumes).map(([key, value]) => [
           key, 
-          value instanceof VolumeData ? value.toJSON() : value
+          value.toJSON()
         ])
       ) : {};
     window.localStorage.setItem('volumes', JSON.stringify(serializedVolumes));
