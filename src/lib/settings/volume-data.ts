@@ -23,25 +23,36 @@ class VolumeData {
   settings: VolumeSettings;
 
   constructor(data: Partial<VolumeData> = {}) {
-    const volumeDefaults = browser ? JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults : {
+    const volumeDefaults = browser ? JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults ?? {
+      singlePageView: false,
+      rightToLeft: true,
+      hasCover: false
+    } : {
       singlePageView: false,
       rightToLeft: true,
       hasCover: false
     };
 
-    this.progress = data.progress ?? 0;
-    this.chars = data.chars ?? 0;
-    this.completed = data.completed ?? false;
-    this.timeReadInMinutes = data.timeReadInMinutes ?? 0;
+    this.progress = typeof data.progress === 'number' ? data.progress : 0;
+    this.chars = typeof data.chars === 'number' ? data.chars : 0;
+    this.completed = !!data.completed;
+    this.timeReadInMinutes = typeof data.timeReadInMinutes === 'number' ? data.timeReadInMinutes : 0;
     this.settings = {
-      singlePageView: data.settings?.singlePageView ?? volumeDefaults.singlePageView,
-      rightToLeft: data.settings?.rightToLeft ?? volumeDefaults.rightToLeft,
-      hasCover: data.settings?.hasCover ?? volumeDefaults.hasCover
+      singlePageView: typeof data.settings?.singlePageView === 'boolean' ? data.settings.singlePageView : volumeDefaults.singlePageView,
+      rightToLeft: typeof data.settings?.rightToLeft === 'boolean' ? data.settings.rightToLeft : volumeDefaults.rightToLeft,
+      hasCover: typeof data.settings?.hasCover === 'boolean' ? data.settings.hasCover : volumeDefaults.hasCover
     };
   }
 
   static fromJSON(json: any): VolumeData {
-    return new VolumeData(json);
+    if (typeof json === 'string') {
+      try {
+        json = JSON.parse(json);
+      } catch {
+        json = {};
+      }
+    }
+    return new VolumeData(json || {});
   }
 
   toJSON() {
@@ -50,7 +61,7 @@ class VolumeData {
       chars: this.chars,
       completed: this.completed,
       timeReadInMinutes: this.timeReadInMinutes,
-      settings: this.settings
+      settings: { ...this.settings }
     };
   }
 }
@@ -66,11 +77,16 @@ type Volumes = Record<string, VolumeData>;
 
 
 const stored = browser ? window.localStorage.getItem('volumes') : undefined;
-const initial: Volumes = stored && browser ? 
-  Object.fromEntries(
-    Object.entries(JSON.parse(stored))
-      .map(([key, value]) => [key, new VolumeData(value)])
-  ) : {};
+const initial: Volumes = stored && browser ? (() => {
+  try {
+    const parsed = JSON.parse(stored);
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, value]) => [key, new VolumeData(value)])
+    );
+  } catch {
+    return {};
+  }
+})() : {};
 
 export const volumes = writable<Volumes>(initial);
 
