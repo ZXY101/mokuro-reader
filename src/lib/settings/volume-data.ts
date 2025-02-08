@@ -142,7 +142,14 @@ export function startCount(volume: string) {
 
 volumes.subscribe((volumes) => {
   if (browser) {
-    window.localStorage.setItem('volumes', volumes ? JSON.stringify(volumes) : '');
+    const serializedVolumes = volumes ? 
+      Object.fromEntries(
+        Object.entries(volumes).map(([key, value]) => [
+          key, 
+          value instanceof VolumeData ? value.toJSON() : value
+        ])
+      ) : {};
+    window.localStorage.setItem('volumes', JSON.stringify(serializedVolumes));
   }
 });
 
