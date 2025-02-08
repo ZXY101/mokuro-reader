@@ -48,7 +48,7 @@
     const clickDuration = ingoreTimeOut ? 0 : end.getTime() - start?.getTime();
 
     if (pages && volume && clickDuration < 200) {
-      if (showSecondPage() && page + 1 === pages.length && newPage > page) {
+      if (showSecondPage() && page >= pages.length && newPage > page) {
         return false;
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
