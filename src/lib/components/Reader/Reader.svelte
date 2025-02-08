@@ -48,12 +48,12 @@
     const clickDuration = ingoreTimeOut ? 0 : end.getTime() - start?.getTime();
 
     if (pages && volume && clickDuration < 200) {
-      if (showSecondPage() && page + 1 === pages.length && newPage > page) {
+      if (showSecondPage() && page >= pages.length && newPage > page) {
         return false;
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
       const { charCount } = getCharCount(pages, pageClamped);
-      if (pageClamped === page) {
+      if (pageClamped !== newPage) {
         let seriesVolumes = $currentSeries;
         const currentVolumeIndex = seriesVolumes.findIndex((v) => v.volume_uuid === volume.volume_uuid);
         if (newPage < 1) {
