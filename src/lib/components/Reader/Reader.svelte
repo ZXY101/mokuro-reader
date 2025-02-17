@@ -49,11 +49,11 @@
 
     if (pages && volume && clickDuration < 200) {
       if (showSecondPage() && page + 1 === pages.length && newPage > page) {
-        return false;
+        return;
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
       const { charCount } = getCharCount(pages, pageClamped);
-      if (pageClamped === page) {
+      if (pageClamped !== newPage) {
         let seriesVolumes = $currentSeries;
         const currentVolumeIndex = seriesVolumes.findIndex((v) => v.volume_uuid === volume.volume_uuid);
         if (newPage < 1) {
@@ -67,15 +67,15 @@
           if (nextVolume) goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`, { invalidateAll: true });
           else goto(`/${volume.series_uuid}`);
         }
+      } else {
+        updateProgress(
+          volume.volume_uuid,
+          pageClamped,
+          charCount,
+          pageClamped === pages.length || pageClamped === pages.length - 1
+        );
+        zoomDefault();
       }
-      updateProgress(
-        volume.volume_uuid,
-        pageClamped,
-        charCount,
-        pageClamped === pages.length || pageClamped === pages.length - 1
-      );
-      zoomDefault();
-      return true;
     }
   }
 
@@ -262,101 +262,103 @@
   <title>{volume?.volume_title || 'Volume'}</title>
 </svelte:head>
 {#if volume && pages && volumeData}
-  <QuickActions
-    {left}
-    {right}
-    src1={Object.values(volumeData.files)[index]}
-    src2={!volumeSettings.singlePageView ? Object.values(volumeData.files)[index + 1] : undefined}
-  />
-  <SettingsButton />
-  <Cropper />
-  <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
-    <div class="flex flex-col gap-3">
-      <div class="flex flex-row items-center gap-5 z-10">
-        <ChervonDoubleLeftSolid
-          on:click={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
-        <ChevronLeftSolid
-          on:click={(e) => left(e, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
-        <Input
-          type="number"
-          size="sm"
-          bind:value={manualPage}
-          on:click={onInputClick}
-          on:change={onManualPageChange}
-        />
-        <ChevronRightSolid
-          on:click={(e) => right(e, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
-        <ChervonDoubleRightSolid
-          on:click={() => changePage(volumeSettings.rightToLeft ? 1 : pages.length, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
+  {#key volume}
+    <QuickActions
+      {left}
+      {right}
+      src1={Object.values(volumeData.files)[index]}
+      src2={!volumeSettings.singlePageView ? Object.values(volumeData.files)[index + 1] : undefined}
+    />
+    <SettingsButton />
+    <Cropper />
+    <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-row items-center gap-5 z-10">
+          <ChervonDoubleLeftSolid
+            on:click={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}
+            class="hover:text-primary-600"
+            size="sm"
+          />
+          <ChevronLeftSolid
+            on:click={(e) => left(e, true)}
+            class="hover:text-primary-600"
+            size="sm"
+          />
+          <Input
+            type="number"
+            size="sm"
+            bind:value={manualPage}
+            on:click={onInputClick}
+            on:change={onManualPageChange}
+          />
+          <ChevronRightSolid
+            on:click={(e) => right(e, true)}
+            class="hover:text-primary-600"
+            size="sm"
+          />
+          <ChervonDoubleRightSolid
+            on:click={() => changePage(volumeSettings.rightToLeft ? 1 : pages.length, true)}
+            class="hover:text-primary-600"
+            size="sm"
+          />
+        </div>
+        <div style:direction={volumeSettings.rightToLeft ? 'rtl' : 'ltr'}>
+          <Range
+            min={1}
+            max={pages.length}
+            bind:value={manualPage}
+            on:change={onManualPageChange}
+            defaultClass=""
+          />
+        </div>
       </div>
-      <div style:direction={volumeSettings.rightToLeft ? 'rtl' : 'ltr'}>
-        <Range
-          min={1}
-          max={pages.length}
-          bind:value={manualPage}
-          on:change={onManualPageChange}
-          defaultClass=""
+    </Popover>
+    <button class="absolute opacity-50 left-5 top-5 z-10 mix-blend-difference" id="page-num">
+      <p class="text-left" class:hidden={!$settings.charCount}>{charDisplay}</p>
+      <p class="text-left" class:hidden={!$settings.pageNum}>{pageDisplay}</p>
+    </button>
+    <div class="flex" style:background-color={$settings.backgroundColor}>
+      <Panzoom>
+        <button
+          class="h-full fixed -left-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+          style:margin-left={`${$settings.edgeButtonWidth}px`}
+          on:mousedown={mouseDown}
+          on:mouseup={left}
         />
-      </div>
+        <button
+          class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+          style:margin-right={`${$settings.edgeButtonWidth}px`}
+          on:mousedown={mouseDown}
+          on:mouseup={right}
+        />
+        <button
+          class="h-screen fixed top-full -left-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
+          on:mousedown={mouseDown}
+          on:mouseup={left}
+        />
+        <button
+          class="h-screen fixed top-full -right-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
+          on:mousedown={mouseDown}
+          on:mouseup={right}
+        />
+        <div
+          class="flex flex-row"
+          class:flex-row-reverse={!volumeSettings.rightToLeft}
+          style:filter={`invert(${$settings.invertColors ? 1 : 0})`}
+          on:dblclick={onDoubleTap}
+          role="none"
+          id="manga-panel"
+        >
+          {#key page}
+            {#if showSecondPage()}
+              <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} />
+            {/if}
+            <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} />
+          {/key}
+        </div>
+      </Panzoom>
     </div>
-  </Popover>
-  <button class="absolute opacity-50 left-5 top-5 z-10 mix-blend-difference" id="page-num">
-    <p class="text-left" class:hidden={!$settings.charCount}>{charDisplay}</p>
-    <p class="text-left" class:hidden={!$settings.pageNum}>{pageDisplay}</p>
-  </button>
-  <div class="flex" style:background-color={$settings.backgroundColor}>
-    <Panzoom>
-      <button
-        class="h-full fixed -left-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
-        style:margin-left={`${$settings.edgeButtonWidth}px`}
-        on:mousedown={mouseDown}
-        on:mouseup={left}
-      />
-      <button
-        class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
-        style:margin-right={`${$settings.edgeButtonWidth}px`}
-        on:mousedown={mouseDown}
-        on:mouseup={right}
-      />
-      <button
-        class="h-screen fixed top-full -left-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
-        on:mousedown={mouseDown}
-        on:mouseup={left}
-      />
-      <button
-        class="h-screen fixed top-full -right-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
-        on:mousedown={mouseDown}
-        on:mouseup={right}
-      />
-      <div
-        class="flex flex-row"
-        class:flex-row-reverse={!volumeSettings.rightToLeft}
-        style:filter={`invert(${$settings.invertColors ? 1 : 0})`}
-        on:dblclick={onDoubleTap}
-        role="none"
-        id="manga-panel"
-      >
-        {#key page}
-          {#if showSecondPage()}
-            <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} />
-          {/if}
-          <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} />
-        {/key}
-      </div>
-    </Panzoom>
-  </div>
+  {/key}
   {#if !$settings.mobile}
     <button
       on:mousedown={mouseDown}

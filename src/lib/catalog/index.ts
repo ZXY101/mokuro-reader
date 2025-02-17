@@ -20,6 +20,7 @@ function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
 export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
   const subscription = liveQuery(async () => {
     const volumesArray = await db.volumes.toArray();
+
     return volumesArray.reduce((acc, vol) => {
       acc[vol.volume_uuid] = vol;
       return acc;
