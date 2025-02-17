@@ -10,7 +10,7 @@
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
-  import { beforeNavigate, goto } from '$app/navigation';
+  import { beforeNavigate } from '$app/navigation';
   import { onMount } from 'svelte';
 
   // TODO: Refactor this whole mess
@@ -49,7 +49,7 @@
 
     if (pages && volume && clickDuration < 200) {
       if (showSecondPage() && page >= pages.length && newPage > page) {
-        return false;
+        return;
       }
       const pageClamped = clamp(newPage, 1, pages?.length);
       const { charCount } = getCharCount(pages, pageClamped);
@@ -59,23 +59,23 @@
         if (newPage < 1) {
           // open previous volume
           const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-          if (previousVolume) goto(`/${volume.series_uuid}/${previousVolume.volume_uuid}`, { invalidateAll: true });
-          else goto(`/${volume.series_uuid}`);
+          if (previousVolume) window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
+          else window.location.href = `/${volume.series_uuid}`;
         } else if (newPage > pages.length) {
           // open next volume
           const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-          if (nextVolume) goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`, { invalidateAll: true });
-          else goto(`/${volume.series_uuid}`);
+          if (nextVolume) window.location.href = `/${volume.series_uuid}/${nextVolume.volume_uuid}`;
+          else window.location.href = `/${volume.series_uuid}`;
         }
+      } else {
+        updateProgress(
+          volume.volume_uuid,
+          pageClamped,
+          charCount,
+          pageClamped === pages.length || pageClamped === pages.length - 1
+        );
+        zoomDefault();
       }
-      updateProgress(
-        volume.volume_uuid,
-        pageClamped,
-        charCount,
-        pageClamped === pages.length || pageClamped === pages.length - 1
-      );
-      zoomDefault();
-      return true;
     }
   }
 
@@ -141,7 +141,7 @@
         toggleFullScreen();
         return;
       case 'Escape':
-        goto(`/${volume.series_uuid}`);
+        window.location.href = `/${volume.series_uuid}`;
         return;
       default:
         break;

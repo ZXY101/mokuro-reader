@@ -1,6 +1,5 @@
 import { browser } from '$app/environment';
-import { derived, get, writable } from 'svelte/store';
-import { settings, updateSetting, } from './settings';
+import { derived, writable } from 'svelte/store';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
 import { currentSeries, currentVolume } from '$lib/catalog';
@@ -14,13 +13,63 @@ export type VolumeSettings = {
 export type VolumeSettingsKey = keyof VolumeSettings;
 
 type Progress = Record<string, number> | undefined;
-
-type VolumeData = {
+type VolumeDataJSON = {
   progress: number;
   chars: number;
   completed: boolean;
   timeReadInMinutes: number,
   settings: VolumeSettings;
+}
+
+class VolumeData implements VolumeDataJSON {
+  progress: number;
+  chars: number;
+  completed: boolean;
+  timeReadInMinutes: number;
+  settings: VolumeSettings;
+
+  constructor(data: Partial<VolumeDataJSON> = {}) {
+    const volumeDefaults = browser ? JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults ?? {
+      singlePageView: false,
+      rightToLeft: true,
+      hasCover: false
+    } : {
+      singlePageView: false,
+      rightToLeft: true,
+      hasCover: false
+    };
+
+    this.progress = typeof data.progress === 'number' ? data.progress : 0;
+    this.chars = typeof data.chars === 'number' ? data.chars : 0;
+    this.completed = !!data.completed;
+    this.timeReadInMinutes = typeof data.timeReadInMinutes === 'number' ? data.timeReadInMinutes : 0;
+    this.settings = {
+      singlePageView: typeof data.settings?.singlePageView === 'boolean' ? data.settings.singlePageView : volumeDefaults.singlePageView,
+      rightToLeft: typeof data.settings?.rightToLeft === 'boolean' ? data.settings.rightToLeft : volumeDefaults.rightToLeft,
+      hasCover: typeof data.settings?.hasCover === 'boolean' ? data.settings.hasCover : volumeDefaults.hasCover
+    };
+  }
+
+  static fromJSON(json: any): VolumeData {
+    if (typeof json === 'string') {
+      try {
+        json = JSON.parse(json);
+      } catch {
+        json = {};
+      }
+    }
+    return new VolumeData(json || {});
+  }
+
+  toJSON() {
+    return {
+      progress: this.progress,
+      chars: this.chars,
+      completed: this.completed,
+      timeReadInMinutes: this.timeReadInMinutes,
+      settings: { ...this.settings }
+    };
+  }
 }
 
 type TotalStats = {
@@ -34,36 +83,24 @@ type Volumes = Record<string, VolumeData>;
 
 
 const stored = browser ? window.localStorage.getItem('volumes') : undefined;
-const initial: Volumes = stored && browser ? JSON.parse(stored) : {};
+const initial: Volumes = stored && browser ? (() => {
+  try {
+    const parsed = JSON.parse(stored);
+    return Object.fromEntries(
+      Object.entries(parsed).map(([key, value]) => [key, new VolumeData(value as Partial<VolumeDataJSON>)])
+    );
+  } catch {
+    return {};
+  }
+})() : {};
 
 export const volumes = writable<Volumes>(initial);
 
 export function initializeVolume(volume: string) {
-  const volumeDefaults = get(settings).volumeDefaults;
-
-  if (!volumeDefaults) {
-    updateSetting('volumeDefaults', {
-      singlePageView: false,
-      rightToLeft: true,
-      hasCover: false
-    })
-  }
-
-  const { hasCover, rightToLeft, singlePageView } = volumeDefaults
   volumes.update((prev) => {
     return {
       ...prev,
-      [volume]: {
-        chars: 0,
-        completed: false,
-        progress: 0,
-        timeReadInMinutes: 0,
-        settings: {
-          hasCover,
-          rightToLeft,
-          singlePageView
-        }
-      }
+      [volume]: new VolumeData()
     };
   });
 }
@@ -81,14 +118,15 @@ export function clearVolumes() {
 
 export function updateProgress(volume: string, progress: number, chars?: number, completed = false) {
   volumes.update((prev) => {
+    const currentVolume = prev[volume] || new VolumeData();
     return {
       ...prev,
-      [volume]: {
-        ...prev?.[volume],
+      [volume]: new VolumeData({
+        ...currentVolume,
         progress,
-        chars: chars || prev?.[volume].chars,
+        chars: chars ?? currentVolume.chars,
         completed
-      }
+      })
     };
   });
 }
@@ -96,12 +134,13 @@ export function updateProgress(volume: string, progress: number, chars?: number,
 export function startCount(volume: string) {
   return setInterval(() => {
     volumes.update((prev) => {
+      const currentVolume = prev[volume] || new VolumeData();
       return {
         ...prev,
-        [volume]: {
-          ...prev?.[volume],
-          timeReadInMinutes: prev?.[volume].timeReadInMinutes + 1
-        }
+        [volume]: new VolumeData({
+          ...currentVolume,
+          timeReadInMinutes: currentVolume.timeReadInMinutes + 1
+        })
       };
     });
   }, 60 * 1000)
@@ -109,7 +148,14 @@ export function startCount(volume: string) {
 
 volumes.subscribe((volumes) => {
   if (browser) {
-    window.localStorage.setItem('volumes', volumes ? JSON.stringify(volumes) : '');
+    const serializedVolumes = volumes ? 
+      Object.fromEntries(
+        Object.entries(volumes).map(([key, value]) => [
+          key, 
+          value.toJSON()
+        ])
+      ) : {};
+    window.localStorage.setItem('volumes', JSON.stringify(serializedVolumes));
   }
 });
 
@@ -139,15 +185,16 @@ export const volumeSettings = derived(volumes, ($volumes) => {
 
 export function updateVolumeSetting(volume: string, key: VolumeSettingsKey, value: any) {
   volumes.update((prev) => {
+    const currentVolume = prev[volume] || new VolumeData();
     return {
       ...prev,
-      [volume]: {
-        ...prev[volume],
+      [volume]: new VolumeData({
+        ...currentVolume,
         settings: {
-          ...prev[volume].settings,
+          ...currentVolume.settings,
           [key]: value
         }
-      }
+      })
     };
   });
   zoomDefault();
