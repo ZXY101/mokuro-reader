@@ -3,8 +3,9 @@
   import { deleteVolume, progress } from '$lib/settings';
   import type { VolumeMetadata } from '$lib/types';
   import { promptConfirmation } from '$lib/util';
+  import { extractManga } from '$lib/util/export';
   import { Frame, ListgroupItem } from 'flowbite-svelte';
-  import { CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
+  import { CheckCircleSolid, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
   import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
 
@@ -43,7 +44,10 @@
     });
   }
 
-
+  async function onExtractClicked(e: Event) {
+    e.stopPropagation();
+    await extractManga(volume);
+  }
 </script>
 
 {#if $page.params.manga}
@@ -73,6 +77,10 @@
           <TrashBinSolid
             class="text-red-400 hover:text-red-500 z-10 poin"
             on:click={onDeleteClicked}
+          />
+          <DownloadSolid
+            class="text-blue-400 hover:text-blue-500 z-10 poin"
+            on:click={onExtractClicked}
           />
           {#if isComplete}
             <CheckCircleSolid />
