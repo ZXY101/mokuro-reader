@@ -221,42 +221,97 @@ async function processImageFile(
   }
 }
 
+interface ExtractedZipContents {
+  mokuroFile?: File;
+  imageFiles: Record<string, File>;
+  nestedArchives: File[];
+}
+
+async function extractZipContents(file: File, parentPath: string = ''): Promise<ExtractedZipContents> {
+  const unzippedFiles = await unzipManga(file);
+  const entries = Object.entries(unzippedFiles);
+  
+  const imageFiles: Record<string, File> = {};
+  const nestedArchives: File[] = [];
+  let mokuroFile: File | undefined;
+
+  for (const [name, entryFile] of entries) {
+    const ext = name.split('.').pop()?.toLowerCase();
+    const fullPath = parentPath ? `${parentPath}/${name}` : name;
+
+    if (ext === 'mokuro') {
+      mokuroFile = entryFile;
+      // Set the relative path for the mokuro file
+      Object.defineProperty(mokuroFile, 'webkitRelativePath', {
+        value: fullPath
+      });
+    } else if (zipTypes.map(t => t.toLowerCase()).includes(ext || '')) {
+      // Set the relative path for the nested archive
+      Object.defineProperty(entryFile, 'webkitRelativePath', {
+        value: fullPath
+      });
+      nestedArchives.push(entryFile);
+    } else {
+      const mime = getMimeType(name);
+      if (imageTypes.includes(mime)) {
+        // Set the relative path for the image file
+        Object.defineProperty(entryFile, 'webkitRelativePath', {
+          value: fullPath
+        });
+        imageFiles[fullPath] = entryFile;
+      }
+    }
+  }
+
+  return { mokuroFile, imageFiles, nestedArchives };
+}
+
 async function processZipFile(
   file: File,
   volumesByPath: Record<string, Partial<VolumeMetadata>>,
   volumesDataByPath: Record<string, Partial<VolumeData>>,
-  titleUuids: Set<string>
+  pendingImagesByPath: Record<string, Record<string, File>>,
+  titleUuids: Set<string>,
+  filesToProcess: File[]
 ): Promise<void> {
-  const unzippedFiles = await unzipManga(file);
-  const entries = Object.entries(unzippedFiles);
   const { path } = getDetails(file);
+  
+  // Extract current zip level
+  const { mokuroFile, imageFiles, nestedArchives } = await extractZipContents(file, path);
 
-  // Find mokuro file if present
-  const mokuroEntry = entries.find(([name]) => name.endsWith('.mokuro'));
-  if (!mokuroEntry) return;
+  // Add nested archives to the list of files to process
+  filesToProcess.push(...nestedArchives);
 
-  // Process mokuro file
-  const { metadata, data, titleUuid } = await processMokuroFile(mokuroEntry[1]);
-  titleUuids.add(titleUuid);
-  volumesByPath[path] = metadata;
-  volumesDataByPath[path] = {
-    ...data,
-    files: {}
-  };
+  if (mokuroFile) {
+    // Process embedded mokuro file
+    const { metadata, data, titleUuid } = await processMokuroFile(mokuroFile);
+    const mokuroPath = getDetails(mokuroFile).path;
+    titleUuids.add(titleUuid);
+    volumesByPath[mokuroPath] = metadata;
+    
+    volumesDataByPath[mokuroPath] = {
+      ...data,
+      files: imageFiles
+    };
 
-  // Process images and upload when complete
-  for (const [name, imageFile] of entries) {
-    const mime = getMimeType(name);
-    if (!imageTypes.includes(mime)) continue;
+    // Upload if complete
+    if (volumesDataByPath[mokuroPath].pages?.length === Object.keys(imageFiles).length) {
+      const uploadData = volumesDataByPath[mokuroPath];
+      delete volumesDataByPath[mokuroPath];
+      await uploadVolumeData(volumesByPath, mokuroPath, uploadData);
+    }
+  } else if (Object.keys(imageFiles).length > 0) {
+    // Store images for potential external mokuro file
+    pendingImagesByPath[path] = imageFiles;
 
-    volumesDataByPath[path].files![name] = imageFile;
-
-    // Check if volume is complete
-    if (volumesDataByPath[path].pages?.length === Object.keys(volumesDataByPath[path].files!).length) {
-      const uploadData = volumesDataByPath[path];
-      delete volumesDataByPath[path]; // Clear memory
-      await uploadVolumeData(volumesByPath, path, uploadData);
-      break;
+    // Check if we already have a mokuro file for this path
+    if (volumesDataByPath[path]) {
+      volumesDataByPath[path].files = imageFiles;
+      if (volumesDataByPath[path].pages?.length === Object.keys(imageFiles).length) {
+        const uploadData = volumesDataByPath[path];
+        delete volumesDataByPath[path];
+        await uploadVolumeData(volumesByPath, path, uploadData);
+      }
     }
   }
 }
@@ -285,46 +340,110 @@ async function processStandaloneImage(
   // Check if volume is complete
   if (volumesDataByPath[vol].pages?.length === Object.keys(volumesDataByPath[vol].files!).length) {
     const uploadData = volumesDataByPath[vol];
-    delete volumesDataByPath[vol]; // Clear memory
+    delete volumesDataByPath[vol];
     await uploadVolumeData(volumesByPath, vol, uploadData);
+  }
+}
+
+async function processMokuroWithPendingImages(
+  file: File,
+  volumesByPath: Record<string, Partial<VolumeMetadata>>,
+  volumesDataByPath: Record<string, Partial<VolumeData>>,
+  pendingImagesByPath: Record<string, Record<string, File>>,
+  titleUuids: Set<string>
+): Promise<void> {
+  const { path } = getDetails(file);
+  const { metadata, data, titleUuid } = await processMokuroFile(file);
+  titleUuids.add(titleUuid);
+  volumesByPath[path] = metadata;
+
+  // Check if we have pending images for this mokuro file
+  if (pendingImagesByPath[path]) {
+    volumesDataByPath[path] = {
+      ...data,
+      files: pendingImagesByPath[path]
+    };
+    delete pendingImagesByPath[path];
+
+    // Upload if complete
+    if (volumesDataByPath[path].pages?.length === Object.keys(volumesDataByPath[path].files!).length) {
+      const uploadData = volumesDataByPath[path];
+      delete volumesDataByPath[path];
+      await uploadVolumeData(volumesByPath, path, uploadData);
+    }
+  } else {
+    // Store mokuro data for potential future images
+    volumesDataByPath[path] = {
+      ...data,
+      files: {}
+    };
   }
 }
 
 export async function processFiles(_files: File[]) {
   const volumesByPath: Record<string, Partial<VolumeMetadata>> = {};
   const volumesDataByPath: Record<string, Partial<VolumeData>> = {};
+  const pendingImagesByPath: Record<string, Record<string, File>> = {};
   const titleUuids = new Set<string>();
 
-  const files = _files.sort((a, b) => 
+  // Create a stack of files to process
+  const fileStack = _files.sort((a, b) => 
     decodeURI(a.name).localeCompare(decodeURI(b.name), undefined, {
       numeric: true,
       sensitivity: 'base'
     })
   );
 
-  // First pass: Process standalone mokuro files
-  for (const file of files) {
-    const { ext, path } = getDetails(file);
-    if (ext !== 'mokuro') continue;
-
-    const { metadata, data, titleUuid } = await processMokuroFile(file);
-    titleUuids.add(titleUuid);
-    volumesByPath[path] = metadata;
-    volumesDataByPath[path] = {
-      ...data,
-      files: {}
-    };
-  }
-
-  // Second pass: Process all other files
-  for (const file of files) {
+  // Process files using a stack, allowing nested archives to be processed immediately
+  while (fileStack.length > 0) {
+    const file = fileStack.pop()!;
     const { ext } = getDetails(file);
     const { type } = file;
 
-    if (ext === 'mokuro') continue;
+    if (ext === 'mokuro') {
+      await processMokuroWithPendingImages(file, volumesByPath, volumesDataByPath, pendingImagesByPath, titleUuids);
+    } else if (ext && zipTypes.includes(ext)) {
+      const { mokuroFile, imageFiles, nestedArchives } = await extractZipContents(file, getDetails(file).path);
+      
+      // Push nested archives onto the stack to be processed next
+      // Push in reverse order to maintain original sort order when popped
+      for (let i = 0; i < nestedArchives.length; i++) {
+        fileStack.push(nestedArchives[i]);
+      }
 
-    if (ext && zipTypes.includes(ext)) {
-      await processZipFile(file, volumesByPath, volumesDataByPath, titleUuids);
+      if (mokuroFile) {
+        // Process embedded mokuro file
+        const { metadata, data, titleUuid } = await processMokuroFile(mokuroFile);
+        const mokuroPath = getDetails(mokuroFile).path;
+        titleUuids.add(titleUuid);
+        volumesByPath[mokuroPath] = metadata;
+        
+        volumesDataByPath[mokuroPath] = {
+          ...data,
+          files: imageFiles
+        };
+
+        // Upload if complete
+        if (volumesDataByPath[mokuroPath].pages?.length === Object.keys(imageFiles).length) {
+          const uploadData = volumesDataByPath[mokuroPath];
+          delete volumesDataByPath[mokuroPath];
+          await uploadVolumeData(volumesByPath, mokuroPath, uploadData);
+        }
+      } else if (Object.keys(imageFiles).length > 0) {
+        // Store images for potential external mokuro file
+        const path = getDetails(file).path;
+        pendingImagesByPath[path] = imageFiles;
+
+        // Check if we already have a mokuro file for this path
+        if (volumesDataByPath[path]) {
+          volumesDataByPath[path].files = imageFiles;
+          if (volumesDataByPath[path].pages?.length === Object.keys(imageFiles).length) {
+            const uploadData = volumesDataByPath[path];
+            delete volumesDataByPath[path];
+            await uploadVolumeData(volumesByPath, path, uploadData);
+          }
+        }
+      }
     } else {
       const mimeType = type || getMimeType(file.name);
       if (imageTypes.includes(mimeType)) {
