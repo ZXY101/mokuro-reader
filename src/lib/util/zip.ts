@@ -32,10 +32,7 @@ export async function zipManga(manga: VolumeMetadata[]) {
     // Add image files
     const imagePromises = volumeData.files ? 
       Object.entries(volumeData.files).map(([filename, file]) => {
-        return zipWriter.add(
-          `${volume.volume_title}/${filename}`, 
-          new BlobReader(file)
-        );
+        return zipWriter.add(filename, new BlobReader(file));
       }) : [];
 
     // Add mokuro data file
