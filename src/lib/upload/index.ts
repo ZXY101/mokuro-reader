@@ -208,7 +208,7 @@ async function processStandaloneImage(
 
   if (!path) return;
 
-  const imageName = path.split('/').at(-1);
+  const relativePath = file.file.webkitRelativePath;
   const vol = Object.keys(volumesDataByPath).find(key => path.startsWith(key));
 
   if(!vol){
@@ -219,17 +219,17 @@ async function processStandaloneImage(
     if (!pendingImagesByPath[dirPath]) {
       pendingImagesByPath[dirPath] = {};
     }
-    pendingImagesByPath[dirPath][imageName] = file.file;
+    pendingImagesByPath[dirPath][relativePath] = file.file;
     return;
   }
 
-  if (!vol || !imageName) return;
+  if (!vol || !relativePath) return;
 
   // Add image to volume data
   if (!volumesDataByPath[vol].files) {
     volumesDataByPath[vol].files = {};
   }
-  volumesDataByPath[vol].files![imageName] = file.file;
+  volumesDataByPath[vol].files![relativePath] = file.file;
 
   // Check if volume is complete
   if (volumesDataByPath[vol].pages?.length === Object.keys(volumesDataByPath[vol].files!).length) {
