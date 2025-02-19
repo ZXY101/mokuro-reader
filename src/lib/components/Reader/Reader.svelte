@@ -47,7 +47,8 @@
     const end = new Date();
     const clickDuration = ingoreTimeOut ? 0 : end.getTime() - start?.getTime();
 
-    if (pages && volume && clickDuration < 200) {
+    // Only apply click duration check for mouse/touch events, not for manual input
+    if (pages && volume && (ingoreTimeOut || clickDuration < 200)) {
       if (showSecondPage() && page >= pages.length && newPage > page) {
         return;
       }
@@ -107,7 +108,12 @@
   }
 
   function onManualPageChange() {
-    changePage(manualPage, true);
+    if (manualPage !== undefined && manualPage !== null) {
+      const newPage = parseInt(manualPage.toString(), 10);
+      if (!isNaN(newPage)) {
+        changePage(newPage, true);
+      }
+    }
   }
 
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
@@ -289,8 +295,13 @@
           bind:value={manualPage}
           on:click={onInputClick}
           on:change={onManualPageChange}
-          on:keydown={(e) => e.key === 'Enter' && onManualPageChange()}
-          on:input={onManualPageChange}
+          on:keydown={(e) => {
+            if (e.key === 'Enter') {
+              onManualPageChange();
+              e.currentTarget.blur();
+            }
+          }}
+          on:blur={onManualPageChange}
         />
         <ChevronRightSolid
           on:click={(e) => right(e, true)}
