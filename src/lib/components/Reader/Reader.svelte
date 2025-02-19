@@ -289,6 +289,8 @@
           bind:value={manualPage}
           on:click={onInputClick}
           on:change={onManualPageChange}
+          on:keydown={(e) => e.key === 'Enter' && onManualPageChange()}
+          on:input={onManualPageChange}
         />
         <ChevronRightSolid
           on:click={(e) => right(e, true)}
