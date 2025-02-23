@@ -2,7 +2,7 @@ import { db } from '$lib/catalog/db';
 import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
-import { BlobWriter, getMimeType, Uint8ArrayReader, ZipReader } from '@zip.js/zip.js';
+import { BlobWriter, getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
 
 export * from './web-import';
@@ -11,13 +11,7 @@ const zipTypes = ['zip', 'cbz', 'ZIP', 'CBZ'];
 const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
 export async function unzipManga(file: File) {
-  let zipReader;
-  if (file.size < 1024 * 1024 * 1024) {
-    const zipFileReader = new Uint8ArrayReader(new Uint8Array(await file.arrayBuffer()));
-    zipReader = new ZipReader(zipFileReader);
-  } else {
-    zipReader = new ZipReader(file.stream());
-  }
+  const zipReader = new ZipReaderStream(file.stream());
   const entries = await zipReader.getEntries();
   const unzippedFiles: Record<string, File> = {};
 
