@@ -8,7 +8,10 @@
 
   function onClose() {
     hidden = true;
-    history.back();
+    // Extract series UUID from current URL and navigate to series page
+    const pathname = window.location.pathname || '';
+    const seriesUuid = pathname.split('/')[1] || '';
+    window.location.href = `/${seriesUuid}`;
   }
 </script>
 
