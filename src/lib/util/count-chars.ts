@@ -10,10 +10,8 @@ import type { Page } from "$lib/types";
 // https://github.com/ttu-ttu/ebook-reader/blob/main/apps/web/src/lib/functions/get-character-count.ts
 
 export function countChars(line: string) {
-  const isNotJapaneseRegex = /[^0-9A-Z○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー０-９Ａ-Ｚｦ-ﾝ\p{Radical}\p{Unified_Ideograph}]+/gimu
-  const cleaned = line.replace(isNotJapaneseRegex, '')
-
-  return Array.from(cleaned).length;
+  const japaneseRegex = /[○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u
+  return Array.from(line).filter(char => japaneseRegex.test(char)).length;
 }
 
 export function getCharCount(pages: Page[], currentPage?: number) {
