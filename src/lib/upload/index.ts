@@ -134,6 +134,18 @@ async function uploadVolumeData(
       .first();
 
     if (!existingVolume) {
+      // Sort files by name case-insensitively
+      if (uploadData.files) {
+        uploadData.files = Object.fromEntries(
+          Object.entries(uploadData.files).sort(([aKey, aFile], [bKey, bFile]) =>
+            aKey.localeCompare(bKey, undefined, {
+              numeric: true,
+              sensitivity: 'base'
+            })
+          )
+        );
+      }
+
       uploadMetadata.thumbnail = await generateThumbnail(
         uploadData.files?.[Object.keys(uploadData.files)[0]]
       );
