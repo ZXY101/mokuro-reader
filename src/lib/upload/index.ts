@@ -7,58 +7,8 @@ import { generateThumbnail } from '$lib/catalog/thumbnails';
 
 export * from './web-import';
 
-const zipTypes = ['zip', 'cbz', 'ZIP', 'CBZ'];
+const zipTypes = ['zip', 'cbz'];
 const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-
-export async function unzipManga(file: File) {
-  // Create a TransformStream for the zip content
-  const zipFileStream = new TransformStream();
-  // Create a Promise that will resolve with the entries
-  const entriesPromise = (async () => {
-    const zipReader = new ZipReaderStream(file.stream());
-    return await zipReader.getEntries();
-  })();
-  const entries = await entriesPromise;
-  const unzippedFiles: Record<string, File> = {};
-
-  // Sort entries by filename
-  const sortedEntries = entries.sort((a, b) => {
-    return a.filename.localeCompare(b.filename, undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    });
-  });
-
-  // Process entries sequentially to maintain memory efficiency
-  for (const entry of sortedEntries) {
-    const mime = getMimeType(entry.filename);
-    const isMokuroFile = entry.filename.split('.').pop() === 'mokuro';
-
-    if (imageTypes.includes(mime) || isMokuroFile) {
-      // Create a TransformStream for each entry
-      const entryStream = new TransformStream();
-      const blobPromise = new Response(entryStream.readable).blob();
-      
-      // Get the entry data as a stream
-      await entry.getData(entryStream.writable);
-      
-      // Wait for the blob to be ready
-      const blob = await blobPromise;
-      const fileName = entry.filename.split('/').pop() || entry.filename;
-      const file = new File([blob], fileName, { type: mime });
-      
-      // Set webkitRelativePath for proper file path handling
-      if (!file.webkitRelativePath) {
-        Object.defineProperty(file, 'webkitRelativePath', {
-          value: entry.filename
-        });
-      }
-      unzippedFiles[entry.filename] = file;
-    }
-  }
-
-  return unzippedFiles;
-}
 
 function getDetails(file: File) {
   const { webkitRelativePath, name } = file;
@@ -93,6 +43,29 @@ async function getFile(fileEntry: FileSystemFileEntry) {
   } catch (err) {
     console.log(err);
   }
+}
+
+function getExtension(fileName: string) {
+  return fileName.split('.')?.pop()?.toLowerCase() ?? '';
+}
+function removeExtension(fileName: string) {
+  const lastDotIndex = fileName.lastIndexOf('.');
+  if (lastDotIndex > -1 && lastDotIndex > fileName.lastIndexOf('/')) {
+    return fileName.slice(0, lastDotIndex);
+  }
+  return fileName; // Return the original file path if no extension exists
+}
+
+function isMokuro(fileName: string) {
+  return getExtension(fileName) === 'mokuro';
+}
+
+function isImage(fileName: string) {
+  return getMimeType(fileName).startsWith('image/') || imageTypes.includes(getExtension(fileName));
+}
+
+function isZip(fileName: string) {
+  return zipTypes.includes(getExtension(fileName));
 }
 
 export async function scanFiles(item: FileSystemEntry, files: Promise<File | undefined>[]) {
@@ -191,32 +164,44 @@ async function processMokuroFile(file: File): Promise<{
   };
 }
 
-async function extractZipContents(
-  file: File,
-  parentPath: string
-): Promise<{ path: string; file: File }[]> {
-  const unzippedFiles = await unzipManga(file);
-  const extractedFiles: { path: string; file: File }[] = [];
-
-  for (const [name, file] of Object.entries(unzippedFiles)) {
-    const ext = getDetails(file).ext;
-    const relativePath = ext ? name.slice(0, -(ext.length + 1)) : name;
-    const path = `${parentPath}/${relativePath}`;
-    extractedFiles.push({ path, file });
-  }
-
-  return extractedFiles.sort((a, b) => a.path.localeCompare(b.path));
-}
-
 async function processZipFile(
-  file: { path: string; file: File },
-  fileStack: { path: string; file: File }[]
+  zipFile: { path: string; file: File },
+  volumesDataByPath: Record<string, Partial<VolumeData>>,
+  volumesByPath: Record<string, Partial<VolumeMetadata>>,
+  pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
-  const path = file.path;
 
-  // Extract and add all files to the stack
-  const extractedFiles = await extractZipContents(file.file, path);
-  fileStack.push(...extractedFiles.reverse());
+  getMimeType(zipFile.file.name);
+  // Process the ZIP file
+  for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
+    // Skip directories as we're only creating File objects
+    if (entry.directory) continue;
+
+    // Process file entries
+    if (entry.readable) {
+      // Convert readable stream to blob
+      const blob = await new Response(entry.readable).blob();
+
+      // Create a File object
+      const fileBlob = new File([blob], entry.filename, {
+        lastModified: entry.lastModified?.getTime() || Date.now()
+      });
+      const file = { path: entry.filename, file: fileBlob };
+
+      if (isMokuro(file.file.name)) {
+        await processMokuroWithPendingImages(
+          file,
+          volumesByPath,
+          volumesDataByPath,
+          pendingImagesByPath
+        );
+      } else if (isZip(file.file.name)) {
+        await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+      } else if (isImage(file.file.name)) {
+        await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+      }
+    }
+  }
 }
 
 async function processStandaloneImage(
@@ -229,7 +214,7 @@ async function processStandaloneImage(
 
   if (!path) return;
 
-  const relativePath = file.file.webkitRelativePath;
+  const relativePath = file.file.name;
   const vol = Object.keys(volumesDataByPath).find((key) => path.startsWith(key));
 
   if (!vol) {
@@ -266,7 +251,7 @@ async function processMokuroWithPendingImages(
   volumesDataByPath: Record<string, Partial<VolumeData>>,
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
-  const path = file.path;
+  const path = removeExtension(file.path);
   const { metadata, data, titleUuid } = await processMokuroFile(file.file);
   volumesByPath[path] = metadata;
 
@@ -314,22 +299,18 @@ export async function processFiles(_files: File[]) {
   // Process files using a stack
   while (fileStack.length > 0) {
     const file = fileStack.pop()!;
-    const { ext } = getDetails(file.file);
 
-    if (ext === 'mokuro') {
+    if (isMokuro(file.file.name)) {
       await processMokuroWithPendingImages(
         file,
         volumesByPath,
         volumesDataByPath,
         pendingImagesByPath
       );
-    } else if (ext && zipTypes.includes(ext)) {
-      await processZipFile(file, fileStack);
-    } else {
-      const mimeType = getMimeType(file.file.name);
-      if (imageTypes.includes(mimeType)) {
+    } else if (isZip(file.file.name)) {
+      await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+    } else if (isImage(file.file.name)) {
         await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-      }
     }
   }
 
