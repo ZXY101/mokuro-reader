@@ -2,8 +2,9 @@ import { db } from '$lib/catalog/db';
 import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
-import { BlobWriter, getMimeType, ZipReaderStream } from '@zip.js/zip.js';
+import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
+import { getAvailableMemory } from '$lib/util/memory';
 
 export * from './web-import';
 
@@ -45,27 +46,10 @@ async function getFile(fileEntry: FileSystemFileEntry) {
   }
 }
 
-function getAvailableMemory(): number {
-  // Modern approach: Using `navigator.deviceMemory` if available
-  if (navigator.deviceMemory) {
-    return navigator.deviceMemory * 1024; // Convert GB to MB
-  }
-
-  // Fallback 1: Use performance hints if needed (e.g., performance.now-based profiling)
-  if (navigator.hardwareConcurrency) {
-    const cores = navigator.hardwareConcurrency; // Number of CPU cores
-    return cores * 512; // Assume 512 MB per core
-  }
-
-  // Fallback 2: If everything fails, return a general error message
-  return 2048;
-}
-
-// Usage example:
-console.log(getAvailableMemory());
 function getExtension(fileName: string) {
   return fileName.split('.')?.pop()?.toLowerCase() ?? '';
 }
+
 function removeExtension(fileName: string) {
   const lastDotIndex = fileName.lastIndexOf('.');
   if (lastDotIndex > -1 && lastDotIndex > fileName.lastIndexOf('/')) {
@@ -189,7 +173,8 @@ async function processZipFile(
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
   // if the zip is bigger than half the availible memory, process it in two phases
-  const isZipTooBig = zipFile.file.size > getAvailableMemory() / 2;
+  const availableMemory = getAvailableMemory() * 0.9;
+  const isZipTooBig = zipFile.file.size > availableMemory;
   for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
     // Skip directories as we're only creating File objects
     if (entry.directory) continue;
