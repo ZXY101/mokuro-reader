@@ -188,7 +188,8 @@ async function processZipFile(
       const fileBlob = new File([blob], entry.filename, {
         lastModified: entry.lastModified?.getTime() || Date.now()
       });
-      const file = { path: entry.filename, file: fileBlob };
+      const path = zipFile.path ==='' ? entry.filename : `${zipFile.path}/${entry.filename}`;
+      const file = { path: path, file: fileBlob };
 
       if (isMokuro(file.file.name)) {
         await processMokuroWithPendingImages(
