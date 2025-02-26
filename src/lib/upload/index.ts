@@ -2,53 +2,14 @@ import { db } from '$lib/catalog/db';
 import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
-import { BlobWriter, getMimeType, Uint8ArrayReader, ZipReader } from '@zip.js/zip.js';
+import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
+import { getAvailableMemory } from '$lib/util/memory';
 
 export * from './web-import';
 
-const zipTypes = ['zip', 'cbz', 'ZIP', 'CBZ'];
+const zipTypes = ['zip', 'cbz'];
 const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
-
-export async function unzipManga(file: File) {
-  let zipReader;
-  if (file.size < 1024 * 1024 * 1024) {
-    const zipFileReader = new Uint8ArrayReader(new Uint8Array(await file.arrayBuffer()));
-    zipReader = new ZipReader(zipFileReader);
-  } else {
-    zipReader = new ZipReader(file.stream());
-  }
-  const entries = await zipReader.getEntries();
-  const unzippedFiles: Record<string, File> = {};
-
-  const sortedEntries = entries.sort((a, b) => {
-    return a.filename.localeCompare(b.filename, undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    });
-  });
-
-  for (const entry of sortedEntries) {
-    const mime = getMimeType(entry.filename);
-    const isMokuroFile = entry.filename.split('.').pop() === 'mokuro';
-
-    if (imageTypes.includes(mime) || isMokuroFile) {
-      const blob = await entry.getData?.(new BlobWriter(mime));
-      if (blob) {
-        const fileName = entry.filename.split('/').pop() || entry.filename;
-        const file = new File([blob], fileName, { type: mime });
-        if (!file.webkitRelativePath) {
-          Object.defineProperty(file, 'webkitRelativePath', {
-            value: entry.filename
-          });
-        }
-        unzippedFiles[entry.filename] = file;
-      }
-    }
-  }
-
-  return unzippedFiles;
-}
 
 function getDetails(file: File) {
   const { webkitRelativePath, name } = file;
@@ -83,6 +44,30 @@ async function getFile(fileEntry: FileSystemFileEntry) {
   } catch (err) {
     console.log(err);
   }
+}
+
+function getExtension(fileName: string) {
+  return fileName.split('.')?.pop()?.toLowerCase() ?? '';
+}
+
+function removeExtension(fileName: string) {
+  const lastDotIndex = fileName.lastIndexOf('.');
+  if (lastDotIndex > -1 && lastDotIndex > fileName.lastIndexOf('/')) {
+    return fileName.slice(0, lastDotIndex);
+  }
+  return fileName; // Return the original file path if no extension exists
+}
+
+function isMokuro(fileName: string) {
+  return getExtension(fileName) === 'mokuro';
+}
+
+function isImage(fileName: string) {
+  return getMimeType(fileName).startsWith('image/') || imageTypes.includes(getExtension(fileName));
+}
+
+function isZip(fileName: string) {
+  return zipTypes.includes(getExtension(fileName));
 }
 
 export async function scanFiles(item: FileSystemEntry, files: Promise<File | undefined>[]) {
@@ -193,32 +178,68 @@ async function processMokuroFile(file: File): Promise<{
   };
 }
 
-async function extractZipContents(
-  file: File,
-  parentPath: string
-): Promise<{ path: string; file: File }[]> {
-  const unzippedFiles = await unzipManga(file);
-  const extractedFiles: { path: string; file: File }[] = [];
+async function processZipFile(
+  zipFile: { path: string; file: File },
+  volumesDataByPath: Record<string, Partial<VolumeData>>,
+  volumesByPath: Record<string, Partial<VolumeMetadata>>,
+  pendingImagesByPath: Record<string, Record<string, File>>
+): Promise<void> {
+  // if the zip is bigger than half the availible memory, process it in two phases
+  const availableMemory = getAvailableMemory() * 0.9;
+  const isZipTooBig = zipFile.file.size > availableMemory;
+  for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
+    // Skip directories as we're only creating File objects
+    if (entry.directory) continue;
 
-  for (const [name, file] of Object.entries(unzippedFiles)) {
-    const ext = getDetails(file).ext;
-    const relativePath = ext ? name.slice(0, -(ext.length + 1)) : name;
-    const path = `${parentPath}/${relativePath}`;
-    extractedFiles.push({ path, file });
+    // Process file entries
+    if (entry.readable) {
+      // Convert readable stream to blob
+      const blob = await new Response(entry.readable).blob();
+
+      // Create a File object
+      const fileBlob = new File([blob], entry.filename, {
+        lastModified: entry.lastModified?.getTime() || Date.now()
+      });
+      const path = zipFile.path ==='' ? entry.filename : `${zipFile.path}/${entry.filename}`;
+      const file = { path: path, file: fileBlob };
+
+      if (isMokuro(file.file.name)) {
+        await processMokuroWithPendingImages(
+          file,
+          volumesByPath,
+          volumesDataByPath,
+          pendingImagesByPath
+        );
+      } else if (isZip(file.file.name)) {
+        await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+      } else if (!isZipTooBig && isImage(file.file.name)) {
+        await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+      }
+    }
   }
 
-  return extractedFiles.sort((a, b) => a.path.localeCompare(b.path));
-}
+  if (isZipTooBig) {
+    for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
+      // Skip directories as we're only creating File objects
+      if (entry.directory) continue;
 
-async function processZipFile(
-  file: { path: string; file: File },
-  fileStack: { path: string; file: File }[]
-): Promise<void> {
-  const path = file.path;
+      // Process file entries
+      if (entry.readable) {
+        // Convert readable stream to blob
+        const blob = await new Response(entry.readable).blob();
 
-  // Extract and add all files to the stack
-  const extractedFiles = await extractZipContents(file.file, path);
-  fileStack.push(...extractedFiles.reverse());
+        // Create a File object
+        const fileBlob = new File([blob], entry.filename, {
+          lastModified: entry.lastModified?.getTime() || Date.now()
+        });
+        const file = { path: entry.filename, file: fileBlob };
+
+        if (isImage(file.file.name)) {
+          await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+        }
+      }
+    }
+  }
 }
 
 async function processStandaloneImage(
@@ -231,7 +252,7 @@ async function processStandaloneImage(
 
   if (!path) return;
 
-  const relativePath = file.file.webkitRelativePath;
+  const relativePath = file.file.name;
   const vol = Object.keys(volumesDataByPath).find((key) => path.startsWith(key));
 
   if (!vol) {
@@ -268,7 +289,7 @@ async function processMokuroWithPendingImages(
   volumesDataByPath: Record<string, Partial<VolumeData>>,
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
-  const path = file.path;
+  const path = removeExtension(file.path);
   const { metadata, data, titleUuid } = await processMokuroFile(file.file);
   volumesByPath[path] = metadata;
 
@@ -316,22 +337,18 @@ export async function processFiles(_files: File[]) {
   // Process files using a stack
   while (fileStack.length > 0) {
     const file = fileStack.pop()!;
-    const { ext } = getDetails(file.file);
 
-    if (ext === 'mokuro') {
+    if (isMokuro(file.file.name)) {
       await processMokuroWithPendingImages(
         file,
         volumesByPath,
         volumesDataByPath,
         pendingImagesByPath
       );
-    } else if (ext && zipTypes.includes(ext)) {
-      await processZipFile(file, fileStack);
-    } else {
-      const mimeType = getMimeType(file.file.name);
-      if (imageTypes.includes(mimeType)) {
-        await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-      }
+    } else if (isZip(file.file.name)) {
+      await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+    } else if (isImage(file.file.name)) {
+      await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
     }
   }
 
