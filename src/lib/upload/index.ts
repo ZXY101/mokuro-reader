@@ -171,8 +171,6 @@ async function processZipFile(
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
 
-  getMimeType(zipFile.file.name);
-  // Process the ZIP file
   for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
     // Skip directories as we're only creating File objects
     if (entry.directory) continue;
@@ -197,7 +195,27 @@ async function processZipFile(
         );
       } else if (isZip(file.file.name)) {
         await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-      } else if (isImage(file.file.name)) {
+      }
+    }
+  }
+
+  // Process the ZIP file
+  for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
+    // Skip directories as we're only creating File objects
+    if (entry.directory) continue;
+
+    // Process file entries
+    if (entry.readable) {
+      // Convert readable stream to blob
+      const blob = await new Response(entry.readable).blob();
+
+      // Create a File object
+      const fileBlob = new File([blob], entry.filename, {
+        lastModified: entry.lastModified?.getTime() || Date.now()
+      });
+      const file = { path: entry.filename, file: fileBlob };
+
+      if (isImage(file.file.name)) {
         await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
       }
     }
