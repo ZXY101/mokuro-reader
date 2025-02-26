@@ -45,6 +45,24 @@ async function getFile(fileEntry: FileSystemFileEntry) {
   }
 }
 
+function getAvailableMemory(): number {
+  // Modern approach: Using `navigator.deviceMemory` if available
+  if (navigator.deviceMemory) {
+    return navigator.deviceMemory * 1024; // Convert GB to MB
+  }
+
+  // Fallback 1: Use performance hints if needed (e.g., performance.now-based profiling)
+  if (navigator.hardwareConcurrency) {
+    const cores = navigator.hardwareConcurrency; // Number of CPU cores
+    return cores * 512; // Assume 512 MB per core
+  }
+
+  // Fallback 2: If everything fails, return a general error message
+  return 2048;
+}
+
+// Usage example:
+console.log(getAvailableMemory());
 function getExtension(fileName: string) {
   return fileName.split('.')?.pop()?.toLowerCase() ?? '';
 }
@@ -170,7 +188,8 @@ async function processZipFile(
   volumesByPath: Record<string, Partial<VolumeMetadata>>,
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
-
+  // if the zip is bigger than half the availible memory, process it in two phases
+  const isZipTooBig = zipFile.file.size > getAvailableMemory() / 2;
   for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
     // Skip directories as we're only creating File objects
     if (entry.directory) continue;
@@ -195,28 +214,31 @@ async function processZipFile(
         );
       } else if (isZip(file.file.name)) {
         await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+      } else if (!isZipTooBig && isImage(file.file.name)) {
+        await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
       }
     }
   }
 
-  // Process the ZIP file
-  for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
-    // Skip directories as we're only creating File objects
-    if (entry.directory) continue;
+  if (isZipTooBig) {
+    for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
+      // Skip directories as we're only creating File objects
+      if (entry.directory) continue;
 
-    // Process file entries
-    if (entry.readable) {
-      // Convert readable stream to blob
-      const blob = await new Response(entry.readable).blob();
+      // Process file entries
+      if (entry.readable) {
+        // Convert readable stream to blob
+        const blob = await new Response(entry.readable).blob();
 
-      // Create a File object
-      const fileBlob = new File([blob], entry.filename, {
-        lastModified: entry.lastModified?.getTime() || Date.now()
-      });
-      const file = { path: entry.filename, file: fileBlob };
+        // Create a File object
+        const fileBlob = new File([blob], entry.filename, {
+          lastModified: entry.lastModified?.getTime() || Date.now()
+        });
+        const file = { path: entry.filename, file: fileBlob };
 
-      if (isImage(file.file.name)) {
-        await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+        if (isImage(file.file.name)) {
+          await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+        }
       }
     }
   }
@@ -328,7 +350,7 @@ export async function processFiles(_files: File[]) {
     } else if (isZip(file.file.name)) {
       await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
     } else if (isImage(file.file.name)) {
-        await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+      await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
     }
   }
 
