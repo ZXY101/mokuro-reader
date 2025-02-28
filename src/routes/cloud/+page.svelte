@@ -157,23 +157,30 @@
         apiKey: API_KEY,
         discoveryDocs: [DISCOVERY_DOC]
       });
+
+      // Initialize token client after gapi client is ready
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: connectDrive
+      });
+
+      // Try to restore the saved token only after gapi client is initialized
+      const savedToken = localStorage.getItem('gdrive_token');
+      if (savedToken) {
+        try {
+          // Set the token in gapi client
+          gapi.client.setToken({ access_token: savedToken });
+          accessToken = savedToken;
+          await connectDrive({ access_token: savedToken });
+        } catch (error) {
+          console.error('Failed to restore saved token:', error);
+          // Token will be cleared in connectDrive if there's an error
+        }
+      }
     });
 
     gapi.load('picker', () => {});
-
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: connectDrive
-    });
-
-    const savedToken = localStorage.getItem('gdrive_token');
-    if (savedToken) {
-      accessToken = savedToken;
-      connectDrive({ access_token: savedToken }).catch(() => {
-        // If there's an error, the token will be cleared in connectDrive
-      });
-    }
   });
 
   function createPicker() {
