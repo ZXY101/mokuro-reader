@@ -1,5 +1,8 @@
 <script lang="ts">
   import { processFiles } from '$lib/upload';
+
+  /** @type {string} */
+  export let accessToken = '';
   import Loader from '$lib/components/Loader.svelte';
   import { formatBytes, showSnackbar, uploadFile } from '$lib/util';
   import { Button, P, Progressbar } from 'flowbite-svelte';
@@ -22,8 +25,6 @@
   const type = 'application/json';
 
   let tokenClient: any;
-  let accessToken = '';
-
   let readerFolderId = '';
   let volumeDataId = '';
   let profilesId = '';
@@ -33,6 +34,10 @@
   let completed = 0;
   let totalSize = 0;
   $: progress = Math.floor((completed / totalSize) * 100).toString();
+
+  $: if (accessToken) {
+    localStorage.setItem('gdrive_token', accessToken);
+  }
 
   function xhrDownloadFileId(fileId: string) {
     return new Promise<Blob>((resolve, reject) => {
@@ -80,8 +85,10 @@
     });
   }
 
-  async function connectDrive(resp?: any) {
+  export async function connectDrive(resp?: any) {
     if (resp?.error !== undefined) {
+      localStorage.removeItem('gdrive_token');
+      accessToken = '';
       throw resp;
     }
 
@@ -132,10 +139,32 @@
   }
 
   function signIn() {
-    if (gapi.client.getToken() === null) {
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } else {
-      tokenClient.requestAccessToken({ prompt: '' });
+    // Always show the account picker to allow switching accounts
+    tokenClient.requestAccessToken({ prompt: 'consent' });
+  }
+
+  export function logout() {
+    // Remove token from localStorage
+    localStorage.removeItem('gdrive_token');
+    
+    // Clear the token from memory
+    accessToken = '';
+    
+    // Revoke the token with Google to ensure account picker shows up next time
+    if (gapi.client.getToken()) {
+      const token = gapi.client.getToken().access_token;
+      // Clear the token from gapi client
+      gapi.client.setToken(null);
+      
+      // Revoke the token with Google's OAuth service
+      fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }).catch(error => {
+        console.error('Error revoking token:', error);
+      });
     }
   }
 
@@ -145,15 +174,30 @@
         apiKey: API_KEY,
         discoveryDocs: [DISCOVERY_DOC]
       });
+
+      // Initialize token client after gapi client is ready
+      tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CLIENT_ID,
+        scope: SCOPES,
+        callback: connectDrive
+      });
+
+      // Try to restore the saved token only after gapi client is initialized
+      const savedToken = localStorage.getItem('gdrive_token');
+      if (savedToken) {
+        try {
+          // Set the token in gapi client
+          gapi.client.setToken({ access_token: savedToken });
+          accessToken = savedToken;
+          await connectDrive({ access_token: savedToken });
+        } catch (error) {
+          console.error('Failed to restore saved token:', error);
+          // Token will be cleared in connectDrive if there's an error
+        }
+      }
     });
 
     gapi.load('picker', () => {});
-
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: CLIENT_ID,
-      scope: SCOPES,
-      callback: connectDrive
-    });
   });
 
   function createPicker() {
@@ -304,7 +348,10 @@
     </Loader>
   {:else if accessToken}
     <div class="flex justify-between items-center gap-6 flex-col">
-      <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+      <div class="flex justify-between items-center w-full max-w-3xl">
+        <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+        <Button color="red" on:click={logout}>Log out</Button>
+      </div>
       <p class="text-center">
         Add your zipped manga files to the <span class="text-primary-700">{READER_FOLDER}</span> folder
         in your Google Drive.
