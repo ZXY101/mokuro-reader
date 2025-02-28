@@ -45,7 +45,7 @@ class VolumeData implements VolumeDataJSON {
     this.chars = typeof data.chars === 'number' ? data.chars : 0;
     this.completed = !!data.completed;
     this.timeReadInMinutes = typeof data.timeReadInMinutes === 'number' ? data.timeReadInMinutes : 0;
-    this.lastProgressUpdate = data.lastProgressUpdate || new Date(0).toISOString(); // Default to epoch time
+    this.lastProgressUpdate = data.lastProgressUpdate || new Date(this.progress).toISOString();
     this.settings = {
       singlePageView: typeof data.settings?.singlePageView === 'boolean' ? data.settings.singlePageView : volumeDefaults.singlePageView,
       rightToLeft: typeof data.settings?.rightToLeft === 'boolean' ? data.settings.rightToLeft : volumeDefaults.rightToLeft,
