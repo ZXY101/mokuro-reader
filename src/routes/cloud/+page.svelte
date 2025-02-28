@@ -11,6 +11,29 @@
   import { promptConfirmation } from '$lib/util';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { profiles, volumes } from '$lib/settings';
+  
+  // Helper function to handle errors consistently
+  function handleDriveError(error: any, context: string) {
+    loadingMessage = '';
+    
+    // Check if it's a connectivity issue
+    const errorMessage = error.toString().toLowerCase();
+    const isConnectivityError = 
+      errorMessage.includes('network') || 
+      errorMessage.includes('connection') || 
+      errorMessage.includes('offline') ||
+      errorMessage.includes('internet');
+    
+    if (!isConnectivityError) {
+      // Log the user out for non-connectivity errors
+      logout();
+      showSnackbar(`Error ${context}: ${error.message || 'Unknown error'}`);
+    } else {
+      showSnackbar('Connection error: Please check your internet connection');
+    }
+    
+    console.error(`${context} error:`, error);
+  }
 
   const CLIENT_ID = import.meta.env.VITE_GDRIVE_CLIENT_ID;
   const API_KEY = import.meta.env.VITE_GDRIVE_API_KEY;
@@ -96,46 +119,50 @@
     accessToken = resp?.access_token;
     loadingMessage = 'Connecting to drive';
 
-    const { result: readerFolderRes } = await gapi.client.drive.files.list({
-      q: `mimeType='application/vnd.google-apps.folder' and name='${READER_FOLDER}'`,
-      fields: 'files(id)'
-    });
-
-    if (readerFolderRes.files?.length === 0) {
-      const { result: createReaderFolderRes } = await gapi.client.drive.files.create({
-        resource: { mimeType: FOLDER_MIME_TYPE, name: READER_FOLDER },
-        fields: 'id'
+    try {
+      const { result: readerFolderRes } = await gapi.client.drive.files.list({
+        q: `mimeType='application/vnd.google-apps.folder' and name='${READER_FOLDER}'`,
+        fields: 'files(id)'
       });
 
-      readerFolderId = createReaderFolderRes.id || '';
-    } else {
-      const id = readerFolderRes.files?.[0]?.id || '';
+      if (readerFolderRes.files?.length === 0) {
+        const { result: createReaderFolderRes } = await gapi.client.drive.files.create({
+          resource: { mimeType: FOLDER_MIME_TYPE, name: READER_FOLDER },
+          fields: 'id'
+        });
 
-      readerFolderId = id || '';
-    }
+        readerFolderId = createReaderFolderRes.id || '';
+      } else {
+        const id = readerFolderRes.files?.[0]?.id || '';
 
-    const { result: volumeDataRes } = await gapi.client.drive.files.list({
-      q: `'${readerFolderId}' in parents and name='${VOLUME_DATA_FILE}'`,
-      fields: 'files(id, name)'
-    });
+        readerFolderId = id || '';
+      }
 
-    if (volumeDataRes.files?.length !== 0) {
-      volumeDataId = volumeDataRes.files?.[0].id || '';
-    }
+      const { result: volumeDataRes } = await gapi.client.drive.files.list({
+        q: `'${readerFolderId}' in parents and name='${VOLUME_DATA_FILE}'`,
+        fields: 'files(id, name)'
+      });
 
-    const { result: profilesRes } = await gapi.client.drive.files.list({
-      q: `'${readerFolderId}' in parents and name='${PROFILES_FILE}'`,
-      fields: 'files(id, name)'
-    });
+      if (volumeDataRes.files?.length !== 0) {
+        volumeDataId = volumeDataRes.files?.[0].id || '';
+      }
 
-    if (profilesRes.files?.length !== 0) {
-      profilesId = profilesRes.files?.[0].id || '';
-    }
+      const { result: profilesRes } = await gapi.client.drive.files.list({
+        q: `'${readerFolderId}' in parents and name='${PROFILES_FILE}'`,
+        fields: 'files(id, name)'
+      });
 
-    loadingMessage = '';
+      if (profilesRes.files?.length !== 0) {
+        profilesId = profilesRes.files?.[0].id || '';
+      }
 
-    if (accessToken) {
-      showSnackbar('Connected to Google Drive');
+      loadingMessage = '';
+
+      if (accessToken) {
+        showSnackbar('Connected to Google Drive');
+      }
+    } catch (error) {
+      handleDriveError(error, 'connecting to Google Drive');
     }
   }
 
@@ -171,30 +198,34 @@
 
   onMount(() => {
     gapi.load('client', async () => {
-      await gapi.client.init({
-        apiKey: API_KEY,
-        discoveryDocs: [DISCOVERY_DOC]
-      });
+      try {
+        await gapi.client.init({
+          apiKey: API_KEY,
+          discoveryDocs: [DISCOVERY_DOC]
+        });
 
-      // Initialize token client after gapi client is ready
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: SCOPES,
-        callback: connectDrive
-      });
+        // Initialize token client after gapi client is ready
+        tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: CLIENT_ID,
+          scope: SCOPES,
+          callback: connectDrive
+        });
 
-      // Try to restore the saved token only after gapi client is initialized
-      const savedToken = localStorage.getItem('gdrive_token');
-      if (savedToken) {
-        try {
-          // Set the token in gapi client
-          gapi.client.setToken({ access_token: savedToken });
-          accessToken = savedToken;
-          await connectDrive({ access_token: savedToken });
-        } catch (error) {
-          console.error('Failed to restore saved token:', error);
-          // Token will be cleared in connectDrive if there's an error
+        // Try to restore the saved token only after gapi client is initialized
+        const savedToken = localStorage.getItem('gdrive_token');
+        if (savedToken) {
+          try {
+            // Set the token in gapi client
+            gapi.client.setToken({ access_token: savedToken });
+            accessToken = savedToken;
+            await connectDrive({ access_token: savedToken });
+          } catch (error) {
+            console.error('Failed to restore saved token:', error);
+            // Token will be cleared in connectDrive if there's an error
+          }
         }
+      } catch (error) {
+        handleDriveError(error, 'initializing Google Drive');
       }
     });
 
@@ -234,9 +265,7 @@
         loadingMessage = '';
       }
     } catch (error) {
-      showSnackbar('Something went wrong');
-      loadingMessage = '';
-      console.error(error);
+      handleDriveError(error, 'processing file');
     }
   }
 
@@ -249,19 +278,23 @@
 
     loadingMessage = 'Uploading volume data';
 
-    const res = await uploadFile({
-      accessToken,
-      fileId: volumeDataId,
-      metadata,
-      localStorageId: 'volumes',
-      type
-    });
+    try {
+      const res = await uploadFile({
+        accessToken,
+        fileId: volumeDataId,
+        metadata,
+        localStorageId: 'volumes',
+        type
+      });
 
-    volumeDataId = res.id;
-    loadingMessage = '';
+      volumeDataId = res.id;
+      loadingMessage = '';
 
-    if (volumeDataId) {
-      showSnackbar('Volume data uploaded');
+      if (volumeDataId) {
+        showSnackbar('Volume data uploaded');
+      }
+    } catch (error) {
+      handleDriveError(error, 'uploading volume data');
     }
   }
 
@@ -274,62 +307,74 @@
 
     loadingMessage = 'Uploading profiles';
 
-    const res = await uploadFile({
-      accessToken,
-      fileId: profilesId,
-      metadata,
-      localStorageId: 'profiles',
-      type
-    });
+    try {
+      const res = await uploadFile({
+        accessToken,
+        fileId: profilesId,
+        metadata,
+        localStorageId: 'profiles',
+        type
+      });
 
-    profilesId = res.id;
-    loadingMessage = '';
+      profilesId = res.id;
+      loadingMessage = '';
 
-    if (profilesId) {
-      showSnackbar('Profiles uploaded');
+      if (profilesId) {
+        showSnackbar('Profiles uploaded');
+      }
+    } catch (error) {
+      handleDriveError(error, 'uploading profiles');
     }
   }
 
   async function onDownloadVolumeData() {
     loadingMessage = 'Downloading volume data';
 
-    const { body } = await gapi.client.drive.files.get({
-      fileId: volumeDataId,
-      alt: 'media'
-    });
+    try {
+      const { body } = await gapi.client.drive.files.get({
+        fileId: volumeDataId,
+        alt: 'media'
+      });
 
-    const downloaded = parseVolumesFromJson(body);
+      const downloaded = parseVolumesFromJson(body);
 
-    volumes.update((prev) => {
-      return {
-        ...prev,
-        ...downloaded
-      };
-    });
+      volumes.update((prev) => {
+        return {
+          ...prev,
+          ...downloaded
+        };
+      });
 
-    loadingMessage = '';
-    showSnackbar('Volume data downloaded');
+      loadingMessage = '';
+      showSnackbar('Volume data downloaded');
+    } catch (error) {
+      handleDriveError(error, 'downloading volume data');
+    }
   }
 
   async function onDownloadProfiles() {
     loadingMessage = 'Downloading profiles';
 
-    const { body } = await gapi.client.drive.files.get({
-      fileId: profilesId,
-      alt: 'media'
-    });
+    try {
+      const { body } = await gapi.client.drive.files.get({
+        fileId: profilesId,
+        alt: 'media'
+      });
 
-    const downloaded = JSON.parse(body);
+      const downloaded = JSON.parse(body);
 
-    profiles.update((prev) => {
-      return {
-        ...prev,
-        ...downloaded
-      };
-    });
+      profiles.update((prev) => {
+        return {
+          ...prev,
+          ...downloaded
+        };
+      });
 
-    loadingMessage = '';
-    showSnackbar('Profiles downloaded');
+      loadingMessage = '';
+      showSnackbar('Profiles downloaded');
+    } catch (error) {
+      handleDriveError(error, 'downloading profiles');
+    }
   }
 </script>
 
