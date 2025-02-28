@@ -82,17 +82,20 @@ type TotalStats = {
 type Volumes = Record<string, VolumeData>;
 
 
-const stored = browser ? window.localStorage.getItem('volumes') : undefined;
-const initial: Volumes = stored && browser ? (() => {
+export function parseVolumesFromJson(storedData: string): Volumes {
   try {
-    const parsed = JSON.parse(stored);
+    const parsed = JSON.parse(storedData);
     return Object.fromEntries(
-      Object.entries(parsed).map(([key, value]) => [key, new VolumeData(value as Partial<VolumeDataJSON>)])
+      Object.entries(parsed).map(([key, value]) => [key, VolumeData.fromJSON(value)])
     );
   } catch {
     return {};
   }
-})() : {};
+}
+
+const initial: Volumes = browser
+  ? parseVolumesFromJson(window.localStorage.getItem('volumes') || '{}')
+  : {};
 
 export const volumes = writable<Volumes>(initial);
 
