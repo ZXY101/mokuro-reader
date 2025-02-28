@@ -19,6 +19,7 @@ type VolumeDataJSON = {
   completed: boolean;
   timeReadInMinutes: number,
   settings: VolumeSettings;
+  lastProgressUpdate: string;
 }
 
 class VolumeData implements VolumeDataJSON {
@@ -27,6 +28,7 @@ class VolumeData implements VolumeDataJSON {
   completed: boolean;
   timeReadInMinutes: number;
   settings: VolumeSettings;
+  lastProgressUpdate: string;
 
   constructor(data: Partial<VolumeDataJSON> = {}) {
     const volumeDefaults = browser ? JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults ?? {
@@ -43,6 +45,7 @@ class VolumeData implements VolumeDataJSON {
     this.chars = typeof data.chars === 'number' ? data.chars : 0;
     this.completed = !!data.completed;
     this.timeReadInMinutes = typeof data.timeReadInMinutes === 'number' ? data.timeReadInMinutes : 0;
+    this.lastProgressUpdate = data.lastProgressUpdate || new Date(this.progress).toISOString();
     this.settings = {
       singlePageView: typeof data.settings?.singlePageView === 'boolean' ? data.settings.singlePageView : volumeDefaults.singlePageView,
       rightToLeft: typeof data.settings?.rightToLeft === 'boolean' ? data.settings.rightToLeft : volumeDefaults.rightToLeft,
@@ -67,6 +70,7 @@ class VolumeData implements VolumeDataJSON {
       chars: this.chars,
       completed: this.completed,
       timeReadInMinutes: this.timeReadInMinutes,
+      lastProgressUpdate: this.lastProgressUpdate,
       settings: { ...this.settings }
     };
   }
@@ -128,7 +132,8 @@ export function updateProgress(volume: string, progress: number, chars?: number,
         ...currentVolume,
         progress,
         chars: chars ?? currentVolume.chars,
-        completed
+        completed,
+        lastProgressUpdate: new Date().toISOString()
       })
     };
   });
@@ -245,8 +250,8 @@ export const mangaStats = derived([currentSeries, volumes], ([$titleVolumes, $vo
 
 export const volumeStats = derived([currentVolume, volumes], ([$currentVolume, $volumes]) => {
   if ($currentVolume && $volumes) {
-    const { chars, completed, timeReadInMinutes, progress } = $volumes[$currentVolume.volume_uuid];
-    return { chars, completed, timeReadInMinutes, progress };
+    const { chars, completed, timeReadInMinutes, progress, lastProgressUpdate } = $volumes[$currentVolume.volume_uuid];
+    return { chars, completed, timeReadInMinutes, progress, lastProgressUpdate };
   }
-  return { chars: 0, completed: 0, timeReadInMinutes: 0, progress: 0 };
+  return { chars: 0, completed: 0, timeReadInMinutes: 0, progress: 0, lastProgressUpdate: new Date(0).toISOString() };
 });
