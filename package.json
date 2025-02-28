@@ -53,6 +53,6 @@
     "svelte-easy-crop": "^2.0.1"
   },
   "engines": {
-    "node": ">=18.x"
+    "node": "18.x"
   }
 }
