@@ -1,5 +1,8 @@
 <script lang="ts">
   import { processFiles } from '$lib/upload';
+
+  /** @type {string} */
+  export let accessToken = '';
   import Loader from '$lib/components/Loader.svelte';
   import { formatBytes, showSnackbar, uploadFile } from '$lib/util';
   import { Button, P, Progressbar } from 'flowbite-svelte';
@@ -22,8 +25,6 @@
   const type = 'application/json';
 
   let tokenClient: any;
-  let accessToken = '';
-
   let readerFolderId = '';
   let volumeDataId = '';
   let profilesId = '';
@@ -33,6 +34,10 @@
   let completed = 0;
   let totalSize = 0;
   $: progress = Math.floor((completed / totalSize) * 100).toString();
+
+  $: if (accessToken) {
+    localStorage.setItem('gdrive_token', accessToken);
+  }
 
   function xhrDownloadFileId(fileId: string) {
     return new Promise<Blob>((resolve, reject) => {
@@ -80,8 +85,10 @@
     });
   }
 
-  async function connectDrive(resp?: any) {
+  export async function connectDrive(resp?: any) {
     if (resp?.error !== undefined) {
+      localStorage.removeItem('gdrive_token');
+      accessToken = '';
       throw resp;
     }
 
@@ -139,6 +146,11 @@
     }
   }
 
+  export function logout() {
+    localStorage.removeItem('gdrive_token');
+    accessToken = '';
+  }
+
   onMount(() => {
     gapi.load('client', async () => {
       await gapi.client.init({
@@ -154,6 +166,14 @@
       scope: SCOPES,
       callback: connectDrive
     });
+
+    const savedToken = localStorage.getItem('gdrive_token');
+    if (savedToken) {
+      accessToken = savedToken;
+      connectDrive({ access_token: savedToken }).catch(() => {
+        // If there's an error, the token will be cleared in connectDrive
+      });
+    }
   });
 
   function createPicker() {
@@ -304,7 +324,10 @@
     </Loader>
   {:else if accessToken}
     <div class="flex justify-between items-center gap-6 flex-col">
-      <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+      <div class="flex justify-between items-center w-full max-w-3xl">
+        <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+        <Button color="red" on:click={logout}>Log out</Button>
+      </div>
       <p class="text-center">
         Add your zipped manga files to the <span class="text-primary-700">{READER_FOLDER}</span> folder
         in your Google Drive.
