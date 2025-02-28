@@ -4,7 +4,6 @@ import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
-import { getAvailableMemory } from '$lib/util/memory';
 
 export * from './web-import';
 
@@ -14,12 +13,15 @@ const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
 function getDetails(file: File) {
   const { webkitRelativePath, name } = file;
   const split = name.split('.');
-  const ext = split.pop();
+  const ext = split.length > 1 ? split.pop() : '';
   const filename = split.join('.');
   let path = filename;
 
   if (webkitRelativePath) {
-    path = webkitRelativePath.split('.')[0];
+    path =
+      ext && ext.length > 0
+        ? webkitRelativePath.split('.').slice(0, -1).join('.')
+        : webkitRelativePath;
   }
 
   return {
@@ -119,6 +121,7 @@ async function uploadVolumeData(
       .first();
 
     if (!existingVolume) {
+      showSnackbar('adding ' + uploadMetadata.volume_title + ' to your catalog');
       // Sort files by name case-insensitively
       if (uploadData.files) {
         uploadData.files = Object.fromEntries(
@@ -178,15 +181,35 @@ async function processMokuroFile(file: File): Promise<{
   };
 }
 
+async function processFile(
+  file: { path: any; file: File },
+  volumesByPath: Record<string, Partial<VolumeMetadata>>,
+  volumesDataByPath: Record<string, Partial<VolumeData>>,
+  pendingImagesByPath: Record<string, Record<string, File>>
+) {
+  if (isMokuro(file.file.name)) {
+    await processMokuroWithPendingImages(
+      file,
+      volumesByPath,
+      volumesDataByPath,
+      pendingImagesByPath
+    );
+    showSnackbar('processed mokuro ' + file.file.name);
+  } else if (isZip(file.file.name)) {
+    showSnackbar('opening ' + file.file.name, 5000);
+    await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+  } else if (isImage(file.file.name)) {
+    await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
+    showSnackbar('processed image ' + file.file.name);
+  }
+}
+
 async function processZipFile(
   zipFile: { path: string; file: File },
   volumesDataByPath: Record<string, Partial<VolumeData>>,
   volumesByPath: Record<string, Partial<VolumeMetadata>>,
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
-  // if the zip is bigger than half the availible memory, process it in two phases
-  const availableMemory = getAvailableMemory() * 0.9;
-  const isZipTooBig = zipFile.file.size > availableMemory;
   for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
     // Skip directories as we're only creating File objects
     if (entry.directory) continue;
@@ -200,44 +223,10 @@ async function processZipFile(
       const fileBlob = new File([blob], entry.filename, {
         lastModified: entry.lastModified?.getTime() || Date.now()
       });
-      const path = zipFile.path ==='' ? entry.filename : `${zipFile.path}/${entry.filename}`;
+      const path = zipFile.path === '' ? entry.filename : `${zipFile.path}/${entry.filename}`;
       const file = { path: path, file: fileBlob };
 
-      if (isMokuro(file.file.name)) {
-        await processMokuroWithPendingImages(
-          file,
-          volumesByPath,
-          volumesDataByPath,
-          pendingImagesByPath
-        );
-      } else if (isZip(file.file.name)) {
-        await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-      } else if (!isZipTooBig && isImage(file.file.name)) {
-        await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-      }
-    }
-  }
-
-  if (isZipTooBig) {
-    for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
-      // Skip directories as we're only creating File objects
-      if (entry.directory) continue;
-
-      // Process file entries
-      if (entry.readable) {
-        // Convert readable stream to blob
-        const blob = await new Response(entry.readable).blob();
-
-        // Create a File object
-        const fileBlob = new File([blob], entry.filename, {
-          lastModified: entry.lastModified?.getTime() || Date.now()
-        });
-        const file = { path: entry.filename, file: fileBlob };
-
-        if (isImage(file.file.name)) {
-          await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-        }
-      }
+      await processFile(file, volumesByPath, volumesDataByPath, pendingImagesByPath);
     }
   }
 }
@@ -325,31 +314,18 @@ export async function processFiles(_files: File[]) {
   const pendingImagesByPath: Record<string, Record<string, File>> = {};
 
   // Create a stack of files to process
-  const fileStack: { path: string; file: File }[] = [];
-  _files.reverse().forEach((file) => {
-    const ext = getDetails(file).ext;
-    const path = ext
-      ? file.webkitRelativePath.slice(0, -(ext.length + 1))
-      : file.webkitRelativePath;
+  let fileStack: { path: string; file: File }[] = [];
+  _files.forEach((file) => {
+    const path = getDetails(file).path;
     fileStack.push({ path, file });
   });
 
-  // Process files using a stack
-  while (fileStack.length > 0) {
-    const file = fileStack.pop()!;
+  fileStack = fileStack.sort((a, b) =>
+    a.file.name.localeCompare(b.file.name, undefined, { numeric: true })
+  );
 
-    if (isMokuro(file.file.name)) {
-      await processMokuroWithPendingImages(
-        file,
-        volumesByPath,
-        volumesDataByPath,
-        pendingImagesByPath
-      );
-    } else if (isZip(file.file.name)) {
-      await processZipFile(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-    } else if (isImage(file.file.name)) {
-      await processStandaloneImage(file, volumesDataByPath, volumesByPath, pendingImagesByPath);
-    }
+  for (const file of fileStack) {
+    await processFile(file, volumesByPath, volumesDataByPath, pendingImagesByPath);
   }
 
   showSnackbar('Files uploaded successfully');
