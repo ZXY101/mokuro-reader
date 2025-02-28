@@ -139,16 +139,33 @@
   }
 
   function signIn() {
-    if (gapi.client.getToken() === null) {
-      tokenClient.requestAccessToken({ prompt: 'consent' });
-    } else {
-      tokenClient.requestAccessToken({ prompt: '' });
-    }
+    // Always show the account picker to allow switching accounts
+    tokenClient.requestAccessToken({ prompt: 'consent' });
   }
 
   export function logout() {
+    // Remove token from localStorage
     localStorage.removeItem('gdrive_token');
+    
+    // Clear the token from memory
     accessToken = '';
+    
+    // Revoke the token with Google to ensure account picker shows up next time
+    if (gapi.client.getToken()) {
+      const token = gapi.client.getToken().access_token;
+      // Clear the token from gapi client
+      gapi.client.setToken(null);
+      
+      // Revoke the token with Google's OAuth service
+      fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      }).catch(error => {
+        console.error('Error revoking token:', error);
+      });
+    }
   }
 
   onMount(() => {

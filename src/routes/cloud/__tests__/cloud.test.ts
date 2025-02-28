@@ -12,12 +12,19 @@ describe('Cloud Component', () => {
     };
     global.localStorage = localStorageMock;
 
+    // Mock fetch API
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({})
+    });
+
     // Mock gapi
     global.gapi = {
       load: vi.fn((api, callback) => callback()),
       client: {
         init: vi.fn(),
         getToken: vi.fn(),
+        setToken: vi.fn(),
         drive: {
           files: {
             list: vi.fn(),
@@ -103,7 +110,17 @@ describe('Cloud Component', () => {
     expect(getByRole('button', { name: 'Log out' })).toBeTruthy();
   });
 
-  it('should clear token on logout', async () => {
+  it('should clear token and revoke access on logout', async () => {
+    // Mock fetch for token revocation
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({})
+    });
+    
+    // Mock gapi.client.getToken to return a token
+    global.gapi.client.getToken = vi.fn().mockReturnValue({ access_token: 'test-token' });
+    global.gapi.client.setToken = vi.fn();
+    
     const mockToken = 'test-token';
     const { getByText } = render(Cloud, { props: { accessToken: mockToken } });
     await new Promise(resolve => setTimeout(resolve, 0));
@@ -112,7 +129,22 @@ describe('Cloud Component', () => {
     await fireEvent.click(logoutButton);
     await new Promise(resolve => setTimeout(resolve, 0));
 
+    // Check localStorage token removal
     expect(localStorage.removeItem).toHaveBeenCalledWith('gdrive_token');
+    
+    // Check token revocation with Google
+    expect(global.gapi.client.setToken).toHaveBeenCalledWith(null);
+    expect(global.fetch).toHaveBeenCalledWith(
+      'https://oauth2.googleapis.com/revoke?token=test-token',
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        }
+      })
+    );
+    
+    // Check UI shows login button
     expect(getByText('Connect to Google Drive')).toBeTruthy();
   });
 });
