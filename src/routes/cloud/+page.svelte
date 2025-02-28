@@ -1,5 +1,6 @@
 <script lang="ts">
   import { processFiles } from '$lib/upload';
+  import { parseVolumesFromJson } from '$lib/settings';
 
   /** @type {string} */
   export let accessToken = '';
@@ -297,7 +298,7 @@
       alt: 'media'
     });
 
-    const downloaded = JSON.parse(body);
+    const downloaded = parseVolumesFromJson(body);
 
     volumes.update((prev) => {
       return {
