@@ -509,7 +509,7 @@
             fileProgress[fileInfo.id] = data.loaded;
             updateOverallProgress();
           },
-          onComplete: async (data) => {
+          onComplete: async (data, releaseMemory) => {
             try {
               console.log(`Received complete message for ${data.fileName}`, {
                 dataType: typeof data.data,
@@ -546,6 +546,8 @@
               
               updateOverallProgress();
               checkAllComplete();
+            } finally {
+              releaseMemory()
             }
           },
           onError: (data) => {
