@@ -255,6 +255,7 @@
       .setMimeTypes('application/zip,application/x-zip-compressed,application/vnd.comicbook+zip,application/x-cbz')
       .setMode(google.picker.DocsViewMode.LIST)
       .setIncludeFolders(true)
+      .setSortOrder(google.picker.SortOrder.NAME)
       .setSelectFolderEnabled(true)
       .setParent(readerFolderId);
 
