@@ -57,7 +57,10 @@
 
   let completed = 0;
   let totalSize = 0;
+  let currentFileIndex = 0;
+  let totalFiles = 0;
   $: progress = Math.floor((completed / totalSize) * 100).toString();
+  $: fileProgress = Math.floor((currentFileIndex / totalFiles) * 100).toString();
 
   $: if (accessToken) {
     localStorage.setItem('gdrive_token', accessToken);
@@ -245,27 +248,115 @@
       .setAppId(CLIENT_ID)
       .setDeveloperKey(API_KEY)
       .enableFeature(google.picker.Feature.NAV_HIDDEN)
+      .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
       .setCallback(pickerCallback)
       .build();
     picker.setVisible(true);
   }
 
+  async function listFilesInFolder(folderId) {
+    try {
+      const { result } = await gapi.client.drive.files.list({
+        q: `'${folderId}' in parents and (mimeType='application/zip' or mimeType='application/x-zip-compressed' or mimeType='application/vnd.comicbook+zip' or mimeType='application/x-cbz' or mimeType='application/vnd.google-apps.folder')`,
+        fields: 'files(id, name, mimeType)',
+        pageSize: 1000
+      });
+      
+      return result.files || [];
+    } catch (error) {
+      handleDriveError(error, 'listing files in folder');
+      return [];
+    }
+  }
+
+  async function processFolder(folderId, folderName) {
+    const files = await listFilesInFolder(folderId);
+    const allFiles = [];
+    
+    // Process each file in the folder
+    for (const file of files) {
+      if (file.mimeType === 'application/vnd.google-apps.folder') {
+        // Recursively process subfolders
+        const subfolderFiles = await processFolder(file.id, file.name);
+        allFiles.push(...subfolderFiles);
+      } else {
+        // Add file to the list
+        allFiles.push(file);
+      }
+    }
+    
+    return allFiles;
+  }
+
+  async function downloadAndProcessFiles(fileList) {
+    const files = [];
+    totalFiles = fileList.length;
+    currentFileIndex = 0;
+    
+    for (const fileInfo of fileList) {
+      currentFileIndex++;
+      loadingMessage = `Downloading file ${currentFileIndex} of ${totalFiles}: ${fileInfo.name}`;
+      
+      try {
+        const blob = await xhrDownloadFileId(fileInfo.id);
+        const file = new File([blob], fileInfo.name);
+        files.push(file);
+      } catch (error) {
+        console.error(`Error downloading ${fileInfo.name}:`, error);
+        showSnackbar(`Failed to download ${fileInfo.name}`);
+      }
+    }
+    
+    if (files.length > 0) {
+      loadingMessage = 'Adding to catalog...';
+      await processFiles(files);
+    }
+    
+    loadingMessage = '';
+    currentFileIndex = 0;
+    totalFiles = 0;
+  }
+
   async function pickerCallback(data: google.picker.ResponseObject) {
     try {
       if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
-        loadingMessage = 'Downloading from drive...';
         const docs = data[google.picker.Response.DOCUMENTS];
-        const blob = await xhrDownloadFileId(docs[0].id);
-
-        loadingMessage = 'Adding to catalog...';
-
-        const file = new File([blob], docs[0].name);
-
-        await processFiles([file]);
-        loadingMessage = '';
+        
+        if (docs.length === 0) return;
+        
+        // Collect all files to download
+        let allFiles = [];
+        
+        // First, identify folders and regular files
+        for (const doc of docs) {
+          if (doc.mimeType === 'application/vnd.google-apps.folder') {
+            // Process folder to get all files inside
+            loadingMessage = `Scanning folder: ${doc.name}`;
+            const folderFiles = await processFolder(doc.id, doc.name);
+            allFiles.push(...folderFiles);
+          } else {
+            // Add regular file
+            allFiles.push(doc);
+          }
+        }
+        
+        // Filter out any non-zip files that might have been included in folders
+        allFiles = allFiles.filter(file => {
+          const mimeType = file.mimeType.toLowerCase();
+          return mimeType.includes('zip') || mimeType.includes('cbz');
+        });
+        
+        if (allFiles.length === 0) {
+          showSnackbar('No compatible files found');
+          loadingMessage = '';
+          return;
+        }
+        
+        // Download and process all files
+        await downloadAndProcessFiles(allFiles);
       }
     } catch (error) {
-      handleDriveError(error, 'processing file');
+      handleDriveError(error, 'processing files');
     }
   }
 
@@ -383,9 +474,17 @@
 </svelte:head>
 
 <div class="p-2 h-[90svh]">
-  {#if loadingMessage || completed > 0}
+  {#if loadingMessage || completed > 0 || totalFiles > 0}
     <Loader>
-      {#if completed > 0}
+      {#if totalFiles > 0 && currentFileIndex > 0}
+        <P>{loadingMessage}</P>
+        <P>File {currentFileIndex} of {totalFiles}</P>
+        <Progressbar progress={fileProgress} />
+        {#if completed > 0}
+          <P class="mt-2">{formatBytes(completed)} / {formatBytes(totalSize)}</P>
+          <Progressbar {progress} />
+        {/if}
+      {:else if completed > 0}
         <P>{formatBytes(completed)} / {formatBytes(totalSize)}</P>
         <Progressbar {progress} />
       {:else}
@@ -402,8 +501,11 @@
         Add your zipped manga files (ZIP or CBZ) to the <span class="text-primary-700">{READER_FOLDER}</span> folder
         in your Google Drive.
       </p>
+      <p class="text-center text-sm text-gray-500">
+        You can select multiple files or entire folders to download at once.
+      </p>
       <div class="flex flex-col gap-4 w-full max-w-3xl">
-        <Button color="blue" on:click={createPicker}>Download manga</Button>
+        <Button color="blue" on:click={createPicker}>Select files or folders to download</Button>
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
