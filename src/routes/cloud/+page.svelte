@@ -73,84 +73,52 @@
     }
   }
 
-  function xhrDownloadFileId(fileId: string, fileName: string) {
+  function xhrDownloadFileIdWithTracking(fileId: string, fileName: string, progressCallback: (loaded: number) => void) {
     return new Promise<Blob>(async (resolve, reject) => {
       const { access_token } = gapi.auth.getToken();
       const xhr = new XMLHttpRequest();
 
       // Get file size before starting download
       const size = await getFileSize(fileId);
-      
-      // Create a unique process ID for this download
-      const processId = `download-${fileId}`;
-      
-      // Add to progress tracker
-      progressTrackerStore.addProcess({
-        id: processId,
-        description: `Downloading: ${fileName}`,
-        progress: 0,
-        bytesLoaded: 0,
-        totalBytes: size
-      });
 
       xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       xhr.setRequestHeader('Authorization', `Bearer ${access_token}`);
       xhr.responseType = 'blob';
 
       xhr.onprogress = ({ loaded }) => {
-        // Update progress tracker
-        progressTrackerStore.updateProcess(processId, {
-          progress: (loaded / size) * 100,
-          bytesLoaded: loaded,
-          status: `${formatBytes(loaded)} of ${formatBytes(size)}`
-        });
+        // Call the progress callback with the loaded bytes
+        progressCallback(loaded);
       };
 
       xhr.onabort = (event) => {
         console.warn(`xhr ${fileId}: download aborted at ${event.loaded} of ${size}`);
-        progressTrackerStore.updateProcess(processId, {
-          status: 'Download aborted',
-          progress: 0
-        });
-        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         showSnackbar('Download failed');
         reject(new Error('Download aborted'));
       };
 
       xhr.onerror = (event) => {
         console.error(`xhr ${fileId}: download error at ${event.loaded} of ${size}`);
-        progressTrackerStore.updateProcess(processId, {
-          status: 'Download failed',
-          progress: 0
-        });
-        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         showSnackbar('Download failed');
         reject(new Error('Error downloading file'));
       };
 
       xhr.onload = () => {
-        progressTrackerStore.updateProcess(processId, {
-          progress: 100,
-          status: 'Download complete',
-          bytesLoaded: size
-        });
-        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         resolve(xhr.response);
       };
 
       xhr.ontimeout = (event) => {
         console.warn(`xhr ${fileId}: download timeout after ${event.loaded} of ${size}`);
-        progressTrackerStore.updateProcess(processId, {
-          status: 'Download timed out',
-          progress: 0
-        });
-        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         showSnackbar('Download timed out');
         reject(new Error('Timeout downloading file'));
       };
 
       xhr.send();
     });
+  }
+  
+  // Keep this function for backward compatibility with other parts of the code
+  function xhrDownloadFileId(fileId: string, fileName: string) {
+    return xhrDownloadFileIdWithTracking(fileId, fileName, () => {});
   }
 
   export async function connectDrive(resp?: any) {
@@ -374,56 +342,86 @@
   async function downloadAndProcessFiles(fileList: { id: string; name: string; mimeType: string }[]) {
     // Create a process for the overall download task
     const overallProcessId = 'overall-download-process';
-    progressTrackerStore.addProcess({
-      id: overallProcessId,
-      description: 'Downloading files',
-      status: `0 of ${fileList.length} files`,
-      progress: 0
-    });
     
     // Sort files by name
     const sortedFiles = fileList.sort((a, b) => a.name.localeCompare(b.name));
     
+    // First, get the total size of all files to download
+    let totalBytesToDownload = 0;
+    let fileSizes: number[] = [];
+    
+    progressTrackerStore.addProcess({
+      id: overallProcessId,
+      description: 'Downloading files',
+      status: `Calculating total size...`,
+      progress: 0,
+      bytesLoaded: 0,
+      totalBytes: 1 // Temporary value until we know the real total
+    });
+    
+    try {
+      for (let i = 0; i < sortedFiles.length; i++) {
+        const size = await getFileSize(sortedFiles[i].id);
+        fileSizes.push(size);
+        totalBytesToDownload += size;
+      }
+    } catch (error) {
+      console.error('Error calculating total size:', error);
+      // Continue anyway with what we have
+    }
+    
+    // Update the progress tracker with the total size
+    progressTrackerStore.updateProcess(overallProcessId, {
+      status: `File 1 of ${sortedFiles.length}: ${sortedFiles[0]?.name || ''}`,
+      totalBytes: totalBytesToDownload,
+      bytesLoaded: 0
+    });
+    
+    let totalBytesDownloaded = 0;
+    
     for (let i = 0; i < sortedFiles.length; i++) {
       const fileInfo = sortedFiles[i];
+      const fileSize = fileSizes[i] || 0;
       
       try {
-        // Update overall progress
+        // Update status to show current file
         progressTrackerStore.updateProcess(overallProcessId, {
-          status: `File ${i + 1} of ${sortedFiles.length}: ${fileInfo.name}`,
-          progress: (i / sortedFiles.length) * 100
+          status: `File ${i + 1} of ${sortedFiles.length}: ${fileInfo.name}`
         });
         
-        const blob = await xhrDownloadFileId(fileInfo.id, fileInfo.name);
+        // Set up a tracking function to update the overall progress
+        const trackProgress = (loaded: number) => {
+          const currentProgress = totalBytesDownloaded + loaded;
+          progressTrackerStore.updateProcess(overallProcessId, {
+            progress: (currentProgress / totalBytesToDownload) * 100,
+            bytesLoaded: currentProgress
+          });
+        };
+        
+        // Download the file with progress tracking
+        const blob = await xhrDownloadFileIdWithTracking(fileInfo.id, fileInfo.name, trackProgress);
         const file = new File([blob], fileInfo.name);
         
-        // Process the file
-        const processId = `process-${fileInfo.id}`;
-        progressTrackerStore.addProcess({
-          id: processId,
-          description: `Processing: ${fileInfo.name}`,
-          progress: 0,
-          status: 'Extracting files...'
-        });
+        // Update total bytes downloaded
+        totalBytesDownloaded += fileSize;
         
+        // Process the file without showing a separate progress entry
         await processFiles([file]);
         
-        // Update process status
-        progressTrackerStore.updateProcess(processId, {
-          progress: 100,
-          status: 'Processing complete'
-        });
-        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       } catch (error) {
         console.error(`Error downloading ${fileInfo.name}:`, error);
         showSnackbar(`Failed to download ${fileInfo.name}`);
+        
+        // Still update the progress to reflect we're moving to the next file
+        totalBytesDownloaded += fileSize;
       }
     }
     
     // Update and remove the overall process
     progressTrackerStore.updateProcess(overallProcessId, {
       status: 'All downloads complete',
-      progress: 100
+      progress: 100,
+      bytesLoaded: totalBytesToDownload
     });
     setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
   }
