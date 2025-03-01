@@ -4,10 +4,8 @@
 
   /** @type {string} */
   export let accessToken = '';
-  import Loader from '$lib/components/Loader.svelte';
-  import ProgressTracker from '$lib/components/ProgressTracker.svelte';
   import { formatBytes, showSnackbar, uploadFile } from '$lib/util';
-  import { Button, P, Progressbar } from 'flowbite-svelte';
+  import { Button } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { promptConfirmation } from '$lib/util';
   import { GoogleSolid } from 'flowbite-svelte-icons';
@@ -325,7 +323,15 @@
     const allFiles = [];
     
     // Process each file in the folder
-    for (const file of files) {
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Update the scan process with subfolder information
+      const scanProcessId = 'folder-scan-process';
+      progressTrackerStore.updateProcess(scanProcessId, {
+        status: `Scanning ${folderName} (${i+1}/${files.length}): ${file.name}`
+      });
+      
       if (file.mimeType === 'application/vnd.google-apps.folder') {
         // Recursively process subfolders
         const subfolderFiles = await processFolder(file.id, file.name);
@@ -433,36 +439,70 @@
         
         if (docs.length === 0) return;
         
+        // Create a process for folder scanning
+        const scanProcessId = 'folder-scan-process';
+        progressTrackerStore.addProcess({
+          id: scanProcessId,
+          description: 'Scanning folders',
+          progress: 0,
+          status: 'Starting scan...'
+        });
+        
         // Collect all files to download
         let allFiles = [];
         
-        // First, identify folders and regular files
-        for (const doc of docs) {
-          if (doc.mimeType === 'application/vnd.google-apps.folder') {
-            // Process folder to get all files inside
-            loadingMessage = `Scanning folder: ${doc.name}`;
-            const folderFiles = await processFolder(doc.id, doc.name);
-            allFiles.push(...folderFiles);
-          } else {
-            // Add regular file
-            allFiles.push(doc);
+        try {
+          // First, identify folders and regular files
+          for (let i = 0; i < docs.length; i++) {
+            const doc = docs[i];
+            
+            // Update progress based on how many items we've processed
+            const scanProgress = (i / docs.length) * 100;
+            
+            if (doc.mimeType === 'application/vnd.google-apps.folder') {
+              // Process folder to get all files inside
+              progressTrackerStore.updateProcess(scanProcessId, {
+                progress: scanProgress,
+                status: `Scanning folder: ${doc.name}`
+              });
+              
+              const folderFiles = await processFolder(doc.id, doc.name);
+              allFiles.push(...folderFiles);
+            } else {
+              // Add regular file
+              allFiles.push(doc);
+            }
           }
+          
+          // Mark scan as complete
+          progressTrackerStore.updateProcess(scanProcessId, {
+            progress: 100,
+            status: 'Scan complete'
+          });
+          setTimeout(() => progressTrackerStore.removeProcess(scanProcessId), 1000);
+          
+          // Filter out any non-zip files that might have been included in folders
+          allFiles = allFiles.filter(file => {
+            const mimeType = file.mimeType.toLowerCase();
+            return mimeType.includes('zip') || mimeType.includes('cbz');
+          });
+          
+          if (allFiles.length === 0) {
+            showSnackbar('No compatible files found');
+            return;
+          }
+          
+          // Download and process all files
+          await downloadAndProcessFiles(allFiles);
+        } catch (error) {
+          // Update the progress tracker to show the error
+          progressTrackerStore.updateProcess(scanProcessId, {
+            progress: 0,
+            status: 'Scan failed'
+          });
+          setTimeout(() => progressTrackerStore.removeProcess(scanProcessId), 3000);
+          throw error; // Re-throw to be caught by the outer catch block
         }
-        
-        // Filter out any non-zip files that might have been included in folders
-        allFiles = allFiles.filter(file => {
-          const mimeType = file.mimeType.toLowerCase();
-          return mimeType.includes('zip') || mimeType.includes('cbz');
-        });
-        
-        if (allFiles.length === 0) {
-          showSnackbar('No compatible files found');
-          loadingMessage = '';
-          return;
-        }
-        
-        // Download and process all files
-        await downloadAndProcessFiles(allFiles);
       }
     } catch (error) {
       handleDriveError(error, 'processing files');
