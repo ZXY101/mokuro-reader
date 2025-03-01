@@ -345,13 +345,13 @@
     return allFiles;
   }
 
-  async function downloadAndProcessFiles(fileList: { id: string; name: string; mimeType: string }[]) {
+  async function downloadAndProcessFiles(fileList: { id: string; name: string; mimeType: string }[], existingProcessId?: string) {
     // Import the worker pool dynamically
     const { WorkerPool } = await import('$lib/util/worker-pool');
     
-    // Create a unique ID for this download batch
-    const batchId = `download-batch-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-    const overallProcessId = batchId;
+    // Use the existing processId if provided, otherwise create a new one
+    const overallProcessId = existingProcessId || 
+      `download-batch-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
     
     // Sort files by name
     const sortedFiles = fileList.sort((a, b) => a.name.localeCompare(b.name));
@@ -360,14 +360,24 @@
     let totalBytesToDownload = 0;
     let fileSizes: { [fileId: string]: number } = {};
     
-    progressTrackerStore.addProcess({
-      id: overallProcessId,
-      description: `Downloading ${sortedFiles.length} files`,
-      status: `Calculating total size...`,
-      progress: 0,
-      bytesLoaded: 0,
-      totalBytes: 1 // Temporary value until we know the real total
-    });
+    // If we're using a new process ID (not continuing from scanning), create a new tracker
+    if (!existingProcessId) {
+      progressTrackerStore.addProcess({
+        id: overallProcessId,
+        description: `Downloading ${sortedFiles.length} files`,
+        status: `Calculating total size...`,
+        progress: 0,
+        bytesLoaded: 0,
+        totalBytes: 1 // Temporary value until we know the real total
+      });
+    } else {
+      // Update the existing tracker
+      progressTrackerStore.updateProcess(overallProcessId, {
+        status: `Calculating total size...`,
+        // Keep the progress at 30% (after scanning phase)
+        progress: 30
+      });
+    }
     
     try {
       // Get file sizes in parallel using Promise.all
@@ -414,9 +424,21 @@
         totalLoaded += fileProgress[fileId];
       }
       
+      // Calculate progress percentage
+      let progressPercentage;
+      
+      if (existingProcessId) {
+        // If we're using an existing process ID, scale the download progress to 30-100%
+        // Download phase is 30-100% of the total progress
+        progressPercentage = 30 + ((totalLoaded / totalBytesToDownload) * 70);
+      } else {
+        // If this is a standalone download, use the full 0-100% range
+        progressPercentage = (totalLoaded / totalBytesToDownload) * 100;
+      }
+      
       // Update the progress tracker
       progressTrackerStore.updateProcess(overallProcessId, {
-        progress: (totalLoaded / totalBytesToDownload) * 100,
+        progress: progressPercentage,
         bytesLoaded: totalLoaded,
         status: `Downloaded ${completedFiles} of ${sortedFiles.length} files (${failedFiles} failed)`
       });
@@ -430,14 +452,18 @@
           // All files have been processed
           workerPool.terminate();
           
-          // Update and remove the overall process
+          // Update the process to show completion
           progressTrackerStore.updateProcess(overallProcessId, {
             status: `All downloads complete (${failedFiles} failed)`,
             progress: 100,
             bytesLoaded: totalBytesToDownload
           });
           
-          setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
+          // Only auto-remove the tracker if it's not part of a larger process
+          if (!existingProcessId) {
+            setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
+          }
+          
           resolve();
         }
       };
@@ -520,7 +546,12 @@
           status: 'No files to download',
           progress: 100
         });
-        setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
+        
+        // Only auto-remove the tracker if it's not part of a larger process
+        if (!existingProcessId) {
+          setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
+        }
+        
         resolve();
       }
     });
@@ -533,13 +564,13 @@
         
         if (docs.length === 0) return;
         
-        // Create a unique ID for this scan process
-        const scanId = `folder-scan-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-        const scanProcessId = scanId;
+        // Create a unique ID for this entire process (scanning + downloading)
+        const processId = `download-process-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
         
+        // Create a single progress tracker for the entire process
         progressTrackerStore.addProcess({
-          id: scanProcessId,
-          description: `Scanning ${docs.length} items`,
+          id: processId,
+          description: `Processing ${docs.length} items`,
           progress: 0,
           status: 'Starting scan...'
         });
@@ -553,30 +584,24 @@
             const doc = docs[i];
             
             // Update progress based on how many items we've processed
-            const scanProgress = (i / docs.length) * 100;
+            // Scanning phase is 0-30% of the total progress
+            const scanProgress = (i / docs.length) * 30;
             
             if (doc.mimeType === 'application/vnd.google-apps.folder') {
               // Process folder to get all files inside
-              progressTrackerStore.updateProcess(scanProcessId, {
+              progressTrackerStore.updateProcess(processId, {
                 progress: scanProgress,
                 status: `Scanning folder: ${doc.name}`
               });
               
-              // Pass the scanProcessId to processFolder
-              const folderFiles = await processFolder(doc.id, doc.name, scanProcessId);
+              // Pass the processId to processFolder
+              const folderFiles = await processFolder(doc.id, doc.name, processId);
               allFiles.push(...folderFiles);
             } else {
               // Add regular file
               allFiles.push(doc);
             }
           }
-          
-          // Mark scan as complete
-          progressTrackerStore.updateProcess(scanProcessId, {
-            progress: 100,
-            status: 'Scan complete'
-          });
-          setTimeout(() => progressTrackerStore.removeProcess(scanProcessId), 1000);
           
           // Filter out any non-zip files that might have been included in folders
           allFiles = allFiles.filter(file => {
@@ -585,19 +610,33 @@
           });
           
           if (allFiles.length === 0) {
+            progressTrackerStore.updateProcess(processId, {
+              progress: 100,
+              status: 'No compatible files found'
+            });
+            setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
             showSnackbar('No compatible files found');
             return;
           }
           
-          // Download and process all files
-          await downloadAndProcessFiles(allFiles);
+          // Update progress to show we're moving to download phase
+          progressTrackerStore.updateProcess(processId, {
+            progress: 30,
+            status: `Found ${allFiles.length} files to download`
+          });
+          
+          // Download and process all files - pass the existing processId
+          await downloadAndProcessFiles(allFiles, processId);
+          
+          // After the entire process is complete, set a timeout to remove the progress tracker
+          setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         } catch (error) {
           // Update the progress tracker to show the error
-          progressTrackerStore.updateProcess(scanProcessId, {
+          progressTrackerStore.updateProcess(processId, {
             progress: 0,
-            status: 'Scan failed'
+            status: 'Process failed'
           });
-          setTimeout(() => progressTrackerStore.removeProcess(scanProcessId), 3000);
+          setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
           throw error; // Re-throw to be caught by the outer catch block
         }
       }
