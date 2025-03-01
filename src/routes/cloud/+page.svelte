@@ -346,6 +346,9 @@
   }
 
   async function downloadAndProcessFiles(fileList: { id: string; name: string; mimeType: string }[]) {
+    // Import the worker pool dynamically
+    const { WorkerPool } = await import('$lib/util/worker-pool');
+    
     // Create a process for the overall download task
     const overallProcessId = 'overall-download-process';
     
@@ -354,7 +357,7 @@
     
     // First, get the total size of all files to download
     let totalBytesToDownload = 0;
-    let fileSizes: number[] = [];
+    let fileSizes: { [fileId: string]: number } = {};
     
     progressTrackerStore.addProcess({
       id: overallProcessId,
@@ -366,11 +369,16 @@
     });
     
     try {
-      for (let i = 0; i < sortedFiles.length; i++) {
-        const size = await getFileSize(sortedFiles[i].id);
-        fileSizes.push(size);
+      // Get file sizes in parallel using Promise.all
+      const sizePromises = sortedFiles.map(file => getFileSize(file.id));
+      const sizes = await Promise.all(sizePromises);
+      
+      // Store sizes in the map and calculate total
+      sortedFiles.forEach((file, index) => {
+        const size = sizes[index];
+        fileSizes[file.id] = size;
         totalBytesToDownload += size;
-      }
+      });
     } catch (error) {
       console.error('Error calculating total size:', error);
       // Continue anyway with what we have
@@ -378,58 +386,130 @@
     
     // Update the progress tracker with the total size
     progressTrackerStore.updateProcess(overallProcessId, {
-      status: `File 1 of ${sortedFiles.length}: ${sortedFiles[0]?.name || ''}`,
+      status: `Preparing to download ${sortedFiles.length} files`,
       totalBytes: totalBytesToDownload,
       bytesLoaded: 0
     });
     
-    let totalBytesDownloaded = 0;
+    // Create a worker pool for parallel downloads
+    // Use navigator.hardwareConcurrency to determine optimal number of workers
+    // but limit to a reasonable number to avoid overwhelming the browser
+    const maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
+    const workerPool = new WorkerPool(undefined, maxWorkers);
     
-    for (let i = 0; i < sortedFiles.length; i++) {
-      const fileInfo = sortedFiles[i];
-      const fileSize = fileSizes[i] || 0;
+    // Track download progress
+    const fileProgress: { [fileId: string]: number } = {};
+    let completedFiles = 0;
+    let failedFiles = 0;
+    const processedFiles: { [fileId: string]: boolean } = {};
+    
+    // Function to update overall progress
+    const updateOverallProgress = () => {
+      let totalLoaded = 0;
       
-      try {
-        // Update status to show current file
-        progressTrackerStore.updateProcess(overallProcessId, {
-          status: `File ${i + 1} of ${sortedFiles.length}: ${fileInfo.name}`
-        });
-        
-        // Set up a tracking function to update the overall progress
-        const trackProgress = (loaded: number) => {
-          const currentProgress = totalBytesDownloaded + loaded;
-          progressTrackerStore.updateProcess(overallProcessId, {
-            progress: (currentProgress / totalBytesToDownload) * 100,
-            bytesLoaded: currentProgress
-          });
-        };
-        
-        // Download the file with progress tracking
-        const blob = await xhrDownloadFileIdWithTracking(fileInfo.id, fileInfo.name, trackProgress);
-        const file = new File([blob], fileInfo.name);
-        
-        // Update total bytes downloaded
-        totalBytesDownloaded += fileSize;
-        
-        // Process the file without showing a separate progress entry
-        await processFiles([file]);
-        
-      } catch (error) {
-        console.error(`Error downloading ${fileInfo.name}:`, error);
-        showSnackbar(`Failed to download ${fileInfo.name}`);
-        
-        // Still update the progress to reflect we're moving to the next file
-        totalBytesDownloaded += fileSize;
+      // Sum up progress from all files
+      for (const fileId in fileProgress) {
+        totalLoaded += fileProgress[fileId];
       }
-    }
+      
+      // Update the progress tracker
+      progressTrackerStore.updateProcess(overallProcessId, {
+        progress: (totalLoaded / totalBytesToDownload) * 100,
+        bytesLoaded: totalLoaded,
+        status: `Downloaded ${completedFiles} of ${sortedFiles.length} files (${failedFiles} failed)`
+      });
+    };
     
-    // Update and remove the overall process
-    progressTrackerStore.updateProcess(overallProcessId, {
-      status: 'All downloads complete',
-      progress: 100,
-      bytesLoaded: totalBytesToDownload
+    // Create a promise that resolves when all downloads are complete
+    return new Promise<void>((resolve) => {
+      // Function to check if all downloads are complete
+      const checkAllComplete = () => {
+        if (completedFiles + failedFiles === sortedFiles.length) {
+          // All files have been processed
+          workerPool.terminate();
+          
+          // Update and remove the overall process
+          progressTrackerStore.updateProcess(overallProcessId, {
+            status: `All downloads complete (${failedFiles} failed)`,
+            progress: 100,
+            bytesLoaded: totalBytesToDownload
+          });
+          
+          setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
+          resolve();
+        }
+      };
+      
+      // Add each file to the worker pool
+      for (const fileInfo of sortedFiles) {
+        // Initialize progress for this file
+        fileProgress[fileInfo.id] = 0;
+        
+        // Create a task for the worker pool
+        workerPool.addTask({
+          id: fileInfo.id,
+          data: {
+            fileId: fileInfo.id,
+            fileName: fileInfo.name,
+            accessToken
+          },
+          onProgress: (data) => {
+            // Update progress for this file
+            fileProgress[fileInfo.id] = data.loaded;
+            updateOverallProgress();
+          },
+          onComplete: async (data) => {
+            try {
+              // Create a File object from the blob
+              const file = new File([data.blob], data.fileName);
+              
+              // Process the file
+              await processFiles([file]);
+              
+              // Mark as completed
+              completedFiles++;
+              fileProgress[fileInfo.id] = fileSizes[fileInfo.id] || 0;
+              processedFiles[fileInfo.id] = true;
+              
+              updateOverallProgress();
+              checkAllComplete();
+            } catch (error) {
+              console.error(`Error processing ${data.fileName}:`, error);
+              showSnackbar(`Failed to process ${data.fileName}`);
+              
+              // Mark as failed
+              failedFiles++;
+              processedFiles[fileInfo.id] = true;
+              
+              updateOverallProgress();
+              checkAllComplete();
+            }
+          },
+          onError: (data) => {
+            console.error(`Error downloading ${fileInfo.name}:`, data.error);
+            showSnackbar(`Failed to download ${fileInfo.name}`);
+            
+            // Mark as failed but count the size as downloaded for progress calculation
+            failedFiles++;
+            fileProgress[fileInfo.id] = fileSizes[fileInfo.id] || 0;
+            processedFiles[fileInfo.id] = true;
+            
+            updateOverallProgress();
+            checkAllComplete();
+          }
+        });
+      }
+      
+      // If there are no files, resolve immediately
+      if (sortedFiles.length === 0) {
+        progressTrackerStore.updateProcess(overallProcessId, {
+          status: 'No files to download',
+          progress: 100
+        });
+        setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
+        resolve();
+      }
     });
-    setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
   }
 
   async function pickerCallback(data: google.picker.ResponseObject) {
