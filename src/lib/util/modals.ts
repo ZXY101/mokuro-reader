@@ -16,3 +16,18 @@ export function promptConfirmation(message: string, onConfirm?: () => void, onCa
     onCancel
   });
 }
+
+type ExtractionModal = {
+  open: boolean;
+  onConfirm?: (asCbz: boolean, individualVolumes: boolean) => void;
+  onCancel?: () => void;
+};
+export const extractionModalStore = writable<ExtractionModal | undefined>(undefined);
+
+export function promptExtraction(onConfirm?: (asCbz: boolean, individualVolumes: boolean) => void, onCancel?: () => void) {
+  extractionModalStore.set({
+    open: true,
+    onConfirm,
+    onCancel
+  });
+}
