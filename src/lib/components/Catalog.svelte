@@ -4,15 +4,44 @@
   import CatalogItem from './CatalogItem.svelte';
   import Loader from './Loader.svelte';
   import { GridOutline, SortOutline, ListOutline } from 'flowbite-svelte-icons';
-  import { miscSettings, updateMiscSetting } from '$lib/settings';
+  import { miscSettings, updateMiscSetting, volumes } from '$lib/settings';
   import CatalogListItem from './CatalogListItem.svelte';
   import { isUpgrading } from '$lib/catalog/db';
 
   $: sortedCatalog = $catalog.sort((a, b) => {
       if ($miscSettings.gallerySorting === 'ASC') {
-        return a.title.localeCompare(b.title);
+        return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
+      } else if ($miscSettings.gallerySorting === 'DESC') {
+        return b.title.localeCompare(a.title, undefined, { numeric: true, sensitivity: 'base' });
       } else {
-        return b.title.localeCompare(a.title);
+        // SMART sorting
+        // Check if series are completed
+        const aVolumes = a.volumes.map(vol => vol.volume_uuid);
+        const bVolumes = b.volumes.map(vol => vol.volume_uuid);
+        
+        const aCompleted = aVolumes.every(volId => $volumes[volId]?.completed);
+        const bCompleted = bVolumes.every(volId => $volumes[volId]?.completed);
+        
+        // If completion status differs, completed series go to the end
+        if (aCompleted !== bCompleted) {
+          return aCompleted ? 1 : -1;
+        }
+        
+        // If both have the same completion status, sort by last updated date
+        const aLastUpdated = Math.max(...aVolumes.map(volId => 
+          new Date($volumes[volId]?.lastProgressUpdate || 0).getTime()
+        ));
+        const bLastUpdated = Math.max(...bVolumes.map(volId => 
+          new Date($volumes[volId]?.lastProgressUpdate || 0).getTime()
+        ));
+        
+        if (aLastUpdated !== bLastUpdated) {
+          // Most recently read first
+          return bLastUpdated - aLastUpdated;
+        }
+        
+        // If all else is equal, use natural sorting on title
+        return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
       }
     })
     .filter((item) => {
@@ -30,10 +59,12 @@
   }
 
   function onOrder() {
-    if ($miscSettings.gallerySorting === 'ASC') {
+    if ($miscSettings.gallerySorting === 'SMART') {
+      updateMiscSetting('gallerySorting', 'ASC');
+    } else if ($miscSettings.gallerySorting === 'ASC') {
       updateMiscSetting('gallerySorting', 'DESC');
     } else {
-      updateMiscSetting('gallerySorting', 'ASC');
+      updateMiscSetting('gallerySorting', 'SMART');
     }
   }
 </script>
@@ -52,6 +83,15 @@
         </Button>
         <Button size="sm" color="alternative" on:click={onOrder}>
           <SortOutline />
+          <span class="ml-1 text-xs">
+            {#if $miscSettings.gallerySorting === 'ASC'}
+              A-Z
+            {:else if $miscSettings.gallerySorting === 'DESC'}
+              Z-A
+            {:else}
+              Smart
+            {/if}
+          </span>
         </Button>
       </div>
       {#if search && sortedCatalog.length === 0}

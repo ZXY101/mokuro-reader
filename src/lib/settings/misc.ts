@@ -3,14 +3,14 @@ import { writable } from 'svelte/store';
 
 export type MiscSettings = {
   galleryLayout: 'grid' | 'list';
-  gallerySorting: 'ASC' | 'DESC';
+  gallerySorting: 'ASC' | 'DESC' | 'SMART';
 };
 
 export type MiscSettingsKey = keyof MiscSettings;
 
 const defaultSettings: MiscSettings = {
   galleryLayout: 'grid',
-  gallerySorting: 'ASC',
+  gallerySorting: 'SMART',
 }
 
 const stored = browser ? window.localStorage.getItem('miscSettings') : undefined;

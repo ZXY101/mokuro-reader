@@ -25,6 +25,18 @@ Once installed and your manga is processed, import your manga into the reader.
 
 ## Development:
 
+### Requirements
+- **Node.js version 18.x** (this project is not compatible with Node.js 19+ or earlier versions)
+- npm
+
+You can use [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions:
+```bash
+# Install Node.js 18
+nvm install 18
+# Use Node.js 18
+nvm use 18
+```
+
 Clone the repo:
 ```bash
 git clone https://github.com/ZXY101/mokuro-reader
