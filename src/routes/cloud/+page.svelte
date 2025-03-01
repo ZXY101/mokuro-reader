@@ -526,7 +526,7 @@
         You can select multiple ZIP/CBZ files or entire folders at once.
       </p>
       <div class="flex flex-col gap-4 w-full max-w-3xl">
-        <Button color="blue" on:click={createPicker}>Select files or folders</Button>
+        <Button color="blue" on:click={createPicker}>Download Manga</Button>
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
