@@ -66,46 +66,60 @@
     localStorage.setItem('gdrive_token', accessToken);
   }
 
+  async function getFileSize(fileId: string): Promise<number> {
+    try {
+      const { result } = await gapi.client.drive.files.get({
+        fileId: fileId,
+        fields: 'size'
+      });
+      return parseInt(result.size || '0', 10);
+    } catch (error) {
+      console.error('Error getting file size:', error);
+      return 0;
+    }
+  }
+
   function xhrDownloadFileId(fileId: string) {
-    return new Promise<Blob>((resolve, reject) => {
+    return new Promise<Blob>(async (resolve, reject) => {
       const { access_token } = gapi.auth.getToken();
       const xhr = new XMLHttpRequest();
 
+      // Get file size before starting download
+      const size = await getFileSize(fileId);
       completed = 0;
-      totalSize = 0;
+      totalSize = size;
 
       xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       xhr.setRequestHeader('Authorization', `Bearer ${access_token}`);
       xhr.responseType = 'blob';
 
-      xhr.onprogress = ({ loaded, total }) => {
-        loadingMessage = '';
+      xhr.onprogress = ({ loaded }) => {
         completed = loaded;
-        totalSize = total;
+        // Don't reset the loading message here
       };
 
       xhr.onabort = (event) => {
-        console.warn(`xhr ${fileId}: download aborted at ${event.loaded} of ${event.total}`);
+        console.warn(`xhr ${fileId}: download aborted at ${event.loaded} of ${totalSize}`);
         showSnackbar('Download failed');
         reject(new Error('Download aborted'));
       };
 
       xhr.onerror = (event) => {
-        console.error(`xhr ${fileId}: download error at ${event.loaded} of ${event.total}`);
+        console.error(`xhr ${fileId}: download error at ${event.loaded} of ${totalSize}`);
         showSnackbar('Download failed');
         reject(new Error('Error downloading file'));
       };
 
       xhr.onload = () => {
         completed = 0;
-        totalSize = 0;
+        // Don't reset totalSize here
         resolve(xhr.response);
       };
 
       xhr.ontimeout = (event) => {
-        console.warn(`xhr ${fileId}: download timeout after ${event.loaded} of ${event.total}`);
+        console.warn(`xhr ${fileId}: download timeout after ${event.loaded} of ${totalSize}`);
         showSnackbar('Download timed out');
-        reject(new Error('Timout downloading file'));
+        reject(new Error('Timeout downloading file'));
       };
 
       xhr.send();
@@ -236,18 +250,25 @@
   });
 
   function createPicker() {
+    // Create a view for ZIP/CBZ files
     const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
       .setMimeTypes('application/zip,application/x-zip-compressed,application/vnd.comicbook+zip,application/x-cbz')
       .setMode(google.picker.DocsViewMode.LIST)
       .setIncludeFolders(true)
+      .setSelectFolderEnabled(true)
+      .setParent(readerFolderId);
+
+    // Create a view specifically for folders
+    const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+      .setSelectFolderEnabled(true)
       .setParent(readerFolderId);
 
     const picker = new google.picker.PickerBuilder()
       .addView(docsView)
+      .addView(folderView)
       .setOAuthToken(accessToken)
       .setAppId(CLIENT_ID)
       .setDeveloperKey(API_KEY)
-      .enableFeature(google.picker.Feature.NAV_HIDDEN)
       .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
       .setCallback(pickerCallback)
       .build();
@@ -298,6 +319,10 @@
       loadingMessage = `Downloading file ${currentFileIndex} of ${totalFiles}: ${fileInfo.name}`;
       
       try {
+        // Reset progress for each file
+        completed = 0;
+        totalSize = 0;
+        
         const blob = await xhrDownloadFileId(fileInfo.id);
         const file = new File([blob], fileInfo.name);
         files.push(file);
@@ -315,6 +340,8 @@
     loadingMessage = '';
     currentFileIndex = 0;
     totalFiles = 0;
+    completed = 0;
+    totalSize = 0;
   }
 
   async function pickerCallback(data: google.picker.ResponseObject) {
@@ -502,10 +529,10 @@
         in your Google Drive.
       </p>
       <p class="text-center text-sm text-gray-500">
-        You can select multiple files or entire folders to download at once.
+        You can select multiple ZIP/CBZ files or entire folders at once.
       </p>
       <div class="flex flex-col gap-4 w-full max-w-3xl">
-        <Button color="blue" on:click={createPicker}>Select files or folders to download</Button>
+        <Button color="blue" on:click={createPicker}>Select files or folders</Button>
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
