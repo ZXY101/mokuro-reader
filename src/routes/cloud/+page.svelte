@@ -234,7 +234,7 @@
 
   function createPicker() {
     const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-      .setMimeTypes('application/zip,application/x-zip-compressed')
+      .setMimeTypes('application/zip,application/x-zip-compressed,application/vnd.comicbook+zip,application/x-cbz')
       .setMode(google.picker.DocsViewMode.LIST)
       .setIncludeFolders(true)
       .setParent(readerFolderId);
@@ -399,7 +399,7 @@
         <Button color="red" on:click={logout}>Log out</Button>
       </div>
       <p class="text-center">
-        Add your zipped manga files to the <span class="text-primary-700">{READER_FOLDER}</span> folder
+        Add your zipped manga files (ZIP or CBZ) to the <span class="text-primary-700">{READER_FOLDER}</span> folder
         in your Google Drive.
       </p>
       <div class="flex flex-col gap-4 w-full max-w-3xl">
