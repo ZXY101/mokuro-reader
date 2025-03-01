@@ -19,11 +19,11 @@ export class WorkerPool {
   private workerTaskMap: Map<Worker, string | null> = new Map();
   private maxConcurrent: number;
   private currentMemoryUsage: number = 0;
-  private maxMemoryUsage: number = 500 * 1024 * 1024; // 500 MB in bytes
+  private maxMemoryUsage: number = 500 * 1024 * 1024; // 500 MB threshold (not a hard limit)
 
   constructor(workerUrl?: string, maxConcurrent = 4, maxMemoryMB = 500) {
     this.maxConcurrent = Math.max(1, Math.min(maxConcurrent, navigator.hardwareConcurrency || 4));
-    this.maxMemoryUsage = maxMemoryMB * 1024 * 1024; // Convert MB to bytes
+    this.maxMemoryUsage = maxMemoryMB * 1024 * 1024; // Convert MB to bytes - this is a threshold, not a hard limit
     
     // Initialize workers
     for (let i = 0; i < this.maxConcurrent; i++) {
@@ -112,18 +112,20 @@ export class WorkerPool {
   private processQueue() {
     // Process as many tasks from the queue as possible based on memory constraints
     while (this.taskQueue.length > 0) {
-      const nextTask = this.taskQueue[0];
-      const memoryRequired = nextTask.memoryRequirement || 0;
-      
-      // Check if adding this task would exceed memory limit
-      if (this.currentMemoryUsage + memoryRequired > this.maxMemoryUsage) {
-        console.log(`Memory limit would be exceeded. Waiting for tasks to complete. Current: ${this.currentMemoryUsage / (1024 * 1024)} MB, Required: ${memoryRequired / (1024 * 1024)} MB, Max: ${this.maxMemoryUsage / (1024 * 1024)} MB`);
+      // Find an available worker first
+      const availableWorker = this.workers.find(worker => this.workerTaskMap.get(worker) === null);
+      if (!availableWorker) {
+        // No available workers, can't process more tasks right now
         break;
       }
       
-      // Find an available worker
-      const availableWorker = this.workers.find(worker => this.workerTaskMap.get(worker) === null);
-      if (!availableWorker) {
+      const nextTask = this.taskQueue[0];
+      const memoryRequired = nextTask.memoryRequirement || 0;
+      
+      // Check if we're already over the memory limit AND this isn't the only task in the queue
+      // We always allow at least one task to run, even if it exceeds the memory limit
+      if (this.currentMemoryUsage > this.maxMemoryUsage && this.activeTasks.size > 0) {
+        console.log(`Memory usage already exceeds limit. Waiting for tasks to complete before starting new ones. Current: ${this.currentMemoryUsage / (1024 * 1024)} MB, Max: ${this.maxMemoryUsage / (1024 * 1024)} MB`);
         break;
       }
       

@@ -406,9 +406,11 @@
     // Use navigator.hardwareConcurrency to determine optimal number of workers
     // but limit to a reasonable number to avoid overwhelming the browser
     const maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
-    // Set memory limit to 500MB to prevent excessive memory usage on mobile devices
-    const memoryLimitMB = 500; // 500 MB memory limit
-    console.log(`Creating worker pool with ${maxWorkers} workers and ${memoryLimitMB}MB memory limit`);
+    // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
+    // This is not a hard limit - tasks that individually need more than 500MB can still run
+    // It just prevents starting new tasks when the current pool already exceeds 500MB
+    const memoryLimitMB = 500; // 500 MB memory threshold
+    console.log(`Creating worker pool with ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`);
     const workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
     
     // Track download progress
