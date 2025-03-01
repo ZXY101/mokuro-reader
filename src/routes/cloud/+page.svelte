@@ -5,17 +5,17 @@
   /** @type {string} */
   export let accessToken = '';
   import Loader from '$lib/components/Loader.svelte';
+  import ProgressTracker from '$lib/components/ProgressTracker.svelte';
   import { formatBytes, showSnackbar, uploadFile } from '$lib/util';
   import { Button, P, Progressbar } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { promptConfirmation } from '$lib/util';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { profiles, volumes } from '$lib/settings';
+  import { progressTrackerStore } from '$lib/util/progress-tracker';
   
   // Helper function to handle errors consistently
   function handleDriveError(error: any, context: string) {
-    loadingMessage = '';
-    
     // Check if it's a connectivity issue
     const errorMessage = error.toString().toLowerCase();
     const isConnectivityError = 
@@ -53,14 +53,8 @@
   let volumeDataId = '';
   let profilesId = '';
 
-  let loadingMessage = '';
-
-  let completed = 0;
-  let totalSize = 0;
-  let currentFileIndex = 0;
-  let totalFiles = 0;
-  $: progress = Math.floor((completed / totalSize) * 100).toString();
-  $: fileProgress = Math.floor((currentFileIndex / totalFiles) * 100).toString();
+  // This variable is used to track if we're connected to Google Drive
+  // and is used in the UI to show/hide the login button
 
   $: if (accessToken) {
     localStorage.setItem('gdrive_token', accessToken);
@@ -79,45 +73,78 @@
     }
   }
 
-  function xhrDownloadFileId(fileId: string) {
+  function xhrDownloadFileId(fileId: string, fileName: string) {
     return new Promise<Blob>(async (resolve, reject) => {
       const { access_token } = gapi.auth.getToken();
       const xhr = new XMLHttpRequest();
 
       // Get file size before starting download
       const size = await getFileSize(fileId);
-      completed = 0;
-      totalSize = size;
+      
+      // Create a unique process ID for this download
+      const processId = `download-${fileId}`;
+      
+      // Add to progress tracker
+      progressTrackerStore.addProcess({
+        id: processId,
+        description: `Downloading: ${fileName}`,
+        progress: 0,
+        bytesLoaded: 0,
+        totalBytes: size
+      });
 
       xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
       xhr.setRequestHeader('Authorization', `Bearer ${access_token}`);
       xhr.responseType = 'blob';
 
       xhr.onprogress = ({ loaded }) => {
-        completed = loaded;
-        // Don't reset the loading message here
+        // Update progress tracker
+        progressTrackerStore.updateProcess(processId, {
+          progress: (loaded / size) * 100,
+          bytesLoaded: loaded,
+          status: `${formatBytes(loaded)} of ${formatBytes(size)}`
+        });
       };
 
       xhr.onabort = (event) => {
-        console.warn(`xhr ${fileId}: download aborted at ${event.loaded} of ${totalSize}`);
+        console.warn(`xhr ${fileId}: download aborted at ${event.loaded} of ${size}`);
+        progressTrackerStore.updateProcess(processId, {
+          status: 'Download aborted',
+          progress: 0
+        });
+        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         showSnackbar('Download failed');
         reject(new Error('Download aborted'));
       };
 
       xhr.onerror = (event) => {
-        console.error(`xhr ${fileId}: download error at ${event.loaded} of ${totalSize}`);
+        console.error(`xhr ${fileId}: download error at ${event.loaded} of ${size}`);
+        progressTrackerStore.updateProcess(processId, {
+          status: 'Download failed',
+          progress: 0
+        });
+        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         showSnackbar('Download failed');
         reject(new Error('Error downloading file'));
       };
 
       xhr.onload = () => {
-        completed = 0;
-        // Don't reset totalSize here
+        progressTrackerStore.updateProcess(processId, {
+          progress: 100,
+          status: 'Download complete',
+          bytesLoaded: size
+        });
+        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         resolve(xhr.response);
       };
 
       xhr.ontimeout = (event) => {
-        console.warn(`xhr ${fileId}: download timeout after ${event.loaded} of ${totalSize}`);
+        console.warn(`xhr ${fileId}: download timeout after ${event.loaded} of ${size}`);
+        progressTrackerStore.updateProcess(processId, {
+          status: 'Download timed out',
+          progress: 0
+        });
+        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
         showSnackbar('Download timed out');
         reject(new Error('Timeout downloading file'));
       };
@@ -134,15 +161,32 @@
     }
 
     accessToken = resp?.access_token;
-    loadingMessage = 'Connecting to drive';
+    
+    const processId = 'connect-drive';
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: 'Connecting to Google Drive',
+      progress: 0,
+      status: 'Initializing connection...'
+    });
 
     try {
+      progressTrackerStore.updateProcess(processId, {
+        progress: 20,
+        status: 'Checking for reader folder...'
+      });
+      
       const { result: readerFolderRes } = await gapi.client.drive.files.list({
         q: `mimeType='application/vnd.google-apps.folder' and name='${READER_FOLDER}'`,
         fields: 'files(id)'
       });
 
       if (readerFolderRes.files?.length === 0) {
+        progressTrackerStore.updateProcess(processId, {
+          progress: 40,
+          status: 'Creating reader folder...'
+        });
+        
         const { result: createReaderFolderRes } = await gapi.client.drive.files.create({
           resource: { mimeType: FOLDER_MIME_TYPE, name: READER_FOLDER },
           fields: 'id'
@@ -151,10 +195,14 @@
         readerFolderId = createReaderFolderRes.id || '';
       } else {
         const id = readerFolderRes.files?.[0]?.id || '';
-
         readerFolderId = id || '';
       }
 
+      progressTrackerStore.updateProcess(processId, {
+        progress: 60,
+        status: 'Checking for volume data...'
+      });
+      
       const { result: volumeDataRes } = await gapi.client.drive.files.list({
         q: `'${readerFolderId}' in parents and name='${VOLUME_DATA_FILE}'`,
         fields: 'files(id, name)'
@@ -164,6 +212,11 @@
         volumeDataId = volumeDataRes.files?.[0].id || '';
       }
 
+      progressTrackerStore.updateProcess(processId, {
+        progress: 80,
+        status: 'Checking for profiles...'
+      });
+      
       const { result: profilesRes } = await gapi.client.drive.files.list({
         q: `'${readerFolderId}' in parents and name='${PROFILES_FILE}'`,
         fields: 'files(id, name)'
@@ -173,12 +226,21 @@
         profilesId = profilesRes.files?.[0].id || '';
       }
 
-      loadingMessage = '';
+      progressTrackerStore.updateProcess(processId, {
+        progress: 100,
+        status: 'Connected successfully'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
 
       if (accessToken) {
         showSnackbar('Connected to Google Drive');
       }
     } catch (error) {
+      progressTrackerStore.updateProcess(processId, {
+        progress: 0,
+        status: 'Connection failed'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       handleDriveError(error, 'connecting to Google Drive');
     }
   }
@@ -310,32 +372,60 @@
   }
 
   async function downloadAndProcessFiles(fileList: { id: string; name: string; mimeType: string }[]) {
-    totalFiles = fileList.length;
-    currentFileIndex = 0;
+    // Create a process for the overall download task
+    const overallProcessId = 'overall-download-process';
+    progressTrackerStore.addProcess({
+      id: overallProcessId,
+      description: 'Downloading files',
+      status: `0 of ${fileList.length} files`,
+      progress: 0
+    });
     
-    for (const fileInfo of fileList.sort((a, b) => a.name.localeCompare(b.name))) {
-      currentFileIndex++;
-      loadingMessage = `Downloading file ${currentFileIndex} of ${totalFiles}: ${fileInfo.name}`;
+    // Sort files by name
+    const sortedFiles = fileList.sort((a, b) => a.name.localeCompare(b.name));
+    
+    for (let i = 0; i < sortedFiles.length; i++) {
+      const fileInfo = sortedFiles[i];
       
       try {
-        // Reset progress for each file
-        completed = 0;
-        totalSize = 0;
+        // Update overall progress
+        progressTrackerStore.updateProcess(overallProcessId, {
+          status: `File ${i + 1} of ${sortedFiles.length}: ${fileInfo.name}`,
+          progress: (i / sortedFiles.length) * 100
+        });
         
-        const blob = await xhrDownloadFileId(fileInfo.id);
+        const blob = await xhrDownloadFileId(fileInfo.id, fileInfo.name);
         const file = new File([blob], fileInfo.name);
-        processFiles([file]);
+        
+        // Process the file
+        const processId = `process-${fileInfo.id}`;
+        progressTrackerStore.addProcess({
+          id: processId,
+          description: `Processing: ${fileInfo.name}`,
+          progress: 0,
+          status: 'Extracting files...'
+        });
+        
+        await processFiles([file]);
+        
+        // Update process status
+        progressTrackerStore.updateProcess(processId, {
+          progress: 100,
+          status: 'Processing complete'
+        });
+        setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       } catch (error) {
         console.error(`Error downloading ${fileInfo.name}:`, error);
         showSnackbar(`Failed to download ${fileInfo.name}`);
       }
     }
     
-    loadingMessage = '';
-    currentFileIndex = 0;
-    totalFiles = 0;
-    completed = 0;
-    totalSize = 0;
+    // Update and remove the overall process
+    progressTrackerStore.updateProcess(overallProcessId, {
+      status: 'All downloads complete',
+      progress: 100
+    });
+    setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
   }
 
   async function pickerCallback(data: google.picker.ResponseObject) {
@@ -388,9 +478,21 @@
       parents: [volumeDataId ? null : readerFolderId]
     };
 
-    loadingMessage = 'Uploading volume data';
+    const processId = 'upload-volume-data';
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: 'Uploading volume data',
+      progress: 0,
+      status: 'Starting upload...'
+    });
 
     try {
+      // Update progress to show it's in progress
+      progressTrackerStore.updateProcess(processId, {
+        progress: 50,
+        status: 'Uploading...'
+      });
+      
       const res = await uploadFile({
         accessToken,
         fileId: volumeDataId,
@@ -400,12 +502,22 @@
       });
 
       volumeDataId = res.id;
-      loadingMessage = '';
+      
+      progressTrackerStore.updateProcess(processId, {
+        progress: 100,
+        status: 'Upload complete'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
 
       if (volumeDataId) {
         showSnackbar('Volume data uploaded');
       }
     } catch (error) {
+      progressTrackerStore.updateProcess(processId, {
+        progress: 0,
+        status: 'Upload failed'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       handleDriveError(error, 'uploading volume data');
     }
   }
@@ -417,9 +529,21 @@
       parents: [profilesId ? null : readerFolderId]
     };
 
-    loadingMessage = 'Uploading profiles';
+    const processId = 'upload-profiles';
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: 'Uploading profiles',
+      progress: 0,
+      status: 'Starting upload...'
+    });
 
     try {
+      // Update progress to show it's in progress
+      progressTrackerStore.updateProcess(processId, {
+        progress: 50,
+        status: 'Uploading...'
+      });
+      
       const res = await uploadFile({
         accessToken,
         fileId: profilesId,
@@ -429,20 +553,42 @@
       });
 
       profilesId = res.id;
-      loadingMessage = '';
+      
+      progressTrackerStore.updateProcess(processId, {
+        progress: 100,
+        status: 'Upload complete'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
 
       if (profilesId) {
         showSnackbar('Profiles uploaded');
       }
     } catch (error) {
+      progressTrackerStore.updateProcess(processId, {
+        progress: 0,
+        status: 'Upload failed'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       handleDriveError(error, 'uploading profiles');
     }
   }
 
   async function onDownloadVolumeData() {
-    loadingMessage = 'Downloading volume data';
+    const processId = 'download-volume-data';
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: 'Downloading volume data',
+      progress: 0,
+      status: 'Starting download...'
+    });
 
     try {
+      // Update progress to show it's in progress
+      progressTrackerStore.updateProcess(processId, {
+        progress: 50,
+        status: 'Downloading...'
+      });
+      
       const { body } = await gapi.client.drive.files.get({
         fileId: volumeDataId,
         alt: 'media'
@@ -457,17 +603,39 @@
         };
       });
 
-      loadingMessage = '';
+      progressTrackerStore.updateProcess(processId, {
+        progress: 100,
+        status: 'Download complete'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+      
       showSnackbar('Volume data downloaded');
     } catch (error) {
+      progressTrackerStore.updateProcess(processId, {
+        progress: 0,
+        status: 'Download failed'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       handleDriveError(error, 'downloading volume data');
     }
   }
 
   async function onDownloadProfiles() {
-    loadingMessage = 'Downloading profiles';
+    const processId = 'download-profiles';
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: 'Downloading profiles',
+      progress: 0,
+      status: 'Starting download...'
+    });
 
     try {
+      // Update progress to show it's in progress
+      progressTrackerStore.updateProcess(processId, {
+        progress: 50,
+        status: 'Downloading...'
+      });
+      
       const { body } = await gapi.client.drive.files.get({
         fileId: profilesId,
         alt: 'media'
@@ -482,9 +650,19 @@
         };
       });
 
-      loadingMessage = '';
+      progressTrackerStore.updateProcess(processId, {
+        progress: 100,
+        status: 'Download complete'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+      
       showSnackbar('Profiles downloaded');
     } catch (error) {
+      progressTrackerStore.updateProcess(processId, {
+        progress: 0,
+        status: 'Download failed'
+      });
+      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       handleDriveError(error, 'downloading profiles');
     }
   }
@@ -495,24 +673,7 @@
 </svelte:head>
 
 <div class="p-2 h-[90svh]">
-  {#if loadingMessage || completed > 0 || totalFiles > 0}
-    <Loader>
-      {#if totalFiles > 0 && currentFileIndex > 0}
-        <P>{loadingMessage}</P>
-        <P>File {currentFileIndex} of {totalFiles}</P>
-        <Progressbar progress={fileProgress} />
-        {#if completed > 0}
-          <P class="mt-2">{formatBytes(completed)} / {formatBytes(totalSize)}</P>
-          <Progressbar {progress} />
-        {/if}
-      {:else if completed > 0}
-        <P>{formatBytes(completed)} / {formatBytes(totalSize)}</P>
-        <Progressbar {progress} />
-      {:else}
-        {loadingMessage}
-      {/if}
-    </Loader>
-  {:else if accessToken}
+  {#if accessToken}
     <div class="flex justify-between items-center gap-6 flex-col">
       <div class="flex justify-between items-center w-full max-w-3xl">
         <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
