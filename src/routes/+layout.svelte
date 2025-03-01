@@ -8,6 +8,7 @@
   import Snackbar from '$lib/components/Snackbar.svelte';
   import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';
   import ExtractionModal from '$lib/components/ExtractionModal.svelte';
+  import ProgressTracker from '$lib/components/ProgressTracker.svelte';
 
   inject({ mode: dev ? 'development' : 'production' });
 
@@ -23,4 +24,5 @@
   <Snackbar />
   <ConfirmationPopup />
   <ExtractionModal />
+  <ProgressTracker />
 </div>
