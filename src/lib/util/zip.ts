@@ -19,11 +19,12 @@ export async function zipManga(
       await createAndDownloadArchive(
         [volume], 
         asCbz, 
-        (volume) => {
+        (volumes) => {
+          const vol = volumes[0]; // Get the single volume from the array
           const extension = asCbz ? 'cbz' : 'zip';
           return includeSeriesTitle 
-            ? `${volume.series_title} - ${volume.volume_title}.${extension}`
-            : `${volume.volume_title}.${extension}`;
+            ? `${vol.series_title} - ${vol.volume_title}.${extension}`
+            : `${vol.volume_title}.${extension}`;
         }
       );
     }
