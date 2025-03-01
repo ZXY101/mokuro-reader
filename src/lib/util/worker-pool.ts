@@ -33,31 +33,52 @@ export class WorkerPool {
     
     worker.onmessage = (event) => {
       const taskId = this.workerTaskMap.get(worker);
-      if (!taskId) return;
+      if (!taskId) {
+        console.warn('Worker pool: Received message but no taskId found', event.data);
+        return;
+      }
       
       const task = this.activeTasks.get(taskId);
-      if (!task) return;
+      if (!task) {
+        console.warn('Worker pool: Received message but no task found for taskId', taskId, event.data);
+        return;
+      }
       
       const data = event.data;
+      console.log(`Worker pool: Received message of type ${data.type} for task ${taskId}`, data);
       
       if (data.type === 'progress' && task.onProgress) {
         task.onProgress(data);
       } else if (data.type === 'complete' && task.onComplete) {
+        console.log(`Worker pool: Calling onComplete for task ${taskId}`, {
+          hasData: !!data.data,
+          dataType: typeof data.data,
+          dataSize: data.data?.byteLength
+        });
         task.onComplete(data);
         this.completeTask(worker);
       } else if (data.type === 'error' && task.onError) {
+        console.error(`Worker pool: Error for task ${taskId}:`, data.error);
         task.onError(data);
         this.completeTask(worker);
       }
     };
     
     worker.onerror = (error) => {
+      console.error('Worker pool: Worker error event:', error);
+      
       const taskId = this.workerTaskMap.get(worker);
-      if (!taskId) return;
+      if (!taskId) {
+        console.warn('Worker pool: Error event but no taskId found');
+        return;
+      }
       
       const task = this.activeTasks.get(taskId);
       if (task && task.onError) {
-        task.onError({ type: 'error', error: error.message });
+        console.error(`Worker pool: Calling onError for task ${taskId}`, error.message);
+        task.onError({ type: 'error', fileId: taskId, error: error.message });
+      } else {
+        console.warn(`Worker pool: No onError handler for task ${taskId}`);
       }
       
       this.completeTask(worker);

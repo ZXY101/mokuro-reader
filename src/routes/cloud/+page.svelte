@@ -395,6 +395,7 @@
     // Use navigator.hardwareConcurrency to determine optimal number of workers
     // but limit to a reasonable number to avoid overwhelming the browser
     const maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
+    console.log(`Creating worker pool with ${maxWorkers} workers`);
     const workerPool = new WorkerPool(undefined, maxWorkers);
     
     // Track download progress
@@ -460,11 +461,23 @@
           },
           onComplete: async (data) => {
             try {
+              console.log(`Received complete message for ${data.fileName}`, {
+                dataType: typeof data.data,
+                dataSize: data.data.byteLength,
+                hasData: !!data.data
+              });
+              
+              // Create a Blob from the ArrayBuffer
+              const blob = new Blob([data.data]);
+              console.log(`Created blob of size ${blob.size} bytes`);
+              
               // Create a File object from the blob
-              const file = new File([data.blob], data.fileName);
+              const file = new File([blob], data.fileName);
+              console.log(`Created file object: ${file.name}, size: ${file.size} bytes`);
               
               // Process the file
               await processFiles([file]);
+              console.log(`Successfully processed file: ${file.name}`);
               
               // Mark as completed
               completedFiles++;
