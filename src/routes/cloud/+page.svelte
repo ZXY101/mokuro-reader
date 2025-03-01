@@ -318,7 +318,8 @@
     }
   }
 
-  async function processFolder(folderId, folderName) {
+  // Pass the scanProcessId as a parameter
+  async function processFolder(folderId, folderName, scanProcessId) {
     const files = await listFilesInFolder(folderId);
     const allFiles = [];
     
@@ -327,14 +328,13 @@
       const file = files[i];
       
       // Update the scan process with subfolder information
-      const scanProcessId = 'folder-scan-process';
       progressTrackerStore.updateProcess(scanProcessId, {
         status: `Scanning ${folderName} (${i+1}/${files.length}): ${file.name}`
       });
       
       if (file.mimeType === 'application/vnd.google-apps.folder') {
-        // Recursively process subfolders
-        const subfolderFiles = await processFolder(file.id, file.name);
+        // Recursively process subfolders - pass the same scanProcessId
+        const subfolderFiles = await processFolder(file.id, file.name, scanProcessId);
         allFiles.push(...subfolderFiles);
       } else {
         // Add file to the list
@@ -349,8 +349,9 @@
     // Import the worker pool dynamically
     const { WorkerPool } = await import('$lib/util/worker-pool');
     
-    // Create a process for the overall download task
-    const overallProcessId = 'overall-download-process';
+    // Create a unique ID for this download batch
+    const batchId = `download-batch-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const overallProcessId = batchId;
     
     // Sort files by name
     const sortedFiles = fileList.sort((a, b) => a.name.localeCompare(b.name));
@@ -361,7 +362,7 @@
     
     progressTrackerStore.addProcess({
       id: overallProcessId,
-      description: 'Downloading files',
+      description: `Downloading ${sortedFiles.length} files`,
       status: `Calculating total size...`,
       progress: 0,
       bytesLoaded: 0,
@@ -532,11 +533,13 @@
         
         if (docs.length === 0) return;
         
-        // Create a process for folder scanning
-        const scanProcessId = 'folder-scan-process';
+        // Create a unique ID for this scan process
+        const scanId = `folder-scan-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+        const scanProcessId = scanId;
+        
         progressTrackerStore.addProcess({
           id: scanProcessId,
-          description: 'Scanning folders',
+          description: `Scanning ${docs.length} items`,
           progress: 0,
           status: 'Starting scan...'
         });
@@ -559,7 +562,8 @@
                 status: `Scanning folder: ${doc.name}`
               });
               
-              const folderFiles = await processFolder(doc.id, doc.name);
+              // Pass the scanProcessId to processFolder
+              const folderFiles = await processFolder(doc.id, doc.name, scanProcessId);
               allFiles.push(...folderFiles);
             } else {
               // Add regular file
