@@ -41,11 +41,19 @@
   }
 
   async function onExtract() {
-    if (manga) {
-      promptExtraction(async (asCbz, individualVolumes) => {
-        loading = true;
-        loading = await zipManga(manga, asCbz, individualVolumes);
-      });
+    if (manga && manga.length > 0) {
+      const firstVolume = {
+        series_title: manga[0].series_title,
+        volume_title: manga[0].volume_title
+      };
+      
+      promptExtraction(
+        firstVolume,
+        async (asCbz, individualVolumes, includeSeriesTitle) => {
+          loading = true;
+          loading = await zipManga(manga, asCbz, individualVolumes, includeSeriesTitle);
+        }
+      );
     }
   }
 </script>

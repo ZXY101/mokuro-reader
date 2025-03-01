@@ -7,11 +7,16 @@ import {
   ZipWriter,
 } from "@zip.js/zip.js";
 
-export async function zipManga(manga: VolumeMetadata[], asCbz = false, individualVolumes = false) {
+export async function zipManga(
+  manga: VolumeMetadata[], 
+  asCbz = false, 
+  individualVolumes = false, 
+  includeSeriesTitle = true
+) {
   if (individualVolumes) {
     // Extract each volume individually
     for (const volume of manga) {
-      await zipSingleVolume(volume, asCbz);
+      await zipSingleVolume(volume, asCbz, includeSeriesTitle);
     }
   } else {
     // Extract all volumes as a single file
@@ -21,7 +26,11 @@ export async function zipManga(manga: VolumeMetadata[], asCbz = false, individua
   return false;
 }
 
-async function zipSingleVolume(volume: VolumeMetadata, asCbz = false) {
+async function zipSingleVolume(
+  volume: VolumeMetadata, 
+  asCbz = false, 
+  includeSeriesTitle = true
+) {
   const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
   
   // Get volume data from the database
@@ -48,19 +57,14 @@ async function zipSingleVolume(volume: VolumeMetadata, asCbz = false) {
       return zipWriter.add(filename, new BlobReader(file));
     }) : [];
 
-  // Add mokuro data file if not CBZ
+  // Add mokuro data file (for both ZIP and CBZ)
   const promises = [
-    ...imagePromises
+    ...imagePromises,
+    zipWriter.add(
+      `${volume.volume_title}.mokuro`, 
+      new TextReader(JSON.stringify(mokuroData))
+    )
   ];
-  
-  if (!asCbz) {
-    promises.push(
-      zipWriter.add(
-        `${volume.volume_title}.mokuro`, 
-        new TextReader(JSON.stringify(mokuroData))
-      )
-    );
-  }
 
   // Wait for all files to be added
   await Promise.all(promises);
@@ -70,7 +74,16 @@ async function zipSingleVolume(volume: VolumeMetadata, asCbz = false) {
   const link = document.createElement('a');
   link.href = URL.createObjectURL(zipFileBlob);
   const extension = asCbz ? 'cbz' : 'zip';
-  link.download = `${volume.series_title} - ${volume.volume_title}.${extension}`;
+  
+  // Generate filename based on options
+  let filename;
+  if (includeSeriesTitle) {
+    filename = `${volume.series_title} - ${volume.volume_title}.${extension}`;
+  } else {
+    filename = `${volume.volume_title}.${extension}`;
+  }
+  
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
 
@@ -99,8 +112,8 @@ async function zipAllVolumes(manga: VolumeMetadata[], asCbz = false) {
       chars: volume.character_count
     };
 
-    // For CBZ, organize files in volume-specific folders
-    const folderPrefix = asCbz ? `${volume.volume_title}/` : '';
+    // Organize files in volume-specific folders
+    const folderPrefix = `${volume.volume_title}/`;
 
     // Add image files
     const imagePromises = volumeData.files ? 
@@ -108,18 +121,14 @@ async function zipAllVolumes(manga: VolumeMetadata[], asCbz = false) {
         return zipWriter.add(`${folderPrefix}${filename}`, new BlobReader(file));
       }) : [];
 
-    // Add mokuro data file if not CBZ
-    if (!asCbz) {
-      return [
-        zipWriter.add(
-          `${folderPrefix}${volume.volume_title}.mokuro`, 
-          new TextReader(JSON.stringify(mokuroData))
-        ),
-        ...imagePromises,
-      ];
-    }
-    
-    return imagePromises;
+    // Add mokuro data file (for both ZIP and CBZ)
+    return [
+      zipWriter.add(
+        `${folderPrefix}${volume.volume_title}.mokuro`, 
+        new TextReader(JSON.stringify(mokuroData))
+      ),
+      ...imagePromises,
+    ];
   });
 
   // Wait for all files to be added

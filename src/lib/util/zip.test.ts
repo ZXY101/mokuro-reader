@@ -51,7 +51,7 @@ describe('zipManga', () => {
   });
 
   it('should call zipAllVolumes when individualVolumes is false', async () => {
-    const result = await zipManga([mockVolume], false, false);
+    const result = await zipManga([mockVolume], false, false, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
     const link = document.createElement('a');
@@ -59,7 +59,7 @@ describe('zipManga', () => {
   });
 
   it('should call zipSingleVolume when individualVolumes is true', async () => {
-    const result = await zipManga([mockVolume], false, true);
+    const result = await zipManga([mockVolume], false, true, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
     const link = document.createElement('a');
@@ -67,10 +67,27 @@ describe('zipManga', () => {
   });
 
   it('should use cbz extension when asCbz is true', async () => {
-    const result = await zipManga([mockVolume], true, false);
+    const result = await zipManga([mockVolume], true, false, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
     const link = document.createElement('a');
     expect(link.download).toContain('.cbz');
+  });
+  
+  it('should include series title in filename when includeSeriesTitle is true', async () => {
+    const result = await zipManga([mockVolume], false, true, true);
+    expect(result).toBe(false);
+    expect(document.createElement).toHaveBeenCalledWith('a');
+    const link = document.createElement('a');
+    expect(link.download).toContain('Test Manga - Volume 1');
+  });
+  
+  it('should exclude series title from filename when includeSeriesTitle is false', async () => {
+    const result = await zipManga([mockVolume], false, true, false);
+    expect(result).toBe(false);
+    expect(document.createElement).toHaveBeenCalledWith('a');
+    const link = document.createElement('a');
+    expect(link.download).not.toContain('Test Manga -');
+    expect(link.download).toContain('Volume 1');
   });
 });
