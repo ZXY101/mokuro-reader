@@ -16,28 +16,44 @@ export async function zipManga(
   if (individualVolumes) {
     // Extract each volume individually
     for (const volume of manga) {
-      await zipSingleVolume(volume, asCbz, includeSeriesTitle);
+      await createAndDownloadArchive(
+        [volume], 
+        asCbz, 
+        (volume) => {
+          const extension = asCbz ? 'cbz' : 'zip';
+          return includeSeriesTitle 
+            ? `${volume.series_title} - ${volume.volume_title}.${extension}`
+            : `${volume.volume_title}.${extension}`;
+        }
+      );
     }
   } else {
     // Extract all volumes as a single file
-    await zipAllVolumes(manga, asCbz);
+    await createAndDownloadArchive(
+      manga, 
+      asCbz, 
+      (volumes) => {
+        const extension = asCbz ? 'cbz' : 'zip';
+        return `${volumes[0].series_title}.${extension}`;
+      }
+    );
   }
   
   return false;
 }
 
-async function zipSingleVolume(
-  volume: VolumeMetadata, 
-  asCbz = false, 
-  includeSeriesTitle = true
-) {
-  const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
-  
+/**
+ * Adds a volume's files to a zip archive
+ * @param zipWriter The ZipWriter instance
+ * @param volume The volume metadata
+ * @returns Promise resolving to an array of promises for adding files
+ */
+async function addVolumeToArchive(zipWriter: ZipWriter<Blob>, volume: VolumeMetadata) {
   // Get volume data from the database
   const volumeData = await db.volumes_data.get(volume.volume_uuid);
   if (!volumeData) {
     console.error(`Volume data not found for ${volume.volume_uuid}`);
-    return false;
+    return [];
   }
 
   // Create mokuro data in the old format for compatibility
@@ -61,90 +77,44 @@ async function zipSingleVolume(
     }) : [];
 
   // Add mokuro data file in the root directory (for both ZIP and CBZ)
-  const promises = [
+  return [
     ...imagePromises,
     zipWriter.add(
       `${volume.volume_title}.mokuro`, 
       new TextReader(JSON.stringify(mokuroData))
     )
   ];
-
-  // Wait for all files to be added
-  await Promise.all(promises);
-
-  const zipFileBlob = await zipWriter.close();
-
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(zipFileBlob);
-  const extension = asCbz ? 'cbz' : 'zip';
-  
-  // Generate filename based on options
-  let filename;
-  if (includeSeriesTitle) {
-    filename = `${volume.series_title} - ${volume.volume_title}.${extension}`;
-  } else {
-    filename = `${volume.volume_title}.${extension}`;
-  }
-  
-  link.download = filename;
-  link.click();
-  URL.revokeObjectURL(link.href);
-
-  return false;
 }
 
-async function zipAllVolumes(manga: VolumeMetadata[], asCbz = false) {
+/**
+ * Creates and downloads an archive containing the specified volumes
+ * @param volumes Array of volumes to include in the archive
+ * @param asCbz Whether to create a CBZ file (true) or ZIP file (false)
+ * @param getFilename Function to generate the filename for the archive
+ * @returns Promise resolving to false when complete
+ */
+async function createAndDownloadArchive(
+  volumes: VolumeMetadata[], 
+  asCbz: boolean,
+  getFilename: (volumes: VolumeMetadata[]) => string
+) {
   const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
-
-  const promises = manga.map(async (volume) => {
-    // Get volume data from the database
-    const volumeData = await db.volumes_data.get(volume.volume_uuid);
-    if (!volumeData) {
-      console.error(`Volume data not found for ${volume.volume_uuid}`);
-      return [];
-    }
-
-    // Create mokuro data in the old format for compatibility
-    const mokuroData = {
-      version: volume.mokuro_version,
-      title: volume.series_title,
-      title_uuid: volume.series_uuid,
-      volume: volume.volume_title,
-      volume_uuid: volume.volume_uuid,
-      pages: volumeData.pages,
-      chars: volume.character_count
-    };
-
-    // Organize files in volume-specific folders
-    const folderPrefix = `${volume.volume_title}/`;
-
-    // Add image files
-    const imagePromises = volumeData.files ? 
-      Object.entries(volumeData.files).map(([filename, file]) => {
-        return zipWriter.add(`${folderPrefix}${filename}`, new BlobReader(file));
-      }) : [];
-
-    // Add mokuro data file (for both ZIP and CBZ)
-    return [
-      zipWriter.add(
-        `${folderPrefix}${volume.volume_title}.mokuro`, 
-        new TextReader(JSON.stringify(mokuroData))
-      ),
-      ...imagePromises,
-    ];
-  });
-
-  // Wait for all files to be added
-  await Promise.all((await Promise.all(promises)).flat());
-
+  
+  // Add each volume to the archive
+  const volumePromises = volumes.map(volume => addVolumeToArchive(zipWriter, volume));
+  
+  // Wait for all volumes to be added
+  await Promise.all((await Promise.all(volumePromises)).flat());
+  
+  // Close the archive and get the blob
   const zipFileBlob = await zipWriter.close();
-
+  
+  // Create a download link
   const link = document.createElement('a');
   link.href = URL.createObjectURL(zipFileBlob);
-  const extension = asCbz ? 'cbz' : 'zip';
-  link.download = `${manga[0].series_title}.${extension}`;
+  link.download = getFilename(volumes);
   link.click();
   URL.revokeObjectURL(link.href);
-
+  
   return false;
 }
