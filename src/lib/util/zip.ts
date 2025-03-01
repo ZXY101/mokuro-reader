@@ -13,30 +13,29 @@ export async function zipManga(
   individualVolumes = false, 
   includeSeriesTitle = true
 ) {
+  const extension = asCbz ? 'cbz' : 'zip';
+  
   if (individualVolumes) {
     // Extract each volume individually
     for (const volume of manga) {
+      // Generate the filename for this specific volume
+      const filename = includeSeriesTitle 
+        ? `${volume.series_title} - ${volume.volume_title}.${extension}`
+        : `${volume.volume_title}.${extension}`;
+        
       await createAndDownloadArchive(
-        [volume], 
-        asCbz, 
-        (volumes) => {
-          const vol = volumes[0]; // Get the single volume from the array
-          const extension = asCbz ? 'cbz' : 'zip';
-          return includeSeriesTitle 
-            ? `${vol.series_title} - ${vol.volume_title}.${extension}`
-            : `${vol.volume_title}.${extension}`;
-        }
+        [volume],  // Pass as array for consistency with the shared function
+        asCbz,
+        filename   // Pass the pre-generated filename directly
       );
     }
   } else {
     // Extract all volumes as a single file
+    const filename = `${manga[0].series_title}.${extension}`;
     await createAndDownloadArchive(
-      manga, 
-      asCbz, 
-      (volumes) => {
-        const extension = asCbz ? 'cbz' : 'zip';
-        return `${volumes[0].series_title}.${extension}`;
-      }
+      manga,
+      asCbz,
+      filename
     );
   }
   
@@ -91,13 +90,13 @@ async function addVolumeToArchive(zipWriter: ZipWriter<Blob>, volume: VolumeMeta
  * Creates and downloads an archive containing the specified volumes
  * @param volumes Array of volumes to include in the archive
  * @param asCbz Whether to create a CBZ file (true) or ZIP file (false)
- * @param getFilename Function to generate the filename for the archive
+ * @param filename The filename to use for the archive
  * @returns Promise resolving to false when complete
  */
 async function createAndDownloadArchive(
   volumes: VolumeMetadata[], 
   asCbz: boolean,
-  getFilename: (volumes: VolumeMetadata[]) => string
+  filename: string
 ) {
   const zipWriter = new ZipWriter(new BlobWriter("application/zip"));
   
@@ -113,7 +112,7 @@ async function createAndDownloadArchive(
   // Create a download link
   const link = document.createElement('a');
   link.href = URL.createObjectURL(zipFileBlob);
-  link.download = getFilename(volumes);
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(link.href);
   

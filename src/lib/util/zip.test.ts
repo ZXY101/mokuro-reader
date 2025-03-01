@@ -55,7 +55,6 @@ describe('zipManga', () => {
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
     const link = document.createElement('a');
-    expect(link.download).toContain('.zip');
     expect(link.download).toBe('Test Manga.zip');
   });
 
@@ -64,7 +63,6 @@ describe('zipManga', () => {
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
     const link = document.createElement('a');
-    expect(link.download).toContain('.zip');
     expect(link.download).toBe('Test Manga - Volume 1.zip');
   });
 
@@ -73,7 +71,6 @@ describe('zipManga', () => {
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
     const link = document.createElement('a');
-    expect(link.download).toContain('.cbz');
     expect(link.download).toBe('Test Manga.cbz');
   });
   
@@ -90,8 +87,50 @@ describe('zipManga', () => {
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
     const link = document.createElement('a');
-    expect(link.download).not.toContain('Test Manga -');
     expect(link.download).toBe('Volume 1.zip');
+  });
+  
+  it('should handle multiple volumes correctly when individualVolumes is true', async () => {
+    // Create a second mock volume
+    const mockVolume2 = {
+      ...mockVolume,
+      volume_uuid: 'test-uuid-2',
+      volume_title: 'Volume 2'
+    };
+    
+    // Mock the document.createElement to track calls
+    const originalCreateElement = document.createElement;
+    const mockCreateElement = vi.fn().mockImplementation((tag) => {
+      if (tag === 'a') {
+        return {
+          href: '',
+          download: '',
+          click: vi.fn()
+        };
+      }
+      return {};
+    });
+    document.createElement = mockCreateElement;
+    
+    // Mock the database get for the second volume
+    // @ts-ignore
+    db.volumes_data.get.mockImplementation((uuid) => {
+      if (uuid === 'test-uuid') {
+        return Promise.resolve(mockVolumeData);
+      } else if (uuid === 'test-uuid-2') {
+        return Promise.resolve(mockVolumeData);
+      }
+      return Promise.resolve(null);
+    });
+    
+    const result = await zipManga([mockVolume, mockVolume2], false, true, true);
+    expect(result).toBe(false);
+    
+    // Should have created 2 download links
+    expect(mockCreateElement).toHaveBeenCalledTimes(2);
+    
+    // Restore the original function
+    document.createElement = originalCreateElement;
   });
   
   it('should use the same internal structure for both single and multiple archives', async () => {
