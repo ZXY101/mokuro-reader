@@ -309,12 +309,11 @@
     return allFiles;
   }
 
-  async function downloadAndProcessFiles(fileList) {
-    const files = [];
+  async function downloadAndProcessFiles(fileList: { id: string; name: string; mimeType: string }[]) {
     totalFiles = fileList.length;
     currentFileIndex = 0;
     
-    for (const fileInfo of fileList) {
+    for (const fileInfo of fileList.sort((a, b) => a.name.localeCompare(b.name))) {
       currentFileIndex++;
       loadingMessage = `Downloading file ${currentFileIndex} of ${totalFiles}: ${fileInfo.name}`;
       
@@ -325,16 +324,11 @@
         
         const blob = await xhrDownloadFileId(fileInfo.id);
         const file = new File([blob], fileInfo.name);
-        files.push(file);
+        processFiles([file]);
       } catch (error) {
         console.error(`Error downloading ${fileInfo.name}:`, error);
         showSnackbar(`Failed to download ${fileInfo.name}`);
       }
-    }
-    
-    if (files.length > 0) {
-      loadingMessage = 'Adding to catalog...';
-      await processFiles(files);
     }
     
     loadingMessage = '';
