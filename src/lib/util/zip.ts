@@ -51,13 +51,16 @@ async function zipSingleVolume(
     chars: volume.character_count
   };
 
-  // Add image files
+  // Create folder name for images (same as mokuro file name without extension)
+  const folderName = `${volume.volume_title}`;
+  
+  // Add image files inside the folder
   const imagePromises = volumeData.files ? 
     Object.entries(volumeData.files).map(([filename, file]) => {
-      return zipWriter.add(filename, new BlobReader(file));
+      return zipWriter.add(`${folderName}/${filename}`, new BlobReader(file));
     }) : [];
 
-  // Add mokuro data file (for both ZIP and CBZ)
+  // Add mokuro data file in the root directory (for both ZIP and CBZ)
   const promises = [
     ...imagePromises,
     zipWriter.add(
