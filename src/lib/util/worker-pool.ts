@@ -8,7 +8,7 @@ export interface WorkerTask {
   data: any;
   memoryRequirement?: number; // Memory requirement in bytes
   onProgress?: (progress: any) => void;
-  onComplete?: (result: any) => void;
+  onComplete?: (result: any, completeTask: () => void) => void;
   onError?: (error: any) => void;
 }
 
@@ -59,8 +59,8 @@ export class WorkerPool {
           dataType: typeof data.data,
           dataSize: data.data?.byteLength
         });
-        task.onComplete(data);
-        this.completeTask(worker);
+        
+        task.onComplete(data, () =>{this.completeTask(worker);});
       } else if (data.type === 'error' && task.onError) {
         console.error(`Worker pool: Error for task ${taskId}:`, data.error);
         task.onError(data);
