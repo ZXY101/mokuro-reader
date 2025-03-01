@@ -5,10 +5,12 @@
   import { Button, Listgroup } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga } from '$lib/util';
+  import { promptExtraction } from '$lib/util/modals';
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume } from '$lib/settings';
   import { mangaStats} from '$lib/settings';
+  import ExtractionModal from '$lib/components/ExtractionModal.svelte';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -39,9 +41,19 @@
   }
 
   async function onExtract() {
-    if (manga) {
-      loading = true;
-      loading = await zipManga(manga);
+    if (manga && manga.length > 0) {
+      const firstVolume = {
+        series_title: manga[0].series_title,
+        volume_title: manga[0].volume_title
+      };
+      
+      promptExtraction(
+        firstVolume,
+        async (asCbz, individualVolumes, includeSeriesTitle) => {
+          loading = true;
+          loading = await zipManga(manga, asCbz, individualVolumes, includeSeriesTitle);
+        }
+      );
     }
   }
 </script>

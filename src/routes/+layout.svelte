@@ -7,6 +7,7 @@
   import NavBar from '$lib/components/NavBar.svelte';
   import Snackbar from '$lib/components/Snackbar.svelte';
   import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';
+  import ExtractionModal from '$lib/components/ExtractionModal.svelte';
 
   inject({ mode: dev ? 'development' : 'production' });
 
@@ -21,4 +22,5 @@
   <slot />
   <Snackbar />
   <ConfirmationPopup />
+  <ExtractionModal />
 </div>
