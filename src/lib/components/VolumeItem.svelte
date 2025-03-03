@@ -72,11 +72,11 @@
           <p>{progressDisplay}</p>
         </div>
         <div class="flex gap-2">
-          <TrashBinSolid
-            withEvents
-            class="text-red-400 hover:text-red-500 z-10 poin"
-            on:click={onDeleteClicked}
-          />
+          <button onclick={onDeleteClicked} class="flex items-center justify-center">
+            <TrashBinSolid
+              class="text-red-400 hover:text-red-500 z-10 poin"
+            />
+          </button>
           {#if isComplete}
             <CheckCircleSolid />
           {/if}
