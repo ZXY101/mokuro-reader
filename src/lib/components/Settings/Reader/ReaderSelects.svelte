@@ -3,8 +3,8 @@
   import { settings, updateSetting } from '$lib/settings';
   import type { SettingsKey } from '$lib/settings';
 
-  $: zoomModeValue = $settings.zoomDefault;
-  $: fontSizeValue = $settings.fontSize;
+  let zoomModeValue = $derived($settings.zoomDefault);
+  let fontSizeValue = $derived($settings.fontSize);
 
   let zoomModes = [
     { value: 'zoomFitToScreen', name: 'Fit to screen' },

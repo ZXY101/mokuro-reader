@@ -1,10 +1,16 @@
 <script lang="ts">
   import { A, Fileupload, Label } from 'flowbite-svelte';
 
-  export let files: FileList | undefined = undefined;
-  export let onUpload: ((files: FileList) => void) | undefined = undefined;
+  interface Props {
+    files?: FileList | undefined;
+    onUpload?: ((files: FileList) => void) | undefined;
+    children?: import('svelte').Snippet;
+    [key: string]: any
+  }
 
-  let input: HTMLInputElement;
+  let { files = $bindable(undefined), onUpload = undefined, children, ...rest }: Props = $props();
+
+  let input: HTMLInputElement = $state();
 
   function handleChange() {
     if (files && onUpload) {
@@ -21,9 +27,9 @@
   type="file"
   bind:files
   bind:this={input}
-  on:change={handleChange}
-  {...$$restProps}
+  onchange={handleChange}
+  {...rest}
   class="hidden"
 />
 
-<A on:click={onClick}><slot>Upload</slot></A>
+<A on:click={onClick}>{#if children}{@render children()}{:else}Upload{/if}</A>

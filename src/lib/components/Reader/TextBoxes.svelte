@@ -4,10 +4,14 @@
   import { settings } from '$lib/settings';
   import { imageToWebp, showCropper, updateLastCard } from '$lib/anki-connect';
 
-  export let page: Page;
-  export let src: File;
+  interface Props {
+    page: Page;
+    src: File;
+  }
 
-  $: textBoxes = page.blocks
+  let { page, src }: Props = $props();
+
+  let textBoxes = $derived(page.blocks
     .map((block) => {
       const { img_height, img_width } = page;
       const { box, font_size, lines, vertical } = block;
@@ -38,14 +42,14 @@
     })
     .sort(({ area: a }, { area: b }) => {
       return b - a;
-    });
+    }));
 
-  $: fontWeight = $settings.boldFont ? 'bold' : '400';
-  $: display = $settings.displayOCR ? 'block' : 'none';
-  $: border = $settings.textBoxBorders ? '1px solid red' : 'none';
-  $: contenteditable = $settings.textEditable;
+  let fontWeight = $derived($settings.boldFont ? 'bold' : '400');
+  let display = $derived($settings.displayOCR ? 'block' : 'none');
+  let border = $derived($settings.textBoxBorders ? '1px solid red' : 'none');
+  let contenteditable = $derived($settings.textEditable);
 
-  $: triggerMethod = $settings.ankiConnectSettings.triggerMethod || 'both';
+  let triggerMethod = $derived($settings.ankiConnectSettings.triggerMethod || 'both');
 
   async function onUpdateCard(lines: string[]) {
     if ($settings.ankiConnectSettings.enabled) {
@@ -89,8 +93,8 @@
     style:border
     style:writing-mode={writingMode}
     role="none"
-    on:contextmenu={(e) => onContextMenu(e, lines)}
-    on:dblclick={(e) => onDoubleTap(e, lines)}
+    oncontextmenu={(e) => onContextMenu(e, lines)}
+    ondblclick={(e) => onDoubleTap(e, lines)}
     {contenteditable}
   >
     {#each lines as line}

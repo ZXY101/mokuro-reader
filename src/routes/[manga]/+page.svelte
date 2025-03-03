@@ -19,9 +19,10 @@
     });
   }
 
-  $: manga = $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga);
+  let manga = $derived($catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga));
 
-  $: loading = false;
+  let loading = $state(false);
+  
 
   async function confirmDelete() {
     const seriesUuid = manga?.[0].series_uuid;

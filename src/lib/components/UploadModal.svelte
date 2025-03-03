@@ -7,10 +7,14 @@
   import { formatBytes } from '$lib/util/upload';
   import { toClipboard } from '$lib/util';
 
-  export let open = false;
+  interface Props {
+    open?: boolean;
+  }
 
-  let promise: Promise<void>;
-  let files: FileList | undefined = undefined;
+  let { open = $bindable(false) }: Props = $props();
+
+  let promise: Promise<void> = $state();
+  let files: FileList | undefined = $state(undefined);
 
   async function onUpload() {
     if (files) {
@@ -29,7 +33,7 @@
     draggedFiles = undefined;
   }
 
-  let storageSpace = '';
+  let storageSpace = $state('');
 
   onMount(() => {
     navigator?.storage?.estimate().then(({ usage, quota }) => {
@@ -40,9 +44,9 @@
   });
 
   let filePromises: Promise<File>[];
-  let draggedFiles: File[] | undefined;
-  let loading = false;
-  $: disabled = loading || (!draggedFiles && !files);
+  let draggedFiles: File[] | undefined = $state();
+  let loading = $state(false);
+  let disabled = $derived(loading || (!draggedFiles && !files));
 
   const dropHandle = async (event: DragEvent) => {
     loading = true;
@@ -83,7 +87,7 @@
   let highlightStyle =
     'flex flex-col justify-center items-center w-full h-64 bg-gray-50 rounded-lg border-2 border-gray-300 border-dashed cursor-pointer dark:bg-bray-800 dark:bg-gray-700 bg-gray-100 dark:border-gray-600 dark:border-gray-500 dark:bg-gray-600';
 
-  let activeStyle = defaultStyle;
+  let activeStyle = $state(defaultStyle);
 </script>
 
 <Modal title="Upload" bind:open outsideclose on:close={reset}>
@@ -93,14 +97,16 @@
   {:then}
     <Accordion flush>
       <AccordionItem>
-        <span slot="header">What to upload?</span>
+        {#snippet header()}
+                <span >What to upload?</span>
+              {/snippet}
         <div class="flex flex-col gap-5">
           <div>
             <p>
               Firstly, ensure that you process your manga with the <b>0.2.0-beta.6</b> of mokuro, you
               can install it by running the following command:
             </p>
-            <div role="none" on:click={toClipboard}>
+            <div role="none" onclick={toClipboard}>
               <code class="text-primary-600 bg-slate-900"
                 >pip3 install git+https://github.com/kha-white/mokuro.git@web-reader</code
               >

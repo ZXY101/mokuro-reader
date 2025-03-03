@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { processFiles } from '$lib/upload';
   import { parseVolumesFromJson } from '$lib/settings';
 
-  /** @type {string} */
-  export let accessToken = '';
+  
   import { formatBytes, showSnackbar, uploadFile } from '$lib/util';
   import { Button } from 'flowbite-svelte';
   import { onMount } from 'svelte';
@@ -11,6 +12,11 @@
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { profiles, volumes } from '$lib/settings';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
+  interface Props {
+    accessToken?: string;
+  }
+
+  let { accessToken = $bindable('') }: Props = $props();
   
   // Helper function to handle errors consistently
   function handleDriveError(error: any, context: string) {
@@ -48,15 +54,17 @@
 
   let tokenClient: any;
   let readerFolderId = '';
-  let volumeDataId = '';
-  let profilesId = '';
+  let volumeDataId = $state('');
+  let profilesId = $state('');
 
   // This variable is used to track if we're connected to Google Drive
   // and is used in the UI to show/hide the login button
 
-  $: if (accessToken) {
-    localStorage.setItem('gdrive_token', accessToken);
-  }
+  run(() => {
+    if (accessToken) {
+      localStorage.setItem('gdrive_token', accessToken);
+    }
+  });
 
   async function getFileSize(fileId: string): Promise<number> {
     try {
@@ -927,7 +935,7 @@
     <div class="flex justify-center pt-0 sm:pt-32">
       <button
         class="w-full border rounded-lg border-slate-600 p-10 border-opacity-50 hover:bg-slate-800 max-w-3xl"
-        on:click={signIn}
+        onclick={signIn}
       >
         <div class="flex sm:flex-row flex-col gap-2 items-center justify-center">
           <GoogleSolid size="lg" />

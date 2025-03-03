@@ -21,7 +21,11 @@
     easing: sineIn
   };
 
-  export let hidden = true;
+  interface Props {
+    hidden?: boolean;
+  }
+
+  let { hidden = $bindable(true) }: Props = $props();
 
   function onReset() {
     hidden = true;

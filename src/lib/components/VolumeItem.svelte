@@ -8,18 +8,22 @@
   import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
 
-  export let volume: VolumeMetadata;
+  interface Props {
+    volume: VolumeMetadata;
+  }
+
+  let { volume }: Props = $props();
 
   const volName = decodeURI(volume.volume_title);
 
-  $: volume_uuid = volume.volume_uuid;
-  $: currentPage = $progress?.[volume.volume_uuid || 0] || 1;
-  $: progressDisplay = `${
+  let volume_uuid = $derived(volume.volume_uuid);
+  let currentPage = $derived($progress?.[volume.volume_uuid || 0] || 1);
+  let progressDisplay = $derived(`${
     currentPage === volume.page_count - 1 ? currentPage + 1 : currentPage
-  } / ${volume.page_count}`;
-  $: isComplete =
-    currentPage === volume.page_count ||
-    currentPage === volume.page_count - 1;
+  } / ${volume.page_count}`);
+  let isComplete =
+    $derived(currentPage === volume.page_count ||
+    currentPage === volume.page_count - 1);
 
   async function onDeleteClicked(e: Event) {
     e.stopPropagation();

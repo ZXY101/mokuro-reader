@@ -7,9 +7,9 @@
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
 
-  let settingsHidden = true;
-  let uploadModalOpen = false;
-  let isReader = false;
+  let settingsHidden = $state(true);
+  let uploadModalOpen = $state(false);
+  let isReader = $state(false);
 
   function openSettings() {
     settingsHidden = false;
