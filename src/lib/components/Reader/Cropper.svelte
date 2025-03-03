@@ -44,7 +44,9 @@
   }
 
   function onCropComplete(e: any) {
-    pixels = e.detail.pixels;
+    // In v4, the event detail structure might have changed
+    // Check if e.detail.pixels exists, otherwise use e.detail directly
+    pixels = e.detail.pixels || e.detail;
   }
 </script>
 

@@ -19,19 +19,19 @@
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
     "@testing-library/svelte": "^5.2.7",
     "@types/gapi.client.drive-v3": "^0.0.4",
-    "@typescript-eslint/eslint-plugin": "^5.45.0",
-    "@typescript-eslint/parser": "^5.45.0",
+    "@typescript-eslint/eslint-plugin": "^8.26.0",
+    "@typescript-eslint/parser": "^8.26.0",
     "@vitest/coverage-v8": "^3.0.7",
     "autoprefixer": "^10.4.14",
-    "eslint": "^8.28.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-svelte": "^2.45.1",
+    "eslint": "^9.21.0",
+    "eslint-config-prettier": "^10.0.2",
+    "eslint-plugin-svelte": "^3.0.2",
     "flowbite": "^3.1.2",
     "flowbite-svelte": "^0.48.4",
     "flowbite-svelte-icons": "^2.0.2",
     "jsdom": "^26.0.0",
     "postcss": "^8.4.24",
-    "postcss-load-config": "^4.0.1",
+    "postcss-load-config": "^6.0.1",
     "prettier": "^3.1.0",
     "prettier-plugin-svelte": "^3.2.6",
     "sass": "^1.64.2",
@@ -52,6 +52,6 @@
     "@zip.js/zip.js": "^2.7.57",
     "dexie": "^4.0.1-alpha.25",
     "panzoom": "^9.4.3",
-    "svelte-easy-crop": "^2.0.1"
+    "svelte-easy-crop": "^4.0.0"
   }
 }
