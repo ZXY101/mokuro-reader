@@ -2,7 +2,7 @@
   import { settings, updateSetting, type SettingsKey } from '$lib/settings';
   import { Toggle } from 'flowbite-svelte';
 
-  $: toggles = [
+  let toggles = $derived([
     { key: 'defaultFullscreen', text: 'Open reader in fullscreen', value: $settings.defaultFullscreen },
     { key: 'textEditable', text: 'Editable text', value: $settings.textEditable },
     { key: 'textBoxBorders', text: 'Text box borders', value: $settings.textBoxBorders },
@@ -15,7 +15,7 @@
     { key: 'showTimer', text: 'Show timer', value: $settings.showTimer },
     { key: 'quickActions', text: 'Show quick actions', value: $settings.quickActions },
     { key: 'invertColors', text: 'Invert colors of the images', value: $settings.invertColors }
-  ] as { key: SettingsKey; text: string; value: any }[];
+  ] as { key: SettingsKey; text: string; value: any }[]);
 </script>
 
 {#each toggles as { key, text, value }}

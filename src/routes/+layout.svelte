@@ -9,6 +9,11 @@
   import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';
   import ExtractionModal from '$lib/components/ExtractionModal.svelte';
   import ProgressTracker from '$lib/components/ProgressTracker.svelte';
+  interface Props {
+    children?: import('svelte').Snippet;
+  }
+
+  let { children }: Props = $props();
 
   inject({ mode: dev ? 'development' : 'production' });
 
@@ -20,7 +25,7 @@
 
 <div class=" h-full min-h-[100svh] text-white">
   <NavBar />
-  <slot />
+  {@render children?.()}
   <Snackbar />
   <ConfirmationPopup />
   <ExtractionModal />

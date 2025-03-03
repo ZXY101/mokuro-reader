@@ -6,9 +6,9 @@
   import { onMount } from 'svelte';
   import Cropper from 'svelte-easy-crop';
 
-  let open = false;
+  let open = $state(false);
   let pixels: Pixels;
-  let loading = false;
+  let loading = $state(false);
 
   afterNavigate(() => {
     close();

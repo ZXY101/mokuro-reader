@@ -21,7 +21,12 @@
     easing: sineIn
   };
 
-  export let hidden = true;
+  interface Props {
+    hidden?: boolean;
+  }
+
+  // In Svelte 5, we need to make sure the hidden prop is properly bindable
+  let { hidden = $bindable(true) }: Props = $props();
 
   function onReset() {
     hidden = true;

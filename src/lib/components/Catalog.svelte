@@ -8,7 +8,27 @@
   import CatalogListItem from './CatalogListItem.svelte';
   import { isUpgrading } from '$lib/catalog/db';
 
-  $: sortedCatalog = $catalog.sort((a, b) => {
+
+  let search = $state('');
+
+  function onLayout() {
+    if ($miscSettings.galleryLayout === 'list') {
+      updateMiscSetting('galleryLayout', 'grid');
+    } else {
+      updateMiscSetting('galleryLayout', 'list');
+    }
+  }
+
+  function onOrder() {
+    if ($miscSettings.gallerySorting === 'SMART') {
+      updateMiscSetting('gallerySorting', 'ASC');
+    } else if ($miscSettings.gallerySorting === 'ASC') {
+      updateMiscSetting('gallerySorting', 'DESC');
+    } else {
+      updateMiscSetting('gallerySorting', 'SMART');
+    }
+  }
+  let sortedCatalog = $derived($catalog.sort((a, b) => {
       if ($miscSettings.gallerySorting === 'ASC') {
         return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
       } else if ($miscSettings.gallerySorting === 'DESC') {
@@ -46,27 +66,7 @@
     })
     .filter((item) => {
       return item.title.toLowerCase().indexOf(search.toLowerCase()) !== -1;
-    });
-
-  let search = '';
-
-  function onLayout() {
-    if ($miscSettings.galleryLayout === 'list') {
-      updateMiscSetting('galleryLayout', 'grid');
-    } else {
-      updateMiscSetting('galleryLayout', 'list');
-    }
-  }
-
-  function onOrder() {
-    if ($miscSettings.gallerySorting === 'SMART') {
-      updateMiscSetting('gallerySorting', 'ASC');
-    } else if ($miscSettings.gallerySorting === 'ASC') {
-      updateMiscSetting('gallerySorting', 'DESC');
-    } else {
-      updateMiscSetting('gallerySorting', 'SMART');
-    }
-  }
+    }));
 </script>
 
 {#if $catalog}

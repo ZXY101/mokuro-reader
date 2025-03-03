@@ -7,12 +7,22 @@
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
 
-  let settingsHidden = true;
-  let uploadModalOpen = false;
-  let isReader = false;
+  // Use $state to make these reactive
+  let settingsHidden = $state(true);
+  let uploadModalOpen = $state(false);
+  let isReader = $state(false);
 
+  // Define event handlers
   function openSettings() {
     settingsHidden = false;
+  }
+
+  function openUploadModal() {
+    uploadModalOpen = true;
+  }
+
+  function navigateToCloud() {
+    goto('/cloud');
   }
 
   afterNavigate(() => {
@@ -35,9 +45,9 @@
       </div>
     </NavBrand>
     <div class="flex md:order-2 gap-5">
-      <UserSettingsSolid class="hover:text-primary-700" on:click={openSettings} />
-      <UploadSolid class="hover:text-primary-700" on:click={() => (uploadModalOpen = true)} />
-      <CloudArrowUpOutline class="hover:text-primary-700" on:click={() => goto('/cloud')} />
+      <UserSettingsSolid withEvents class="hover:text-primary-700 cursor-pointer" on:click={openSettings} />
+      <UploadSolid withEvents class="hover:text-primary-700 cursor-pointer" on:click={openUploadModal} />
+      <CloudArrowUpOutline withEvents class="hover:text-primary-700 cursor-pointer" on:click={navigateToCloud} />
     </div>
   </Navbar>
 </div>

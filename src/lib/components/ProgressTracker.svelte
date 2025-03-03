@@ -1,10 +1,10 @@
 <script lang="ts">
   import { Progressbar, Button } from 'flowbite-svelte';
-  import { ChevronUpSolid, ChevronDownSolid, CloseSolid } from 'flowbite-svelte-icons';
+  import { CaretUpSolid, CaretDownSolid, CloseCircleSolid } from 'flowbite-svelte-icons';
   import { formatBytes } from '$lib/util';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
 
-  let expanded = true;
+  let expanded = $state(true);
   
   function toggleExpanded() {
     expanded = !expanded;
@@ -19,8 +19,8 @@
   <div class="fixed bottom-4 right-4 z-50 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 w-80 overflow-hidden transition-all duration-200">
     <div 
       class="flex justify-between items-center p-3 bg-primary-100 dark:bg-primary-900 cursor-pointer" 
-      on:click={toggleExpanded}
-      on:keydown={(e) => e.key === 'Enter' && toggleExpanded()}
+      onclick={toggleExpanded}
+      onkeydown={(e) => e.key === 'Enter' && toggleExpanded()}
       role="button"
       tabindex="0"
     >
@@ -33,9 +33,9 @@
       </div>
       <div>
         {#if expanded}
-          <ChevronDownSolid class="w-4 h-4" />
+          <CaretDownSolid class="w-4 h-4" />
         {:else}
-          <ChevronUpSolid class="w-4 h-4" />
+          <CaretUpSolid class="w-4 h-4" />
         {/if}
       </div>
     </div>
@@ -47,7 +47,7 @@
             <div class="flex justify-between items-center mb-1">
               <div class="text-sm font-medium">{process.description}</div>
               <Button size="xs" color="none" class="p-1" on:click={() => removeProcess(process.id)}>
-                <CloseSolid class="w-3 h-3" />
+                <CloseCircleSolid withEvents class="w-3 h-3" />
               </Button>
             </div>
             

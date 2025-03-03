@@ -1,13 +1,15 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { Button, Modal, Toggle } from 'flowbite-svelte';
   import { extractionModalStore } from '$lib/util/modals';
   import { onMount } from 'svelte';
 
-  let open = false;
-  let asCbz = true;
-  let individualVolumes = false;
-  let includeSeriesTitle = true;
-  let firstVolumePreview = '';
+  let open = $state(false);
+  let asCbz = $state(true);
+  let individualVolumes = $state(false);
+  let includeSeriesTitle = $state(true);
+  let firstVolumePreview = $state('');
 
   onMount(() => {
     extractionModalStore.subscribe((value) => {
@@ -47,15 +49,19 @@
     open = false;
   }
 
-  $: if ($extractionModalStore?.firstVolume) {
-    updateFilenamePreview($extractionModalStore.firstVolume);
-  }
-
-  $: if (asCbz !== undefined || includeSeriesTitle !== undefined || individualVolumes !== undefined) {
+  run(() => {
     if ($extractionModalStore?.firstVolume) {
       updateFilenamePreview($extractionModalStore.firstVolume);
     }
-  }
+  });
+
+  run(() => {
+    if (asCbz !== undefined || includeSeriesTitle !== undefined || individualVolumes !== undefined) {
+      if ($extractionModalStore?.firstVolume) {
+        updateFilenamePreview($extractionModalStore.firstVolume);
+      }
+    }
+  });
 </script>
 
 <Modal bind:open size="md" autoclose outsideclose>
