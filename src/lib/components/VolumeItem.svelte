@@ -51,7 +51,7 @@
 {#if $page.params.manga}
   <Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
     <ListgroupItem
-      onclick={() => goto(`/${$page.params.manga}/${volume_uuid}`)}
+      on:click={() => goto(`/${$page.params.manga}/${volume_uuid}`)}
       normalClass="py-4"
     >
       {#if volume.thumbnail}
