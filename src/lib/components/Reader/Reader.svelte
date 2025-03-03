@@ -286,11 +286,13 @@
     <div class="flex flex-col gap-3">
       <div class="flex flex-row items-center gap-5 z-10">
         <BackwardStepSolid
+          withEvents
           on:click={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}
           class="hover:text-primary-600"
           size="sm"
         />
         <CaretLeftSolid
+          withEvents
           on:click={(e) => left(e, true)}
           class="hover:text-primary-600"
           size="sm"
@@ -310,11 +312,13 @@
           on:blur={onManualPageChange}
         />
         <CaretRightSolid
+          withEvents
           on:click={(e) => right(e, true)}
           class="hover:text-primary-600"
           size="sm"
         />
         <ForwardStepSolid
+          withEvents
           on:click={() => changePage(volumeSettings.rightToLeft ? 1 : pages.length, true)}
           class="hover:text-primary-600"
           size="sm"
