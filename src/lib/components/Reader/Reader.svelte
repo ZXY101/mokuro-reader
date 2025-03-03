@@ -285,44 +285,44 @@
   <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
     <div class="flex flex-col gap-3">
       <div class="flex flex-row items-center gap-5 z-10">
-        <BackwardStepSolid
-          withEvents
-          on:click={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
-        <CaretLeftSolid
-          withEvents
-          on:click={(e) => left(e, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
+        <button onclick={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}>
+          <BackwardStepSolid
+            class="hover:text-primary-600"
+            size="sm"
+          />
+        </button>
+        <button onclick={(e) => left(e, true)}>
+          <CaretLeftSolid
+            class="hover:text-primary-600"
+            size="sm"
+          />
+        </button>
         <Input
           type="number"
           size="sm"
           bind:value={manualPage}
-          on:click={onInputClick}
-          on:change={onManualPageChange}
-          on:keydown={(e) => {
+          onclick={onInputClick}
+          onchange={onManualPageChange}
+          onkeydown={(e) => {
             if (e.key === 'Enter') {
               onManualPageChange();
               e.currentTarget.blur();
             }
           }}
-          on:blur={onManualPageChange}
+          onblur={onManualPageChange}
         />
-        <CaretRightSolid
-          withEvents
-          on:click={(e) => right(e, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
-        <ForwardStepSolid
-          withEvents
-          on:click={() => changePage(volumeSettings.rightToLeft ? 1 : pages.length, true)}
-          class="hover:text-primary-600"
-          size="sm"
-        />
+        <button onclick={(e) => right(e, true)}>
+          <CaretRightSolid
+            class="hover:text-primary-600"
+            size="sm"
+          />
+        </button>
+        <button onclick={() => changePage(volumeSettings.rightToLeft ? 1 : pages.length, true)}>
+          <ForwardStepSolid
+            class="hover:text-primary-600"
+            size="sm"
+          />
+        </button>
       </div>
       <div style:direction={volumeSettings.rightToLeft ? 'rtl' : 'ltr'}>
         <Range

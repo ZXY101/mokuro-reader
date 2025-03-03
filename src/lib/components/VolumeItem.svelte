@@ -51,7 +51,7 @@
 {#if $page.params.manga}
   <Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
     <ListgroupItem
-      on:click={() => goto(`/${$page.params.manga}/${volume_uuid}`)}
+      onclick={() => goto(`/${$page.params.manga}/${volume_uuid}`)}
       normalClass="py-4"
     >
       {#if volume.thumbnail}
@@ -72,11 +72,11 @@
           <p>{progressDisplay}</p>
         </div>
         <div class="flex gap-2">
-          <TrashBinSolid
-            withEvents
-            class="text-red-400 hover:text-red-500 z-10 poin"
-            on:click={onDeleteClicked}
-          />
+          <button onclick={onDeleteClicked} class="flex items-center justify-center">
+            <TrashBinSolid
+              class="text-red-400 hover:text-red-500 z-10 poin"
+            />
+          </button>
           {#if isComplete}
             <CheckCircleSolid />
           {/if}
