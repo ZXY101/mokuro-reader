@@ -11,6 +11,7 @@
     open?: boolean;
   }
 
+  // In Svelte 5, we need to make sure the open prop is properly bindable
   let { open = $bindable(false) }: Props = $props();
 
   let promise: Promise<void> = $state();

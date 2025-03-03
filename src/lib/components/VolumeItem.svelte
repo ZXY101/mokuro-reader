@@ -73,6 +73,7 @@
         </div>
         <div class="flex gap-2">
           <TrashBinSolid
+            withEvents
             class="text-red-400 hover:text-red-500 z-10 poin"
             on:click={onDeleteClicked}
           />
