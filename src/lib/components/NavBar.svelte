@@ -45,9 +45,15 @@
       </div>
     </NavBrand>
     <div class="flex md:order-2 gap-5">
-      <UserSettingsSolid withEvents class="hover:text-primary-700 cursor-pointer" on:click={openSettings} />
-      <UploadSolid withEvents class="hover:text-primary-700 cursor-pointer" on:click={openUploadModal} />
-      <CloudArrowUpOutline withEvents class="hover:text-primary-700 cursor-pointer" on:click={navigateToCloud} />
+      <button onclick={openSettings} class="flex items-center justify-center">
+        <UserSettingsSolid class="hover:text-primary-700 cursor-pointer" />
+      </button>
+      <button onclick={openUploadModal} class="flex items-center justify-center">
+        <UploadSolid class="hover:text-primary-700 cursor-pointer" />
+      </button>
+      <button onclick={navigateToCloud} class="flex items-center justify-center">
+        <CloudArrowUpOutline class="hover:text-primary-700 cursor-pointer" />
+      </button>
     </div>
   </Navbar>
 </div>
