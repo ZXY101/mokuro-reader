@@ -14,8 +14,9 @@
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
-    "@sveltejs/adapter-auto": "^2.0.0",
-    "@sveltejs/kit": "^1.20.4",
+    "@sveltejs/adapter-auto": "^3.0.0",
+    "@sveltejs/kit": "^2.0.0",
+    "@sveltejs/vite-plugin-svelte": "^3.0.0",
     "@testing-library/svelte": "^5.2.7",
     "@types/gapi.client.drive-v3": "^0.0.4",
     "@typescript-eslint/eslint-plugin": "^5.45.0",
