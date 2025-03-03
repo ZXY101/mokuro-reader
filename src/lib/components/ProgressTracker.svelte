@@ -46,7 +46,7 @@
           <div class="mb-4 last:mb-0">
             <div class="flex justify-between items-center mb-1">
               <div class="text-sm font-medium">{process.description}</div>
-              <Button size="xs" color="none" class="p-1" onclick={() => removeProcess(process.id)}>
+              <Button size="xs" color="none" class="p-1" on:click={() => removeProcess(process.id)}>
                 <CloseCircleSolid class="w-3 h-3" />
               </Button>
             </div>

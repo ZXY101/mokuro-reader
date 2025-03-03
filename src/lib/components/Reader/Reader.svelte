@@ -301,15 +301,15 @@
           type="number"
           size="sm"
           bind:value={manualPage}
-          onclick={onInputClick}
-          onchange={onManualPageChange}
-          onkeydown={(e) => {
+          on:click={onInputClick}
+          on:change={onManualPageChange}
+          on:keydown={(e) => {
             if (e.key === 'Enter') {
               onManualPageChange();
               e.currentTarget.blur();
             }
           }}
-          onblur={onManualPageChange}
+          on:blur={onManualPageChange}
         />
         <button onclick={(e) => right(e, true)}>
           <CaretRightSolid
