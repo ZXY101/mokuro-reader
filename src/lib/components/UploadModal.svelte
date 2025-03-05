@@ -16,6 +16,21 @@
 
   let promise: Promise<void> = $state();
   let files: FileList | undefined = $state(undefined);
+  let isMobileDevice = $state(false);
+
+  // Check if the device is mobile
+  function checkMobileDevice() {
+    // Using userAgent to detect mobile devices
+    const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+    if (/android|iPad|iPhone|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)) {
+      return true;
+    }
+    
+    // Additional check for touch devices and small screens
+    return (('ontouchstart' in window) || 
+            (navigator.maxTouchPoints > 0) || 
+            (window.innerWidth <= 800 && window.innerHeight <= 900));
+  }
 
   async function onUpload() {
     if (files) {
@@ -37,6 +52,9 @@
   let storageSpace = $state('');
 
   onMount(() => {
+    // Check if device is mobile
+    isMobileDevice = checkMobileDevice();
+    
     navigator?.storage?.estimate().then(({ usage, quota }) => {
       if (usage && quota) {
         storageSpace = `Storage: ${formatBytes(usage)} / ${formatBytes(quota)}`;
@@ -118,9 +136,14 @@
             manga along with the <code>.mokuro</code> files.
           </p>
           <p>
-            On mobile, uploading via directory is not supported so you will need to zip your manga
-            first and then upload it via
-            <code class="text-primary-600 bg-slate-900">choose files</code>.
+            {#if isMobileDevice}
+              <b>Note:</b> On mobile devices, directory upload is not supported. Please zip your manga
+              first and then upload it via <code class="text-primary-600 bg-slate-900">choose files</code>.
+            {:else}
+              On mobile devices, directory upload is not supported. If you're using a mobile device,
+              you will need to zip your manga first and then upload it via
+              <code class="text-primary-600 bg-slate-900">choose files</code>.
+            {/if}
           </p>
         </div>
       </AccordionItem>
@@ -187,24 +210,33 @@
             }}
           >
             choose files
-          </button> /
-          <button 
-            type="button"
-            class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
-            onclick={() => {
-              const input = document.createElement('input');
-              input.type = 'file';
-              input.setAttribute('webkitdirectory', '');
-              input.onchange = (e) => {
-                if (e.target.files.length > 0) {
-                  files = e.target.files;
-                }
-              };
-              input.click();
-            }}
-          >
-            choose directory
           </button>
+          
+          {#if !isMobileDevice}
+            / <button 
+              type="button"
+              class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
+              onclick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.setAttribute('webkitdirectory', '');
+                input.onchange = (e) => {
+                  if (e.target.files.length > 0) {
+                    files = e.target.files;
+                  }
+                };
+                input.click();
+              }}
+            >
+              choose directory
+            </button>
+          {/if}
+          
+          {#if isMobileDevice}
+            <span class="ml-1 text-xs text-gray-500 dark:text-gray-400 italic">
+              (directory upload not available on mobile)
+            </span>
+          {/if}
         </p>
       {/if}
     </Dropzone>
