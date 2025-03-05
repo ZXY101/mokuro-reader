@@ -74,7 +74,7 @@
     <div class="flex flex-col gap-5">
       <div class="flex gap-1 py-2 w-full">
         <div class="flex-grow">
-          <Search bind:value={search} class="w-full" />
+          <Search bind:value={search} class="w-full [&>div>input]:h-10" size="md" />
         </div>
         <Button size="sm" color="alternative" on:click={onLayout} class="min-w-10 h-10 flex items-center justify-center">
           {#if $miscSettings.galleryLayout === 'list'}
