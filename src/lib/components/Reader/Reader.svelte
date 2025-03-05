@@ -235,7 +235,7 @@
 
     return true;
   });
-  let manualPage;
+  let manualPage = $state(0);
   run(() => {
     manualPage = page;
   });
@@ -346,22 +346,26 @@
         style:margin-left={`${$settings.edgeButtonWidth}px`}
         onmousedown={mouseDown}
         onmouseup={left}
+        aria-label="Previous page"
 ></button>
       <button
         class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
         style:margin-right={`${$settings.edgeButtonWidth}px`}
         onmousedown={mouseDown}
         onmouseup={right}
+        aria-label="Next page"
 ></button>
       <button
         class="h-screen fixed top-full -left-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
         onmousedown={mouseDown}
         onmouseup={left}
+        aria-label="Previous page (bottom left)"
 ></button>
       <button
         class="h-screen fixed top-full -right-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
         onmousedown={mouseDown}
         onmouseup={right}
+        aria-label="Next page (bottom right)"
 ></button>
       <div
         class="flex flex-row"
@@ -386,12 +390,14 @@
       onmouseup={left}
       class="left-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
       style:width={`${$settings.edgeButtonWidth}px`}
+      aria-label="Previous page (left edge)"
 ></button>
     <button
       onmousedown={mouseDown}
       onmouseup={right}
       class="right-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
       style:width={`${$settings.edgeButtonWidth}px`}
+      aria-label="Next page (right edge)"
 ></button>
   {/if}
 {:else}
