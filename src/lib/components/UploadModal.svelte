@@ -169,10 +169,42 @@
         <Spinner />
       {:else}
         <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-          Drag and drop / <FileUpload bind:files accept=".mokuro,.zip,.cbz" multiple
-            >choose files</FileUpload
-          > /
-          <FileUpload bind:files webkitdirectory>choose directory</FileUpload>
+          Drag and drop / 
+          <button 
+            type="button"
+            class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
+            onclick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.mokuro,.zip,.cbz';
+              input.multiple = true;
+              input.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                  files = e.target.files;
+                }
+              };
+              input.click();
+            }}
+          >
+            choose files
+          </button> /
+          <button 
+            type="button"
+            class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
+            onclick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.setAttribute('webkitdirectory', '');
+              input.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                  files = e.target.files;
+                }
+              };
+              input.click();
+            }}
+          >
+            choose directory
+          </button>
         </p>
       {/if}
     </Dropzone>
