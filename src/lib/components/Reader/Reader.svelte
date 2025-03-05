@@ -235,7 +235,7 @@
 
     return true;
   });
-  let manualPage;
+  let manualPage = $state(0);
   run(() => {
     manualPage = page;
   });
