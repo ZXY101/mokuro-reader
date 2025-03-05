@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { settings, updateAnkiSetting } from '$lib/settings';
-  import { AccordionItem, Label, Toggle, Input, Helper, Select } from 'flowbite-svelte';
+  import { AccordionItem, Helper, Input, Label, Select, Toggle } from 'flowbite-svelte';
 
   let disabled = $derived(!$settings.ankiConnectSettings.enabled);
 
@@ -25,7 +25,7 @@
 
 <AccordionItem>
   {#snippet header()}
-    <span >Anki Connect</span>
+    <span>Anki Connect</span>
   {/snippet}
   <div class="flex flex-col gap-5">
     <Helper

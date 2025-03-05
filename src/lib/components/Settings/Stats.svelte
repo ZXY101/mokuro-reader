@@ -5,7 +5,7 @@
 
 <AccordionItem>
   {#snippet header()}
-    <span >Stats</span>
+    <span>Stats</span>
   {/snippet}
   <div>
     <p>Completed volumes: {$totalStats?.completed || 0}</p>

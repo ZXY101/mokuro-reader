@@ -18,12 +18,14 @@
 
   let volume_uuid = $derived(volume.volume_uuid);
   let currentPage = $derived($progress?.[volume.volume_uuid || 0] || 1);
-  let progressDisplay = $derived(`${
-    currentPage === volume.page_count - 1 ? currentPage + 1 : currentPage
-  } / ${volume.page_count}`);
-  let isComplete =
-    $derived(currentPage === volume.page_count ||
-    currentPage === volume.page_count - 1);
+  let progressDisplay = $derived(
+    `${
+      currentPage === volume.page_count - 1 ? currentPage + 1 : currentPage
+    } / ${volume.page_count}`
+  );
+  let isComplete = $derived(
+    currentPage === volume.page_count || currentPage === volume.page_count - 1
+  );
 
   async function onDeleteClicked(e: Event) {
     e.stopPropagation();
@@ -60,7 +62,6 @@
           alt="img"
           style="margin-right:10px;"
           class="object-contain w-[50px] h-[70px] bg-black border-gray-900 border"
-
         />
       {/if}
       <div
@@ -73,9 +74,7 @@
         </div>
         <div class="flex gap-2">
           <button onclick={onDeleteClicked} class="flex items-center justify-center">
-            <TrashBinSolid
-              class="text-red-400 hover:text-red-500 z-10 poin"
-            />
+            <TrashBinSolid class="text-red-400 hover:text-red-500 z-10 poin" />
           </button>
           {#if isComplete}
             <CheckCircleSolid />

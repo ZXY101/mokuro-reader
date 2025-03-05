@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Drawer, CloseButton, Button, Accordion } from 'flowbite-svelte';
+  import { Accordion, Button, CloseButton, Drawer } from 'flowbite-svelte';
   import { UserSettingsSolid } from 'flowbite-svelte-icons';
   import { sineIn } from 'svelte/easing';
   import { resetSettings } from '$lib/settings';

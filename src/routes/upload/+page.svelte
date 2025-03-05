@@ -6,6 +6,7 @@
   import { promptConfirmation, showSnackbar } from '$lib/util';
   import { P, Progressbar } from 'flowbite-svelte';
   import { onMount } from 'svelte';
+
   export const BASE_URL = $page.url.searchParams.get('source') || 'https://www.mokuro.moe/manga';
 
   const manga = $page.url.searchParams.get('manga');

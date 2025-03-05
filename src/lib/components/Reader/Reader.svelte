@@ -2,12 +2,23 @@
   import { run } from 'svelte/legacy';
 
   import { currentSeries, currentVolume, currentVolumeData } from '$lib/catalog';
-  import { Panzoom, panzoomStore, toggleFullScreen, zoomDefault, zoomFitToScreen } from '$lib/panzoom';
+  import {
+    Panzoom,
+    panzoomStore,
+    toggleFullScreen,
+    zoomDefault,
+    zoomFitToScreen
+  } from '$lib/panzoom';
   import { progress, settings, updateProgress, type VolumeSettings } from '$lib/settings';
   import { clamp, debounce, fireExstaticEvent } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
-  import { BackwardStepSolid, ForwardStepSolid, CaretLeftSolid, CaretRightSolid } from 'flowbite-svelte-icons';
+  import {
+    BackwardStepSolid,
+    CaretLeftSolid,
+    CaretRightSolid,
+    ForwardStepSolid
+  } from 'flowbite-svelte-icons';
   import Cropper from './Cropper.svelte';
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
@@ -21,7 +32,6 @@
   }
 
   let { volumeSettings }: Props = $props();
-
 
   let start: Date;
 
@@ -52,11 +62,14 @@
       const { charCount } = getCharCount(pages, pageClamped);
       if (pageClamped !== newPage) {
         let seriesVolumes = $currentSeries;
-        const currentVolumeIndex = seriesVolumes.findIndex((v) => v.volume_uuid === volume.volume_uuid);
+        const currentVolumeIndex = seriesVolumes.findIndex(
+          (v) => v.volume_uuid === volume.volume_uuid
+        );
         if (newPage < 1) {
           // open previous volume
           const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-          if (previousVolume) window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
+          if (previousVolume)
+            window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
           else window.location.href = `/${volume.series_uuid}`;
         } else if (newPage > pages.length) {
           // open next volume
@@ -127,7 +140,6 @@
     }
   }
 
-
   let startX = 0;
   let startY = 0;
   let touchStart: Date;
@@ -183,7 +195,6 @@
     }
   }
 
-
   onMount(() => {
     if ($settings.defaultFullscreen) {
       document.documentElement.requestFullscreen();
@@ -215,11 +226,12 @@
   let pages = $derived(volumeData?.pages || []);
   let page = $derived($progress?.[volume?.volume_uuid || 0] || 1);
   let index = $derived(page - 1);
-  let navAmount =
-    $derived(volumeSettings.singlePageView ||
-    (volumeSettings.hasCover && !volumeSettings.singlePageView && index === 0)
+  let navAmount = $derived(
+    volumeSettings.singlePageView ||
+      (volumeSettings.hasCover && !volumeSettings.singlePageView && index === 0)
       ? 1
-      : 2);
+      : 2
+  );
   let showSecondPage = $derived(() => {
     if (!pages) {
       return false;
@@ -239,9 +251,9 @@
   run(() => {
     manualPage = page;
   });
-  let pageDisplay = $derived(showSecondPage()
-    ? `${page},${page + 1} / ${pages?.length}`
-    : `${page} / ${pages?.length}`);
+  let pageDisplay = $derived(
+    showSecondPage() ? `${page},${page + 1} / ${pages?.length}` : `${page} / ${pages?.length}`
+  );
   let charCount = $derived($settings.charCount ? getCharCount(pages, page).charCount : 0);
   let maxCharCount = $derived(getCharCount(pages).charCount);
   let charDisplay = $derived(`${charCount} / ${maxCharCount}`);
@@ -286,16 +298,10 @@
     <div class="flex flex-col gap-3">
       <div class="flex flex-row items-center gap-5 z-10">
         <button onclick={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}>
-          <BackwardStepSolid
-            class="hover:text-primary-600"
-            size="sm"
-          />
+          <BackwardStepSolid class="hover:text-primary-600" size="sm" />
         </button>
         <button onclick={(e) => left(e, true)}>
-          <CaretLeftSolid
-            class="hover:text-primary-600"
-            size="sm"
-          />
+          <CaretLeftSolid class="hover:text-primary-600" size="sm" />
         </button>
         <Input
           type="number"
@@ -312,16 +318,10 @@
           on:blur={onManualPageChange}
         />
         <button onclick={(e) => right(e, true)}>
-          <CaretRightSolid
-            class="hover:text-primary-600"
-            size="sm"
-          />
+          <CaretRightSolid class="hover:text-primary-600" size="sm" />
         </button>
         <button onclick={() => changePage(volumeSettings.rightToLeft ? 1 : pages.length, true)}>
-          <ForwardStepSolid
-            class="hover:text-primary-600"
-            size="sm"
-          />
+          <ForwardStepSolid class="hover:text-primary-600" size="sm" />
         </button>
       </div>
       <div style:direction={volumeSettings.rightToLeft ? 'rtl' : 'ltr'}>
@@ -346,23 +346,23 @@
         style:margin-left={`${$settings.edgeButtonWidth}px`}
         onmousedown={mouseDown}
         onmouseup={left}
-></button>
+      ></button>
       <button
         class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
         style:margin-right={`${$settings.edgeButtonWidth}px`}
         onmousedown={mouseDown}
         onmouseup={right}
-></button>
+      ></button>
       <button
         class="h-screen fixed top-full -left-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
         onmousedown={mouseDown}
         onmouseup={left}
-></button>
+      ></button>
       <button
         class="h-screen fixed top-full -right-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
         onmousedown={mouseDown}
         onmouseup={right}
-></button>
+      ></button>
       <div
         class="flex flex-row"
         class:flex-row-reverse={!volumeSettings.rightToLeft}
@@ -386,13 +386,13 @@
       onmouseup={left}
       class="left-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
       style:width={`${$settings.edgeButtonWidth}px`}
-></button>
+    ></button>
     <button
       onmousedown={mouseDown}
       onmouseup={right}
       class="right-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
       style:width={`${$settings.edgeButtonWidth}px`}
-></button>
+    ></button>
   {/if}
 {:else}
   <div class="fixed z-50 left-1/2 top-1/2">

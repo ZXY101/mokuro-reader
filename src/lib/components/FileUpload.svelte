@@ -1,11 +1,9 @@
 <script lang="ts">
-  import { A, Fileupload, Label } from 'flowbite-svelte';
-
   interface Props {
     files?: FileList | undefined;
     onUpload?: ((files: FileList) => void) | undefined;
     children?: import('svelte').Snippet;
-    [key: string]: any
+    [key: string]: any;
   }
 
   let { files = $bindable(undefined), onUpload = undefined, children, ...rest }: Props = $props();
@@ -25,7 +23,7 @@
   });
 </script>
 
-<button 
+<button
   type="button"
   onclick={handleClick}
   class="inline-flex items-center hover:underline text-primary-600 dark:text-primary-500 cursor-pointer bg-transparent border-none p-0 m-0"
@@ -33,10 +31,4 @@
   {#if children}{@render children()}{:else}Upload{/if}
 </button>
 
-<input
-  type="file"
-  bind:files
-  bind:this={fileInput}
-  {...rest}
-  class="hidden"
-/>
+<input type="file" bind:files bind:this={fileInput} {...rest} class="hidden" />

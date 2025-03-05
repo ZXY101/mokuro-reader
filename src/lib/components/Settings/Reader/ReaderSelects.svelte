@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Select, Input, Label } from 'flowbite-svelte';
-  import { settings, updateSetting } from '$lib/settings';
+  import { Input, Label, Select } from 'flowbite-svelte';
   import type { SettingsKey } from '$lib/settings';
+  import { settings, updateSetting } from '$lib/settings';
 
   let zoomModeValue = $derived($settings.zoomDefault);
   let fontSizeValue = $derived($settings.fontSize);

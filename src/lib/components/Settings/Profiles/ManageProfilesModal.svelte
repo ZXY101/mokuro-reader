@@ -9,11 +9,11 @@
     renameProfile
   } from '$lib/settings';
   import { promptConfirmation, showSnackbar } from '$lib/util';
-  import { Listgroup, ListgroupItem, Modal, Input } from 'flowbite-svelte';
+  import { Input, Listgroup, ListgroupItem, Modal } from 'flowbite-svelte';
   import {
     CirclePlusSolid,
-    FileCopySolid,
     EditOutline,
+    FileCopySolid,
     TrashBinSolid,
     UserEditSolid
   } from 'flowbite-svelte-icons';
@@ -87,21 +87,16 @@
 </script>
 
 <Modal size="xs" bind:open outsideclose>
-  <Listgroup {items} >
+  <Listgroup {items}>
     {#snippet children({ item })}
-        <ListgroupItem class="flex flex-row justify-between gap-6">
+      <ListgroupItem class="flex flex-row justify-between gap-6">
         <div class="flex-1">
           {#if profileToEdit === item}
             <form onsubmit={preventDefault(onEdit)}>
               <Input size="sm" bind:value={newName} autofocus on:click={onInputClick}>
                 {#snippet right()}
-                            <EditOutline
-                    
-                    size="sm"
-                    on:click={onEdit}
-                    class="hover:text-primary-700"
-                  />
-                          {/snippet}
+                  <EditOutline size="sm" on:click={onEdit} class="hover:text-primary-700" />
+                {/snippet}
               </Input>
             </form>
           {:else}
@@ -116,17 +111,21 @@
               class="hover:text-primary-700"
               on:click={() => onEditClicked(item)}
             />
-            <TrashBinSolid size="sm" class="hover:text-primary-700" on:click={() => onDelete(item)} />
+            <TrashBinSolid
+              size="sm"
+              class="hover:text-primary-700"
+              on:click={() => onDelete(item)}
+            />
           {/if}
         </div>
       </ListgroupItem>
-          {/snippet}
-    </Listgroup>
+    {/snippet}
+  </Listgroup>
   <form onsubmit={preventDefault(onSubmit)}>
     <Input type="text" placeholder="New profile..." bind:value={newProfile}>
       {#snippet right()}
-            <CirclePlusSolid  class="hover:text-primary-700" on:click={onSubmit} />
-          {/snippet}
+        <CirclePlusSolid class="hover:text-primary-700" on:click={onSubmit} />
+      {/snippet}
     </Input>
   </form>
 </Modal>

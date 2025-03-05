@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { AccordionItem, Button, Label, Range } from 'flowbite-svelte';
+  import { AccordionItem, Label, Range } from 'flowbite-svelte';
   import ReaderSelects from './ReaderSelects.svelte';
   import ReaderToggles from './ReaderToggles.svelte';
   import { settings, updateSetting } from '$lib/settings';
@@ -17,7 +17,7 @@
 
 <AccordionItem>
   {#snippet header()}
-    <span >Reader</span>
+    <span>Reader</span>
   {/snippet}
   <div class="flex flex-col gap-5">
     <ReaderSelects />

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Navbar, NavBrand } from 'flowbite-svelte';
-  import { UserSettingsSolid, UploadSolid, CloudArrowUpOutline } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, UploadSolid, UserSettingsSolid } from 'flowbite-svelte-icons';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import Settings from './Settings/Settings.svelte';

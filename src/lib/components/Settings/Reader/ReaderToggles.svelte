@@ -1,9 +1,13 @@
 <script lang="ts">
-  import { settings, updateSetting, type SettingsKey } from '$lib/settings';
+  import { settings, type SettingsKey, updateSetting } from '$lib/settings';
   import { Toggle } from 'flowbite-svelte';
 
   let toggles = $derived([
-    { key: 'defaultFullscreen', text: 'Open reader in fullscreen', value: $settings.defaultFullscreen },
+    {
+      key: 'defaultFullscreen',
+      text: 'Open reader in fullscreen',
+      value: $settings.defaultFullscreen
+    },
     { key: 'textEditable', text: 'Editable text', value: $settings.textEditable },
     { key: 'textBoxBorders', text: 'Text box borders', value: $settings.textBoxBorders },
     { key: 'displayOCR', text: 'OCR enabled', value: $settings.displayOCR },

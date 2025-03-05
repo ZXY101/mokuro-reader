@@ -1,13 +1,13 @@
 <script lang="ts">
   import { READER_VERSION } from '$lib/consts';
   import { toClipboard } from '$lib/util';
-  import { A, AccordionItem, Badge, Helper, Span } from 'flowbite-svelte';
+  import { A, AccordionItem, Badge, Helper } from 'flowbite-svelte';
   import { GithubSolid } from 'flowbite-svelte-icons';
 </script>
 
 <AccordionItem>
   {#snippet header()}
-    <span >About</span>
+    <span>About</span>
   {/snippet}
   <div class="flex flex-col gap-5">
     <div class="flex flex-row justify-between">

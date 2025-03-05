@@ -15,7 +15,7 @@
 
 <AccordionItem open>
   {#snippet header()}
-    <span >Volume defaults</span>
+    <span>Volume defaults</span>
   {/snippet}
   <div class="flex flex-col gap-5">
     <Helper>The default settings that are applied when you start a new volume</Helper>

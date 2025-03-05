@@ -19,12 +19,7 @@
     src2: File | undefined;
   }
 
-  let {
-    left,
-    right,
-    src1,
-    src2
-  }: Props = $props();
+  let { left, right, src1, src2 }: Props = $props();
 
   let open = $state(false);
 

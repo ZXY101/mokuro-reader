@@ -1,14 +1,14 @@
 <script lang="ts">
   import '../app.postcss';
-  import { dev } from '$app/environment';
+  import { browser, dev } from '$app/environment';
   import { inject } from '@vercel/analytics';
-  import { browser } from '$app/environment';
 
   import NavBar from '$lib/components/NavBar.svelte';
   import Snackbar from '$lib/components/Snackbar.svelte';
   import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';
   import ExtractionModal from '$lib/components/ExtractionModal.svelte';
   import ProgressTracker from '$lib/components/ProgressTracker.svelte';
+
   interface Props {
     children?: import('svelte').Snippet;
   }

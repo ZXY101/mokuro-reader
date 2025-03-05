@@ -10,9 +10,11 @@
 
   let { onClose }: Props = $props();
 
-  let items = $derived(Object.keys($profiles).map((id) => {
-    return { value: id, name: id };
-  }));
+  let items = $derived(
+    Object.keys($profiles).map((id) => {
+      return { value: id, name: id };
+    })
+  );
 
   let profile = $state($currentProfile);
 
@@ -59,7 +61,7 @@
 
 <AccordionItem>
   {#snippet header()}
-    <span >Profile</span>
+    <span>Profile</span>
   {/snippet}
   <div class="flex flex-col gap-5">
     <div class="flex flex-col gap-2">

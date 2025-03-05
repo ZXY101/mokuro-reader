@@ -1,6 +1,6 @@
 <script lang="ts">
   import { afterNavigate, beforeNavigate } from '$app/navigation';
-  import { cropperStore, getCroppedImg, updateLastCard, type Pixels } from '$lib/anki-connect';
+  import { cropperStore, getCroppedImg, type Pixels, updateLastCard } from '$lib/anki-connect';
   import { settings } from '$lib/settings';
   import { Button, Modal, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';

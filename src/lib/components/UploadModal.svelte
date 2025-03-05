@@ -1,9 +1,7 @@
 <script lang="ts">
-  import { Button, Dropzone, Modal, Spinner, Accordion, AccordionItem } from 'flowbite-svelte';
-  import FileUpload from './FileUpload.svelte';
-  import { processFiles } from '$lib/upload';
+  import { Accordion, AccordionItem, Button, Dropzone, Modal, Spinner } from 'flowbite-svelte';
+  import { processFiles, scanFiles } from '$lib/upload';
   import { onMount } from 'svelte';
-  import { scanFiles } from '$lib/upload';
   import { formatBytes } from '$lib/util/upload';
   import { toClipboard } from '$lib/util';
 
@@ -25,11 +23,13 @@
     if (/android|iPad|iPhone|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)) {
       return true;
     }
-    
+
     // Additional check for touch devices and small screens
-    return (('ontouchstart' in window) || 
-            (navigator.maxTouchPoints > 0) || 
-            (window.innerWidth <= 800 && window.innerHeight <= 900));
+    return (
+      'ontouchstart' in window ||
+      navigator.maxTouchPoints > 0 ||
+      (window.innerWidth <= 800 && window.innerHeight <= 900)
+    );
   }
 
   async function onUpload() {
@@ -54,7 +54,7 @@
   onMount(() => {
     // Check if device is mobile
     isMobileDevice = checkMobileDevice();
-    
+
     navigator?.storage?.estimate().then(({ usage, quota }) => {
       if (usage && quota) {
         storageSpace = `Storage: ${formatBytes(usage)} / ${formatBytes(quota)}`;
@@ -117,8 +117,8 @@
     <Accordion flush>
       <AccordionItem>
         {#snippet header()}
-                <span >What to upload?</span>
-              {/snippet}
+          <span>What to upload?</span>
+        {/snippet}
         <div class="flex flex-col gap-5">
           <div>
             <p>
@@ -137,8 +137,9 @@
           </p>
           <p>
             {#if isMobileDevice}
-              <b>Note:</b> On mobile devices, directory upload is not supported. Please zip your manga
-              first and then upload it via <code class="text-primary-600 bg-slate-900">choose files</code>.
+              <b>Note:</b> On mobile devices, directory upload is not supported. Please zip your
+              manga first and then upload it via
+              <code class="text-primary-600 bg-slate-900">choose files</code>.
             {:else}
               On mobile devices, directory upload is not supported. If you're using a mobile device,
               you will need to zip your manga first and then upload it via
@@ -192,8 +193,8 @@
         <Spinner />
       {:else}
         <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-          Drag and drop / 
-          <button 
+          Drag and drop /
+          <button
             type="button"
             class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
             onclick={() => {
@@ -211,9 +212,9 @@
           >
             choose files
           </button>
-          
+
           {#if !isMobileDevice}
-            / <button 
+            / <button
               type="button"
               class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
               onclick={() => {
@@ -231,7 +232,7 @@
               choose directory
             </button>
           {/if}
-          
+
           {#if isMobileDevice}
             <span class="ml-1 text-xs text-gray-500 dark:text-gray-400 italic">
               (directory upload not available on mobile)

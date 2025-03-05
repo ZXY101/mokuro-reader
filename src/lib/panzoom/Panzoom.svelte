@@ -1,5 +1,6 @@
 <script lang="ts">
   import { initPanzoom } from './util';
+
   interface Props {
     children?: import('svelte').Snippet;
   }

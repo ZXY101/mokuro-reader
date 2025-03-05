@@ -32,7 +32,7 @@
 
 <AccordionItem open>
   {#snippet header()}
-    <span >Volume settings</span>
+    <span>Volume settings</span>
   {/snippet}
   <div class="flex flex-col gap-5">
     <Helper>These settings only apply to this volume</Helper>
