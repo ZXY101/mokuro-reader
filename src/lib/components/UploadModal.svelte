@@ -170,35 +170,41 @@
       {:else}
         <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
           Drag and drop / 
-          <button 
-            type="button" 
-            class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer"
-            onclick={() => document.getElementById('file-upload-multiple').click()}
+          <a 
+            href="javascript:void(0)" 
+            class="text-primary-600 dark:text-primary-500 hover:underline cursor-pointer"
+            onclick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = '.mokuro,.zip,.cbz';
+              input.multiple = true;
+              input.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                  files = e.target.files;
+                }
+              };
+              input.click();
+            }}
           >
             choose files
-          </button> /
-          <button 
-            type="button" 
-            class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer"
-            onclick={() => document.getElementById('directory-upload').click()}
+          </a> /
+          <a 
+            href="javascript:void(0)" 
+            class="text-primary-600 dark:text-primary-500 hover:underline cursor-pointer"
+            onclick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.setAttribute('webkitdirectory', '');
+              input.onchange = (e) => {
+                if (e.target.files.length > 0) {
+                  files = e.target.files;
+                }
+              };
+              input.click();
+            }}
           >
             choose directory
-          </button>
-          <input 
-            id="file-upload-multiple" 
-            type="file" 
-            accept=".mokuro,.zip,.cbz" 
-            multiple 
-            bind:files 
-            class="hidden" 
-          />
-          <input 
-            id="directory-upload" 
-            type="file" 
-            webkitdirectory 
-            bind:files 
-            class="hidden" 
-          />
+          </a>
         </p>
       {/if}
     </Dropzone>
