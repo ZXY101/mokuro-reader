@@ -8,9 +8,7 @@
   import { promptExtraction } from '$lib/util/modals';
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
-  import { deleteVolume } from '$lib/settings';
-  import { mangaStats} from '$lib/settings';
-  import ExtractionModal from '$lib/components/ExtractionModal.svelte';
+  import { deleteVolume, mangaStats } from '$lib/settings';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -19,9 +17,11 @@
     });
   }
 
-  $: manga = $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga);
+  let manga = $derived(
+    $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga)
+  );
 
-  $: loading = false;
+  let loading = $state(false);
 
   async function confirmDelete() {
     const seriesUuid = manga?.[0].series_uuid;
@@ -46,14 +46,11 @@
         series_title: manga[0].series_title,
         volume_title: manga[0].volume_title
       };
-      
-      promptExtraction(
-        firstVolume,
-        async (asCbz, individualVolumes, includeSeriesTitle) => {
-          loading = true;
-          loading = await zipManga(manga, asCbz, individualVolumes, includeSeriesTitle);
-        }
-      );
+
+      promptExtraction(firstVolume, async (asCbz, individualVolumes, includeSeriesTitle) => {
+        loading = true;
+        loading = await zipManga(manga, asCbz, individualVolumes, includeSeriesTitle);
+      });
     }
   }
 </script>
