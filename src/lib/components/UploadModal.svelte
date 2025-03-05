@@ -170,9 +170,9 @@
       {:else}
         <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
           Drag and drop / 
-          <a 
-            href="javascript:void(0)" 
-            class="text-primary-600 dark:text-primary-500 hover:underline cursor-pointer"
+          <button 
+            type="button"
+            class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
             onclick={() => {
               const input = document.createElement('input');
               input.type = 'file';
@@ -187,10 +187,10 @@
             }}
           >
             choose files
-          </a> /
-          <a 
-            href="javascript:void(0)" 
-            class="text-primary-600 dark:text-primary-500 hover:underline cursor-pointer"
+          </button> /
+          <button 
+            type="button"
+            class="text-primary-600 dark:text-primary-500 hover:underline bg-transparent border-none p-0 m-0 cursor-pointer inline-flex"
             onclick={() => {
               const input = document.createElement('input');
               input.type = 'file';
@@ -204,7 +204,7 @@
             }}
           >
             choose directory
-          </a>
+          </button>
         </p>
       {/if}
     </Dropzone>
