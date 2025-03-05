@@ -10,8 +10,13 @@
 
   let { files = $bindable(undefined), onUpload = undefined, children, ...rest }: Props = $props();
 
-  // Create a unique ID for the input
-  const inputId = `file-input-${Math.random().toString(36).substring(2, 9)}`;
+  let fileInput: HTMLInputElement;
+
+  function handleClick() {
+    if (fileInput) {
+      fileInput.click();
+    }
+  }
 
   $effect(() => {
     if (files && onUpload) {
@@ -20,14 +25,18 @@
   });
 </script>
 
-<label for={inputId} class="inline-flex items-center hover:underline text-primary-600 dark:text-primary-500 cursor-pointer">
+<button 
+  type="button"
+  onclick={handleClick}
+  class="inline-flex items-center hover:underline text-primary-600 dark:text-primary-500 cursor-pointer bg-transparent border-none p-0 m-0"
+>
   {#if children}{@render children()}{:else}Upload{/if}
-</label>
+</button>
 
 <input
-  id={inputId}
   type="file"
   bind:files
+  bind:this={fileInput}
   {...rest}
   class="hidden"
 />
