@@ -9,6 +9,11 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 - Extensive customization and profile support
 - Anki connect integration & image cropping
 - Installation and offline support
+- CBZ file support for import and export
+- Google Drive integration for cloud storage
+- Smart sorting for manga files
+- Memory-efficient processing for mobile devices
+- Collapsible progress tracker for background operations
 
 ## Usage:
 You can find the reader hosted [here](https://reader.mokuro.app/).
@@ -23,23 +28,27 @@ pip install git+https://github.com/kha-white/mokuro.git@web-reader
 
 Once installed and your manga is processed, import your manga into the reader.
 
+### Importing Files
+You can import manga in several ways:
+- Upload local files (folders, zip files, or CBZ files)
+- Import directly from Google Drive
+- Select multiple files and folders at once
+
+### Exporting to CBZ
+You can export your manga to CBZ format with various options:
+- Include mokuro data in the CBZ file
+- Customize filenames
+- Export individual volumes
+
 ## Development:
 
 ### Requirements
-- **Node.js version 18.x** (this project is not compatible with Node.js 19+ or earlier versions)
+- Node.js (latest LTS version recommended)
 - npm
-
-You can use [nvm](https://github.com/nvm-sh/nvm) to manage Node.js versions:
-```bash
-# Install Node.js 18
-nvm install 18
-# Use Node.js 18
-nvm use 18
-```
 
 Clone the repo:
 ```bash
-git clone https://github.com/ZXY101/mokuro-reader
+git clone https://github.com/Gnathonic/mokuro-reader
 cd mokuro-reader
 ```
 
@@ -52,3 +61,23 @@ Start the dev server:
 ```bash
 npm run dev
 ```
+
+### Testing
+Run the tests:
+```bash
+npm test
+```
+
+Generate test coverage report:
+```bash
+npm run test:coverage
+```
+
+### Technology Stack
+- **Svelte 5**: Latest version of the Svelte framework
+- **SvelteKit 2**: Full-stack framework for building web applications
+- **Vite 6**: Next generation frontend tooling
+- **TypeScript**: For type safety and better developer experience
+- **Tailwind CSS**: Utility-first CSS framework
+- **Flowbite**: UI component library built on top of Tailwind CSS
+- **Vitest**: Testing framework compatible with Vite
