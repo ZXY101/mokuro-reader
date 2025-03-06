@@ -330,7 +330,6 @@
           max={pages.length}
           bind:value={manualPage}
           on:change={onManualPageChange}
-          defaultClass=""
         />
       </div>
     </div>
