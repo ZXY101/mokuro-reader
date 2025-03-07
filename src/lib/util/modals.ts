@@ -3,15 +3,22 @@ import { writable } from 'svelte/store';
 type ConfirmationPopup = {
   open: boolean;
   message: string;
-  onConfirm?: () => void;
+  showStatsOption?: boolean;
+  onConfirm?: (deleteStats?: boolean) => void;
   onCancel?: () => void;
 };
 export const confirmationPopupStore = writable<ConfirmationPopup | undefined>(undefined);
 
-export function promptConfirmation(message: string, onConfirm?: () => void, onCancel?: () => void) {
+export function promptConfirmation(
+  message: string, 
+  onConfirm?: (deleteStats?: boolean) => void, 
+  onCancel?: () => void,
+  showStatsOption: boolean = false
+) {
   confirmationPopupStore.set({
     open: true,
     message,
+    showStatsOption,
     onConfirm,
     onCancel
   });
