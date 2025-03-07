@@ -225,6 +225,13 @@ const excludedDirPatterns = [
 function isProblematicPath(path: string): boolean {
   if (!path) return false;
   
+  // Check for macOS hidden files that start with "._"
+  const pathParts = path.split('/');
+  const fileName = pathParts[pathParts.length - 1];
+  if (fileName.startsWith('._')) {
+    return true;
+  }
+  
   return excludedDirPatterns.some(pattern => 
     path.includes('/' + pattern + '/') || 
     path.endsWith('/' + pattern) || 
