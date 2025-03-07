@@ -181,12 +181,69 @@ async function processMokuroFile(file: File): Promise<{
   };
 }
 
+// List of problematic directory patterns to exclude
+const excludedDirPatterns = [
+  // macOS system directories
+  '__MACOSX',
+  '.DS_Store',
+  '.Trashes',
+  '.Spotlight-V100',
+  '.fseventsd',
+  '.TemporaryItems',
+  '.Trash',
+  
+  // Windows system directories
+  'System Volume Information',
+  '$RECYCLE.BIN',
+  'Thumbs.db',
+  'desktop.ini',
+  'Desktop.ini',
+  'RECYCLER',
+  'RECYCLED',
+  
+  // Linux/Unix system directories
+  '.Trash-1000',
+  '.thumbnails',
+  '.directory',
+  
+  // Cloud storage special folders
+  '.dropbox',
+  '.dropbox.cache',
+  
+  // Version control
+  '.git',
+  '.svn',
+  
+  // General backup/temp files
+  '~$',
+  '.bak',
+  '.tmp',
+  '.temp'
+];
+
+// Function to check if a path contains any problematic directory patterns
+function isProblematicPath(path: string): boolean {
+  if (!path) return false;
+  
+  return excludedDirPatterns.some(pattern => 
+    path.includes('/' + pattern + '/') || 
+    path.endsWith('/' + pattern) || 
+    path === pattern
+  );
+}
+
 async function processFile(
   file: { path: any; file: File },
   volumesByPath: Record<string, Partial<VolumeMetadata>>,
   volumesDataByPath: Record<string, Partial<VolumeData>>,
   pendingImagesByPath: Record<string, Record<string, File>>
 ) {
+  // Skip processing if the file path contains any problematic directory patterns
+  if (isProblematicPath(file.path) || isProblematicPath(file.file.webkitRelativePath)) {
+    console.log(`Skipping file in problematic directory: ${file.path || file.file.webkitRelativePath}`);
+    return;
+  }
+  
   if (isMokuro(file.file.name)) {
     await processMokuroWithPendingImages(
       file,
