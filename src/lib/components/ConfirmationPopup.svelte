@@ -6,32 +6,34 @@
   import { browser } from '$app/environment';
 
   let open = $state(false);
-  let deleteStats = $state(false);
+  let checkboxValue = $state(false);
 
-  // Load the user's previous selection from localStorage
   onMount(() => {
-    if (browser) {
-      const savedPreference = localStorage.getItem('deleteStatsPreference');
-      if (savedPreference !== null) {
-        deleteStats = savedPreference === 'true';
-      }
-    }
-
     confirmationPopupStore.subscribe((value) => {
       if (value) {
         open = value.open;
+        
+        // Load the user's previous selection from localStorage if checkbox option is provided
+        if (browser && value.checkboxOption) {
+          const { storageKey, defaultValue } = value.checkboxOption;
+          const savedPreference = localStorage.getItem(storageKey);
+          checkboxValue = savedPreference !== null 
+            ? savedPreference === 'true' 
+            : defaultValue;
+        }
       }
     });
   });
 
   function handleConfirm() {
-    // Save the user's preference
-    if (browser) {
-      localStorage.setItem('deleteStatsPreference', deleteStats.toString());
+    // Save the user's preference if checkbox option is provided
+    if (browser && $confirmationPopupStore?.checkboxOption) {
+      const { storageKey } = $confirmationPopupStore.checkboxOption;
+      localStorage.setItem(storageKey, checkboxValue.toString());
     }
     
     if ($confirmationPopupStore?.onConfirm) {
-      $confirmationPopupStore.onConfirm(deleteStats);
+      $confirmationPopupStore.onConfirm(checkboxValue);
     }
   }
 </script>
@@ -42,11 +44,11 @@
     <h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
       {$confirmationPopupStore?.message}
     </h3>
-    {#if $confirmationPopupStore?.showStatsOption}
+    {#if $confirmationPopupStore?.checkboxOption}
       <div class="flex items-center justify-center mb-4">
-        <Checkbox bind:checked={deleteStats} id="delete-stats" />
-        <label for="delete-stats" class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-          Also delete stats and progress?
+        <Checkbox bind:checked={checkboxValue} id="confirmation-checkbox" />
+        <label for="confirmation-checkbox" class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+          {$confirmationPopupStore.checkboxOption.label}
         </label>
       </div>
     {/if}

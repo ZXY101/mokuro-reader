@@ -41,7 +41,16 @@
   }
 
   function onDelete() {
-    promptConfirmation('Are you sure you want to delete this manga?', confirmDelete, undefined, true);
+    promptConfirmation(
+      'Are you sure you want to delete this manga?', 
+      confirmDelete, 
+      undefined, 
+      {
+        label: "Also delete stats and progress?",
+        storageKey: "deleteStatsPreference",
+        defaultValue: false
+      }
+    );
   }
 
   async function onExtract() {
