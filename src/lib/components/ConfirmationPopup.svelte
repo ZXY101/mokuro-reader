@@ -35,6 +35,18 @@
     if ($confirmationPopupStore?.onConfirm) {
       $confirmationPopupStore.onConfirm(checkboxValue);
     }
+    
+    // Always close the modal after confirmation
+    open = false;
+  }
+  
+  function handleCancel() {
+    if ($confirmationPopupStore?.onCancel) {
+      $confirmationPopupStore.onCancel();
+    }
+    
+    // Always close the modal after cancellation
+    open = false;
   }
 </script>
 
@@ -53,6 +65,6 @@
       </div>
     {/if}
     <Button color="red" class="mr-2" on:click={handleConfirm}>Yes</Button>
-    <Button color="alternative" on:click={$confirmationPopupStore?.onCancel}>No</Button>
+    <Button color="alternative" on:click={handleCancel}>No</Button>
   </div>
 </Modal>
