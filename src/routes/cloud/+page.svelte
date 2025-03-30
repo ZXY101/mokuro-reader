@@ -3,6 +3,7 @@
 
   import { processFiles } from '$lib/upload';
   import { parseVolumesFromJson, profiles, volumes } from '$lib/settings';
+  import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
 
   import { promptConfirmation, showSnackbar, uploadFile } from '$lib/util';
   import { Button, Toggle, Tooltip } from 'flowbite-svelte';
@@ -54,7 +55,6 @@
   let readerFolderId = '';
   let volumeDataId = $state('');
   let profilesId = $state('');
-  let turboDownload = $state(false);
 
   // This variable is used to track if we're connected to Google Drive
   // and is used in the UI to show/hide the login button
@@ -425,7 +425,7 @@
     let maxWorkers;
     let memoryLimitMB;
     
-    if (turboDownload) {
+    if ($miscSettings.turboDownload) {
       // In turbo mode, use more workers and disable memory limits
       maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
       memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
@@ -925,10 +925,16 @@
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
         
         <div class="flex items-center gap-2">
-          <Toggle size="small" checked={turboDownload} on:change={() => turboDownload = !turboDownload} id="turbo-toggle">
-            Turbo Download
-          </Toggle>
-          <Tooltip triggeredBy="#turbo-toggle" placement="right">
+          <div id="turbo-toggle-container">
+            <Toggle 
+              size="small" 
+              checked={$miscSettings.turboDownload} 
+              on:change={() => updateMiscSetting('turboDownload', !$miscSettings.turboDownload)}
+            >
+              Turbo Download
+            </Toggle>
+          </div>
+          <Tooltip triggeredBy="#turbo-toggle-container" placement="right">
             Disables memory limits and increases thread count for faster downloads. May cause instability on memory-constrained devices. Only speeds up downloads significantly if you have a fast internet connection.
           </Tooltip>
         </div>
