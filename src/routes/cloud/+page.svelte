@@ -935,7 +935,7 @@
             </Toggle>
           </div>
           <Tooltip triggeredBy="#turbo-toggle-container" placement="right">
-            Disables memory limits and increases thread count for faster downloads. May cause instability on memory-constrained devices. Only speeds up downloads significantly if you have a fast internet connection.
+            May cause crashes on lower-end devices or for very large downloads.
           </Tooltip>
         </div>
         
