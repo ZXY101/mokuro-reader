@@ -5,7 +5,7 @@
   import { parseVolumesFromJson, profiles, volumes } from '$lib/settings';
 
   import { promptConfirmation, showSnackbar, uploadFile } from '$lib/util';
-  import { Button } from 'flowbite-svelte';
+  import { Button, Toggle, Tooltip } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
@@ -54,6 +54,7 @@
   let readerFolderId = '';
   let volumeDataId = $state('');
   let profilesId = $state('');
+  let turboDownload = $state(false);
 
   // This variable is used to track if we're connected to Google Drive
   // and is used in the UI to show/hide the login button
@@ -421,14 +422,26 @@
     // Create a worker pool for parallel downloads
     // Use navigator.hardwareConcurrency to determine optimal number of workers
     // but limit to a reasonable number to avoid overwhelming the browser
-    const maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
-    // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
-    // This is not a hard limit - tasks that individually need more than 500MB can still run
-    // It just prevents starting new tasks when the current pool already exceeds 500MB
-    const memoryLimitMB = 500; // 500 MB memory threshold
-    console.log(
-      `Creating worker pool with ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
-    );
+    let maxWorkers;
+    let memoryLimitMB;
+    
+    if (turboDownload) {
+      // In turbo mode, use more workers and disable memory limits
+      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
+      memoryLimitMB = 0; // No memory limit in turbo mode
+      console.log(`Turbo download enabled: Using ${maxWorkers} workers with no memory limit`);
+    } else {
+      // Standard mode with reasonable limits
+      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
+      // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
+      // This is not a hard limit - tasks that individually need more than 500MB can still run
+      // It just prevents starting new tasks when the current pool already exceeds 500MB
+      memoryLimitMB = 500; // 500 MB memory threshold
+      console.log(
+        `Creating worker pool with ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
+      );
+    }
+    
     const workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
 
     // Track download progress
@@ -910,6 +923,16 @@
       </p>
       <div class="flex flex-col gap-4 w-full max-w-3xl">
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
+        
+        <div class="flex items-center gap-2">
+          <Toggle size="small" checked={turboDownload} on:change={() => turboDownload = !turboDownload} id="turbo-toggle">
+            Turbo Download
+          </Toggle>
+          <Tooltip triggeredBy="#turbo-toggle" placement="right">
+            Disables memory limits and increases thread count for faster downloads. May cause instability on memory-constrained devices. Only speeds up downloads significantly if you have a fast internet connection.
+          </Tooltip>
+        </div>
+        
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
