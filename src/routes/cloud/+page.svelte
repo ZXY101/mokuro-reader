@@ -6,7 +6,7 @@
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
 
   import { promptConfirmation, showSnackbar, uploadFile } from '$lib/util';
-  import { Button, Toggle, Tooltip } from 'flowbite-svelte';
+  import { Badge, Button, Toggle } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
@@ -924,8 +924,8 @@
       <div class="flex flex-col gap-4 w-full max-w-3xl">
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
         
-        <div class="flex items-center gap-2">
-          <div id="turbo-toggle-container">
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center gap-2">
             <Toggle 
               size="small" 
               checked={$miscSettings.turboDownload} 
@@ -933,10 +933,11 @@
             >
               Turbo Download
             </Toggle>
+            <Badge color="red" class="text-xs">Experimental</Badge>
           </div>
-          <Tooltip triggeredBy="#turbo-toggle-container" placement="right">
+          <p class="text-xs text-gray-500 ml-1">
             May cause crashes on lower-end devices or for very large downloads.
-          </Tooltip>
+          </p>
         </div>
         
         <div class="flex-col gap-2 flex">
