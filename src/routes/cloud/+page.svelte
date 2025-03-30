@@ -933,12 +933,12 @@
             >
               <span class="flex items-center gap-2">
                 Turbo Download
-                <Badge color="red">Experimental</Badge>
+                <Badge color="blue">High-End</Badge>
               </span>
             </Toggle>
           </div>
           <p class="text-xs text-gray-500 ml-1">
-            May cause crashes on lower-end devices or for very large downloads.
+            Recommended for powerful devices with fast internet connections.
           </p>
         </div>
         
