@@ -428,7 +428,7 @@
     if (turboDownload) {
       // In turbo mode, use more workers and disable memory limits
       maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
-      memoryLimitMB = 0; // No memory limit in turbo mode
+      memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
       console.log(`Turbo download enabled: Using ${maxWorkers} workers with no memory limit`);
     } else {
       // Standard mode with reasonable limits
