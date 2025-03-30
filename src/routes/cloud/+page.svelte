@@ -931,9 +931,11 @@
               checked={$miscSettings.turboDownload} 
               on:change={() => updateMiscSetting('turboDownload', !$miscSettings.turboDownload)}
             >
-              Turbo Download
+              <span class="flex items-center gap-2">
+                Turbo Download
+                <Badge color="red">Experimental</Badge>
+              </span>
             </Toggle>
-            <Badge color="red" class="text-xs">Experimental</Badge>
           </div>
           <p class="text-xs text-gray-500 ml-1">
             May cause crashes on lower-end devices or for very large downloads.
