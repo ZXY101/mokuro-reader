@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export type MiscSettings = {
   galleryLayout: 'grid' | 'list';
   gallerySorting: 'ASC' | 'DESC' | 'SMART';
-  turboDownload: boolean;
+  throttleDownloads: boolean;
 };
 
 export type MiscSettingsKey = keyof MiscSettings;
@@ -12,7 +12,7 @@ export type MiscSettingsKey = keyof MiscSettings;
 const defaultSettings: MiscSettings = {
   galleryLayout: 'grid',
   gallerySorting: 'SMART',
-  turboDownload: false
+  throttleDownloads: true
 };
 
 const stored = browser ? window.localStorage.getItem('miscSettings') : undefined;

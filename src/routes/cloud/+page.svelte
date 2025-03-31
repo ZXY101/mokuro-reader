@@ -425,21 +425,21 @@
     let maxWorkers;
     let memoryLimitMB;
     
-    if ($miscSettings.turboDownload) {
-      // In turbo mode, use more workers and disable memory limits
-      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
-      memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
-      console.log(`Turbo download enabled: Using ${maxWorkers} workers with no memory limit`);
-    } else {
-      // Standard mode with reasonable limits
+    if ($miscSettings.throttleDownloads) {
+      // Throttled mode with reasonable limits
       maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
       // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
       // This is not a hard limit - tasks that individually need more than 500MB can still run
       // It just prevents starting new tasks when the current pool already exceeds 500MB
       memoryLimitMB = 500; // 500 MB memory threshold
       console.log(
-        `Creating worker pool with ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
+        `Throttled downloads: Using ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
       );
+    } else {
+      // Unthrottled mode, use more workers and disable memory limits
+      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
+      memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
+      console.log(`Unthrottled downloads: Using ${maxWorkers} workers with no memory limit`);
     }
     
     const workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
@@ -928,17 +928,16 @@
           <div class="flex items-center gap-2">
             <Toggle 
               size="small" 
-              checked={$miscSettings.turboDownload} 
-              on:change={() => updateMiscSetting('turboDownload', !$miscSettings.turboDownload)}
+              checked={$miscSettings.throttleDownloads} 
+              on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
             >
               <span class="flex items-center gap-2">
-                Turbo Download
-                <Badge color="blue">High-End</Badge>
+                Throttle downloads for stability
               </span>
             </Toggle>
           </div>
           <p class="text-xs text-gray-500 ml-1">
-            Recommended for powerful devices with fast internet connections.
+            Helps prevent crashes on low memory devices or for extremely large downloads.
           </p>
         </div>
         
