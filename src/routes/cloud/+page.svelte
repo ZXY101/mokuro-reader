@@ -3,9 +3,10 @@
 
   import { processFiles } from '$lib/upload';
   import { parseVolumesFromJson, profiles, volumes } from '$lib/settings';
+  import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
 
   import { promptConfirmation, showSnackbar, uploadFile } from '$lib/util';
-  import { Button } from 'flowbite-svelte';
+  import { Badge, Button, Toggle } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
@@ -463,14 +464,26 @@
     // Create a worker pool for parallel downloads
     // Use navigator.hardwareConcurrency to determine optimal number of workers
     // but limit to a reasonable number to avoid overwhelming the browser
-    const maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
-    // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
-    // This is not a hard limit - tasks that individually need more than 500MB can still run
-    // It just prevents starting new tasks when the current pool already exceeds 500MB
-    const memoryLimitMB = 500; // 500 MB memory threshold
-    console.log(
-      `Creating worker pool with ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
-    );
+    let maxWorkers;
+    let memoryLimitMB;
+    
+    if ($miscSettings.throttleDownloads) {
+      // Throttled mode with reasonable limits
+      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
+      // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
+      // This is not a hard limit - tasks that individually need more than 500MB can still run
+      // It just prevents starting new tasks when the current pool already exceeds 500MB
+      memoryLimitMB = 500; // 500 MB memory threshold
+      console.log(
+        `Throttled downloads: Using ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
+      );
+    } else {
+      // Unthrottled mode, use more workers and disable memory limits
+      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
+      memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
+      console.log(`Unthrottled downloads: Using ${maxWorkers} workers with no memory limit`);
+    }
+    
     const workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
 
     // Track download progress
@@ -959,6 +972,24 @@
       </p>
       <div class="flex flex-col gap-4 w-full max-w-3xl">
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
+        
+        <div class="flex flex-col gap-2">
+          <div class="flex items-center gap-2">
+            <Toggle 
+              size="small" 
+              checked={$miscSettings.throttleDownloads} 
+              on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
+            >
+              <span class="flex items-center gap-2">
+                Throttle downloads for stability
+              </span>
+            </Toggle>
+          </div>
+          <p class="text-xs text-gray-500 ml-1">
+            Helps prevent crashes on low memory devices or for extremely large downloads.
+          </p>
+        </div>
+        
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
