@@ -101,7 +101,7 @@ async function downloadFile(fileId: string, fileName: string, accessToken: strin
     };
 
     return new Promise<void>((resolve, reject) => {
-      xhr.onload = () => {
+      xhr.onload = async () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
             // Get the ArrayBuffer response
