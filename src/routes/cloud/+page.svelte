@@ -596,42 +596,21 @@
           onComplete: async (data, releaseMemory) => {
             try {
               console.log(`Received complete message for ${data.fileName}`, {
-                dataType: typeof data.data,
-                dataSize: data.data?.byteLength,
-                hasData: !!data.data,
-                isDecompressed: data.isDecompressed,
                 entriesCount: data.entries?.length
               });
 
-              if (data.isDecompressed && data.entries && data.entries.length > 0) {
-                console.log(`Processing ${data.entries.length} decompressed entries from ${data.fileName}`);
-                
-                // Create File objects for each entry
-                const files = data.entries.map(entry => {
-                  return new File([entry.data], entry.filename);
-                });
-                
-                console.log(`Created ${files.length} file objects from decompressed entries`);
-                
-                // Process all the files
-                await processFiles(files);
-                console.log(`Successfully processed ${files.length} decompressed files from ${data.fileName}`);
-              } else {
-                // Handle the original file (either not a zip/cbz or decompression failed)
-                console.log(`Processing original file: ${data.fileName}`);
-                
-                // Create a Blob from the ArrayBuffer
-                const blob = new Blob([data.data]);
-                console.log(`Created blob of size ${blob.size} bytes`);
-
-                // Create a File object from the blob
-                const file = new File([blob], data.fileName);
-                console.log(`Created file object: ${file.name}, size: ${file.size} bytes`);
-
-                // Process the file
-                await processFiles([file]);
-                console.log(`Successfully processed file: ${file.name}`);
-              }
+              console.log(`Processing ${data.entries.length} decompressed entries from ${data.fileName}`);
+              
+              // Create File objects for each entry
+              const files = data.entries.map(entry => {
+                return new File([entry.data], entry.filename);
+              });
+              
+              console.log(`Created ${files.length} file objects from decompressed entries`);
+              
+              // Process all the files
+              await processFiles(files);
+              console.log(`Successfully processed ${files.length} decompressed files from ${data.fileName}`);
 
               // Mark as completed
               completedFiles++;
