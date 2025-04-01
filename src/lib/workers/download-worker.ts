@@ -1,6 +1,6 @@
 // Web worker for downloading files from Google Drive
 // This file will be bundled by Vite as a web worker
-import { BlobReader, ZipReader, Entry } from '@zip.js/zip.js';
+import { BlobReader, ZipReader, Entry, BlobWriter, getMimeType } from '@zip.js/zip.js';
 
 // Define the worker context
 const ctx: Worker = self as any;
@@ -129,15 +129,17 @@ async function downloadFile(fileId: string, fileName: string, accessToken: strin
             for (const entry of entries) {
               // Skip directories
               if (entry.directory) continue;
-              
+
               try {
+                const mime = getMimeType(entry.filename)
+                const blob:Blob = await entry.getData(new BlobWriter(mime));
                 // Get the entry data as an array buffer
-                const entryData = await entry.getData(new Uint8Array) as Uint8Array;
+                const buffer = await blob.arrayBuffer();
                 
                 // Add the entry to the decompressed entries
                 decompressedEntries.push({
                   filename: entry.filename,
-                  data: entryData.buffer
+                  data: buffer
                 });
               } catch (entryError) {
                 console.error(`Worker: Error extracting entry ${entry.filename}:`, entryError);
