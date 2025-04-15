@@ -23,7 +23,7 @@
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
   import { beforeNavigate } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
 
   // TODO: Refactor this whole mess
   export let volumeSettings: VolumeSettings;
@@ -221,11 +221,54 @@
     }
   }
 
-  onMount(() => {
+// preload volumes
+let preloadStyle: HTMLStyleElement | null = null;
+
+$: {
+    if (volume && index != undefined) {
+      let preloadStartIndex = Math.max(0, index - (showSecondPage() ? 2 : 1));
+      let preloadEndIndex = index + (showSecondPage() ? 3 : 1);
+      let imagesToPreload: string[] = [];
+
+      for (let i = preloadEndIndex; i >= preloadStartIndex; i--) {
+          let src = Object.values(volume?.files)[i];
+          src.blob = src.blob || URL.createObjectURL(src);
+          imagesToPreload.push(src.blob);
+      }
+
+      preloadStyle = preloadStyle || document.createElement('style');
+
+      preloadStyle.innerHTML = `
+          body::after {
+          position: absolute;
+          width: 0;
+          height: 0;
+          overflow: hidden;
+          z-index: -1;
+          content: ${imagesToPreload.map(url => `url(${url})`).join(' ')};
+          }
+      `;
+    }
+}
+
+onMount(() => {
     if ($settings.defaultFullscreen) {
       document.documentElement.requestFullscreen();
     }
-  });
+
+    preloadStyle = preloadStyle || document.createElement('style');
+    preloadStyle.type = 'text/css';
+    preloadStyle.id = "preloadCSS";
+
+    document.head.appendChild(preloadStyle);
+});
+
+onDestroy(() => {
+    if (preloadStyle) {
+      document.head.removeChild(preloadStyle);
+    }
+    preloadStyle = null;
+});
 
   beforeNavigate(() => {
     if (document.exitFullscreen) {
