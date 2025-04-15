@@ -11,6 +11,7 @@
   import Stats from './Stats.svelte';
   import VolumeDefaults from './Volume/VolumeDefaults.svelte';
   import VolumeSettings from './Volume/VolumeSettings.svelte';
+  import KeyboardShortcuts from './KeyboardShortcuts.svelte';
   import About from './About.svelte';
   import QuickAccess from './QuickAccess.svelte';
   import { beforeNavigate } from '$app/navigation';
@@ -67,6 +68,7 @@
       <AnkiConnectSettings />
       <CatalogSettings />
       <Stats />
+      <KeyboardShortcuts />
       <About />
     </Accordion>
     <div class="flex flex-col gap-2">
