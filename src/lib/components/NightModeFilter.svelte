@@ -6,21 +6,24 @@
   // Create elements to hold our filter
   let styleElement: HTMLStyleElement | null = null;
   let svgElement: SVGElement | null = null;
-  let overlayElement: HTMLDivElement | null = null;
+  let canvasElement: HTMLCanvasElement | null = null;
   let isFirefox = false;
+  let isMobile = false;
 
-  // Function to detect Firefox
-  function detectFirefox() {
-    if (!browser) return false;
-    return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+  // Function to detect browser
+  function detectBrowser() {
+    if (!browser) return;
+    
+    isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+    isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
 
   // Function to apply the night mode filter
   function applyNightModeFilter() {
     if (!browser) return;
     
-    // Detect Firefox
-    isFirefox = detectFirefox();
+    // Detect browser
+    detectBrowser();
     
     // Create style element if it doesn't exist
     if (!styleElement) {
@@ -67,28 +70,71 @@
     
     // Apply the filter
     if ($settings.nightMode) {
-      if (isFirefox) {
-        // Firefox-specific implementation using a combination of CSS filters and overlay
+      if (isFirefox || isMobile) {
+        // For Firefox and mobile browsers, use a CSS-only approach
         styleElement.textContent = `
+          /* Convert everything to red using CSS */
+          
+          /* Base filter for the entire page */
           html {
             filter: grayscale(100%) !important;
           }
+          
+          /* Apply red color to text elements */
+          body, div, span, p, h1, h2, h3, h4, h5, h6, 
+          a, button, input, select, textarea, label {
+            color: #ff0000 !important;
+          }
+          
+          /* Keep black text black */
+          [style*="color: #000"], 
+          [style*="color: black"], 
+          [style*="color: rgb(0, 0, 0)"], 
+          [style*="color: rgba(0, 0, 0"] {
+            color: #000000 !important;
+          }
+          
+          /* Handle images and media */
+          img, video, canvas {
+            filter: grayscale(100%) brightness(0.8) !important;
+          }
+          
+          /* Handle SVG elements */
+          svg * {
+            stroke: #ff0000 !important;
+            fill: #ff0000 !important;
+          }
+          
+          /* Keep black SVG elements black */
+          svg [stroke="#000000"], 
+          svg [stroke="black"],
+          svg [fill="#000000"],
+          svg [fill="black"] {
+            stroke: #000000 !important;
+            fill: #000000 !important;
+          }
+          
+          /* Handle form elements */
+          input, select, textarea, button {
+            background-color: #330000 !important;
+            border-color: #ff0000 !important;
+          }
+          
+          /* Handle links */
+          a:link, a:visited, a:hover, a:active {
+            color: #ff0000 !important;
+          }
+          
+          /* Handle backgrounds */
+          [style*="background-color"] {
+            background-color: #000000 !important;
+          }
+          
+          /* Remove background images */
+          [style*="background-image"] {
+            background-image: none !important;
+          }
         `;
-        
-        // Create overlay element for Firefox if it doesn't exist
-        if (!overlayElement) {
-          overlayElement = document.createElement('div');
-          overlayElement.style.position = 'fixed';
-          overlayElement.style.top = '0';
-          overlayElement.style.left = '0';
-          overlayElement.style.width = '100%';
-          overlayElement.style.height = '100%';
-          overlayElement.style.backgroundColor = 'red';
-          overlayElement.style.mixBlendMode = 'multiply';
-          overlayElement.style.pointerEvents = 'none';
-          overlayElement.style.zIndex = '9999';
-          document.body.appendChild(overlayElement);
-        }
       } else {
         // Chrome-based browsers implementation using SVG filter
         styleElement.textContent = `
@@ -96,22 +142,10 @@
             filter: url('#night-mode-filter') !important;
           }
         `;
-        
-        // Remove overlay if it exists (in case user switched browsers)
-        if (overlayElement) {
-          overlayElement.remove();
-          overlayElement = null;
-        }
       }
     } else {
       // Turn off night mode
       styleElement.textContent = '';
-      
-      // Remove overlay if it exists
-      if (overlayElement) {
-        overlayElement.remove();
-        overlayElement = null;
-      }
     }
   }
 
@@ -133,8 +167,8 @@
       if (svgElement) {
         svgElement.remove();
       }
-      if (overlayElement) {
-        overlayElement.remove();
+      if (canvasElement) {
+        canvasElement.remove();
       }
     }
   });
