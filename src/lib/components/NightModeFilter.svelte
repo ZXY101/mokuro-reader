@@ -3,11 +3,11 @@
   import { browser } from '$app/environment';
   import { onMount, onDestroy } from 'svelte';
 
-  // Create a style element to hold our CSS filter
+  // Create elements to hold our filter
   let styleElement: HTMLStyleElement | null = null;
-  let canvasElement: HTMLCanvasElement | null = null;
+  let svgElement: SVGElement | null = null;
 
-  // Function to apply the night mode filter
+  // Function to apply the night mode filter using SVG filter
   function applyNightModeFilter() {
     if (!browser) return;
     
@@ -17,30 +17,37 @@
       document.head.appendChild(styleElement);
     }
     
-    // Apply the stronger red filter using a color matrix transformation
+    // Create SVG filter element if it doesn't exist
+    if (!svgElement) {
+      svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svgElement.setAttribute('width', '0');
+      svgElement.setAttribute('height', '0');
+      svgElement.style.position = 'absolute';
+      svgElement.style.zIndex = '-9999';
+      svgElement.innerHTML = `
+        <defs>
+          <filter id="night-mode-filter">
+            <!-- This implements the exact color matrix:
+                 [-1/3, -1/3, -1/3, 0, 255,  // red channel
+                  0, 0, 0, 0, 0,             // green channel
+                  0, 0, 0, 0, 0,             // blue channel
+                  0, 0, 0, 1, 0]             // alpha channel -->
+            <feColorMatrix type="matrix" 
+              values="-0.333 -0.333 -0.333 0 255
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+          </filter>
+        </defs>
+      `;
+      document.body.appendChild(svgElement);
+    }
+    
+    // Apply the SVG filter that exactly matches the color matrix
     if ($settings.nightMode) {
-      // This uses a CSS filter that approximates the color matrix:
-      // [-1/3, -1/3, -1/3, 0, 255,  // red channel
-      //  0, 0, 0, 0, 0,             // green channel
-      //  0, 0, 0, 0, 0,             // blue channel
-      //  0, 0, 0, 1, 0]             // alpha channel
       styleElement.textContent = `
         html {
-          filter: brightness(0.7) contrast(1.2) grayscale(1) sepia(1) hue-rotate(0deg) saturate(3) !important;
-        }
-        
-        /* Create a red overlay with screen blend mode */
-        html::before {
-          content: "";
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-color: rgba(255, 0, 0, 0.3);
-          mix-blend-mode: screen;
-          pointer-events: none;
-          z-index: 9999;
+          filter: url(#night-mode-filter) !important;
         }
       `;
     } else {
@@ -48,40 +55,14 @@
     }
   }
 
-  // For more advanced color matrix transformations, we could use a canvas-based approach
-  function setupCanvasFilter() {
-    if (!browser || !$settings.nightMode) return;
-    
-    // This is an alternative approach using canvas that could be implemented
-    // for more precise color matrix transformations if needed
-    /*
-    if (!canvasElement) {
-      canvasElement = document.createElement('canvas');
-      canvasElement.style.position = 'fixed';
-      canvasElement.style.top = '0';
-      canvasElement.style.left = '0';
-      canvasElement.style.width = '100%';
-      canvasElement.style.height = '100%';
-      canvasElement.style.pointerEvents = 'none';
-      canvasElement.style.zIndex = '9999';
-      document.body.appendChild(canvasElement);
-      
-      // Apply color matrix transformation here
-      // This would require capturing the screen content and applying the matrix
-    }
-    */
-  }
-
   // Watch for changes to the night mode setting
   $: if (browser && $settings) {
     applyNightModeFilter();
-    setupCanvasFilter();
   }
 
   // Set up and clean up
   onMount(() => {
     applyNightModeFilter();
-    setupCanvasFilter();
   });
 
   onDestroy(() => {
@@ -89,11 +70,11 @@
       if (styleElement) {
         styleElement.remove();
       }
-      if (canvasElement) {
-        canvasElement.remove();
+      if (svgElement) {
+        svgElement.remove();
       }
     }
   });
 </script>
 
-<!-- This component doesn't render any visible elements, it just applies the CSS filter -->
+<!-- This component doesn't render any visible elements, it just applies the SVG filter -->
