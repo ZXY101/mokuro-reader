@@ -19,7 +19,7 @@
     { key: 'showTimer', text: 'Show timer', value: $settings.showTimer },
     { key: 'quickActions', text: 'Show quick actions', value: $settings.quickActions },
     { key: 'invertColors', text: 'Invert colors of the images', value: $settings.invertColors },
-    { key: 'nightMode', text: 'Night mode (red filter)', value: $settings.nightMode }
+    { key: 'nightMode', text: 'Night mode (strong red filter)', value: $settings.nightMode }
   ] as { key: SettingsKey; text: string; value: any }[]);
 </script>
 
