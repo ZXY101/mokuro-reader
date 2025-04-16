@@ -8,6 +8,7 @@
   import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';
   import ExtractionModal from '$lib/components/ExtractionModal.svelte';
   import ProgressTracker from '$lib/components/ProgressTracker.svelte';
+  import NightModeFilter from '$lib/components/NightModeFilter.svelte';
 
   interface Props {
     children?: import('svelte').Snippet;
@@ -30,4 +31,5 @@
   <ConfirmationPopup />
   <ExtractionModal />
   <ProgressTracker />
+  <NightModeFilter />
 </div>
