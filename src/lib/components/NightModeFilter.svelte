@@ -5,9 +5,9 @@
 
   // Create elements to hold our filter
   let styleElement: HTMLStyleElement | null = null;
-  let canvasElement: HTMLCanvasElement | null = null;
+  let svgElement: SVGElement | null = null;
 
-  // Function to apply the night mode filter using a canvas-based approach
+  // Function to apply the night mode filter
   function applyNightModeFilter() {
     if (!browser) return;
     
@@ -17,27 +17,47 @@
       document.head.appendChild(styleElement);
     }
     
-    // Apply the CSS filter
+    // Create SVG filter element if it doesn't exist
+    if (!svgElement) {
+      svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svgElement.setAttribute('width', '0');
+      svgElement.setAttribute('height', '0');
+      svgElement.style.position = 'absolute';
+      svgElement.style.zIndex = '-9999';
+      
+      // This implements a filter that approximates the Flutter color matrix:
+      // [-1/3, -1/3, -1/3, 0, 255,  // red channel
+      //  0, 0, 0, 0, 0,             // green channel
+      //  0, 0, 0, 0, 0,             // blue channel
+      //  0, 0, 0, 1, 0]             // alpha channel
+      
+      svgElement.innerHTML = `
+        <defs>
+          <filter id="night-mode-filter">
+            <!-- Convert to grayscale first -->
+            <feColorMatrix type="matrix" 
+              values="0.2126 0.7152 0.0722 0 0
+                      0.2126 0.7152 0.0722 0 0
+                      0.2126 0.7152 0.0722 0 0
+                      0 0 0 1 0" />
+                      
+            <!-- Keep only the red channel -->
+            <feColorMatrix type="matrix"
+              values="1 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 0 0
+                      0 0 0 1 0" />
+          </filter>
+        </defs>
+      `;
+      document.body.appendChild(svgElement);
+    }
+    
+    // Apply the filter
     if ($settings.nightMode) {
-      // This CSS implementation is a close approximation of the Flutter color matrix
-      // It preserves black as black while converting other colors to red based on luminosity
       styleElement.textContent = `
         html {
-          filter: grayscale(100%) brightness(0.8) !important;
-        }
-        
-        /* Create a red overlay with multiply blend mode to preserve blacks */
-        html::before {
-          content: "";
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background-color: red;
-          mix-blend-mode: multiply;
-          pointer-events: none;
-          z-index: 9999;
+          filter: url(#night-mode-filter) !important;
         }
       `;
     } else {
@@ -60,11 +80,11 @@
       if (styleElement) {
         styleElement.remove();
       }
-      if (canvasElement) {
-        canvasElement.remove();
+      if (svgElement) {
+        svgElement.remove();
       }
     }
   });
 </script>
 
-<!-- This component doesn't render any visible elements, it just applies the CSS filter -->
+<!-- This component doesn't render any visible elements, it just applies the filter -->
