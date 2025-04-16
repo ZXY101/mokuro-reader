@@ -3,28 +3,18 @@
   import { browser } from '$app/environment';
   import { onMount, onDestroy } from 'svelte';
 
-  // Create style element to hold our filter application
-  let styleElement: HTMLStyleElement | null = null;
-
-  // Function to apply the night mode filter
+  // Function to apply the night mode filter using CSS variables
   function applyNightModeFilter() {
     if (!browser) return;
     
-    // Create style element if it doesn't exist
-    if (!styleElement) {
-      styleElement = document.createElement('style');
-      document.head.appendChild(styleElement);
-    }
+    // Get the document's root element
+    const rootElement = document.documentElement;
     
-    // Apply the filter - the SVG filter is already in the HTML
+    // Set the CSS variable based on the night mode setting
     if ($settings.nightMode) {
-      styleElement.textContent = `
-        html {
-          filter: url('#night-mode-filter') !important;
-        }
-      `;
+      rootElement.style.setProperty('--night-mode-filter', 'url(#night-mode-filter)');
     } else {
-      styleElement.textContent = '';
+      rootElement.style.setProperty('--night-mode-filter', 'none');
     }
   }
 
@@ -33,16 +23,10 @@
     applyNightModeFilter();
   }
 
-  // Set up and clean up
+  // Set up
   onMount(() => {
     applyNightModeFilter();
   });
-
-  onDestroy(() => {
-    if (browser && styleElement) {
-      styleElement.remove();
-    }
-  });
 </script>
 
-<!-- No SVG filter here - it's now in app.html -->
+<!-- No visible elements - just applies the filter via CSS variables -->

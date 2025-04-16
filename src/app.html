@@ -11,19 +11,30 @@
     <script src="https://apis.google.com/js/api.js"></script>
     <script src="https://accounts.google.com/gsi/client"></script>
     %sveltekit.head%
+    <style>
+      /* CSS Variables for night mode */
+      :root {
+        --night-mode-filter: none; /* Default: no filter */
+      }
+      
+      /* Apply the filter to the html element */
+      html {
+        filter: var(--night-mode-filter);
+      }
+    </style>
     <!-- SVG filter for night mode - included directly in the HTML -->
     <svg width="0" height="0" style="position: absolute; z-index: -9999; visibility: hidden;">
       <defs>
         <filter id="night-mode-filter" color-interpolation-filters="sRGB">
           <!-- Convert to grayscale first -->
-          <feColorMatrix id="night-mode-grayscale" type="matrix" 
+          <feColorMatrix type="matrix" 
             values="0.2126 0.7152 0.0722 0 0
                     0.2126 0.7152 0.0722 0 0
                     0.2126 0.7152 0.0722 0 0
                     0 0 0 1 0" />
                     
           <!-- Keep only the red channel -->
-          <feColorMatrix id="night-mode-red-channel" type="matrix"
+          <feColorMatrix type="matrix"
             values="1 0 0 0 0
                     0 0 0 0 0
                     0 0 0 0 0
