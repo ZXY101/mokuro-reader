@@ -3,7 +3,7 @@
   import { browser } from '$app/environment';
   import { onMount, onDestroy } from 'svelte';
 
-  // Create elements to hold our filter
+  // Create style element to hold our filter application
   let styleElement: HTMLStyleElement | null = null;
 
   // Function to apply the night mode filter
@@ -16,7 +16,7 @@
       document.head.appendChild(styleElement);
     }
     
-    // Apply the filter
+    // Apply the filter - the SVG filter is already in the HTML
     if ($settings.nightMode) {
       styleElement.textContent = `
         html {
@@ -45,23 +45,4 @@
   });
 </script>
 
-<!-- Include the SVG filter directly in the component template -->
-<svg width="0" height="0" style="position: absolute; z-index: -9999; visibility: hidden;">
-  <defs>
-    <filter id="night-mode-filter" color-interpolation-filters="sRGB">
-      <!-- Convert to grayscale first -->
-      <feColorMatrix type="matrix" 
-        values="0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0.2126 0.7152 0.0722 0 0
-                0 0 0 1 0" />
-                
-      <!-- Keep only the red channel -->
-      <feColorMatrix type="matrix"
-        values="1 0 0 0 0
-                0 0 0 0 0
-                0 0 0 0 0
-                0 0 0 1 0" />
-    </filter>
-  </defs>
-</svg>
+<!-- No SVG filter here - it's now in app.html -->
