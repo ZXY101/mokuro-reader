@@ -41,7 +41,7 @@
     } else {
       // If no sync function is available, show a message
       console.log('Sync function not available');
-      showSnackbar('Sync function not available');
+      showSnackbar('Sync read progress function not available');
     }
   }
   
@@ -93,7 +93,7 @@
       <button 
         onclick={handleSync} 
         class="flex items-center justify-center w-6 h-6" 
-        title={accessToken ? "Sync volume data with cloud" : "Sign in to sync"}
+        title={accessToken ? "Sync read progress with Google Drive" : "Sign in to sync"}
       >
         <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
       </button>

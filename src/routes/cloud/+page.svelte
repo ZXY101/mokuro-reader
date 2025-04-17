@@ -834,7 +834,7 @@
     const processId = 'sync-volume-data';
     progressTrackerStore.addProcess({
       id: processId,
-      description: 'Syncing volume data',
+      description: 'Syncing read progress',
       progress: 0,
       status: 'Starting sync...'
     });
@@ -935,14 +935,14 @@
       });
       setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
       
-      showSnackbar('Volume data synced successfully');
+      showSnackbar('Read progress synced successfully');
     } catch (error) {
       progressTrackerStore.updateProcess(processId, {
         progress: 0,
         status: 'Sync failed'
       });
       setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'syncing volume data');
+      handleDriveError(error, 'syncing read progress');
     }
   }
   
@@ -1043,10 +1043,10 @@
             color="dark"
             on:click={performSync}
           >
-            Sync volume data
+            Sync read progress
           </Button>
           <p class="text-xs text-gray-500 ml-1">
-            Merges local and cloud data, keeping the most recent progress for each volume.
+            Merges local and Google Drive data, keeping the most recent progress for each volume.
           </p>
         </div>
         <div class="flex-col gap-2 flex">
