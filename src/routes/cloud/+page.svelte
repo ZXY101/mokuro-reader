@@ -18,8 +18,11 @@
     signIn,
     logout,
     syncReadProgress,
-    READER_FOLDER
+    READER_FOLDER,
+    CLIENT_ID,
+    API_KEY
   } from '$lib/util';
+  import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
   import { Badge, Button, Toggle } from 'flowbite-svelte';
   import { onMount } from 'svelte';
