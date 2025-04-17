@@ -753,57 +753,6 @@
     }
   }
 
-  async function onUploadVolumeData() {
-    const metadata = {
-      mimeType: type,
-      name: VOLUME_DATA_FILE,
-      parents: [volumeDataId ? null : readerFolderId]
-    };
-
-    const processId = 'upload-volume-data';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: 'Uploading volume data',
-      progress: 0,
-      status: 'Starting upload...'
-    });
-
-    try {
-      // Update progress to show it's in progress
-      progressTrackerStore.updateProcess(processId, {
-        progress: 50,
-        status: 'Uploading...'
-      });
-
-      const res = await uploadFile({
-        accessToken,
-        fileId: volumeDataId,
-        metadata,
-        localStorageId: 'volumes',
-        type
-      });
-
-      volumeDataId = res.id;
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 100,
-        status: 'Upload complete'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-      if (volumeDataId) {
-        showSnackbar('Volume data uploaded');
-      }
-    } catch (error) {
-      progressTrackerStore.updateProcess(processId, {
-        progress: 0,
-        status: 'Upload failed'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'uploading volume data');
-    }
-  }
-
   async function onUploadProfiles() {
     const metadata = {
       mimeType: type,
@@ -854,51 +803,120 @@
       handleDriveError(error, 'uploading profiles');
     }
   }
-
-  async function onDownloadVolumeData() {
-    const processId = 'download-volume-data';
+  
+  async function onSyncVolumeData() {
+    const processId = 'sync-volume-data';
     progressTrackerStore.addProcess({
       id: processId,
-      description: 'Downloading volume data',
+      description: 'Syncing volume data',
       progress: 0,
-      status: 'Starting download...'
+      status: 'Starting sync...'
     });
 
     try {
-      // Update progress to show it's in progress
+      // Step 1: Download cloud volume data if it exists
+      let cloudVolumes = {};
+      if (volumeDataId) {
+        progressTrackerStore.updateProcess(processId, {
+          progress: 20,
+          status: 'Downloading cloud data...'
+        });
+
+        try {
+          const { body } = await gapi.client.drive.files.get({
+            fileId: volumeDataId,
+            alt: 'media'
+          });
+          cloudVolumes = parseVolumesFromJson(body);
+        } catch (error) {
+          console.error('Error downloading cloud volume data:', error);
+          // Continue with empty cloud volumes if download fails
+        }
+      }
+
+      // Step 2: Get local volume data
       progressTrackerStore.updateProcess(processId, {
-        progress: 50,
-        status: 'Downloading...'
+        progress: 40,
+        status: 'Merging data...'
       });
 
-      const { body } = await gapi.client.drive.files.get({
+      let localVolumes = {};
+      volumes.subscribe(value => {
+        localVolumes = { ...value };
+      })();
+
+      // Step 3: Merge the data, keeping the newer records based on lastProgressUpdate
+      const mergedVolumes = {};
+      
+      // Process all volume IDs from both sources
+      const allVolumeIds = new Set([
+        ...Object.keys(localVolumes),
+        ...Object.keys(cloudVolumes)
+      ]);
+      
+      allVolumeIds.forEach(volumeId => {
+        const localVolume = localVolumes[volumeId];
+        const cloudVolume = cloudVolumes[volumeId];
+        
+        // If volume exists only in one source, use that one
+        if (!localVolume) {
+          mergedVolumes[volumeId] = cloudVolume;
+        } else if (!cloudVolume) {
+          mergedVolumes[volumeId] = localVolume;
+        } else {
+          // Both exist, compare lastProgressUpdate dates
+          const localDate = new Date(localVolume.lastProgressUpdate).getTime();
+          const cloudDate = new Date(cloudVolume.lastProgressUpdate).getTime();
+          
+          // Keep the newer record
+          mergedVolumes[volumeId] = localDate >= cloudDate ? localVolume : cloudVolume;
+        }
+      });
+      
+      // Step 4: Update local volume data with merged data
+      progressTrackerStore.updateProcess(processId, {
+        progress: 60,
+        status: 'Updating local data...'
+      });
+      
+      volumes.update(() => mergedVolumes);
+      
+      // Step 5: Upload merged data to cloud
+      progressTrackerStore.updateProcess(processId, {
+        progress: 80,
+        status: 'Uploading merged data...'
+      });
+      
+      const metadata = {
+        mimeType: type,
+        name: VOLUME_DATA_FILE,
+        parents: [volumeDataId ? null : readerFolderId]
+      };
+      
+      const res = await uploadFile({
+        accessToken,
         fileId: volumeDataId,
-        alt: 'media'
+        metadata,
+        localStorageId: 'volumes',
+        type
       });
-
-      const downloaded = parseVolumesFromJson(body);
-
-      volumes.update((prev) => {
-        return {
-          ...prev,
-          ...downloaded
-        };
-      });
-
+      
+      volumeDataId = res.id;
+      
       progressTrackerStore.updateProcess(processId, {
         progress: 100,
-        status: 'Download complete'
+        status: 'Sync complete'
       });
       setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-      showSnackbar('Volume data downloaded');
+      
+      showSnackbar('Volume data synced successfully');
     } catch (error) {
       progressTrackerStore.updateProcess(processId, {
         progress: 0,
-        status: 'Download failed'
+        status: 'Sync failed'
       });
       setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'downloading volume data');
+      handleDriveError(error, 'syncing volume data');
     }
   }
 
@@ -992,19 +1010,13 @@
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
-            on:click={() => promptConfirmation('Upload volume data?', onUploadVolumeData)}
+            on:click={() => promptConfirmation('Sync volume data?', onSyncVolumeData)}
           >
-            Upload volume data
+            Sync volume data
           </Button>
-          {#if volumeDataId}
-            <Button
-              color="alternative"
-              on:click={() =>
-                promptConfirmation('Download and overwrite volume data?', onDownloadVolumeData)}
-            >
-              Download volume data
-            </Button>
-          {/if}
+          <p class="text-xs text-gray-500 ml-1">
+            Merges local and cloud data, keeping the most recent progress for each volume.
+          </p>
         </div>
         <div class="flex-col gap-2 flex">
           <Button
