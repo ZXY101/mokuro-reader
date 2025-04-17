@@ -211,6 +211,15 @@
 
       if (accessToken) {
         showSnackbar('Connected to Google Drive');
+        
+        // Check if we need to sync after login
+        const syncAfterLogin = localStorage.getItem('sync_after_login');
+        if (syncAfterLogin === 'true') {
+          // Clear the flag
+          localStorage.removeItem('sync_after_login');
+          // Perform sync
+          setTimeout(() => performSync(), 500);
+        }
       }
     } catch (error) {
       progressTrackerStore.updateProcess(processId, {
@@ -804,7 +813,21 @@
     }
   }
   
-  async function onSyncVolumeData() {
+  // This function handles the sync operation with authentication check
+  export async function syncVolumeData() {
+    // If not authenticated, prompt login first
+    if (!accessToken) {
+      // Store that we want to sync after login
+      localStorage.setItem('sync_after_login', 'true');
+      signIn();
+      return;
+    }
+    
+    await performSync();
+  }
+  
+  // This function performs the actual sync operation
+  async function performSync() {
     const processId = 'sync-volume-data';
     progressTrackerStore.addProcess({
       id: processId,
@@ -919,6 +942,11 @@
       handleDriveError(error, 'syncing volume data');
     }
   }
+  
+  // For backward compatibility with the button in the cloud page
+  async function onSyncVolumeData() {
+    await performSync();
+  }
 
   async function onDownloadProfiles() {
     const processId = 'download-profiles';
@@ -1010,7 +1038,7 @@
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
-            on:click={() => promptConfirmation('Sync volume data?', onSyncVolumeData)}
+            on:click={performSync}
           >
             Sync volume data
           </Button>
