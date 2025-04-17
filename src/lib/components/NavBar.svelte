@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Navbar, NavBrand, Tooltip } from 'flowbite-svelte';
-  import { CloudArrowUpOutline, UploadSolid, UserSettingsSolid, SyncSolid } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, UploadSolid, UserSettingsSolid, ArrowsRepeatOutline } from 'flowbite-svelte-icons';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import Settings from './Settings/Settings.svelte';
@@ -95,7 +95,7 @@
             class="flex items-center justify-center w-6 h-6" 
             disabled={!accessToken}
           >
-            <SyncSolid class={`w-6 h-6 ${accessToken ? 'hover:text-primary-700 cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`} />
+            <ArrowsRepeatOutline class={`w-6 h-6 ${accessToken ? 'hover:text-primary-700 cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`} />
           </button>
         </Tooltip>
       </div>
