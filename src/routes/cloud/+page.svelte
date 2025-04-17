@@ -5,7 +5,7 @@
   import { parseVolumesFromJson, profiles, volumes } from '$lib/settings';
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
 
-  import { promptConfirmation, showSnackbar, uploadFile } from '$lib/util';
+  import { promptConfirmation, showSnackbar, uploadFile, syncFunctionStore } from '$lib/util';
   import { Badge, Button, Toggle } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
@@ -301,6 +301,9 @@
   }
 
   onMount(() => {
+    // Register the sync function in the store
+    syncFunctionStore.set(syncVolumeData);
+    
     // Clear service worker cache for Google Drive downloads
     clearServiceWorkerCache();
     

@@ -7,13 +7,19 @@
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
   import { onMount } from 'svelte';
+  import { syncFunctionStore } from '$lib/util';
 
   // Use $state to make these reactive
   let settingsHidden = $state(true);
   let uploadModalOpen = $state(false);
   let isReader = $state(false);
   let accessToken = $state('');
-  let syncVolumeData: () => Promise<void>;
+  
+  // Subscribe to the sync function store
+  let syncFunction = $state(null);
+  syncFunctionStore.subscribe(value => {
+    syncFunction = value;
+  });
 
   // Define event handlers
   function openSettings() {
@@ -29,8 +35,8 @@
   }
   
   function handleSync() {
-    if (typeof syncVolumeData === 'function') {
-      syncVolumeData();
+    if (typeof syncFunction === 'function') {
+      syncFunction();
     } else {
       goto('/cloud');
     }
@@ -43,13 +49,6 @@
     if (savedToken) {
       accessToken = savedToken;
     }
-    
-    // Import the syncVolumeData function from the cloud page
-    import('../../routes/cloud/+page.svelte').then(module => {
-      syncVolumeData = module.syncVolumeData;
-    }).catch(error => {
-      console.error('Failed to import syncVolumeData:', error);
-    });
     
     // Listen for changes to the token
     window.addEventListener('storage', (event) => {
