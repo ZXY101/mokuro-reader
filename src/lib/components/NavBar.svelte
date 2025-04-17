@@ -45,7 +45,7 @@
     }
     
     // Import the syncVolumeData function from the cloud page
-    import('/src/routes/cloud/+page.svelte').then(module => {
+    import('../../routes/cloud/+page.svelte').then(module => {
       syncVolumeData = module.syncVolumeData;
     }).catch(error => {
       console.error('Failed to import syncVolumeData:', error);
