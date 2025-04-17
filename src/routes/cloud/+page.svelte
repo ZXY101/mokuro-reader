@@ -1045,9 +1045,6 @@
           >
             Sync read progress
           </Button>
-          <p class="text-xs text-gray-500 ml-1">
-            Merges local and Google Drive data, keeping the most recent progress for each volume.
-          </p>
         </div>
         <div class="flex-col gap-2 flex">
           <Button
