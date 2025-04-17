@@ -7,7 +7,7 @@
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
   import { onMount } from 'svelte';
-  import { syncFunctionStore } from '$lib/util';
+  import { syncFunctionStore, showSnackbar } from '$lib/util';
 
   // Use $state to make these reactive
   let settingsHidden = $state(true);
@@ -35,10 +35,13 @@
   }
   
   function handleSync() {
+    // If we have a sync function, use it
     if (typeof syncFunction === 'function') {
       syncFunction();
     } else {
-      goto('/cloud');
+      // If no sync function is available, show a message
+      console.log('Sync function not available');
+      showSnackbar('Sync function not available');
     }
   }
   
@@ -89,10 +92,10 @@
       </button>
       <button 
         onclick={handleSync} 
-        class="flex items-center justify-center w-8 h-8 ml-1 border border-gray-300 rounded-md p-1" 
+        class="flex items-center justify-center w-6 h-6" 
         title={accessToken ? "Sync volume data with cloud" : "Sign in to sync"}
       >
-        <RefreshOutline class={`w-5 h-5 ${accessToken ? 'text-blue-500 hover:text-primary-700 cursor-pointer' : 'text-gray-400'}`} />
+        <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
       </button>
     </div>
   </Navbar>
