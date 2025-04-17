@@ -3,65 +3,80 @@
   import { browser } from '$app/environment';
   import { onMount, onDestroy } from 'svelte';
 
-  // Create elements to hold our filter
-  let styleElement: HTMLStyleElement | null = null;
-  let svgElement: SVGElement | null = null;
+  // Elements for Firefox overlay approach
+  let grayscaleLayer: HTMLDivElement | null = null;
+  let redOverlay: HTMLDivElement | null = null;
+  let isFirefox = false;
+
+  // Function to detect Firefox
+  function detectFirefox() {
+    if (!browser) return false;
+    return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
+  }
 
   // Function to apply the night mode filter
   function applyNightModeFilter() {
     if (!browser) return;
     
-    // Create style element if it doesn't exist
-    if (!styleElement) {
-      styleElement = document.createElement('style');
-      document.head.appendChild(styleElement);
-    }
+    // Detect Firefox
+    isFirefox = detectFirefox();
     
-    // Create SVG filter element if it doesn't exist
-    if (!svgElement) {
-      svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      svgElement.setAttribute('width', '0');
-      svgElement.setAttribute('height', '0');
-      svgElement.style.position = 'absolute';
-      svgElement.style.zIndex = '-9999';
-      
-      // This implements a filter that approximates the Flutter color matrix:
-      // [-1/3, -1/3, -1/3, 0, 255,  // red channel
-      //  0, 0, 0, 0, 0,             // green channel
-      //  0, 0, 0, 0, 0,             // blue channel
-      //  0, 0, 0, 1, 0]             // alpha channel
-      
-      svgElement.innerHTML = `
-        <defs>
-          <filter id="night-mode-filter">
-            <!-- Convert to grayscale first -->
-            <feColorMatrix type="matrix" 
-              values="0.2126 0.7152 0.0722 0 0
-                      0.2126 0.7152 0.0722 0 0
-                      0.2126 0.7152 0.0722 0 0
-                      0 0 0 1 0" />
-                      
-            <!-- Keep only the red channel -->
-            <feColorMatrix type="matrix"
-              values="1 0 0 0 0
-                      0 0 0 0 0
-                      0 0 0 0 0
-                      0 0 0 1 0" />
-          </filter>
-        </defs>
-      `;
-      document.body.appendChild(svgElement);
-    }
-    
-    // Apply the filter
-    if ($settings.nightMode) {
-      styleElement.textContent = `
-        html {
-          filter: url(#night-mode-filter) !important;
+    if (isFirefox) {
+      // Firefox approach: Use overlays with blend modes
+      if ($settings.nightMode) {
+        // Create grayscale layer if it doesn't exist
+        if (!grayscaleLayer) {
+          grayscaleLayer = document.createElement('div');
+          grayscaleLayer.id = 'grayscale-saturation-layer';
+          grayscaleLayer.style.position = 'fixed';
+          grayscaleLayer.style.top = '0';
+          grayscaleLayer.style.left = '0';
+          grayscaleLayer.style.width = '100%';
+          grayscaleLayer.style.height = '100%';
+          grayscaleLayer.style.backgroundColor = 'rgba(0, 0, 0, 1)';
+          grayscaleLayer.style.pointerEvents = 'none';
+          grayscaleLayer.style.zIndex = '999998';
+          grayscaleLayer.style.mixBlendMode = 'saturation'; // Removes color saturation
+          grayscaleLayer.style.display = 'block';
+          document.body.appendChild(grayscaleLayer);
         }
-      `;
+        
+        // Create red overlay if it doesn't exist
+        if (!redOverlay) {
+          redOverlay = document.createElement('div');
+          redOverlay.id = 'red-overlay';
+          redOverlay.style.position = 'fixed';
+          redOverlay.style.top = '0';
+          redOverlay.style.left = '0';
+          redOverlay.style.width = '100%';
+          redOverlay.style.height = '100%';
+          redOverlay.style.backgroundColor = 'rgba(255, 0, 0, 1)';
+          redOverlay.style.pointerEvents = 'none';
+          redOverlay.style.zIndex = '999999'; // Higher than grayscale
+          redOverlay.style.mixBlendMode = 'multiply';
+          redOverlay.style.display = 'block';
+          document.body.appendChild(redOverlay);
+        }
+      } else {
+        // Remove overlays if night mode is off
+        if (grayscaleLayer) {
+          grayscaleLayer.remove();
+          grayscaleLayer = null;
+        }
+        if (redOverlay) {
+          redOverlay.remove();
+          redOverlay = null;
+        }
+      }
     } else {
-      styleElement.textContent = '';
+      // Non-Firefox approach: Use CSS variables with SVG filter
+      const rootElement = document.documentElement;
+      
+      if ($settings.nightMode) {
+        rootElement.style.setProperty('--night-mode-filter', 'url(#night-mode-filter)');
+      } else {
+        rootElement.style.setProperty('--night-mode-filter', 'none');
+      }
     }
   }
 
@@ -70,21 +85,22 @@
     applyNightModeFilter();
   }
 
-  // Set up and clean up
+  // Set up
   onMount(() => {
     applyNightModeFilter();
   });
 
+  // Clean up
   onDestroy(() => {
     if (browser) {
-      if (styleElement) {
-        styleElement.remove();
+      if (grayscaleLayer) {
+        grayscaleLayer.remove();
       }
-      if (svgElement) {
-        svgElement.remove();
+      if (redOverlay) {
+        redOverlay.remove();
       }
     }
   });
 </script>
 
-<!-- This component doesn't render any visible elements, it just applies the filter -->
+<!-- No visible elements - just applies the filter via CSS variables or overlays -->
