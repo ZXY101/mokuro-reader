@@ -634,19 +634,9 @@
     // Clear service worker cache for Google Drive downloads
     clearServiceWorkerCache();
     
-    console.log('Cloud page mounted, initializing Google Drive API');
-    console.log('Current state:', { accessToken, readerFolderId, volumeDataId, profilesId });
-    
     try {
       // Always try to initialize when the cloud page is loaded
       await initGoogleDriveApi();
-      console.log('Google Drive API initialized successfully');
-      console.log('Updated state:', { 
-        accessToken: get(accessTokenStore), 
-        readerFolderId: get(readerFolderIdStore), 
-        volumeDataId: get(volumeDataIdStore), 
-        profilesId: get(profilesIdStore) 
-      });
     } catch (error) {
       console.error('Failed to initialize Google Drive API:', error);
     }
@@ -705,14 +695,6 @@
 </svelte:head>
 
 <div class="p-2 h-[90svh]">
-  <!-- Debug info -->
-  <div class="text-xs text-gray-500 mb-4">
-    <p>Access Token: {accessToken ? 'Present' : 'Not present'}</p>
-    <p>Reader Folder ID: {readerFolderId ? readerFolderId : 'Not set'}</p>
-    <p>Volume Data ID: {volumeDataId ? volumeDataId : 'Not set'}</p>
-    <p>Profiles ID: {profilesId ? profilesId : 'Not set'}</p>
-  </div>
-
   {#if accessToken}
     <div class="flex justify-between items-center gap-6 flex-col">
       <div class="flex justify-between items-center w-full max-w-3xl">
