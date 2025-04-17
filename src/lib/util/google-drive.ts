@@ -1,7 +1,7 @@
 import { parseVolumesFromJson, volumes } from '$lib/settings';
 import { progressTrackerStore } from '$lib/util/progress-tracker';
 import { showSnackbar } from '$lib/util/snackbar';
-import { uploadFile } from '$lib/util/upload';
+import { uploadFile } from '$lib/util/cloud';
 import { writable, get } from 'svelte/store';
 
 // Constants
