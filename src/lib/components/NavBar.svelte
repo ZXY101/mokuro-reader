@@ -38,14 +38,8 @@
     syncReadProgress();
   }
   
-  // Initialize Google Drive API
+  // Listen for changes to the token in localStorage
   onMount(() => {
-    // Initialize the Google Drive API
-    initGoogleDriveApi().catch(error => {
-      console.error('Failed to initialize Google Drive API:', error);
-    });
-    
-    // Listen for changes to the token in localStorage
     window.addEventListener('storage', (event) => {
       if (event.key === 'gdrive_token') {
         accessTokenStore.set(event.newValue || '');

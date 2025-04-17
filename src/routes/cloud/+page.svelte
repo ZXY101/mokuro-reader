@@ -146,11 +146,6 @@
   onMount(() => {
     // Clear service worker cache for Google Drive downloads
     clearServiceWorkerCache();
-    
-    // Initialize Google Drive API
-    initGoogleDriveApi().catch(error => {
-      console.error('Failed to initialize Google Drive API:', error);
-    });
   });
 
   function createPicker() {
