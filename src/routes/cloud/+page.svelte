@@ -626,6 +626,16 @@
   async function performSync() {
     await syncReadProgress();
   }
+  
+  // Make sure the cloud page is properly initialized
+  onMount(() => {
+    // If we have a token but no folder ID, try to initialize
+    if (accessToken && !readerFolderId) {
+      initGoogleDriveApi().catch(error => {
+        console.error('Failed to initialize Google Drive API:', error);
+      });
+    }
+  });
 
   async function onDownloadProfiles() {
     const processId = 'download-profiles';
