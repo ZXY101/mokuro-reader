@@ -1,6 +1,6 @@
 <script lang="ts">
   import '../app.postcss';
-  import { browser, dev } from '$app/environment';
+  import { dev } from '$app/environment';
   import { inject } from '@vercel/analytics';
 
   import NavBar from '$lib/components/NavBar.svelte';
@@ -17,11 +17,6 @@
   let { children }: Props = $props();
 
   inject({ mode: dev ? 'development' : 'production' });
-
-  // Start thumbnail processing only in browser environment
-  if (browser) {
-    import('$lib/catalog/thumbnails');
-  }
 </script>
 
 <div class=" h-full min-h-[100svh] text-white">

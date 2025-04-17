@@ -2,68 +2,44 @@
   import { run } from 'svelte/legacy';
 
   import { processFiles } from '$lib/upload';
-  import { parseVolumesFromJson, profiles, volumes } from '$lib/settings';
+  import { profiles } from '$lib/settings';
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
 
-  import { promptConfirmation, showSnackbar, uploadFile } from '$lib/util';
+  import { 
+    promptConfirmation, 
+    showSnackbar, 
+    uploadFile, 
+    accessTokenStore,
+    readerFolderIdStore,
+    volumeDataIdStore,
+    profilesIdStore,
+    tokenClientStore,
+    initGoogleDriveApi,
+    signIn,
+    logout,
+    syncReadProgress,
+    READER_FOLDER
+  } from '$lib/util';
+  import { get } from 'svelte/store';
   import { Badge, Button, Toggle } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
-  import { progressTrackerStore } from '$lib/util/progress-tracker';
 
-  interface Props {
-    accessToken?: string;
-  }
-
-  let { accessToken = $bindable('') }: Props = $props();
-
-  // Helper function to handle errors consistently
-  function handleDriveError(error: any, context: string) {
-    // Check if it's a connectivity issue
-    const errorMessage = error.toString().toLowerCase();
-    const isConnectivityError =
-      errorMessage.includes('network') ||
-      errorMessage.includes('connection') ||
-      errorMessage.includes('offline') ||
-      errorMessage.includes('internet');
-
-    if (!isConnectivityError) {
-      // Log the user out for non-connectivity errors
-      logout();
-      showSnackbar(`Error ${context}: ${error.message || 'Unknown error'}`);
-    } else {
-      showSnackbar('Connection error: Please check your internet connection');
-    }
-
-    console.error(`${context} error:`, error);
-  }
-
-  const CLIENT_ID = import.meta.env.VITE_GDRIVE_CLIENT_ID;
-  const API_KEY = import.meta.env.VITE_GDRIVE_API_KEY;
-
-  const DISCOVERY_DOC = 'https://www.googleapis.com/discovery/v1/apis/drive/v3/rest';
-  const SCOPES = 'https://www.googleapis.com/auth/drive.file';
-
-  const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
-  const READER_FOLDER = 'mokuro-reader';
-  const VOLUME_DATA_FILE = 'volume-data.json';
-  const PROFILES_FILE = 'profiles.json';
-
-  const type = 'application/json';
-
-  let tokenClient: any;
-  let readerFolderId = '';
+  // Subscribe to stores
+  let accessToken = $state('');
+  let readerFolderId = $state('');
   let volumeDataId = $state('');
   let profilesId = $state('');
+  let tokenClient = $state(null);
+  
+  accessTokenStore.subscribe(value => { accessToken = value; });
+  readerFolderIdStore.subscribe(value => { readerFolderId = value; });
+  volumeDataIdStore.subscribe(value => { volumeDataId = value; });
+  profilesIdStore.subscribe(value => { profilesId = value; });
+  tokenClientStore.subscribe(value => { tokenClient = value; });
 
-  // This variable is used to track if we're connected to Google Drive
-  // and is used in the UI to show/hide the login button
-
-  run(() => {
-    if (accessToken) {
-      localStorage.setItem('gdrive_token', accessToken);
-    }
-  });
+  // Use constants from the google-drive utility
+  const type = 'application/json';
 
   async function getFileSize(fileId: string): Promise<number> {
     try {
@@ -130,128 +106,6 @@
     return xhrDownloadFileIdWithTracking(fileId, fileName, () => {});
   }
 
-  export async function connectDrive(resp?: any) {
-    if (resp?.error !== undefined) {
-      localStorage.removeItem('gdrive_token');
-      accessToken = '';
-      throw resp;
-    }
-
-    accessToken = resp?.access_token;
-
-    const processId = 'connect-drive';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: 'Connecting to Google Drive',
-      progress: 0,
-      status: 'Initializing connection...'
-    });
-
-    try {
-      progressTrackerStore.updateProcess(processId, {
-        progress: 20,
-        status: 'Checking for reader folder...'
-      });
-
-      const { result: readerFolderRes } = await gapi.client.drive.files.list({
-        q: `mimeType='application/vnd.google-apps.folder' and name='${READER_FOLDER}'`,
-        fields: 'files(id)'
-      });
-
-      if (readerFolderRes.files?.length === 0) {
-        progressTrackerStore.updateProcess(processId, {
-          progress: 40,
-          status: 'Creating reader folder...'
-        });
-
-        const { result: createReaderFolderRes } = await gapi.client.drive.files.create({
-          resource: { mimeType: FOLDER_MIME_TYPE, name: READER_FOLDER },
-          fields: 'id'
-        });
-
-        readerFolderId = createReaderFolderRes.id || '';
-      } else {
-        const id = readerFolderRes.files?.[0]?.id || '';
-        readerFolderId = id || '';
-      }
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 60,
-        status: 'Checking for volume data...'
-      });
-
-      const { result: volumeDataRes } = await gapi.client.drive.files.list({
-        q: `'${readerFolderId}' in parents and name='${VOLUME_DATA_FILE}'`,
-        fields: 'files(id, name)'
-      });
-
-      if (volumeDataRes.files?.length !== 0) {
-        volumeDataId = volumeDataRes.files?.[0].id || '';
-      }
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 80,
-        status: 'Checking for profiles...'
-      });
-
-      const { result: profilesRes } = await gapi.client.drive.files.list({
-        q: `'${readerFolderId}' in parents and name='${PROFILES_FILE}'`,
-        fields: 'files(id, name)'
-      });
-
-      if (profilesRes.files?.length !== 0) {
-        profilesId = profilesRes.files?.[0].id || '';
-      }
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 100,
-        status: 'Connected successfully'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-      if (accessToken) {
-        showSnackbar('Connected to Google Drive');
-      }
-    } catch (error) {
-      progressTrackerStore.updateProcess(processId, {
-        progress: 0,
-        status: 'Connection failed'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'connecting to Google Drive');
-    }
-  }
-
-  function signIn() {
-    // Always show the account picker to allow switching accounts
-    tokenClient.requestAccessToken({ prompt: 'consent' });
-  }
-
-  export function logout() {
-    // Remove token from localStorage
-    localStorage.removeItem('gdrive_token');
-
-    // Clear the token from memory
-    accessToken = '';
-
-    // Revoke the token with Google to ensure account picker shows up next time
-    if (gapi.client.getToken()) {
-      const token = gapi.client.getToken().access_token;
-      // Clear the token from gapi client
-      gapi.client.setToken(null);
-
-      // Revoke the token with Google's OAuth service
-      fetch(`https://oauth2.googleapis.com/revoke?token=${token}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      }).catch((error) => {
-        console.error('Error revoking token:', error);
-      });
-    }
-  }
-
   // Function to clear service worker cache for Google Drive downloads
   async function clearServiceWorkerCache() {
     if ('caches' in window) {
@@ -294,40 +148,6 @@
   onMount(() => {
     // Clear service worker cache for Google Drive downloads
     clearServiceWorkerCache();
-    
-    gapi.load('client', async () => {
-      try {
-        await gapi.client.init({
-          apiKey: API_KEY,
-          discoveryDocs: [DISCOVERY_DOC]
-        });
-
-        // Initialize token client after gapi client is ready
-        tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID,
-          scope: SCOPES,
-          callback: connectDrive
-        });
-
-        // Try to restore the saved token only after gapi client is initialized
-        const savedToken = localStorage.getItem('gdrive_token');
-        if (savedToken) {
-          try {
-            // Set the token in gapi client
-            gapi.client.setToken({ access_token: savedToken });
-            accessToken = savedToken;
-            await connectDrive({ access_token: savedToken });
-          } catch (error) {
-            console.error('Failed to restore saved token:', error);
-            // Token will be cleared in connectDrive if there's an error
-          }
-        }
-      } catch (error) {
-        handleDriveError(error, 'initializing Google Drive');
-      }
-    });
-
-    gapi.load('picker', () => {});
   });
 
   function createPicker() {
@@ -753,57 +573,6 @@
     }
   }
 
-  async function onUploadVolumeData() {
-    const metadata = {
-      mimeType: type,
-      name: VOLUME_DATA_FILE,
-      parents: [volumeDataId ? null : readerFolderId]
-    };
-
-    const processId = 'upload-volume-data';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: 'Uploading volume data',
-      progress: 0,
-      status: 'Starting upload...'
-    });
-
-    try {
-      // Update progress to show it's in progress
-      progressTrackerStore.updateProcess(processId, {
-        progress: 50,
-        status: 'Uploading...'
-      });
-
-      const res = await uploadFile({
-        accessToken,
-        fileId: volumeDataId,
-        metadata,
-        localStorageId: 'volumes',
-        type
-      });
-
-      volumeDataId = res.id;
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 100,
-        status: 'Upload complete'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-      if (volumeDataId) {
-        showSnackbar('Volume data uploaded');
-      }
-    } catch (error) {
-      progressTrackerStore.updateProcess(processId, {
-        progress: 0,
-        status: 'Upload failed'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'uploading volume data');
-    }
-  }
-
   async function onUploadProfiles() {
     const metadata = {
       mimeType: type,
@@ -854,53 +623,24 @@
       handleDriveError(error, 'uploading profiles');
     }
   }
-
-  async function onDownloadVolumeData() {
-    const processId = 'download-volume-data';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: 'Downloading volume data',
-      progress: 0,
-      status: 'Starting download...'
-    });
-
-    try {
-      // Update progress to show it's in progress
-      progressTrackerStore.updateProcess(processId, {
-        progress: 50,
-        status: 'Downloading...'
-      });
-
-      const { body } = await gapi.client.drive.files.get({
-        fileId: volumeDataId,
-        alt: 'media'
-      });
-
-      const downloaded = parseVolumesFromJson(body);
-
-      volumes.update((prev) => {
-        return {
-          ...prev,
-          ...downloaded
-        };
-      });
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 100,
-        status: 'Download complete'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-      showSnackbar('Volume data downloaded');
-    } catch (error) {
-      progressTrackerStore.updateProcess(processId, {
-        progress: 0,
-        status: 'Download failed'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'downloading volume data');
-    }
+  
+  // For backward compatibility with the button in the cloud page
+  async function performSync() {
+    await syncReadProgress();
   }
+  
+  // Make sure the cloud page is properly initialized
+  onMount(async () => {
+    // Clear service worker cache for Google Drive downloads
+    clearServiceWorkerCache();
+    
+    try {
+      // Always try to initialize when the cloud page is loaded
+      await initGoogleDriveApi();
+    } catch (error) {
+      console.error('Failed to initialize Google Drive API:', error);
+    }
+  });
 
   async function onDownloadProfiles() {
     const processId = 'download-profiles';
@@ -992,19 +732,10 @@
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
-            on:click={() => promptConfirmation('Upload volume data?', onUploadVolumeData)}
+            on:click={performSync}
           >
-            Upload volume data
+            Sync read progress
           </Button>
-          {#if volumeDataId}
-            <Button
-              color="alternative"
-              on:click={() =>
-                promptConfirmation('Download and overwrite volume data?', onDownloadVolumeData)}
-            >
-              Download volume data
-            </Button>
-          {/if}
         </div>
         <div class="flex-col gap-2 flex">
           <Button
