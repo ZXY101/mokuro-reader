@@ -7,7 +7,7 @@
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
   import { onMount } from 'svelte';
-  import { syncFunctionStore, showSnackbar } from '$lib/util';
+  import { showSnackbar, accessTokenStore, initGoogleDriveApi, syncReadProgress } from '$lib/util';
 
   // Use $state to make these reactive
   let settingsHidden = $state(true);
@@ -15,10 +15,9 @@
   let isReader = $state(false);
   let accessToken = $state('');
   
-  // Subscribe to the sync function store
-  let syncFunction = $state(null);
-  syncFunctionStore.subscribe(value => {
-    syncFunction = value;
+  // Subscribe to the access token store
+  accessTokenStore.subscribe(value => {
+    accessToken = value;
   });
 
   // Define event handlers
@@ -35,28 +34,21 @@
   }
   
   function handleSync() {
-    // If we have a sync function, use it
-    if (typeof syncFunction === 'function') {
-      syncFunction();
-    } else {
-      // If no sync function is available, show a message
-      console.log('Sync function not available');
-      showSnackbar('Sync read progress function not available');
-    }
+    // Use the syncReadProgress function from the google-drive utility
+    syncReadProgress();
   }
   
-  // Check if user is logged in to Google Drive
+  // Initialize Google Drive API
   onMount(() => {
-    // Check for saved token
-    const savedToken = localStorage.getItem('gdrive_token');
-    if (savedToken) {
-      accessToken = savedToken;
-    }
+    // Initialize the Google Drive API
+    initGoogleDriveApi().catch(error => {
+      console.error('Failed to initialize Google Drive API:', error);
+    });
     
-    // Listen for changes to the token
+    // Listen for changes to the token in localStorage
     window.addEventListener('storage', (event) => {
       if (event.key === 'gdrive_token') {
-        accessToken = event.newValue || '';
+        accessTokenStore.set(event.newValue || '');
       }
     });
   });
