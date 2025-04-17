@@ -87,17 +87,13 @@
       <button onclick={navigateToCloud} class="flex items-center justify-center w-6 h-6">
         <CloudArrowUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
       </button>
-      <div class="relative">
-        <Tooltip content={accessToken ? "Sync volume data with cloud" : "Sign in to sync"}>
-          <button 
-            onclick={handleSync} 
-            class="flex items-center justify-center w-6 h-6" 
-            disabled={!accessToken}
-          >
-            <RefreshOutline class={`w-6 h-6 ${accessToken ? 'hover:text-primary-700 cursor-pointer' : 'text-gray-400 cursor-not-allowed'}`} />
-          </button>
-        </Tooltip>
-      </div>
+      <button 
+        onclick={handleSync} 
+        class="flex items-center justify-center w-8 h-8 ml-1 border border-gray-300 rounded-md p-1" 
+        title={accessToken ? "Sync volume data with cloud" : "Sign in to sync"}
+      >
+        <RefreshOutline class={`w-5 h-5 ${accessToken ? 'text-blue-500 hover:text-primary-700 cursor-pointer' : 'text-gray-400'}`} />
+      </button>
     </div>
   </Navbar>
 </div>
