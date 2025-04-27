@@ -50,18 +50,42 @@ export async function blobToBase64(blob: Blob) {
   });
 }
 
-export async function imageToWebp(source: File) {
+export async function imageToWebp(source: File, settings: any) {
   const image = await createImageBitmap(source);
   const canvas = new OffscreenCanvas(image.width, image.height);
   const context = canvas.getContext("2d");
 
   if (context) {
     context.drawImage(image, 0, 0);
-    const blob = await canvas.convertToBlob({ type: 'image/webp' });
+    await imageResize(canvas, context, settings.ankiConnectSettings.widthField, settings.ankiConnectSettings.heightField);
+    const blob = await canvas.convertToBlob({ type: 'image/webp', quality: settings.ankiConnectSettings.qualityField });
     image.close();
 
     return await blobToBase64(blob);
   }
+}
+
+export async function imageResize(canvas: OffscreenCanvas,  ctx: OffscreenCanvasRenderingContext2D, maxWidth: number, maxHeight: number): Promise<OffscreenCanvas> {
+  return new Promise((resolve, reject) => {
+    const widthRatio = maxWidth <= 0 ? 1 : maxWidth / canvas.width;
+    const heightRatio = maxHeight <= 0 ? 1 : maxHeight / canvas.height;
+    const ratio = Math.min(1, Math.min(widthRatio, heightRatio));
+
+    if (ratio < 1) {
+        const newWidth = canvas.width * ratio;
+        const newHeight = canvas.height * ratio;
+        createImageBitmap(canvas, { resizeWidth: newWidth, resizeHeight: newHeight, resizeQuality: 'high' })
+            .then((sprite) => {
+                canvas.width = newWidth;
+                canvas.height = newHeight;
+                ctx.drawImage(sprite, 0, 0);
+                resolve(canvas);
+            })
+            .catch((e) => reject(e));
+    } else {
+        resolve(canvas);
+    }
+  });
 }
 
 export async function updateLastCard(imageData: string | null | undefined, sentence?: string) {
