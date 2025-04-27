@@ -1,6 +1,6 @@
 import { showSnackbar } from '$lib/util';
 import { writable } from 'svelte/store';
-import { blobToBase64 } from '.';
+import { blobToBase64, imageResize } from '.';
 
 type CropperModal = {
   open: boolean;
@@ -34,7 +34,7 @@ function getRadianAngle(degreeValue: number) {
 
 export type Pixels = { width: number; height: number; x: number; y: number }
 
-export async function getCroppedImg(imageSrc: string, pixelCrop: Pixels, rotation = 0) {
+export async function getCroppedImg(imageSrc: string, pixelCrop: Pixels, settings: any, rotation = 0 ) {
   const image = await createImage(imageSrc);
   const canvas = new OffscreenCanvas(image.width, image.height);
   const ctx = canvas.getContext('2d');
@@ -71,8 +71,9 @@ export async function getCroppedImg(imageSrc: string, pixelCrop: Pixels, rotatio
     Math.round(0 - safeArea / 2 + image.width * 0.5 - pixelCrop.x),
     Math.round(0 - safeArea / 2 + image.height * 0.5 - pixelCrop.y)
   );
-
-  const blob = await canvas.convertToBlob({ type: 'image/webp' });
+  
+  await imageResize(canvas, ctx, settings.ankiConnectSettings.widthField, settings.ankiConnectSettings.heightField);
+  const blob = await canvas.convertToBlob({ type: 'image/webp', quality: settings.ankiConnectSettings.qualityField });
 
   return await blobToBase64(blob)
 }

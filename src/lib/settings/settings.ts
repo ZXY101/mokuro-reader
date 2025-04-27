@@ -28,6 +28,9 @@ export type AnkiConnectSettings = {
   enabled: boolean;
   pictureField: string;
   sentenceField: string;
+  heightField: number;
+  widthField: number;
+  qualityField: number;
   cropImage: boolean;
   overwriteImage: boolean;
   grabSentence: boolean;
@@ -98,6 +101,9 @@ const defaultSettings: Settings = {
     overwriteImage: true,
     pictureField: 'Picture',
     sentenceField: 'Sentence',
+    heightField: 200,
+    widthField: 200,
+    qualityField: 0.5,
     triggerMethod: 'both'
   }
 };
