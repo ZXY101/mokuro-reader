@@ -1,6 +1,7 @@
 import { showSnackbar } from '$lib/util';
 import { writable } from 'svelte/store';
 import { blobToBase64, imageResize } from '.';
+import { Settings } from '$lib/settings';
 
 type CropperModal = {
   open: boolean;
@@ -34,7 +35,7 @@ function getRadianAngle(degreeValue: number) {
 
 export type Pixels = { width: number; height: number; x: number; y: number }
 
-export async function getCroppedImg(imageSrc: string, pixelCrop: Pixels, settings: any, rotation = 0 ) {
+export async function getCroppedImg(imageSrc: string, pixelCrop: Pixels, settings: Settings, rotation = 0 ) {
   const image = await createImage(imageSrc);
   const canvas = new OffscreenCanvas(image.width, image.height);
   const ctx = canvas.getContext('2d');

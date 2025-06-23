@@ -124,6 +124,9 @@
         type="number"
         bind:value={qualityField}
         on:change={() => updateAnkiSetting('qualityField', qualityField)}
+        min={0}
+        max={1} 
+        step="0.1"
       />
     </div>
   </div>

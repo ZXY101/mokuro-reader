@@ -101,9 +101,9 @@ const defaultSettings: Settings = {
     overwriteImage: true,
     pictureField: 'Picture',
     sentenceField: 'Sentence',
-    heightField: 200,
-    widthField: 200,
-    qualityField: 0.5,
+    heightField: 0,
+    widthField: 0,
+    qualityField: 1,
     triggerMethod: 'both'
   }
 };

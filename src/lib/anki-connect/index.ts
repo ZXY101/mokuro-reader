@@ -1,4 +1,4 @@
-import { settings } from "$lib/settings";
+import { Settings, settings } from "$lib/settings";
 import { showSnackbar } from "$lib/util"
 import { get } from "svelte/store";
 
@@ -50,7 +50,7 @@ export async function blobToBase64(blob: Blob) {
   });
 }
 
-export async function imageToWebp(source: File, settings: any) {
+export async function imageToWebp(source: File, settings: Settings) {
   const image = await createImageBitmap(source);
   const canvas = new OffscreenCanvas(image.width, image.height);
   const context = canvas.getContext("2d");
