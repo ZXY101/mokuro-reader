@@ -12,15 +12,24 @@ export function initPanzoom(node: HTMLElement) {
   container = node;
   pz = panzoom(node, {
     bounds: false,
-    maxZoom: 10,
-    minZoom: 0.1,
+    maxZoom: Math.pow(1.25, 10), //Adjusted to exponents of zoom in/out
+    minZoom: Math.pow(0.8, 10),
     zoomDoubleClickSpeed: 1,
     enableTextSelection: true,
     beforeMouseDown: (e) => {
       const nodeName = (e.target as HTMLElement).nodeName;
-      return nodeName === 'P';
+      const mousePanDisabled = get(settings).disableMousePan;
+      return nodeName === 'P' || mousePanDisabled;
     },
-    beforeWheel: (e) => e.altKey,
+    beforeWheel: (e) => {
+      if (!e.ctrlKey) {
+          const pzStore = get(panzoomStore);
+          pzStore?.moveBy(0, -e.deltaY * pzStore.getTransform().scale, false);
+
+          return true;
+      }
+      return false;
+    },
     onTouch: (e) => e.touches.length > 1,
     // Panzoom typing is wrong here
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment

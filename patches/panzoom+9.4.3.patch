@@ -1,0 +1,18 @@
+diff --git a/node_modules/panzoom/index.js b/node_modules/panzoom/index.js
+index cc1556c..cb5a439 100644
+--- a/node_modules/panzoom/index.js
++++ b/node_modules/panzoom/index.js
+@@ -934,7 +934,12 @@ function createPanZoom(domElement, options) {
+   function getScaleMultiplier(delta) {
+     var sign = Math.sign(delta);
+     var deltaAdjustedSpeed = Math.min(0.25, Math.abs(speed * delta / 128));
+-    return 1 - sign * deltaAdjustedSpeed;
++    var zoomInMultiplier = 1 + deltaAdjustedSpeed;
++    var multiplier = zoomInMultiplier;
++    if (sign > 0) {
++      multiplier = 1 / zoomInMultiplier;
++    }
++    return multiplier;
+   }
+ 
+   function triggerPanStart() {
