@@ -22,8 +22,10 @@ export type MokuroData = {
   pages: Page[];
 };
 
+type FileWithBlob = File & { blob?: string };
+
 export type Volume = {
   mokuroData: MokuroData;
   volumeName: string;
-  files: Record<string, File>;
+  files: Record<string, FileWithBlob>;
 };

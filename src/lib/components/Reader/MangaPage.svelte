@@ -4,11 +4,21 @@
   import TextBoxes from './TextBoxes.svelte';
   import { zoomDefault } from '$lib/panzoom';
 
+  type FileWithBlob = File & { blob?: string };
+
   export let page: Page;
-  export let src: File;
+  export let src: FileWithBlob;
+  let url: string = '';
 
-  $: url = src ? `url(${URL.createObjectURL(src)})` : '';
-
+  // $: url = src ? `url(${URL.createObjectURL(src)})` : '';
+  $: {
+      if (src) {
+          src.blob = src.blob || URL.createObjectURL(src);
+          url = `url(${src.blob})`;
+      } else {
+          url = '';
+      }
+  }
   let legacy: HTMLElement | null;
 
   onMount(() => {
