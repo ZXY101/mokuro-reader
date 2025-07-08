@@ -7,7 +7,7 @@
     zoomDefault,
     zoomFitToScreen
   } from '$lib/panzoom';
-  import { progress, settings, updateProgress, type VolumeSettings } from '$lib/settings';
+  import { progress, settings, updateProgress, updateVolumeSetting, volumes, type VolumeSettings } from '$lib/settings';
   import { clamp, debounce, fireExstaticEvent } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
@@ -111,8 +111,17 @@
   }
 
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
-    const action = event.code || event.key;
+    if (event.target && event.target instanceof HTMLElement) {
+      const selection = window.getSelection();
+      const isTyping = event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable;
+      const isSelecting = selection && selection.toString().length > 0;
 
+      if (isTyping || isSelecting) {
+        return;
+      }
+    }
+    const action = event.code || event.key;
+    
     switch (action) {
       case 'ArrowLeft':
         left(event, true);
@@ -140,6 +149,28 @@
       case 'KeyF':
         toggleFullScreen();
         return;
+      case 'KeyC':
+          const volumeId = $pageStore.params.volume;
+          updateVolumeSetting(volumeId, "hasCover", !volumeSettings.hasCover);
+          const pageClamped = Math.max($volumes[volumeId].progress - 1, 1);
+          updateProgress(volumeId, pageClamped);
+          zoomDefault();
+          return;
+      case 'KeyW':
+          $panzoomStore?.moveBy(0, 300 * $panzoomStore?.getTransform().scale, true);
+          return;
+      case 'KeyS':
+          $panzoomStore?.moveBy(0, -300 * $panzoomStore?.getTransform().scale, true);
+          return;
+      case 'KeyA':
+          left(event, true);
+          return;
+      case 'KeyD':
+          right(event, true);
+          return;
+      case 'KeyR':
+          zoomDefault();
+          return;
       default:
         break;
     }

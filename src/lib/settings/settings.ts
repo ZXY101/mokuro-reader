@@ -45,6 +45,7 @@ export type VolumeDefaults = {
 
 export type Settings = {
   defaultFullscreen: boolean;
+  disableMousePan: boolean;
   textEditable: boolean;
   textBoxBorders: boolean;
   displayOCR: boolean;
@@ -73,6 +74,7 @@ export type VolumeDefaultsKey = keyof VolumeDefaults;
 
 const defaultSettings: Settings = {
   defaultFullscreen: false,
+  disableMousePan: true,
   displayOCR: true,
   textEditable: false,
   textBoxBorders: false,
@@ -80,17 +82,17 @@ const defaultSettings: Settings = {
   pageNum: true,
   charCount: false,
   mobile: false,
-  bounds: false,
+  bounds: true,
   backgroundColor: '#030712',
   swipeThreshold: 50,
   edgeButtonWidth: 40,
   showTimer: false,
   quickActions: true,
   fontSize: 'auto',
-  zoomDefault: 'zoomFitToScreen',
+  zoomDefault: 'keepZoomStart',
   invertColors: false,
   volumeDefaults: {
-    singlePageView: false,
+    singlePageView: true,
     rightToLeft: true,
     hasCover: false
   },

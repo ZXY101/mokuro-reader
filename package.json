@@ -9,7 +9,8 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "lint": "prettier --plugin-search-dir . --check . && eslint .",
-    "format": "prettier --plugin-search-dir . --write ."
+    "format": "prettier --plugin-search-dir . --write .",
+    "postinstall": "patch-package"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^2.0.0",
@@ -44,6 +45,7 @@
     "@zip.js/zip.js": "^2.7.20",
     "dexie": "^4.0.1-alpha.25",
     "panzoom": "^9.4.3",
+    "patch-package": "8.0.0",
     "svelte-easy-crop": "^2.0.1"
   }
 }
