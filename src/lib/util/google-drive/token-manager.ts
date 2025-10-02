@@ -139,8 +139,27 @@ class TokenManager {
       scope: GOOGLE_DRIVE_CONFIG.SCOPES,
       callback: (response: any) => {
         if (response?.error) {
-          console.error('Token client error:', response.error);
-          this.clearToken();
+          console.error('Token client error:', response.error, response.error_description);
+
+          // Handle specific error cases
+          if (response.error === 'access_denied') {
+            // User denied access OR permissions were revoked server-side by user/Google
+            // Clear auth history to force full consent screen on next attempt
+            // This ensures we re-request all permissions properly
+            this.clearToken(false);
+            showSnackbar('Google Drive access was denied. Please sign in again to grant permissions.');
+          } else if (response.error === 'popup_closed') {
+            // User closed the popup - don't clear anything, they might retry
+            // Preserve all state so they can try again immediately
+            showSnackbar('Sign-in cancelled. Please try again when ready.');
+          } else {
+            // Other errors (network issues, etc.) - keep auth history but clear token
+            // Next sign-in will use minimal prompt since permissions weren't explicitly denied
+            this.clearToken(true);
+            showSnackbar('Authentication failed. Please try signing in again.');
+          }
+
+          this.isRefreshing = false;
           return;
         }
 
