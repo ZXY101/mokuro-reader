@@ -191,15 +191,26 @@ class TokenManager {
       // Determine if user has authenticated before
       const hasAuthenticated = browser && localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED) === 'true';
 
+      // Debug logging
+      console.log('🔍 requestNewToken called:', {
+        silent,
+        forceConsent,
+        hasAuthenticated,
+        willUseConsent: forceConsent || !hasAuthenticated
+      });
+
       if (silent) {
-        // Attempt silent refresh (no UI shown if possible)
-        client.requestAccessToken({ prompt: '' });
+        // Attempt silent refresh (no UI shown)
+        console.log('→ Using silent refresh (prompt: "none")');
+        client.requestAccessToken({ prompt: 'none' });
       } else if (forceConsent || !hasAuthenticated) {
         // Force full consent screen (for initial auth or when explicitly requested)
+        console.log('→ Using full consent screen (prompt: "consent")');
         client.requestAccessToken({ prompt: 'consent' });
       } else {
-        // Re-authentication: minimal UI, reuse existing permissions
-        client.requestAccessToken({ prompt: '' });
+        // Re-authentication: minimal UI, just account selection, reuse existing permissions
+        console.log('→ Using minimal re-auth (no prompt parameter = default select_account)');
+        client.requestAccessToken({});
       }
     } else {
       throw new Error('Token client not initialized');
