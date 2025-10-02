@@ -9,11 +9,12 @@ export { tokenManager, driveApiClient, DriveApiError, syncService, GOOGLE_DRIVE_
 export type { TokenInfo, DriveFile, SyncProgress } from './types';
 
 // Backward compatibility exports for old API
+// TODO: Migrate cloud/+page.svelte to use tokenManager, syncService directly
 export const accessTokenStore = tokenManager.token;
 export const tokenClientStore = tokenManager.tokenClient;
 export const readerFolderIdStore = syncService.readerFolderId;
-export const volumeDataIdStore = writable<string>('');
-export const profilesIdStore = writable<string>('');
+export const volumeDataIdStore = writable<string>(''); // Legacy - not used by new implementation
+export const profilesIdStore = writable<string>(''); // Legacy - not used by new implementation
 
 // Constants compatibility
 export const CLIENT_ID = GOOGLE_DRIVE_CONFIG.CLIENT_ID;
