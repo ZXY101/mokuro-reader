@@ -160,11 +160,19 @@ localStorage.setItem('gdrive_token_expires', fourMinutesFromNow.toString());
 
 ```javascript
 // Check all Google Drive state
-console.log({
-  token: localStorage.getItem('gdrive_token'),
+console.log('Current Google Drive State:', {
+  token: localStorage.getItem('gdrive_token') ? 'EXISTS' : 'NULL',
   expires: localStorage.getItem('gdrive_token_expires'),
   hasAuth: localStorage.getItem('gdrive_has_authenticated'),
-  expiresIn: Math.round((parseInt(localStorage.getItem('gdrive_token_expires')) - Date.now()) / 60000) + ' minutes'
+  lastAuth: localStorage.getItem('gdrive_last_auth_time'),
+  expiresIn: localStorage.getItem('gdrive_token_expires')
+    ? Math.round((parseInt(localStorage.getItem('gdrive_token_expires')) - Date.now()) / 60000) + ' minutes'
+    : 'N/A'
+});
+
+// Check what ALL localStorage keys exist with 'gdrive' prefix
+Object.keys(localStorage).filter(k => k.includes('gdrive')).forEach(key => {
+  console.log(`  ${key}: ${localStorage.getItem(key)}`);
 });
 ```
 
