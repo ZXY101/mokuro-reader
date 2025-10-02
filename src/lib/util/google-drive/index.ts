@@ -24,8 +24,8 @@ export async function initGoogleDriveApi(): Promise<void> {
 // Convenience functions for external use
 export function signInToGoogleDrive(): void {
   if (!tokenManager.isAuthenticated()) {
-    // First-time sign in: show full consent screen
-    tokenManager.requestNewToken(false, true);
+    // Will auto-detect if first-time (consent) or re-auth (minimal)
+    tokenManager.requestNewToken(false, false);
   }
 }
 

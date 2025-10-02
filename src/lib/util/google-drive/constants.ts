@@ -23,7 +23,8 @@ export const GOOGLE_DRIVE_CONFIG = {
     TOKEN: 'gdrive_token',
     TOKEN_EXPIRES: 'gdrive_token_expires',
     SYNC_AFTER_LOGIN: 'sync_after_login',
-    LAST_AUTH_TIME: 'gdrive_last_auth_time'
+    LAST_AUTH_TIME: 'gdrive_last_auth_time',
+    HAS_AUTHENTICATED: 'gdrive_has_authenticated' // Track if user has ever authenticated
   },
 
   // Token refresh settings

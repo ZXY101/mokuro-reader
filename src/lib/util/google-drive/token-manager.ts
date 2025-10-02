@@ -85,6 +85,7 @@ class TokenManager {
     if (browser) {
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN, token);
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.LAST_AUTH_TIME, Date.now().toString());
+      localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED, 'true');
 
       if (expiresIn) {
         const expiresAt = Date.now() + (expiresIn * 1000);
@@ -94,7 +95,7 @@ class TokenManager {
     }
   }
 
-  clearToken(): void {
+  clearToken(keepAuthHistory = true): void {
     this.tokenStore.set('');
     this.isRefreshing = false;
 
@@ -102,6 +103,11 @@ class TokenManager {
       localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN);
       localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN_EXPIRES);
       localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.LAST_AUTH_TIME);
+
+      // Only clear auth history on explicit logout
+      if (!keepAuthHistory) {
+        localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED);
+      }
     }
 
     // Clear from gapi client
@@ -156,14 +162,17 @@ class TokenManager {
     tokenClient.subscribe(value => { client = value; })();
 
     if (client) {
+      // Determine if user has authenticated before
+      const hasAuthenticated = browser && localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED) === 'true';
+
       if (silent) {
         // Attempt silent refresh (no UI shown if possible)
         client.requestAccessToken({ prompt: '' });
-      } else if (forceConsent) {
-        // Force full consent screen (for initial auth or account switching)
+      } else if (forceConsent || !hasAuthenticated) {
+        // Force full consent screen (for initial auth or when explicitly requested)
         client.requestAccessToken({ prompt: 'consent' });
       } else {
-        // Default: minimal UI, reuse existing permissions
+        // Re-authentication: minimal UI, reuse existing permissions
         client.requestAccessToken({ prompt: '' });
       }
     } else {
@@ -214,7 +223,8 @@ class TokenManager {
       await this.revokeToken(currentToken);
     }
 
-    this.clearToken();
+    // Clear token AND auth history on explicit logout
+    this.clearToken(false);
   }
 
   private getCurrentToken(): string {
