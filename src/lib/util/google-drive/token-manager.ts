@@ -88,9 +88,16 @@ class TokenManager {
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED, 'true');
 
       if (expiresIn) {
-        const expiresAt = Date.now() + (expiresIn * 1000);
+        // Debug mode: Override expiry to 30 seconds for testing
+        const actualExpiresIn = GOOGLE_DRIVE_CONFIG.DEBUG_SHORT_TOKEN_EXPIRY ? 30 : expiresIn;
+        const expiresAt = Date.now() + (actualExpiresIn * 1000);
         localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN_EXPIRES, expiresAt.toString());
-        console.log('Token set, expires in', Math.round(expiresIn / 60), 'minutes');
+
+        if (GOOGLE_DRIVE_CONFIG.DEBUG_SHORT_TOKEN_EXPIRY) {
+          console.warn('🔧 DEBUG MODE: Token will expire in 30 seconds');
+        } else {
+          console.log('Token set, expires in', Math.round(expiresIn / 60), 'minutes');
+        }
       }
     }
   }

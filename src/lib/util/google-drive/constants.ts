@@ -30,5 +30,8 @@ export const GOOGLE_DRIVE_CONFIG = {
   // Token refresh settings
   TOKEN_REFRESH_BUFFER_MS: 5 * 60 * 1000, // Refresh 5 minutes before expiry
   TOKEN_WARNING_BUFFER_MS: 10 * 60 * 1000, // Warn 10 minutes before expiry
-  TOKEN_REFRESH_CHECK_INTERVAL_MS: 2 * 60 * 1000 // Check every 2 minutes
+  TOKEN_REFRESH_CHECK_INTERVAL_MS: 2 * 60 * 1000, // Check every 2 minutes
+
+  // Debug mode: Set to true to use short-lived tokens for testing (30 seconds)
+  DEBUG_SHORT_TOKEN_EXPIRY: false
 } as const;
