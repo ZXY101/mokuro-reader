@@ -26,6 +26,8 @@
   );
 
   let loading = $state(false);
+  let backingUpSeries = $state(false);
+  let backupProgress = $state('');
 
   let token = $state('');
   $effect(() => {
@@ -118,6 +120,9 @@
       return;
     }
 
+    backingUpSeries = true;
+    backupProgress = `0/${volumesToBackup.length}`;
+
     progressTrackerStore.addProcess({
       id: processId,
       description: `Backing up ${seriesTitle}`,
@@ -128,25 +133,31 @@
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < volumesToBackup.length; i++) {
-      const volume = volumesToBackup[i];
-      const progress = Math.round(((i + 1) / volumesToBackup.length) * 100);
+    try {
+      for (let i = 0; i < volumesToBackup.length; i++) {
+        const volume = volumesToBackup[i];
+        const progress = Math.round(((i + 1) / volumesToBackup.length) * 100);
 
-      progressTrackerStore.updateProcess(processId, {
-        progress,
-        status: `${i + 1}/${volumesToBackup.length}: ${volume.volume_title}`
-      });
+        backupProgress = `${i + 1}/${volumesToBackup.length}`;
 
-      try {
-        await backupVolumeToDrive(volume);
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to backup ${volume.volume_title}:`, error);
-        failCount++;
+        progressTrackerStore.updateProcess(processId, {
+          progress,
+          status: `${i + 1}/${volumesToBackup.length}: ${volume.volume_title}`
+        });
+
+        try {
+          await backupVolumeToDrive(volume);
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to backup ${volume.volume_title}:`, error);
+          failCount++;
+        }
       }
+    } finally {
+      backingUpSeries = false;
+      backupProgress = '';
+      progressTrackerStore.removeProcess(processId);
     }
-
-    progressTrackerStore.removeProcess(processId);
 
     if (failCount === 0) {
       showSnackbar(`Successfully backed up ${successCount} volumes`, 'success');
@@ -170,13 +181,16 @@
           <p>Minutes read: {$mangaStats.timeReadInMinutes}</p>
         </div>
       </div>
-      <div class="sm:block flex-col flex gap-2">
+      <div class="flex flex-col gap-2">
         <Button
           color={allBackedUp ? 'green' : 'light'}
           on:click={backupSeries}
-          disabled={allBackedUp || !isAuthenticated}
+          disabled={backingUpSeries || allBackedUp || !isAuthenticated}
         >
-          {#if allBackedUp}
+          {#if backingUpSeries}
+            <Spinner size="4" class="me-2" />
+            Backing up {backupProgress}
+          {:else if allBackedUp}
             <CloudArrowUpOutline class="w-4 h-4 me-2" />
             Series backed up
           {:else}
