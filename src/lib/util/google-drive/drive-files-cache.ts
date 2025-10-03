@@ -49,14 +49,14 @@ class DriveFilesCacheManager {
         'id, name'
       );
 
-      if (!folderResponse.files || folderResponse.files.length === 0) {
+      if (!folderResponse || folderResponse.length === 0) {
         console.log('No mokuro-reader folder found, cache is empty');
         this.cache.set(new Map());
         this.lastFetchTime = Date.now();
         return;
       }
 
-      const appFolderId = folderResponse.files[0].id;
+      const appFolderId = folderResponse[0].id;
 
       // Recursively list all .cbz files in the folder structure
       const allFiles = await this.listAllCbzFiles(appFolderId);
@@ -96,9 +96,9 @@ class DriveFilesCacheManager {
       'id, name, mimeType, modifiedTime, size'
     );
 
-    if (!response.files) return files;
+    if (!response) return files;
 
-    for (const item of response.files) {
+    for (const item of response) {
       const currentPath = parentPath ? `${parentPath}/${item.name}` : item.name;
 
       if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
