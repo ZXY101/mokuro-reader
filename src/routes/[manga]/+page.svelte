@@ -12,7 +12,7 @@
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats } from '$lib/settings';
   import { tokenManager, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
-  import { CloudArrowUpOutline } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, TrashBinSolid } from 'flowbite-svelte-icons';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -96,30 +96,71 @@
   }
 
   async function deleteSeriesFromDrive(volumes: VolumeMetadata[]) {
-    const fileIds: string[] = [];
+    if (!volumes || volumes.length === 0) return;
 
-    for (const vol of volumes) {
-      const driveFile = driveFilesCache.getDriveFile(vol.series_title, vol.volume_title);
-      if (driveFile) {
-        fileIds.push(driveFile.fileId);
-      }
+    const seriesTitle = volumes[0].series_title;
+
+    // Get any file from the series to find the parent folder
+    const sampleFile = driveFilesCache.getDriveFile(volumes[0].series_title, volumes[0].volume_title);
+    if (!sampleFile) {
+      showSnackbar('Series folder not found in Drive', 'error');
+      return;
     }
 
-    if (fileIds.length > 0) {
-      try {
-        await driveApiClient.trashFiles(fileIds);
+    try {
+      // Get the parent folder ID from the file
+      const fileDetails = await driveApiClient.listFiles(
+        `'${sampleFile.fileId}' in parents`,
+        'files(parents)'
+      );
 
-        // Remove from cache
-        for (const vol of volumes) {
-          driveFilesCache.removeDriveFile(vol.series_title, vol.volume_title);
-        }
+      // Actually we need to get the file's parent, let me use a different approach
+      // Search for the series folder by name
+      const folders = await driveApiClient.listFiles(
+        `name='${seriesTitle}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        'files(id,name)'
+      );
 
-        showSnackbar(`Moved ${fileIds.length} files to Drive trash`, 'success');
-      } catch (error) {
-        console.error('Failed to delete series from Drive:', error);
-        showSnackbar('Failed to delete from Drive', 'error');
+      if (folders.length === 0) {
+        showSnackbar('Series folder not found in Drive', 'error');
+        return;
       }
+
+      const folderId = folders[0].id;
+
+      // Trash the entire folder
+      await driveApiClient.trashFile(folderId);
+
+      // Remove all volumes from cache
+      for (const vol of volumes) {
+        driveFilesCache.removeDriveFile(vol.series_title, vol.volume_title);
+      }
+
+      showSnackbar(`Moved series folder to Drive trash`, 'success');
+    } catch (error) {
+      console.error('Failed to delete series from Drive:', error);
+      showSnackbar('Failed to delete from Drive', 'error');
     }
+  }
+
+  async function onDeleteFromDrive() {
+    if (!manga || manga.length === 0) return;
+    if (!isAuthenticated) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    if (!anyBackedUp) {
+      showSnackbar('No backups found in Drive', 'info');
+      return;
+    }
+
+    promptConfirmation(
+      `Delete ${manga[0].series_title} from Google Drive?`,
+      async () => {
+        await deleteSeriesFromDrive(manga);
+      }
+    );
   }
 
   function onDelete() {
@@ -254,6 +295,16 @@
             {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
           {/if}
         </Button>
+        {#if anyBackedUp}
+          <Button
+            color="red"
+            on:click={onDeleteFromDrive}
+            disabled={!isAuthenticated}
+          >
+            <TrashBinSolid class="w-4 h-4 me-2" />
+            Delete from Drive
+          </Button>
+        {/if}
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
         <Button color="light" on:click={onExtract} disabled={loading}>
           {loading ? 'Extracting...' : 'Extract manga'}
