@@ -295,11 +295,10 @@
             {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
           {/if}
         </Button>
-        {#if anyBackedUp}
+        {#if anyBackedUp && isAuthenticated}
           <Button
             color="red"
             on:click={onDeleteFromDrive}
-            disabled={!isAuthenticated}
           >
             <TrashBinSolid class="w-4 h-4 me-2" />
             Delete from Drive
