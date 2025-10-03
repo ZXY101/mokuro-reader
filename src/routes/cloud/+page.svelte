@@ -721,6 +721,9 @@
       return;
     }
 
+    // Import driveFilesCache
+    const { driveFilesCache } = await import('$lib/util/google-drive');
+
     // Get all volumes from catalog
     const allVolumes: VolumeMetadata[] = [];
     for (const series of $catalog) {
@@ -732,23 +735,35 @@
       return;
     }
 
+    // Filter out already backed up volumes
+    const volumesToBackup = allVolumes.filter(vol =>
+      !driveFilesCache.existsInDrive(vol.series_title, vol.volume_title)
+    );
+
+    const skippedCount = allVolumes.length - volumesToBackup.length;
+
+    if (volumesToBackup.length === 0) {
+      showSnackbar('All volumes already backed up', 'info');
+      return;
+    }
+
     const processId = 'backup-all';
     progressTrackerStore.addProcess({
       id: processId,
-      description: `Backing up ${allVolumes.length} volumes`,
+      description: `Backing up ${volumesToBackup.length} volumes`,
       progress: 0,
-      status: 'Starting backup...'
+      status: skippedCount > 0 ? `Skipping ${skippedCount} already backed up` : 'Starting backup...'
     });
 
     let completedCount = 0;
     let failedCount = 0;
 
-    for (let i = 0; i < allVolumes.length; i++) {
-      const volume = allVolumes[i];
+    for (let i = 0; i < volumesToBackup.length; i++) {
+      const volume = volumesToBackup[i];
 
       try {
         progressTrackerStore.updateProcess(processId, {
-          progress: (i / allVolumes.length) * 100,
+          progress: (i / volumesToBackup.length) * 100,
           status: `Backing up ${volume.series_title} - ${volume.volume_title}...`
         });
 
@@ -762,13 +777,16 @@
 
     progressTrackerStore.updateProcess(processId, {
       progress: 100,
-      status: `Backup complete (${completedCount} succeeded, ${failedCount} failed)`
+      status: `Backup complete (${completedCount} succeeded, ${failedCount} failed${skippedCount > 0 ? `, ${skippedCount} skipped` : ''})`
     });
 
     setTimeout(() => progressTrackerStore.removeProcess(processId), 5000);
 
     if (failedCount === 0) {
-      showSnackbar('All volumes backed up successfully', 'success');
+      const message = skippedCount > 0
+        ? `${completedCount} volumes backed up, ${skippedCount} already backed up`
+        : 'All volumes backed up successfully';
+      showSnackbar(message, 'success');
     } else {
       showSnackbar(`Backup completed with ${failedCount} failures`, 'error');
     }
