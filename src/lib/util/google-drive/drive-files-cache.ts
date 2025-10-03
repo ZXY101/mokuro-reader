@@ -46,7 +46,7 @@ class DriveFilesCacheManager {
       // Query for ALL .cbz files the app can see (no parent folder constraint)
       const allCbzFiles = await driveApiClient.listFiles(
         `name contains '.cbz' and trashed=false`,
-        'id, name, mimeType, modifiedTime, size, parents'
+        'files(id,name,mimeType,modifiedTime,size,parents)'
       );
       console.log('Found .cbz files:', allCbzFiles);
 
