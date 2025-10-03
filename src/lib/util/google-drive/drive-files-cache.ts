@@ -44,10 +44,12 @@ class DriveFilesCacheManager {
       console.log('Fetching all Drive file metadata...');
 
       // Find the mokuro-reader folder
+      console.log('Searching for folder:', GOOGLE_DRIVE_CONFIG.APP_FOLDER_NAME);
       const folderResponse = await driveApiClient.listFiles(
         `name='${GOOGLE_DRIVE_CONFIG.APP_FOLDER_NAME}' and mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}' and trashed=false`,
         'id, name'
       );
+      console.log('Folder search response:', folderResponse);
 
       if (!folderResponse || folderResponse.length === 0) {
         console.log('No mokuro-reader folder found, cache is empty');
@@ -75,6 +77,11 @@ class DriveFilesCacheManager {
       this.lastFetchTime = Date.now();
     } catch (error) {
       console.error('Failed to fetch Drive files cache:', error);
+      console.error('Error details:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
       // Don't clear cache on error, keep stale data
     } finally {
       this.isFetching = false;

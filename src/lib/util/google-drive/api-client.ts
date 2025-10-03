@@ -40,6 +40,9 @@ class DriveApiClient {
     try {
       return await apiCall();
     } catch (error: any) {
+      console.error('Drive API error caught:', error);
+      console.error('Error details - status:', error.status, 'message:', error.message);
+
       const isNetworkError = error.message?.toLowerCase().includes('network') ||
         error.message?.toLowerCase().includes('offline') ||
         error.status === 0;
