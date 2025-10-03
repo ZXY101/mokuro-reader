@@ -179,6 +179,18 @@ class TokenManager {
         if (access_token) {
           this.setToken(access_token, expires_in);
           gapi.client.setToken({ access_token });
+
+          // Check if we need to sync after login
+          if (browser) {
+            const shouldSync = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
+            if (shouldSync === 'true') {
+              localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
+              // Import syncService dynamically to avoid circular dependency
+              import('./sync-service').then(({ syncService }) => {
+                setTimeout(() => syncService.syncReadProgress(), 500);
+              });
+            }
+          }
         }
       }
     });

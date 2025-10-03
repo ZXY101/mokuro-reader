@@ -25,12 +25,27 @@ export const READER_FOLDER = GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER;
 export async function initGoogleDriveApi(): Promise<void> {
   try {
     await driveApiClient.initialize();
-    
-    // Check if we need to sync after login
-    const shouldSync = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
-    if (shouldSync === 'true' && tokenManager.isAuthenticated()) {
-      localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
-      setTimeout(() => syncService.syncReadProgress(), 500);
+
+    if (tokenManager.isAuthenticated()) {
+      // Check if we need to sync after login (flag set by syncReadProgress when no token)
+      const shouldSync = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
+      if (shouldSync === 'true') {
+        localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
+        setTimeout(() => syncService.syncReadProgress(), 500);
+      }
+      // Auto-sync on page load if authenticated and hasn't synced recently (within last 5 seconds)
+      else {
+        const lastSyncTime = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME);
+        const now = Date.now();
+        const timeSinceLastSync = lastSyncTime ? now - parseInt(lastSyncTime, 10) : Infinity;
+
+        // Only auto-sync if it's been more than 5 seconds since last sync
+        // This prevents duplicate syncs on quick page refreshes
+        if (timeSinceLastSync > 5000) {
+          console.log('Auto-syncing on page load...');
+          setTimeout(() => syncService.syncReadProgress(), 500);
+        }
+      }
     }
   } catch (error) {
     console.error('Failed to initialize Google Drive API:', error);
