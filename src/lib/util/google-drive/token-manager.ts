@@ -32,16 +32,18 @@ class TokenManager {
       const now = Date.now();
       const expiry = parseInt(expiresAt, 10);
 
-      // Check if token is still valid with buffer
-      if (expiry > now + GOOGLE_DRIVE_CONFIG.TOKEN_REFRESH_BUFFER_MS) {
-        this.setToken(token);
+      // Check if token is still valid (with some buffer time)
+      if (expiry > now) {
+        // Just update the store, don't modify localStorage
+        this.tokenStore.set(token);
+
         // Only set gapi token if gapi is loaded
         if (typeof gapi !== 'undefined' && gapi.client) {
           gapi.client.setToken({ access_token: token });
         }
         console.log('Loaded persisted token, expires in', Math.round((expiry - now) / 60000), 'minutes');
       } else {
-        console.log('Token expired or expiring soon, will need re-authentication');
+        console.log('Token expired, will need re-authentication');
         this.clearToken();
       }
     }
@@ -182,6 +184,13 @@ class TokenManager {
     });
 
     this.tokenClientStore.set(tokenClient);
+
+    // If we have a persisted token in the store, set it in gapi.client now that gapi is loaded
+    const currentToken = this.getCurrentToken();
+    if (currentToken && typeof gapi !== 'undefined' && gapi.client) {
+      gapi.client.setToken({ access_token: currentToken });
+      console.log('Restored persisted token to gapi.client');
+    }
   }
 
   requestNewToken(silent = false, forceConsent = false): void {
