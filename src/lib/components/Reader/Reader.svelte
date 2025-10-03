@@ -25,6 +25,7 @@
   import QuickActions from './QuickActions.svelte';
   import { beforeNavigate } from '$app/navigation';
   import { onMount } from 'svelte';
+  import { activityTracker } from '$lib/util/activity-tracker';
 
   // TODO: Refactor this whole mess
   interface Props {
@@ -85,6 +86,9 @@
           pageClamped === pages.length || pageClamped === pages.length - 1
         );
         zoomDefault();
+
+        // Record activity for auto-timer and auto-sync
+        activityTracker.recordActivity();
       }
     }
   }
@@ -199,6 +203,19 @@
     if ($settings.defaultFullscreen) {
       document.documentElement.requestFullscreen();
     }
+
+    // Set the timeout duration from settings
+    activityTracker.setTimeoutDuration($settings.inactivityTimeoutMinutes);
+
+    return () => {
+      // Stop activity tracker when component unmounts
+      activityTracker.stop();
+    };
+  });
+
+  // Update timeout duration when settings change
+  $effect(() => {
+    activityTracker.setTimeoutDuration($settings.inactivityTimeoutMinutes);
   });
 
   beforeNavigate(() => {

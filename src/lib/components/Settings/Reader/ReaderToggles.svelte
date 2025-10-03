@@ -1,6 +1,6 @@
 <script lang="ts">
   import { settings, type SettingsKey, updateSetting } from '$lib/settings';
-  import { Toggle } from 'flowbite-svelte';
+  import { Toggle, Range, Label } from 'flowbite-svelte';
 
   let toggles = $derived([
     {
@@ -26,3 +26,16 @@
 {#each toggles as { key, text, value }}
   <Toggle size="small" checked={value} on:change={() => updateSetting(key, !value)}>{text}</Toggle>
 {/each}
+
+<div class="mt-4">
+  <Label class="mb-2">
+    Inactivity timeout: {$settings.inactivityTimeoutMinutes} minutes
+    <span class="text-xs text-gray-500 ml-2">(Auto-stop timer and sync after inactivity)</span>
+  </Label>
+  <Range
+    min="1"
+    max="30"
+    value={$settings.inactivityTimeoutMinutes}
+    on:change={(e) => updateSetting('inactivityTimeoutMinutes', Number(e.target.value))}
+  />
+</div>
