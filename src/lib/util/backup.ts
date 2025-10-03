@@ -151,7 +151,7 @@ export async function backupVolumeToDrive(
     name: fileName,
     modifiedTime: new Date().toISOString(),
     size: cbzBlob.size,
-    path: fileName // Just filename for simple lookup
+    path: `${volume.series_title}/${fileName}`
   });
 
   return fileId;
