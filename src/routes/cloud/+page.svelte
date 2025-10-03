@@ -5,10 +5,10 @@
   import { profiles } from '$lib/settings';
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
 
-  import { 
-    promptConfirmation, 
-    showSnackbar, 
-    uploadFile, 
+  import {
+    promptConfirmation,
+    showSnackbar,
+    uploadFile,
     accessTokenStore,
     readerFolderIdStore,
     volumeDataIdStore,
@@ -18,6 +18,7 @@
     signIn,
     logout,
     syncReadProgress,
+    syncService,
     READER_FOLDER,
     CLIENT_ID,
     API_KEY
@@ -34,12 +35,17 @@
   let volumeDataId = $state('');
   let profilesId = $state('');
   let tokenClient = $state(null);
-  
-  accessTokenStore.subscribe(value => { accessToken = value; });
-  readerFolderIdStore.subscribe(value => { readerFolderId = value; });
-  volumeDataIdStore.subscribe(value => { volumeDataId = value; });
-  profilesIdStore.subscribe(value => { profilesId = value; });
-  tokenClientStore.subscribe(value => { tokenClient = value; });
+
+  $effect(() => {
+    const unsubscribers = [
+      accessTokenStore.subscribe(value => { accessToken = value; }),
+      readerFolderIdStore.subscribe(value => { readerFolderId = value.reader; }),
+      volumeDataIdStore.subscribe(value => { volumeDataId = value; }),
+      profilesIdStore.subscribe(value => { profilesId = value; }),
+      tokenClientStore.subscribe(value => { tokenClient = value; })
+    ];
+    return () => unsubscribers.forEach(unsub => unsub());
+  });
 
   // Use constants from the google-drive utility
   const type = 'application/json';
@@ -153,7 +159,23 @@
     clearServiceWorkerCache();
   });
 
-  function createPicker() {
+  async function createPicker() {
+    // Ensure reader folder exists first
+    if (!readerFolderId) {
+      try {
+        await syncService.ensureReaderFolderExists();
+      } catch (error) {
+        console.error('Failed to ensure reader folder exists:', error);
+        showSnackbar('Failed to access Google Drive folder');
+        return;
+      }
+    }
+
+    // Wait a tick to ensure readerFolderId is updated
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    console.log('Creating picker with readerFolderId:', readerFolderId);
+
     // Create a view for ZIP/CBZ files
     const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
       .setMimeTypes(
@@ -161,13 +183,20 @@
       )
       .setMode(google.picker.DocsViewMode.LIST)
       .setIncludeFolders(true)
-      .setSelectFolderEnabled(true)
-      .setParent(readerFolderId);
+      .setSelectFolderEnabled(true);
+
+    // Only set parent if we have a folder ID
+    if (readerFolderId) {
+      docsView.setParent(readerFolderId);
+    }
 
     // Create a view specifically for folders
     const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-      .setSelectFolderEnabled(true)
-      .setParent(readerFolderId);
+      .setSelectFolderEnabled(true);
+
+    if (readerFolderId) {
+      folderView.setParent(readerFolderId);
+    }
 
     const picker = new google.picker.PickerBuilder()
       .addView(docsView)
@@ -636,10 +665,19 @@
   onMount(async () => {
     // Clear service worker cache for Google Drive downloads
     clearServiceWorkerCache();
-    
+
     try {
       // Always try to initialize when the cloud page is loaded
       await initGoogleDriveApi();
+
+      // If user is authenticated, ensure reader folder exists
+      if (accessToken) {
+        try {
+          await syncService.ensureReaderFolderExists();
+        } catch (error) {
+          console.error('Failed to ensure reader folder exists:', error);
+        }
+      }
     } catch (error) {
       console.error('Failed to initialize Google Drive API:', error);
     }

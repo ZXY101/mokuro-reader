@@ -19,7 +19,7 @@ class DriveApiClient {
     if (this.isInitialized) return;
 
     return new Promise((resolve, reject) => {
-      gapi.load('client', async () => {
+      gapi.load('client:picker', async () => {
         try {
           await gapi.client.init({
             apiKey: GOOGLE_DRIVE_CONFIG.API_KEY,

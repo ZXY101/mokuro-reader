@@ -17,6 +17,12 @@ class SyncService {
     return this.folderIds;
   }
 
+  getCurrentReaderFolderId(): string {
+    let id = '';
+    this.folderIds.subscribe(ids => { id = ids.reader; })();
+    return id;
+  }
+
   async ensureReaderFolderExists(): Promise<string> {
     const folders = await driveApiClient.listFiles(
       `mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}' and name='${GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER}'`,

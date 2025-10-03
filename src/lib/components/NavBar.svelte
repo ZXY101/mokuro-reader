@@ -16,8 +16,11 @@
   let accessToken = $state('');
 
   // Subscribe to the token manager
-  tokenManager.token.subscribe(value => {
-    accessToken = value;
+  $effect(() => {
+    const unsubscribe = tokenManager.token.subscribe(value => {
+      accessToken = value;
+    });
+    return unsubscribe;
   });
 
   // Define event handlers

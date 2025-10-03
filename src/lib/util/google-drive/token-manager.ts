@@ -35,7 +35,10 @@ class TokenManager {
       // Check if token is still valid with buffer
       if (expiry > now + GOOGLE_DRIVE_CONFIG.TOKEN_REFRESH_BUFFER_MS) {
         this.setToken(token);
-        gapi.client.setToken({ access_token: token });
+        // Only set gapi token if gapi is loaded
+        if (typeof gapi !== 'undefined' && gapi.client) {
+          gapi.client.setToken({ access_token: token });
+        }
         console.log('Loaded persisted token, expires in', Math.round((expiry - now) / 60000), 'minutes');
       } else {
         console.log('Token expired or expiring soon, will need re-authentication');
