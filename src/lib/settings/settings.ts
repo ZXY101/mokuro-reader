@@ -59,6 +59,7 @@ export type Settings = {
   zoomDefault: ZoomModes;
   invertColors: boolean;
   nightMode: boolean;
+  inactivityTimeoutMinutes: number;
   volumeDefaults: VolumeDefaults;
   ankiConnectSettings: AnkiConnectSettings;
 };
@@ -88,6 +89,7 @@ const defaultSettings: Settings = {
   zoomDefault: 'zoomFitToScreen',
   invertColors: false,
   nightMode: false,
+  inactivityTimeoutMinutes: 5,
   volumeDefaults: {
     singlePageView: false,
     rightToLeft: true,

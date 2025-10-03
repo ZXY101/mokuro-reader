@@ -1,5 +1,7 @@
 <script lang="ts">
   import { startCount, volumeStats } from '$lib/settings';
+  import { activityTracker } from '$lib/util/activity-tracker';
+  import { onMount } from 'svelte';
 
   interface Props {
     count: number | undefined;
@@ -10,14 +12,42 @@
 
   let active = $derived(Boolean(count));
 
-  function onClick() {
-    if (count) {
-      clearInterval(count);
-      count = undefined;
-    } else {
+  function startTimer() {
+    if (!count) {
       count = startCount(volumeId);
     }
   }
+
+  function stopTimer() {
+    if (count) {
+      clearInterval(count);
+      count = undefined;
+    }
+  }
+
+  function onClick() {
+    if (count) {
+      stopTimer();
+    } else {
+      startTimer();
+    }
+  }
+
+  onMount(() => {
+    // Initialize activity tracker callbacks
+    activityTracker.initialize({
+      onActive: () => {
+        startTimer();
+      },
+      onInactive: () => {
+        stopTimer();
+      }
+    });
+
+    return () => {
+      stopTimer();
+    };
+  });
 </script>
 
 <button

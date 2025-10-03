@@ -2,7 +2,7 @@
   import { page } from '$app/stores';
   import Reader from '$lib/components/Reader/Reader.svelte';
   import Timer from '$lib/components/Reader/Timer.svelte';
-  import { initializeVolume, settings, startCount, volumes, volumeSettings } from '$lib/settings';
+  import { initializeVolume, settings, volumes, volumeSettings } from '$lib/settings';
   import { onMount } from 'svelte';
 
   let volumeId = $derived($page.params.volume);
@@ -13,11 +13,11 @@
       initializeVolume(volumeId);
     }
 
-    count = startCount(volumeId);
-
     return () => {
-      clearInterval(count);
-      count = undefined;
+      if (count) {
+        clearInterval(count);
+        count = undefined;
+      }
     };
   });
 </script>

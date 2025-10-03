@@ -6,3 +6,4 @@ export * from './zip';
 export * from './cloud';
 export * from './sync-store';
 export * from './google-drive';
+export * from './activity-tracker';
