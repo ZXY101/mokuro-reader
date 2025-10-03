@@ -26,8 +26,24 @@
   );
 
   let loading = $state(false);
-  let backingUpSeries = $state(false);
-  let backupProgress = $state('');
+
+  // Track backup state from progress tracker
+  let progressState = $state($progressTrackerStore);
+  $effect(() => {
+    return progressTrackerStore.subscribe(value => {
+      progressState = value;
+    });
+  });
+
+  let seriesTitle = $derived(manga?.[0]?.series_title || '');
+  let processId = $derived(`backup-series-${seriesTitle}`);
+
+  let backupProcess = $derived.by(() => {
+    return progressState.processes.find(p => p.id === processId);
+  });
+
+  let backingUpSeries = $derived(!!backupProcess);
+  let backupProgress = $derived(backupProcess?.status?.match(/(\d+\/\d+)/)?.[1] || '');
 
   let token = $state('');
   $effect(() => {
@@ -107,8 +123,13 @@
       return;
     }
 
-    const seriesTitle = manga[0].series_title;
-    const processId = `backup-series-${seriesTitle}`;
+    // If already backing up, don't start again
+    if (backingUpSeries) {
+      return;
+    }
+
+    const currentSeriesTitle = manga[0].series_title;
+    const currentProcessId = `backup-series-${currentSeriesTitle}`;
 
     // Filter out already backed up volumes
     const volumesToBackup = manga.filter(vol =>
@@ -120,12 +141,9 @@
       return;
     }
 
-    backingUpSeries = true;
-    backupProgress = `0/${volumesToBackup.length}`;
-
     progressTrackerStore.addProcess({
-      id: processId,
-      description: `Backing up ${seriesTitle}`,
+      id: currentProcessId,
+      description: `Backing up ${currentSeriesTitle}`,
       progress: 0,
       status: `0/${volumesToBackup.length} volumes`
     });
@@ -138,9 +156,7 @@
         const volume = volumesToBackup[i];
         const progress = Math.round(((i + 1) / volumesToBackup.length) * 100);
 
-        backupProgress = `${i + 1}/${volumesToBackup.length}`;
-
-        progressTrackerStore.updateProcess(processId, {
+        progressTrackerStore.updateProcess(currentProcessId, {
           progress,
           status: `${i + 1}/${volumesToBackup.length}: ${volume.volume_title}`
         });
@@ -154,9 +170,7 @@
         }
       }
     } finally {
-      backingUpSeries = false;
-      backupProgress = '';
-      progressTrackerStore.removeProcess(processId);
+      progressTrackerStore.removeProcess(currentProcessId);
     }
 
     if (failCount === 0) {
