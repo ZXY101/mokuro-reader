@@ -7,17 +7,20 @@
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
   import { onMount } from 'svelte';
-  import { showSnackbar, accessTokenStore, initGoogleDriveApi, syncReadProgress } from '$lib/util';
+  import { showSnackbar, tokenManager, initGoogleDriveApi, syncReadProgress } from '$lib/util';
 
   // Use $state to make these reactive
   let settingsHidden = $state(true);
   let uploadModalOpen = $state(false);
   let isReader = $state(false);
   let accessToken = $state('');
-  
-  // Subscribe to the access token store
-  accessTokenStore.subscribe(value => {
-    accessToken = value;
+
+  // Subscribe to the token manager
+  $effect(() => {
+    const unsubscribe = tokenManager.token.subscribe(value => {
+      accessToken = value;
+    });
+    return unsubscribe;
   });
 
   // Define event handlers
@@ -38,14 +41,8 @@
     syncReadProgress();
   }
   
-  // Listen for changes to the token in localStorage
-  onMount(() => {
-    window.addEventListener('storage', (event) => {
-      if (event.key === 'gdrive_token') {
-        accessTokenStore.set(event.newValue || '');
-      }
-    });
-  });
+  // Token changes are handled automatically by tokenManager
+  // No need to manually listen to localStorage changes
 
   afterNavigate(() => {
     isReader = $page.route.id === '/[manga]/[volume]';
