@@ -20,13 +20,16 @@
     syncService,
     READER_FOLDER,
     CLIENT_ID,
-    API_KEY
+    API_KEY,
+    backupVolumeToDrive
   } from '$lib/util';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
   import { Badge, Button, Toggle } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
+  import { catalog } from '$lib/catalog';
+  import type { VolumeMetadata } from '$lib/types';
 
   // Subscribe to stores
   let accessToken = $state('');
@@ -711,6 +714,65 @@
       handleDriveError(error, 'downloading profiles');
     }
   }
+
+  async function backupAllSeries() {
+    if (!accessToken) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    // Get all volumes from catalog
+    const allVolumes: VolumeMetadata[] = [];
+    for (const series of $catalog) {
+      allVolumes.push(...series.volumes);
+    }
+
+    if (allVolumes.length === 0) {
+      showSnackbar('No volumes to backup', 'error');
+      return;
+    }
+
+    const processId = 'backup-all';
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: `Backing up ${allVolumes.length} volumes`,
+      progress: 0,
+      status: 'Starting backup...'
+    });
+
+    let completedCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < allVolumes.length; i++) {
+      const volume = allVolumes[i];
+
+      try {
+        progressTrackerStore.updateProcess(processId, {
+          progress: (i / allVolumes.length) * 100,
+          status: `Backing up ${volume.series_title} - ${volume.volume_title}...`
+        });
+
+        await backupVolumeToDrive(volume);
+        completedCount++;
+      } catch (error) {
+        console.error(`Failed to backup ${volume.volume_title}:`, error);
+        failedCount++;
+      }
+    }
+
+    progressTrackerStore.updateProcess(processId, {
+      progress: 100,
+      status: `Backup complete (${completedCount} succeeded, ${failedCount} failed)`
+    });
+
+    setTimeout(() => progressTrackerStore.removeProcess(processId), 5000);
+
+    if (failedCount === 0) {
+      showSnackbar('All volumes backed up successfully', 'success');
+    } else {
+      showSnackbar(`Backup completed with ${failedCount} failures`, 'error');
+    }
+  }
 </script>
 
 <svelte:head>
@@ -734,12 +796,12 @@
       </p>
       <div class="flex flex-col gap-4 w-full max-w-3xl">
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
-        
+
         <div class="flex flex-col gap-2">
           <div class="flex items-center gap-2">
-            <Toggle 
-              size="small" 
-              checked={$miscSettings.throttleDownloads} 
+            <Toggle
+              size="small"
+              checked={$miscSettings.throttleDownloads}
               on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
             >
               <span class="flex items-center gap-2">
@@ -751,13 +813,22 @@
             Helps prevent crashes on low memory devices or for extremely large downloads.
           </p>
         </div>
-        
+
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
             on:click={performSync}
           >
             Sync read progress
+          </Button>
+        </div>
+
+        <div class="flex-col gap-2 flex">
+          <Button
+            color="purple"
+            on:click={() => promptConfirmation('Backup all series to Google Drive?', backupAllSeries)}
+          >
+            Backup all series to Drive
           </Button>
         </div>
         <div class="flex-col gap-2 flex">

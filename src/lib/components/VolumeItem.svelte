@@ -7,6 +7,7 @@
   import { CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
+  import BackupButton from './BackupButton.svelte';
 
   interface Props {
     volume: VolumeMetadata;
@@ -85,7 +86,8 @@
           <p class="font-semibold" class:text-white={!isComplete}>{volName}</p>
           <p>{progressDisplay}</p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+          <BackupButton {volume} class="mr-2" />
           <button onclick={onDeleteClicked} class="flex items-center justify-center">
             <TrashBinSolid class="text-red-400 hover:text-red-500 z-10 poin" />
           </button>

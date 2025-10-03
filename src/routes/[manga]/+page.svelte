@@ -2,6 +2,7 @@
   import { catalog } from '$lib/catalog';
   import { goto } from '$app/navigation';
   import VolumeItem from '$lib/components/VolumeItem.svelte';
+  import BackupButton from '$lib/components/BackupButton.svelte';
   import { Button, Listgroup } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga } from '$lib/util';
