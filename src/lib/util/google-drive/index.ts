@@ -33,18 +33,10 @@ export async function initGoogleDriveApi(): Promise<void> {
         localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
         setTimeout(() => syncService.syncReadProgress(), 500);
       }
-      // Auto-sync on page load if authenticated and hasn't synced recently (within last 5 seconds)
+      // Auto-sync on page load if authenticated
       else {
-        const lastSyncTime = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME);
-        const now = Date.now();
-        const timeSinceLastSync = lastSyncTime ? now - parseInt(lastSyncTime, 10) : Infinity;
-
-        // Only auto-sync if it's been more than 5 seconds since last sync
-        // This prevents duplicate syncs on quick page refreshes
-        if (timeSinceLastSync > 5000) {
-          console.log('Auto-syncing on page load...');
-          setTimeout(() => syncService.syncReadProgress(), 500);
-        }
+        console.log('Auto-syncing on page load...');
+        setTimeout(() => syncService.syncReadProgress(), 500);
       }
     }
   } catch (error) {

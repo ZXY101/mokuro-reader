@@ -125,9 +125,6 @@ class SyncService {
         status: 'Sync complete'
       });
 
-      // Record sync time
-      localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.LAST_SYNC_TIME, Date.now().toString());
-
       showSnackbar('Read progress synced successfully');
 
     } catch (error) {
