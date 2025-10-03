@@ -51,6 +51,11 @@
       return;
     }
 
+    if (isBackedUp) {
+      showSnackbar('Volume already backed up', 'info');
+      return;
+    }
+
     isBackingUp = true;
     try {
       await backupVolumeToDrive(volume, (step) => {
@@ -71,9 +76,9 @@
   color={isBackedUp ? 'green' : 'light'}
   size="xs"
   class={className}
-  disabled={isBackingUp || !isAuthenticated}
+  disabled={isBackingUp || !isAuthenticated || isBackedUp}
   on:click={handleBackup}
-  title={isBackedUp ? 'Already backed up to Drive. Click to re-backup.' : 'Backup to Google Drive'}
+  title={isBackedUp ? 'Already backed up to Drive' : 'Backup to Google Drive'}
 >
   {#if isBackingUp}
     <Spinner size="4" class="me-2" />

@@ -7,6 +7,7 @@
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga, showSnackbar, backupVolumeToDrive } from '$lib/util';
   import { promptExtraction } from '$lib/util/modals';
+  import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats } from '$lib/settings';
@@ -25,8 +26,6 @@
   );
 
   let loading = $state(false);
-  let backingUpSeries = $state(false);
-  let backupProgress = $state('');
 
   let token = $state('');
   $effect(() => {
@@ -48,6 +47,11 @@
   let allBackedUp = $derived.by(() => {
     if (!manga || manga.length === 0) return false;
     return manga.every(vol => driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`));
+  });
+
+  let anyBackedUp = $derived.by(() => {
+    if (!manga || manga.length === 0) return false;
+    return manga.some(vol => driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`));
   });
 
   async function confirmDelete(deleteStats = false) {
@@ -101,13 +105,37 @@
       return;
     }
 
-    backingUpSeries = true;
+    const seriesTitle = manga[0].series_title;
+    const processId = `backup-series-${seriesTitle}`;
+
+    // Filter out already backed up volumes
+    const volumesToBackup = manga.filter(vol =>
+      !driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`)
+    );
+
+    if (volumesToBackup.length === 0) {
+      showSnackbar('All volumes already backed up', 'info');
+      return;
+    }
+
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: `Backing up ${seriesTitle}`,
+      progress: 0,
+      status: `0/${volumesToBackup.length} volumes`
+    });
+
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < manga.length; i++) {
-      const volume = manga[i];
-      backupProgress = `Backing up ${i + 1}/${manga.length}: ${volume.volume_title}`;
+    for (let i = 0; i < volumesToBackup.length; i++) {
+      const volume = volumesToBackup[i];
+      const progress = Math.round(((i + 1) / volumesToBackup.length) * 100);
+
+      progressTrackerStore.updateProcess(processId, {
+        progress,
+        status: `${i + 1}/${volumesToBackup.length}: ${volume.volume_title}`
+      });
 
       try {
         await backupVolumeToDrive(volume);
@@ -118,11 +146,10 @@
       }
     }
 
-    backingUpSeries = false;
-    backupProgress = '';
+    progressTrackerStore.removeProcess(processId);
 
     if (failCount === 0) {
-      showSnackbar(`Successfully backed up all ${successCount} volumes`, 'success');
+      showSnackbar(`Successfully backed up ${successCount} volumes`, 'success');
     } else {
       showSnackbar(`Backed up ${successCount} volumes, ${failCount} failed`, 'error');
     }
@@ -147,17 +174,14 @@
         <Button
           color={allBackedUp ? 'green' : 'light'}
           on:click={backupSeries}
-          disabled={backingUpSeries || !isAuthenticated}
+          disabled={allBackedUp || !isAuthenticated}
         >
-          {#if backingUpSeries}
-            <Spinner size="4" class="me-2" />
-            {backupProgress}
-          {:else if allBackedUp}
+          {#if allBackedUp}
             <CloudArrowUpOutline class="w-4 h-4 me-2" />
             Series backed up
           {:else}
             <CloudArrowUpOutline class="w-4 h-4 me-2" />
-            Backup series to Drive
+            {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
           {/if}
         </Button>
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
