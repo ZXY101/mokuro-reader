@@ -14,7 +14,6 @@
     volumeDataIdStore,
     profilesIdStore,
     tokenClientStore,
-    initGoogleDriveApi,
     signIn,
     logout,
     syncReadProgress,
@@ -661,26 +660,9 @@
     await syncReadProgress();
   }
   
-  // Make sure the cloud page is properly initialized
   onMount(async () => {
     // Clear service worker cache for Google Drive downloads
     clearServiceWorkerCache();
-
-    try {
-      // Always try to initialize when the cloud page is loaded
-      await initGoogleDriveApi();
-
-      // If user is authenticated, ensure reader folder exists
-      if (accessToken) {
-        try {
-          await syncService.ensureReaderFolderExists();
-        } catch (error) {
-          console.error('Failed to ensure reader folder exists:', error);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to initialize Google Drive API:', error);
-    }
   });
 
   async function onDownloadProfiles() {
