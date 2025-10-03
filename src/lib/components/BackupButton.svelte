@@ -1,10 +1,11 @@
 <script lang="ts">
   import { Button, Spinner } from 'flowbite-svelte';
-  import { CloudArrowUpOutline } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, CheckCircleSolid } from 'flowbite-svelte-icons';
   import { backupVolumeToDrive } from '$lib/util';
   import { showSnackbar } from '$lib/util';
-  import { tokenManager } from '$lib/util/google-drive';
+  import { tokenManager, driveFilesCache } from '$lib/util/google-drive';
   import type { VolumeMetadata } from '$lib/types';
+  import type { DriveFileMetadata } from '$lib/util/google-drive';
 
   interface Props {
     volume: VolumeMetadata;
@@ -24,6 +25,19 @@
   });
 
   let isAuthenticated = $derived(token !== '');
+
+  // Subscribe to Drive files cache
+  let driveCache = $state<Map<string, DriveFileMetadata>>(new Map());
+  $effect(() => {
+    return driveFilesCache.store.subscribe(value => {
+      driveCache = value;
+    });
+  });
+
+  // Check if this volume exists in Drive
+  let isBackedUp = $derived(
+    driveCache.has(`${volume.series_title}/${volume.volume_title}.cbz`)
+  );
 
   async function handleBackup(e: MouseEvent) {
     e.stopPropagation();
@@ -50,15 +64,19 @@
 </script>
 
 <Button
-  color="light"
+  color={isBackedUp ? 'green' : 'light'}
   size="xs"
   class={className}
   disabled={isBackingUp || !isAuthenticated}
   on:click={handleBackup}
+  title={isBackedUp ? 'Already backed up to Drive. Click to re-backup.' : 'Backup to Google Drive'}
 >
   {#if isBackingUp}
     <Spinner size="4" class="me-2" />
     {currentStep || 'Backing up...'}
+  {:else if isBackedUp}
+    <CheckCircleSolid class="w-4 h-4 me-2" />
+    Backed up
   {:else}
     <CloudArrowUpOutline class="w-4 h-4 me-2" />
     Backup to Drive

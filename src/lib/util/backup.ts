@@ -1,5 +1,6 @@
 import type { VolumeMetadata } from '$lib/types';
 import { driveApiClient } from './google-drive/api-client';
+import { driveFilesCache } from './google-drive/drive-files-cache';
 import { createArchiveBlob } from './zip';
 
 /**
@@ -143,6 +144,15 @@ export async function backupVolumeToDrive(
       console.warn('Failed to delete old file:', error);
     }
   }
+
+  // Update the cache with the newly uploaded file
+  driveFilesCache.addDriveFile(volume.series_title, volume.volume_title, {
+    fileId,
+    name: fileName,
+    modifiedTime: new Date().toISOString(),
+    size: cbzBlob.size,
+    path: `${volume.series_title}/${fileName}`
+  });
 
   return fileId;
 }

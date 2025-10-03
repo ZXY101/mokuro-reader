@@ -2,11 +2,13 @@ import { writable } from 'svelte/store';
 import { tokenManager } from './token-manager';
 import { driveApiClient, DriveApiError } from './api-client';
 import { syncService } from './sync-service';
+import { driveFilesCache } from './drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
 
 // Re-export the main modules
-export { tokenManager, driveApiClient, DriveApiError, syncService, GOOGLE_DRIVE_CONFIG };
+export { tokenManager, driveApiClient, DriveApiError, syncService, driveFilesCache, GOOGLE_DRIVE_CONFIG };
 export type { TokenInfo, DriveFile, SyncProgress } from './types';
+export type { DriveFileMetadata } from './drive-files-cache';
 
 // Backward compatibility exports for old API
 // TODO: Migrate cloud/+page.svelte to use tokenManager, syncService directly
@@ -27,6 +29,11 @@ export async function initGoogleDriveApi(): Promise<void> {
     await driveApiClient.initialize();
 
     if (tokenManager.isAuthenticated()) {
+      // Fetch Drive files cache for backup status
+      driveFilesCache.fetchAllFiles().catch(err =>
+        console.error('Failed to fetch Drive files cache:', err)
+      );
+
       // Check if we need to sync after login (flag set by syncReadProgress when no token)
       const shouldSync = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
       if (shouldSync === 'true') {
@@ -50,11 +57,22 @@ export function signInToGoogleDrive(): void {
   if (!tokenManager.isAuthenticated()) {
     // Will auto-detect if first-time (consent) or re-auth (minimal)
     tokenManager.requestNewToken(false, false);
+
+    // Fetch cache after successful sign-in
+    // Note: This will be called when the token callback fires
+    tokenManager.token.subscribe(token => {
+      if (token) {
+        driveFilesCache.fetchAllFiles().catch(err =>
+          console.error('Failed to fetch Drive files cache after sign-in:', err)
+        );
+      }
+    });
   }
 }
 
 export async function signOutFromGoogleDrive(): Promise<void> {
   await tokenManager.logout();
+  driveFilesCache.clearCache();
 }
 
 export function isSignedIn(): boolean {
