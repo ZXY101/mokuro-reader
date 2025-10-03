@@ -11,7 +11,7 @@
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats } from '$lib/settings';
-  import { tokenManager, driveFilesCache } from '$lib/util/google-drive';
+  import { tokenManager, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
   import { CloudArrowUpOutline } from 'flowbite-svelte-icons';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
@@ -72,33 +72,75 @@
     return manga.some(vol => driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`));
   });
 
-  async function confirmDelete(deleteStats = false) {
+  async function confirmDelete(deleteStats = false, deleteDrive = false) {
     const seriesUuid = manga?.[0].series_uuid;
     if (seriesUuid) {
       manga?.forEach((vol) => {
         const volId = vol.volume_uuid;
         db.volumes_data.where('volume_uuid').equals(vol.volume_uuid).delete();
         db.volumes.where('volume_uuid').equals(vol.volume_uuid).delete();
-        
+
         // Only delete stats and progress if the checkbox is checked
         if (deleteStats) {
           deleteVolume(volId);
         }
       });
+
+      // Delete from Drive if checkbox checked
+      if (deleteDrive && isAuthenticated && manga) {
+        await deleteSeriesFromDrive(manga);
+      }
+
       goto('/');
     }
   }
 
+  async function deleteSeriesFromDrive(volumes: VolumeMetadata[]) {
+    const fileIds: string[] = [];
+
+    for (const vol of volumes) {
+      const driveFile = driveFilesCache.getDriveFile(vol.series_title, vol.volume_title);
+      if (driveFile) {
+        fileIds.push(driveFile.fileId);
+      }
+    }
+
+    if (fileIds.length > 0) {
+      try {
+        await driveApiClient.trashFiles(fileIds);
+
+        // Remove from cache
+        for (const vol of volumes) {
+          driveFilesCache.removeDriveFile(vol.series_title, vol.volume_title);
+        }
+
+        showSnackbar(`Moved ${fileIds.length} files to Drive trash`, 'success');
+      } catch (error) {
+        console.error('Failed to delete series from Drive:', error);
+        showSnackbar('Failed to delete from Drive', 'error');
+      }
+    }
+  }
+
   function onDelete() {
+    const hasDriveBackups = manga?.some(vol =>
+      driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`)
+    );
+
     promptConfirmation(
-      'Are you sure you want to delete this manga?', 
-      confirmDelete, 
-      undefined, 
+      'Are you sure you want to delete this manga?',
+      confirmDelete,
+      undefined,
       {
         label: "Also delete stats and progress?",
         storageKey: "deleteStatsPreference",
         defaultValue: false
-      }
+      },
+      hasDriveBackups ? {
+        label: "Also delete from Google Drive?",
+        storageKey: "deleteDrivePreference",
+        defaultValue: false
+      } : undefined
     );
   }
 

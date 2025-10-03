@@ -146,6 +146,21 @@ class DriveApiClient {
     });
   }
 
+  async trashFile(fileId: string): Promise<void> {
+    return this.handleApiCall(async () => {
+      await gapi.client.drive.files.update({
+        fileId,
+        resource: { trashed: true }
+      });
+    });
+  }
+
+  async trashFiles(fileIds: string[]): Promise<void> {
+    // Batch delete by trashing each file
+    const promises = fileIds.map(fileId => this.trashFile(fileId));
+    await Promise.all(promises);
+  }
+
   private getCurrentToken(): string {
     let token = '';
     tokenManager.token.subscribe(value => { token = value; })();

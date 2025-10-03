@@ -1,9 +1,9 @@
 <script lang="ts">
   import { Button, Spinner } from 'flowbite-svelte';
-  import { CloudArrowUpOutline, CheckCircleSolid } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { backupVolumeToDrive } from '$lib/util';
   import { showSnackbar } from '$lib/util';
-  import { tokenManager, driveFilesCache } from '$lib/util/google-drive';
+  import { tokenManager, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
   import type { VolumeMetadata } from '$lib/types';
   import type { DriveFileMetadata } from '$lib/util/google-drive';
 
@@ -70,24 +70,74 @@
       currentStep = '';
     }
   }
+
+  async function handleDelete(e: MouseEvent) {
+    e.stopPropagation();
+
+    if (!isAuthenticated) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    if (!isBackedUp) {
+      showSnackbar('Volume not backed up', 'info');
+      return;
+    }
+
+    const driveFile = driveFilesCache.getDriveFile(volume.series_title, volume.volume_title);
+    if (!driveFile) {
+      showSnackbar('File not found in Drive', 'error');
+      return;
+    }
+
+    try {
+      await driveApiClient.trashFile(driveFile.fileId);
+      driveFilesCache.removeDriveFile(volume.series_title, volume.volume_title);
+      showSnackbar('Moved to Drive trash', 'success');
+    } catch (error) {
+      console.error('Delete failed:', error);
+      showSnackbar(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+    }
+  }
 </script>
 
-<Button
-  color={isBackedUp ? 'green' : 'light'}
-  size="xs"
-  class={className}
-  disabled={isBackingUp || !isAuthenticated || isBackedUp}
-  on:click={handleBackup}
-  title={isBackedUp ? 'Already backed up to Drive' : 'Backup to Google Drive'}
->
-  {#if isBackingUp}
-    <Spinner size="4" class="me-2" />
-    {currentStep || 'Backing up...'}
-  {:else if isBackedUp}
-    <CheckCircleSolid class="w-4 h-4 me-2" />
-    Backed up
-  {:else}
-    <CloudArrowUpOutline class="w-4 h-4 me-2" />
-    Backup to Drive
-  {/if}
-</Button>
+{#if isBackedUp}
+  <div class="flex gap-1">
+    <Button
+      color="green"
+      size="xs"
+      class={className}
+      disabled={true}
+      title="Already backed up to Drive"
+    >
+      <CheckCircleSolid class="w-4 h-4 me-2" />
+      Backed up
+    </Button>
+    <Button
+      color="red"
+      size="xs"
+      on:click={handleDelete}
+      disabled={!isAuthenticated}
+      title="Delete from Drive (move to trash)"
+    >
+      <TrashBinSolid class="w-4 h-4" />
+    </Button>
+  </div>
+{:else}
+  <Button
+    color="light"
+    size="xs"
+    class={className}
+    disabled={isBackingUp || !isAuthenticated}
+    on:click={handleBackup}
+    title="Backup to Google Drive"
+  >
+    {#if isBackingUp}
+      <Spinner size="4" class="me-2" />
+      {currentStep || 'Backing up...'}
+    {:else}
+      <CloudArrowUpOutline class="w-4 h-4 me-2" />
+      Backup to Drive
+    {/if}
+  </Button>
+{/if}
