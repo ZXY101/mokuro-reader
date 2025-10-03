@@ -102,27 +102,17 @@
 </script>
 
 {#if isBackedUp}
-  <div class="flex gap-1">
-    <Button
-      color="green"
-      size="xs"
-      class={className}
-      disabled={true}
-      title="Already backed up to Drive"
-    >
-      <CheckCircleSolid class="w-4 h-4 me-2" />
-      Backed up
-    </Button>
-    <Button
-      color="red"
-      size="xs"
-      on:click={handleDelete}
-      disabled={!isAuthenticated}
-      title="Delete from Drive (move to trash)"
-    >
-      <TrashBinSolid class="w-4 h-4" />
-    </Button>
-  </div>
+  <Button
+    color="red"
+    size="xs"
+    class={className}
+    on:click={handleDelete}
+    disabled={!isAuthenticated}
+    title="Delete from Drive (move to trash)"
+  >
+    <TrashBinSolid class="w-4 h-4 me-2" />
+    Delete from Drive
+  </Button>
 {:else}
   <Button
     color="light"

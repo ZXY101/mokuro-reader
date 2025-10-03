@@ -279,29 +279,28 @@
         </div>
       </div>
       <div class="flex flex-row gap-2 items-start">
-        <Button
-          color={allBackedUp ? 'green' : 'light'}
-          on:click={backupSeries}
-          disabled={backingUpSeries || allBackedUp || !isAuthenticated}
-        >
-          {#if backingUpSeries}
-            <Spinner size="4" class="me-2" />
-            Backing up {backupProgress}
-          {:else if allBackedUp}
-            <CloudArrowUpOutline class="w-4 h-4 me-2" />
-            Series backed up
-          {:else}
-            <CloudArrowUpOutline class="w-4 h-4 me-2" />
-            {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
-          {/if}
-        </Button>
+        {#if !allBackedUp}
+          <Button
+            color="light"
+            on:click={backupSeries}
+            disabled={backingUpSeries || !isAuthenticated}
+          >
+            {#if backingUpSeries}
+              <Spinner size="4" class="me-2" />
+              Backing up {backupProgress}
+            {:else}
+              <CloudArrowUpOutline class="w-4 h-4 me-2" />
+              {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
+            {/if}
+          </Button>
+        {/if}
         {#if anyBackedUp && isAuthenticated}
           <Button
             color="red"
             on:click={onDeleteFromDrive}
           >
             <TrashBinSolid class="w-4 h-4 me-2" />
-            Delete from Drive
+            Delete series from Drive
           </Button>
         {/if}
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
