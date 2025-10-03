@@ -35,9 +35,13 @@
   });
 
   // Check if this volume exists in Drive
-  let isBackedUp = $derived(
-    driveCache.has(`${volume.series_title}/${volume.volume_title}.cbz`)
-  );
+  let expectedPath = $derived(`${volume.series_title}/${volume.volume_title}.cbz`);
+  let isBackedUp = $derived(() => {
+    const exists = driveCache.has(expectedPath);
+    console.log(`Checking backup status for: ${expectedPath}, exists: ${exists}`);
+    console.log('Cache keys:', Array.from(driveCache.keys()));
+    return exists;
+  });
 
   async function handleBackup(e: MouseEvent) {
     e.stopPropagation();
