@@ -25,7 +25,9 @@
 
   let isAuthenticated = $derived(token !== '');
 
-  async function handleBackup() {
+  async function handleBackup(e: MouseEvent) {
+    e.stopPropagation();
+
     if (!isAuthenticated) {
       showSnackbar('Please sign in to Google Drive first', 'error');
       return;
