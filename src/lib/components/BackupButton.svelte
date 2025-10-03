@@ -34,11 +34,11 @@
     });
   });
 
-  // Check if this volume exists in Drive
-  let expectedPath = $derived(`${volume.series_title}/${volume.volume_title}.cbz`);
+  // Check if this volume exists in Drive (by filename)
+  let expectedFilename = $derived(`${volume.volume_title}.cbz`);
   let isBackedUp = $derived.by(() => {
-    const exists = driveCache.has(expectedPath);
-    console.log(`Checking backup status for: ${expectedPath}, exists: ${exists}`);
+    const exists = driveCache.has(expectedFilename);
+    console.log(`Checking backup status for: ${expectedFilename}, exists: ${exists}`);
     console.log('Cache keys:', Array.from(driveCache.keys()));
     return exists;
   });

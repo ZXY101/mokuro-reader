@@ -46,59 +46,28 @@ class DriveFilesCacheManager {
       // Query for ALL .cbz files the app can see (no parent folder constraint)
       const allCbzFiles = await driveApiClient.listFiles(
         `name contains '.cbz' and trashed=false`,
-        'id, name, mimeType, modifiedTime, size, parents'
+        'id, name, mimeType, modifiedTime, size'
       );
       console.log('Found .cbz files:', allCbzFiles);
 
-      // Fetch all folder names in a single batch
-      const folderIds = new Set<string>();
-      for (const file of allCbzFiles) {
-        if (file.parents && file.parents.length > 0) {
-          folderIds.add(file.parents[0]); // Get immediate parent
-        }
-      }
-
-      const folderNames = new Map<string, string>();
-      for (const folderId of folderIds) {
-        try {
-          const folders = await driveApiClient.listFiles(
-            `'${folderId}' in parents`,
-            'id, name'
-          );
-          // Actually get the folder itself, not its contents
-          const response = await gapi.client.drive.files.get({
-            fileId: folderId,
-            fields: 'id, name'
-          });
-          folderNames.set(folderId, response.result.name || folderId);
-        } catch (err) {
-          console.warn('Could not fetch folder name for:', folderId);
-          folderNames.set(folderId, folderId);
-        }
-      }
-
       const cacheMap = new Map<string, DriveFileMetadata>();
 
-      // Build paths from file metadata
+      // Cache by filename (we'll match against volume_title.cbz)
       for (const file of allCbzFiles) {
         if (file.name.endsWith('.cbz')) {
-          // Build path as seriesFolder/filename
-          const parentId = file.parents?.[0];
-          const seriesFolder = parentId ? folderNames.get(parentId) || 'unknown' : 'unknown';
-          const path = `${seriesFolder}/${file.name}`;
-
-          cacheMap.set(path, {
+          // Key by filename for simple lookup
+          cacheMap.set(file.name, {
             fileId: file.id,
             name: file.name,
             modifiedTime: file.modifiedTime || new Date().toISOString(),
             size: file.size ? parseInt(file.size) : undefined,
-            path: path
+            path: file.name // Just store filename as path for now
           });
         }
       }
 
       console.log(`Cached ${cacheMap.size} Drive files:`);
-      console.log('Cache paths:', Array.from(cacheMap.keys()));
+      console.log('Cache filenames:', Array.from(cacheMap.keys()));
       this.cache.set(cacheMap);
       this.lastFetchTime = Date.now();
     } catch (error) {
@@ -153,7 +122,7 @@ class DriveFilesCacheManager {
   }
 
   /**
-   * Check if a file exists in Google Drive by path
+   * Check if a file exists in Google Drive by filename
    * Used to determine if a local volume is already backed up
    */
   existsInDrive(seriesTitle: string, volumeTitle: string): boolean {
@@ -162,12 +131,12 @@ class DriveFilesCacheManager {
       currentCache = value;
     })();
 
-    const expectedPath = `${seriesTitle}/${volumeTitle}.cbz`;
-    return currentCache.has(expectedPath);
+    const filename = `${volumeTitle}.cbz`;
+    return currentCache.has(filename);
   }
 
   /**
-   * Get Drive file metadata by path
+   * Get Drive file metadata by filename
    */
   getDriveFile(seriesTitle: string, volumeTitle: string): DriveFileMetadata | undefined {
     let currentCache: Map<string, DriveFileMetadata> = new Map();
@@ -175,8 +144,8 @@ class DriveFilesCacheManager {
       currentCache = value;
     })();
 
-    const expectedPath = `${seriesTitle}/${volumeTitle}.cbz`;
-    return currentCache.get(expectedPath);
+    const filename = `${volumeTitle}.cbz`;
+    return currentCache.get(filename);
   }
 
   /**
@@ -212,9 +181,9 @@ class DriveFilesCacheManager {
    */
   addDriveFile(seriesTitle: string, volumeTitle: string, metadata: DriveFileMetadata): void {
     this.cache.update((cache) => {
-      const expectedPath = `${seriesTitle}/${volumeTitle}.cbz`;
+      const filename = `${volumeTitle}.cbz`;
       const newCache = new Map(cache);
-      newCache.set(expectedPath, metadata);
+      newCache.set(filename, metadata);
       return newCache;
     });
   }
@@ -224,9 +193,9 @@ class DriveFilesCacheManager {
    */
   removeDriveFile(seriesTitle: string, volumeTitle: string): void {
     this.cache.update((cache) => {
-      const expectedPath = `${seriesTitle}/${volumeTitle}.cbz`;
+      const filename = `${volumeTitle}.cbz`;
       const newCache = new Map(cache);
-      newCache.delete(expectedPath);
+      newCache.delete(filename);
       return newCache;
     });
   }
