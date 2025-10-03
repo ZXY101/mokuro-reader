@@ -13,6 +13,7 @@ class ActivityTracker {
   private isActive = writable(false);
   private callbacks: ActivityCallback | null = null;
   private timeoutDuration = 5 * 60 * 1000; // 5 minutes in milliseconds
+  private currentActiveState = false;
 
   constructor() {
     if (browser) {
@@ -23,6 +24,7 @@ class ActivityTracker {
         } else {
           this.callbacks?.onInactive();
         }
+        this.currentActiveState = active;
       });
     }
   }
@@ -54,8 +56,10 @@ class ActivityTracker {
       clearTimeout(this.timeoutId);
     }
 
-    // Set active state
-    this.isActive.set(true);
+    // Set active state only if currently inactive to avoid triggering callbacks repeatedly
+    if (!this.currentActiveState) {
+      this.isActive.set(true);
+    }
 
     // Set new timeout
     this.timeoutId = window.setTimeout(() => {
