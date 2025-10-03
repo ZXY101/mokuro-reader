@@ -4,7 +4,11 @@
       "WebFetch(domain:developers.google.com)",
       "Bash(git commit:*)",
       "Bash(npm run build:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(git cherry-pick:*)",
+      "Bash(gh pr create:*)"
     ],
     "deny": [],
     "ask": []
