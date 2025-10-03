@@ -43,31 +43,57 @@ class DriveFilesCacheManager {
     try {
       console.log('Fetching all Drive file metadata...');
 
-      // Find the mokuro-reader folder
-      console.log('Searching for folder:', GOOGLE_DRIVE_CONFIG.APP_FOLDER_NAME);
-      const folderResponse = await driveApiClient.listFiles(
-        `name='${GOOGLE_DRIVE_CONFIG.APP_FOLDER_NAME}' and mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}' and trashed=false`,
-        'id, name'
+      // Query for ALL .cbz files the app can see (no parent folder constraint)
+      const allCbzFiles = await driveApiClient.listFiles(
+        `name contains '.cbz' and trashed=false`,
+        'id, name, mimeType, modifiedTime, size, parents'
       );
-      console.log('Folder search response:', folderResponse);
+      console.log('Found .cbz files:', allCbzFiles);
 
-      if (!folderResponse || folderResponse.length === 0) {
-        console.log('No mokuro-reader folder found, cache is empty');
-        this.cache.set(new Map());
-        this.lastFetchTime = Date.now();
-        return;
+      // Fetch all folder names in a single batch
+      const folderIds = new Set<string>();
+      for (const file of allCbzFiles) {
+        if (file.parents && file.parents.length > 0) {
+          folderIds.add(file.parents[0]); // Get immediate parent
+        }
       }
 
-      const appFolderId = folderResponse[0].id;
-
-      // Recursively list all .cbz files in the folder structure
-      const allFiles = await this.listAllCbzFiles(appFolderId);
+      const folderNames = new Map<string, string>();
+      for (const folderId of folderIds) {
+        try {
+          const folders = await driveApiClient.listFiles(
+            `'${folderId}' in parents`,
+            'id, name'
+          );
+          // Actually get the folder itself, not its contents
+          const response = await gapi.client.drive.files.get({
+            fileId: folderId,
+            fields: 'id, name'
+          });
+          folderNames.set(folderId, response.result.name || folderId);
+        } catch (err) {
+          console.warn('Could not fetch folder name for:', folderId);
+          folderNames.set(folderId, folderId);
+        }
+      }
 
       const cacheMap = new Map<string, DriveFileMetadata>();
 
-      for (const file of allFiles) {
-        if (file.path) {
-          cacheMap.set(file.path, file);
+      // Build paths from file metadata
+      for (const file of allCbzFiles) {
+        if (file.name.endsWith('.cbz')) {
+          // Build path as seriesFolder/filename
+          const parentId = file.parents?.[0];
+          const seriesFolder = parentId ? folderNames.get(parentId) || 'unknown' : 'unknown';
+          const path = `${seriesFolder}/${file.name}`;
+
+          cacheMap.set(path, {
+            fileId: file.id,
+            name: file.name,
+            modifiedTime: file.modifiedTime || new Date().toISOString(),
+            size: file.size ? parseInt(file.size) : undefined,
+            path: path
+          });
         }
       }
 
