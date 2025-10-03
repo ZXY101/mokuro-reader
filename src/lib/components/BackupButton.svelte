@@ -15,7 +15,15 @@
 
   let isBackingUp = $state(false);
   let currentStep = $state('');
-  let isAuthenticated = $derived($tokenManager.token !== '');
+
+  let token = $state('');
+  $effect(() => {
+    return tokenManager.token.subscribe(value => {
+      token = value;
+    });
+  });
+
+  let isAuthenticated = $derived(token !== '');
 
   async function handleBackup() {
     if (!isAuthenticated) {
