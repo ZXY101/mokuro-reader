@@ -1,14 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "WebFetch(domain:developers.google.com)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(git checkout:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(npm run build:*)",
-      "Bash(npm run dev:*)",
-      "Bash(git pull:*)",
-      "Bash(git stash:*)",
-      "Bash(git cherry-pick:*)",
-      "Bash(gh pr create:*)"
+      "Bash(git push:*)",
+      "Bash(git restore:*)"
     ],
     "deny": [],
     "ask": []

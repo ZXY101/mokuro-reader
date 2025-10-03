@@ -40,6 +40,9 @@ class DriveApiClient {
     try {
       return await apiCall();
     } catch (error: any) {
+      console.error('Drive API error caught:', error);
+      console.error('Error details - status:', error.status, 'message:', error.message);
+
       const isNetworkError = error.message?.toLowerCase().includes('network') ||
         error.message?.toLowerCase().includes('offline') ||
         error.status === 0;
@@ -141,6 +144,21 @@ class DriveApiClient {
 
       return await response.json();
     });
+  }
+
+  async trashFile(fileId: string): Promise<void> {
+    return this.handleApiCall(async () => {
+      await gapi.client.drive.files.update({
+        fileId,
+        resource: { trashed: true }
+      });
+    });
+  }
+
+  async trashFiles(fileIds: string[]): Promise<void> {
+    // Batch delete by trashing each file
+    const promises = fileIds.map(fileId => this.trashFile(fileId));
+    await Promise.all(promises);
   }
 
   private getCurrentToken(): string {

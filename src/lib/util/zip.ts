@@ -76,6 +76,24 @@ async function addVolumeToArchive(zipWriter: ZipWriter<Blob>, volume: VolumeMeta
 }
 
 /**
+ * Creates an archive blob containing the specified volumes
+ * @param volumes Array of volumes to include in the archive
+ * @returns Promise resolving to the archive blob
+ */
+export async function createArchiveBlob(volumes: VolumeMetadata[]): Promise<Blob> {
+  const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+
+  // Add each volume to the archive
+  const volumePromises = volumes.map((volume) => addVolumeToArchive(zipWriter, volume));
+
+  // Wait for all volumes to be added
+  await Promise.all((await Promise.all(volumePromises)).flat());
+
+  // Close the archive and get the blob
+  return await zipWriter.close();
+}
+
+/**
  * Creates and downloads an archive containing the specified volumes
  * @param volumes Array of volumes to include in the archive
  * @param asCbz Whether to create a CBZ file (true) or ZIP file (false)
@@ -87,16 +105,7 @@ async function createAndDownloadArchive(
   asCbz: boolean,
   filename: string
 ) {
-  const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
-
-  // Add each volume to the archive
-  const volumePromises = volumes.map((volume) => addVolumeToArchive(zipWriter, volume));
-
-  // Wait for all volumes to be added
-  await Promise.all((await Promise.all(volumePromises)).flat());
-
-  // Close the archive and get the blob
-  const zipFileBlob = await zipWriter.close();
+  const zipFileBlob = await createArchiveBlob(volumes);
 
   // Create a download link
   const link = document.createElement('a');
