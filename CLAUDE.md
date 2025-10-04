@@ -130,6 +130,18 @@ const query = `name='${folderName}' and ...`;
 - `prompt: ''` (empty) - Minimal UI, reuses existing permissions (use for re-authentication after token expiry)
 - `silent: true` - Attempts completely silent refresh with no UI
 
+**Google Drive API Query Pattern**:
+- Our broad queries like `(name contains '.cbz' or mimeType='folder') and trashed=false` are intentionally designed this way
+- Google automatically scopes results to only what the app has permission to access - we don't need manual folder restrictions
+- This pattern (broad query + client-side filtering) is the CORRECT approach - it minimizes API calls while working within OAuth permission constraints
+- If you think folder scoping might be needed, ask first - broad queries are almost always the right solution
+
+**Svelte 5 Reactive Performance**:
+- `$derived` and `$derived.by()` functions run for EVERY instance of a component
+- If a component appears N times (e.g., BackupButton for each volume), operations inside derived run N times
+- Expensive operations or console logging in derived can cause severe performance issues with repeated components
+- Debug logging is fine when actively debugging an issue, but MUST be removed once that issue is addressed or when switching focus to other work
+
 ### Worker Pool Pattern
 
 The application uses Web Workers for parallel downloads from Google Drive:
