@@ -2,6 +2,7 @@ import type { VolumeData, VolumeMetadata } from '$lib/types';
 import Dexie, { type Table } from 'dexie';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
 import { writable } from 'svelte/store';
+import { browser } from '$app/environment';
 
 function naturalSort(a: string, b: string): number {
   return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
@@ -55,7 +56,11 @@ export class CatalogDexie extends Dexie {
         await tx.table('volumes').bulkAdd(volumes);
         await tx.table('volumes_data').bulkAdd(volumes_data);
       });
-    startThumbnailProcessing();
+
+    // Only start thumbnail processing in browser environment
+    if (browser) {
+      startThumbnailProcessing();
+    }
   }
 
   async processThumbnails(batchSize: number = 5): Promise<void> {
