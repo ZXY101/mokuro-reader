@@ -84,8 +84,7 @@ class DriveFilesCacheManager {
         }
       }
 
-      console.log(`Cached ${cacheMap.size} Drive files:`);
-      console.log('Cache paths:', Array.from(cacheMap.keys()));
+      console.log(`Cached ${cacheMap.size} Drive files`);
       this.cache.set(cacheMap);
       this.lastFetchTime = Date.now();
     } catch (error) {
