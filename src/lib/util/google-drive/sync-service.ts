@@ -4,6 +4,7 @@ import { parseVolumesFromJson, volumes } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import { driveApiClient, DriveApiError, escapeNameForDriveQuery } from './api-client';
 import { tokenManager } from './token-manager';
+import { driveFilesCache } from './drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG, type SyncProgress } from './constants';
 
 class SyncService {
@@ -70,17 +71,14 @@ class SyncService {
         status: 'Initializing...'
       });
 
-      // Step 1: Ensure folder structure exists
+      // Step 1: Ensure folder exists and get volume-data.json from cache
       progressTrackerStore.updateProcess(processId, {
         progress: 10,
-        status: 'Setting up folder structure...'
+        status: 'Checking for existing data...'
       });
 
       const readerFolderId = await this.ensureReaderFolderExists();
-      const volumeDataFileId = await this.findFileInFolder(
-        GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA,
-        readerFolderId
-      );
+      const volumeDataFileId = driveFilesCache.getVolumeDataFileId();
 
       // Step 2: Download cloud data if it exists
       let cloudVolumes = {};
@@ -114,13 +112,23 @@ class SyncService {
 
       volumes.update(() => mergedVolumes);
 
-      // Step 5: Upload merged data
-      progressTrackerStore.updateProcess(processId, {
-        progress: 90,
-        status: 'Uploading merged data...'
-      });
+      // Step 5: Upload merged data (only if changed)
+      const mergedJson = JSON.stringify(mergedVolumes);
+      const cloudJson = JSON.stringify(cloudVolumes);
 
-      await this.uploadVolumeData(mergedVolumes, volumeDataFileId, readerFolderId);
+      if (mergedJson !== cloudJson) {
+        progressTrackerStore.updateProcess(processId, {
+          progress: 90,
+          status: 'Uploading merged data...'
+        });
+
+        await this.uploadVolumeData(mergedVolumes, volumeDataFileId, readerFolderId);
+      } else {
+        progressTrackerStore.updateProcess(processId, {
+          progress: 90,
+          status: 'No changes to upload'
+        });
+      }
 
       progressTrackerStore.updateProcess(processId, {
         progress: 100,

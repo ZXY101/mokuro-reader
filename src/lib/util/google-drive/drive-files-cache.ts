@@ -22,11 +22,16 @@ export interface DriveFileMetadata {
  */
 class DriveFilesCacheManager {
   private cache = writable<Map<string, DriveFileMetadata>>(new Map());
+  private volumeDataFileId: string | null = null;
   private isFetching = false;
   private lastFetchTime: number | null = null;
 
   get store() {
     return this.cache;
+  }
+
+  getVolumeDataFileId(): string | null {
+    return this.volumeDataFileId;
   }
 
   /**
@@ -43,27 +48,36 @@ class DriveFilesCacheManager {
     try {
       console.log('Fetching all Drive file metadata...');
 
-      // Single query to get ALL items (both .cbz files and folders) in one call
-      // This is much more efficient than multiple API calls
+      // Get ALL items with no restrictions to debug what we have access to
       const allItems = await driveApiClient.listFiles(
-        `(name contains '.cbz' or mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}') and trashed=false`,
+        `trashed=false`,
         'files(id,name,mimeType,modifiedTime,size,parents)'
       );
       console.log('Found items:', allItems);
 
-      // Separate files and folders, build folder ID->name map
+      // Count by file type
+      const typeCounts: Record<string, number> = {};
       const cbzFiles: any[] = [];
       const folderNames = new Map<string, string>();
+      const foundFolderNames: string[] = [];
 
       for (const item of allItems) {
+        const ext = item.name.includes('.') ? item.name.split('.').pop() : 'no-extension';
+        typeCounts[ext] = (typeCounts[ext] || 0) + 1;
+
         if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
           folderNames.set(item.id, item.name);
+          foundFolderNames.push(item.name);
         } else if (item.name.endsWith('.cbz')) {
           cbzFiles.push(item);
+        } else if (item.name === GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA) {
+          this.volumeDataFileId = item.id;
         }
       }
 
+      console.log('File type counts:', typeCounts);
       console.log(`Found ${cbzFiles.length} .cbz files and ${folderNames.size} folders`);
+      console.log('Folder names:', foundFolderNames);
 
       // Build cache from files using the folder map
       const cacheMap = new Map<string, DriveFileMetadata>();
