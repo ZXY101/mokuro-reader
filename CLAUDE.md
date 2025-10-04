@@ -19,6 +19,26 @@ Mokuro Reader is a web-based manga reader for [mokuro](https://github.com/kha-wh
 - `npm run lint` - Lint code (Prettier + ESLint)
 - `npm run format` - Format code with Prettier
 
+### Preview Server Port Management
+**CRITICAL**: The preview server MUST always run on port 4173 for Google OAuth to work correctly.
+
+Before starting a new preview server:
+1. Kill all existing preview processes to free up port 4173
+2. Use these commands to find and kill processes:
+```bash
+# Find process on port 4173
+netstat -ano | findstr :4173 | awk '{print $5}' | head -1
+
+# Kill the process (replace PID with actual process ID)
+taskkill //F //PID <PID>
+
+# Kill processes on multiple ports if needed (4173-4178)
+netstat -ano | findstr :4174 | awk '{print $5}' | head -1 | xargs -I {} taskkill //F //PID {}
+```
+3. Then start the preview server: `npm run preview`
+
+**Why this matters**: Vite's preview server auto-increments the port if 4173 is occupied. Google OAuth is configured for localhost:4173 specifically, so any other port will break authentication.
+
 ### Node.js Version Requirement
 **IMPORTANT**: This project requires Node.js 18.x. It is not compatible with Node.js 19+ or earlier versions. Use `nvm use` (an `.nvmrc` file is present) or manually switch to Node 18.
 
