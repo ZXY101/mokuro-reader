@@ -42,8 +42,11 @@ class SyncService {
   }
 
   async findFileInFolder(fileName: string, folderId: string): Promise<string> {
+    // Escape single quotes and backslashes in file name for Drive query
+    const escapedFileName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
     const files = await driveApiClient.listFiles(
-      `'${folderId}' in parents and name='${fileName}'`,
+      `'${folderId}' in parents and name='${escapedFileName}'`,
       'files(id)'
     );
 

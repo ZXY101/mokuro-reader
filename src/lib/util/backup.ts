@@ -74,10 +74,13 @@ export async function getOrCreateFolder(
   folderName: string,
   parentFolderId?: string
 ): Promise<string> {
+  // Escape single quotes and backslashes in folder name for Drive query
+  const escapedFolderName = folderName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
   // Search for existing folder
   const query = parentFolderId
-    ? `name='${folderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-    : `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    ? `name='${escapedFolderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    : `name='${escapedFolderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
   const files = await driveApiClient.listFiles(query, 'files(id, name)');
 
@@ -99,9 +102,12 @@ export async function findFile(
   fileName: string,
   parentFolderId?: string
 ): Promise<string | null> {
+  // Escape single quotes and backslashes in file name for Drive query
+  const escapedFileName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
   const query = parentFolderId
-    ? `name='${fileName}' and '${parentFolderId}' in parents and trashed=false`
-    : `name='${fileName}' and trashed=false`;
+    ? `name='${escapedFileName}' and '${parentFolderId}' in parents and trashed=false`
+    : `name='${escapedFileName}' and trashed=false`;
 
   const files = await driveApiClient.listFiles(query, 'files(id, name)');
 
