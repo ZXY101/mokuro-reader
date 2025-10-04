@@ -8,7 +8,22 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(git show:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run preview:*)",
+      "Bash(pkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(awk:*)",
+      "Bash(xargs:*)",
+      "Bash(git stash:*)",
+      "Bash(npx update-browserslist-db:*)",
+      "Bash(nvm:*)",
+      "Bash(npm install:*)",
+      "Bash(Select-String -Pattern \"Error|error|vite\")",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

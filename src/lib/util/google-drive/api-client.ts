@@ -1,6 +1,24 @@
 import { GOOGLE_DRIVE_CONFIG, type DriveFile } from './constants';
 import { tokenManager } from './token-manager';
 
+/**
+ * Escapes special characters in file/folder names for use in Google Drive API queries.
+ *
+ * Google Drive query syntax requires:
+ * - Backslashes to be escaped as \\
+ * - Single quotes to be escaped as \'
+ *
+ * @param name The file or folder name to escape
+ * @returns The escaped name safe for use in Drive API queries
+ *
+ * @example
+ * escapeNameForDriveQuery("Haven't You Heard") // returns "Haven\'t You Heard"
+ * escapeNameForDriveQuery("Path\\to\\file") // returns "Path\\\\to\\\\file"
+ */
+export function escapeNameForDriveQuery(name: string): string {
+  return name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export class DriveApiError extends Error {
   constructor(
     message: string,

@@ -2,7 +2,7 @@ import { writable } from 'svelte/store';
 import { progressTrackerStore } from '../progress-tracker';
 import { parseVolumesFromJson, volumes } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
-import { driveApiClient, DriveApiError } from './api-client';
+import { driveApiClient, DriveApiError, escapeNameForDriveQuery } from './api-client';
 import { tokenManager } from './token-manager';
 import { GOOGLE_DRIVE_CONFIG, type SyncProgress } from './constants';
 
@@ -42,8 +42,7 @@ class SyncService {
   }
 
   async findFileInFolder(fileName: string, folderId: string): Promise<string> {
-    // Escape single quotes and backslashes in file name for Drive query
-    const escapedFileName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const escapedFileName = escapeNameForDriveQuery(fileName);
 
     const files = await driveApiClient.listFiles(
       `'${folderId}' in parents and name='${escapedFileName}'`,

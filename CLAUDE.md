@@ -112,6 +112,19 @@ Located in `src/lib/util/google-drive/`, the integration is modular:
 
 The implementation uses Google's OAuth2 implicit flow (access tokens only, no refresh tokens since there's no backend). Tokens expire after ~1 hour but the system attempts automatic renewal and shows user-friendly warnings.
 
+**IMPORTANT - Query String Escaping**: When constructing Google Drive API queries with file or folder names, **always** use the `escapeNameForDriveQuery()` function from `api-client.ts`. This escapes special characters (backslashes and single quotes) that would otherwise cause API errors. Never manually escape names or construct queries without this function.
+
+```typescript
+import { escapeNameForDriveQuery } from '$lib/util/google-drive/api-client';
+
+// ✅ Correct
+const escapedName = escapeNameForDriveQuery(folderName);
+const query = `name='${escapedName}' and ...`;
+
+// ❌ Wrong - will fail with names containing apostrophes
+const query = `name='${folderName}' and ...`;
+```
+
 **Important**: The `prompt` parameter in OAuth requests determines the user experience:
 - `prompt: 'consent'` - Forces full consent screen every time (use only for initial sign-in)
 - `prompt: ''` (empty) - Minimal UI, reuses existing permissions (use for re-authentication after token expiry)

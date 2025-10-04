@@ -1,5 +1,5 @@
 import type { VolumeMetadata } from '$lib/types';
-import { driveApiClient } from './google-drive/api-client';
+import { driveApiClient, escapeNameForDriveQuery } from './google-drive/api-client';
 import { driveFilesCache } from './google-drive/drive-files-cache';
 import { createArchiveBlob } from './zip';
 
@@ -74,8 +74,7 @@ export async function getOrCreateFolder(
   folderName: string,
   parentFolderId?: string
 ): Promise<string> {
-  // Escape single quotes and backslashes in folder name for Drive query
-  const escapedFolderName = folderName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const escapedFolderName = escapeNameForDriveQuery(folderName);
 
   // Search for existing folder
   const query = parentFolderId
@@ -102,8 +101,7 @@ export async function findFile(
   fileName: string,
   parentFolderId?: string
 ): Promise<string | null> {
-  // Escape single quotes and backslashes in file name for Drive query
-  const escapedFileName = fileName.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  const escapedFileName = escapeNameForDriveQuery(fileName);
 
   const query = parentFolderId
     ? `name='${escapedFileName}' and '${parentFolderId}' in parents and trashed=false`
