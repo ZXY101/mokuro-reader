@@ -43,53 +43,44 @@ class DriveFilesCacheManager {
     try {
       console.log('Fetching all Drive file metadata...');
 
-      // Query for ALL .cbz files the app can see (no parent folder constraint)
-      const allCbzFiles = await driveApiClient.listFiles(
-        `name contains '.cbz' and trashed=false`,
+      // Single query to get ALL items (both .cbz files and folders) in one call
+      // This is much more efficient than multiple API calls
+      const allItems = await driveApiClient.listFiles(
+        `(name contains '.cbz' or mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}') and trashed=false`,
         'files(id,name,mimeType,modifiedTime,size,parents)'
       );
-      console.log('Found .cbz files:', allCbzFiles);
+      console.log('Found items:', allItems);
 
-      // Get parent folder names for all files
-      const parentFolderIds = new Set<string>();
-      for (const file of allCbzFiles) {
-        if (file.parents && file.parents.length > 0) {
-          parentFolderIds.add(file.parents[0]);
-        }
-      }
-
-      // Fetch folder names in batch
+      // Separate files and folders, build folder ID->name map
+      const cbzFiles: any[] = [];
       const folderNames = new Map<string, string>();
-      for (const folderId of parentFolderIds) {
-        try {
-          const response = await gapi.client.drive.files.get({
-            fileId: folderId,
-            fields: 'id, name'
-          });
-          folderNames.set(folderId, response.result.name || '');
-        } catch (err) {
-          console.warn('Could not fetch folder name for:', folderId);
+
+      for (const item of allItems) {
+        if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
+          folderNames.set(item.id, item.name);
+        } else if (item.name.endsWith('.cbz')) {
+          cbzFiles.push(item);
         }
       }
 
+      console.log(`Found ${cbzFiles.length} .cbz files and ${folderNames.size} folders`);
+
+      // Build cache from files using the folder map
       const cacheMap = new Map<string, DriveFileMetadata>();
 
-      // Cache by path: parentFolder/filename
-      for (const file of allCbzFiles) {
-        if (file.name.endsWith('.cbz')) {
-          const parentId = file.parents?.[0];
-          const parentName = parentId ? folderNames.get(parentId) : null;
+      for (const file of cbzFiles) {
+        const parentId = file.parents?.[0];
+        const parentName = parentId ? folderNames.get(parentId) : null;
 
-          if (parentName) {
-            const path = `${parentName}/${file.name}`;
-            cacheMap.set(path, {
-              fileId: file.id,
-              name: file.name,
-              modifiedTime: file.modifiedTime || new Date().toISOString(),
-              size: file.size ? parseInt(file.size) : undefined,
-              path: path
-            });
-          }
+        if (parentName) {
+          const path = `${parentName}/${file.name}`;
+          cacheMap.set(path, {
+            fileId: file.id,
+            name: file.name,
+            modifiedTime: file.modifiedTime || new Date().toISOString(),
+            size: file.size ? parseInt(file.size) : undefined,
+            path: path
+          });
         }
       }
 

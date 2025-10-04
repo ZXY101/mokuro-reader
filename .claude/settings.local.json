@@ -23,7 +23,8 @@
       "Bash(nvm:*)",
       "Bash(npm install:*)",
       "Bash(Select-String -Pattern \"Error|error|vite\")",
-      "Bash(node:*)"
+      "Bash(node:*)",
+      "WebSearch"
     ],
     "deny": [],
     "ask": []
