@@ -26,7 +26,9 @@
       "Bash(node:*)",
       "WebSearch",
       "Bash(git clean:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(gh pr close:*)",
+      "Bash(gh pr create:*)"
     ],
     "deny": [],
     "ask": []
