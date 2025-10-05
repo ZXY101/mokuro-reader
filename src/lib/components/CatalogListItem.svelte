@@ -50,7 +50,7 @@
 
   // Check if this series is downloading
   let isDownloading = $derived.by(() => {
-    if (!volume || !isPlaceholderOnly) return false;
+    if (!volume) return false;
 
     const seriesProcessId = `download-series-${volume.series_title}`;
     const hasSeriesDownload = progressState.processes.some(p => p.id === seriesProcessId);
