@@ -31,7 +31,8 @@
       "Bash(gh pr create:*)",
       "Bash(gh pr diff:*)",
       "Bash(timeout 2 npm run preview)",
-      "WebFetch(domain:developers.google.com)"
+      "WebFetch(domain:developers.google.com)",
+      "Bash(gh pr edit:*)"
     ],
     "deny": [],
     "ask": []
