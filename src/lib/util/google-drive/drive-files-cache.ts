@@ -155,7 +155,19 @@ class DriveFilesCacheManager {
       this.lastFetchTime = Date.now();
       this.cacheLoadedStore.set(true);
 
-      // Check if sync was requested after login
+    } catch (error) {
+      console.error('Failed to fetch Drive files cache:', error);
+      console.error('Error details:', error);
+      if (error instanceof Error) {
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+      }
+      // Don't clear cache on error, keep stale data
+    } finally {
+      this.isFetching = false;
+      this.isFetchingStore.set(false);
+
+      // Check if sync was requested after login (do this in finally to ensure fetch is complete)
       const { GOOGLE_DRIVE_CONFIG } = await import('./constants');
       const shouldSync = typeof window !== 'undefined' &&
         localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN) === 'true';
@@ -169,17 +181,6 @@ class DriveFilesCacheManager {
           console.error('Sync after login failed:', err)
         );
       }
-    } catch (error) {
-      console.error('Failed to fetch Drive files cache:', error);
-      console.error('Error details:', error);
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
-      // Don't clear cache on error, keep stale data
-    } finally {
-      this.isFetching = false;
-      this.isFetchingStore.set(false);
     }
   }
 
