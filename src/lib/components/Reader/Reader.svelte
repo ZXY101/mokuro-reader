@@ -355,23 +355,27 @@
   <div class="flex" style:background-color={$settings.backgroundColor}>
     <Panzoom>
       <button
+        aria-label="Previous page (left edge)"
         class="h-full fixed -left-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
         style:margin-left={`${$settings.edgeButtonWidth}px`}
         onmousedown={mouseDown}
         onmouseup={left}
       ></button>
       <button
+        aria-label="Next page (right edge)"
         class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
         style:margin-right={`${$settings.edgeButtonWidth}px`}
         onmousedown={mouseDown}
         onmouseup={right}
       ></button>
       <button
+        aria-label="Previous page (bottom left)"
         class="h-screen fixed top-full -left-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
         onmousedown={mouseDown}
         onmouseup={left}
       ></button>
       <button
+        aria-label="Next page (bottom right)"
         class="h-screen fixed top-full -right-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
         onmousedown={mouseDown}
         onmouseup={right}
@@ -395,12 +399,14 @@
   </div>
   {#if !$settings.mobile}
     <button
+      aria-label="Previous page (left edge)"
       onmousedown={mouseDown}
       onmouseup={left}
       class="left-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
       style:width={`${$settings.edgeButtonWidth}px`}
     ></button>
     <button
+      aria-label="Next page (right edge)"
       onmousedown={mouseDown}
       onmouseup={right}
       class="right-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"

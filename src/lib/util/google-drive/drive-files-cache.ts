@@ -21,12 +21,26 @@ export interface DriveFileMetadata {
  * It does NOT track local files - only what exists in Google Drive.
  */
 class DriveFilesCacheManager {
-  private cache = writable<Map<string, DriveFileMetadata>>(new Map());
+  private cache = writable<Map<string, DriveFileMetadata[]>>(new Map());
   private isFetching = false;
   private lastFetchTime: number | null = null;
 
   get store() {
     return this.cache;
+  }
+
+  getVolumeDataFileId(): string | null {
+    const files = this.getVolumeDataFiles();
+    return files.length > 0 ? files[0].fileId : null;
+  }
+
+  getVolumeDataFiles(): DriveFileMetadata[] {
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
+    this.cache.subscribe((value) => {
+      currentCache = value;
+    })();
+
+    return currentCache.get(GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA) || [];
   }
 
   /**
@@ -43,60 +57,104 @@ class DriveFilesCacheManager {
     try {
       console.log('Fetching all Drive file metadata...');
 
-      // Query for ALL .cbz files the app can see (no parent folder constraint)
-      const allCbzFiles = await driveApiClient.listFiles(
-        `name contains '.cbz' and trashed=false`,
+      // Get ALL items with no restrictions to debug what we have access to
+      const allItems = await driveApiClient.listFiles(
+        `trashed=false`,
         'files(id,name,mimeType,modifiedTime,size,parents)'
       );
-      console.log('Found .cbz files:', allCbzFiles);
+      console.log('Found items:', allItems);
 
-      // Get parent folder names for all files
-      const parentFolderIds = new Set<string>();
-      for (const file of allCbzFiles) {
-        if (file.parents && file.parents.length > 0) {
-          parentFolderIds.add(file.parents[0]);
-        }
-      }
-
-      // Fetch folder names in batch
+      // Count by file type
+      const typeCounts: Record<string, number> = {};
+      const cbzFiles: any[] = [];
+      const volumeDataFiles: any[] = [];
       const folderNames = new Map<string, string>();
-      for (const folderId of parentFolderIds) {
-        try {
-          const response = await gapi.client.drive.files.get({
-            fileId: folderId,
-            fields: 'id, name'
-          });
-          folderNames.set(folderId, response.result.name || '');
-        } catch (err) {
-          console.warn('Could not fetch folder name for:', folderId);
+      const foundFolderNames: string[] = [];
+
+      for (const item of allItems) {
+        const ext = item.name && item.name.includes('.') ? item.name.split('.').pop() || 'no-extension' : 'no-extension';
+        typeCounts[ext] = (typeCounts[ext] || 0) + 1;
+
+        if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
+          folderNames.set(item.id, item.name);
+          foundFolderNames.push(item.name);
+        } else if (item.name.endsWith('.cbz')) {
+          cbzFiles.push(item);
+        } else if (item.name === GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA) {
+          volumeDataFiles.push(item);
         }
       }
 
-      const cacheMap = new Map<string, DriveFileMetadata>();
+      // Log warning if duplicates found
+      if (volumeDataFiles.length > 1) {
+        console.warn(`Found ${volumeDataFiles.length} volume-data.json files - duplicates will be merged and cleaned up during sync`);
+      }
 
-      // Cache by path: parentFolder/filename
-      for (const file of allCbzFiles) {
-        if (file.name.endsWith('.cbz')) {
-          const parentId = file.parents?.[0];
-          const parentName = parentId ? folderNames.get(parentId) : null;
+      console.log('File type counts:', typeCounts);
+      console.log(`Found ${cbzFiles.length} .cbz files and ${folderNames.size} folders`);
+      console.log('Folder names:', foundFolderNames);
 
-          if (parentName) {
-            const path = `${parentName}/${file.name}`;
-            cacheMap.set(path, {
-              fileId: file.id,
-              name: file.name,
-              modifiedTime: file.modifiedTime || new Date().toISOString(),
-              size: file.size ? parseInt(file.size) : undefined,
-              path: path
-            });
+      // Build cache from files using the folder map
+      // All entries are arrays to support Drive's duplicate file names
+      const cacheMap = new Map<string, DriveFileMetadata[]>();
+
+      // Add .cbz files (group by path in case of duplicates)
+      for (const file of cbzFiles) {
+        const parentId = file.parents?.[0];
+        const parentName = parentId ? folderNames.get(parentId) : null;
+
+        if (parentName) {
+          const path = `${parentName}/${file.name}`;
+          const metadata: DriveFileMetadata = {
+            fileId: file.id,
+            name: file.name,
+            modifiedTime: file.modifiedTime || new Date().toISOString(),
+            size: file.size ? parseInt(file.size) : undefined,
+            path: path
+          };
+
+          const existing = cacheMap.get(path);
+          if (existing) {
+            existing.push(metadata);
+          } else {
+            cacheMap.set(path, [metadata]);
           }
         }
       }
 
-      console.log(`Cached ${cacheMap.size} Drive files:`);
-      console.log('Cache paths:', Array.from(cacheMap.keys()));
+      // Add volume-data.json files as an array
+      if (volumeDataFiles.length > 0) {
+        const volumeDataMetadata = volumeDataFiles.map(file => {
+          console.log('Volume data file from API:', file);
+          return {
+            fileId: file.id,
+            name: file.name,
+            modifiedTime: file.modifiedTime || new Date().toISOString(),
+            size: file.size ? parseInt(file.size) : undefined,
+            path: file.name
+          };
+        });
+
+        console.log('Cached volume data metadata:', volumeDataMetadata);
+        cacheMap.set(GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA, volumeDataMetadata);
+      }
+
+      console.log(`Cached ${cbzFiles.length} .cbz files and ${volumeDataFiles.length} volume-data.json file(s)`);
       this.cache.set(cacheMap);
       this.lastFetchTime = Date.now();
+
+      // Automatically trigger read progress sync after cache refresh
+      // This ensures we merge and clean up duplicate volume-data.json files
+      if (volumeDataFiles.length > 0) {
+        console.log('Cache loaded, triggering read progress sync...');
+        // Delay slightly to ensure cache is fully propagated
+        setTimeout(async () => {
+          const { syncService } = await import('./sync-service');
+          syncService.syncReadProgress().catch(err =>
+            console.error('Auto-sync after cache refresh failed:', err)
+          );
+        }, 100);
+      }
     } catch (error) {
       console.error('Failed to fetch Drive files cache:', error);
       console.error('Error details:', error);
@@ -153,26 +211,43 @@ class DriveFilesCacheManager {
    * Used to determine if a local volume is already backed up
    */
   existsInDrive(seriesTitle: string, volumeTitle: string): boolean {
-    let currentCache: Map<string, DriveFileMetadata> = new Map();
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
     this.cache.subscribe((value) => {
       currentCache = value;
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    return currentCache.has(path);
+    const files = currentCache.get(path);
+    return files !== undefined && files.length > 0;
   }
 
   /**
    * Get Drive file metadata by path (parent/filename)
+   * Returns first file if there are duplicates
    */
   getDriveFile(seriesTitle: string, volumeTitle: string): DriveFileMetadata | undefined {
-    let currentCache: Map<string, DriveFileMetadata> = new Map();
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
     this.cache.subscribe((value) => {
       currentCache = value;
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    return currentCache.get(path);
+    const files = currentCache.get(path);
+    return files && files.length > 0 ? files[0] : undefined;
+  }
+
+  /**
+   * Get ALL Drive file metadata by path (parent/filename)
+   * Returns array of all files with this path (handles duplicates)
+   */
+  getDriveFiles(seriesTitle: string, volumeTitle: string): DriveFileMetadata[] {
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
+    this.cache.subscribe((value) => {
+      currentCache = value;
+    })();
+
+    const path = `${seriesTitle}/${volumeTitle}.cbz`;
+    return currentCache.get(path) || [];
   }
 
   /**
@@ -180,12 +255,16 @@ class DriveFilesCacheManager {
    * Future use: Discover remote-only volumes for download placeholders
    */
   getAllDriveFiles(): DriveFileMetadata[] {
-    let currentCache: Map<string, DriveFileMetadata> = new Map();
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
     this.cache.subscribe((value) => {
       currentCache = value;
     })();
 
-    return Array.from(currentCache.values());
+    const result: DriveFileMetadata[] = [];
+    for (const files of currentCache.values()) {
+      result.push(...files);
+    }
+    return result;
   }
 
   /**
@@ -193,14 +272,16 @@ class DriveFilesCacheManager {
    * Future use: Show remote-only volumes in series view
    */
   getDriveFilesBySeries(seriesTitle: string): DriveFileMetadata[] {
-    let currentCache: Map<string, DriveFileMetadata> = new Map();
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
     this.cache.subscribe((value) => {
       currentCache = value;
     })();
 
-    return Array.from(currentCache.values()).filter((file) =>
-      file.path.startsWith(`${seriesTitle}/`)
-    );
+    const result: DriveFileMetadata[] = [];
+    for (const files of currentCache.values()) {
+      result.push(...files.filter((file) => file.path.startsWith(`${seriesTitle}/`)));
+    }
+    return result;
   }
 
   /**
@@ -210,13 +291,46 @@ class DriveFilesCacheManager {
     this.cache.update((cache) => {
       const path = `${seriesTitle}/${volumeTitle}.cbz`;
       const newCache = new Map(cache);
-      newCache.set(path, metadata);
+      const existing = newCache.get(path);
+
+      if (existing) {
+        // Check if this file ID already exists, replace it
+        const index = existing.findIndex(f => f.fileId === metadata.fileId);
+        if (index >= 0) {
+          existing[index] = metadata;
+        } else {
+          existing.push(metadata);
+        }
+      } else {
+        newCache.set(path, [metadata]);
+      }
+
       return newCache;
     });
   }
 
   /**
-   * Remove from cache after deletion from Drive
+   * Remove specific file from cache by file ID
+   */
+  removeDriveFileById(fileId: string): void {
+    this.cache.update((cache) => {
+      const newCache = new Map(cache);
+
+      for (const [path, files] of newCache.entries()) {
+        const filtered = files.filter(f => f.fileId !== fileId);
+        if (filtered.length === 0) {
+          newCache.delete(path);
+        } else if (filtered.length !== files.length) {
+          newCache.set(path, filtered);
+        }
+      }
+
+      return newCache;
+    });
+  }
+
+  /**
+   * Remove from cache after deletion from Drive (removes all files with this path)
    */
   removeDriveFile(seriesTitle: string, volumeTitle: string): void {
     this.cache.update((cache) => {

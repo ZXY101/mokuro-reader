@@ -19,6 +19,26 @@ Mokuro Reader is a web-based manga reader for [mokuro](https://github.com/kha-wh
 - `npm run lint` - Lint code (Prettier + ESLint)
 - `npm run format` - Format code with Prettier
 
+### Preview Server Port Management
+**CRITICAL**: The preview server MUST always run on port 4173 for Google OAuth to work correctly.
+
+Before starting a new preview server:
+1. Kill all existing preview processes to free up port 4173
+2. Use these commands to find and kill processes:
+```bash
+# Find process on port 4173
+netstat -ano | findstr :4173 | awk '{print $5}' | head -1
+
+# Kill the process (replace PID with actual process ID)
+taskkill //F //PID <PID>
+
+# Kill processes on multiple ports if needed (4173-4178)
+netstat -ano | findstr :4174 | awk '{print $5}' | head -1 | xargs -I {} taskkill //F //PID {}
+```
+3. Then start the preview server: `npm run preview`
+
+**Why this matters**: Vite's preview server auto-increments the port if 4173 is occupied. Google OAuth is configured for localhost:4173 specifically, so any other port will break authentication.
+
 ### Node.js Version Requirement
 **IMPORTANT**: This project requires Node.js 18.x. It is not compatible with Node.js 19+ or earlier versions. Use `nvm use` (an `.nvmrc` file is present) or manually switch to Node 18.
 
@@ -92,10 +112,35 @@ Located in `src/lib/util/google-drive/`, the integration is modular:
 
 The implementation uses Google's OAuth2 implicit flow (access tokens only, no refresh tokens since there's no backend). Tokens expire after ~1 hour but the system attempts automatic renewal and shows user-friendly warnings.
 
+**IMPORTANT - Query String Escaping**: When constructing Google Drive API queries with file or folder names, **always** use the `escapeNameForDriveQuery()` function from `api-client.ts`. This escapes special characters (backslashes and single quotes) that would otherwise cause API errors. Never manually escape names or construct queries without this function.
+
+```typescript
+import { escapeNameForDriveQuery } from '$lib/util/google-drive/api-client';
+
+// ✅ Correct
+const escapedName = escapeNameForDriveQuery(folderName);
+const query = `name='${escapedName}' and ...`;
+
+// ❌ Wrong - will fail with names containing apostrophes
+const query = `name='${folderName}' and ...`;
+```
+
 **Important**: The `prompt` parameter in OAuth requests determines the user experience:
 - `prompt: 'consent'` - Forces full consent screen every time (use only for initial sign-in)
 - `prompt: ''` (empty) - Minimal UI, reuses existing permissions (use for re-authentication after token expiry)
 - `silent: true` - Attempts completely silent refresh with no UI
+
+**Google Drive API Query Pattern**:
+- Our broad queries like `(name contains '.cbz' or mimeType='folder') and trashed=false` are intentionally designed this way
+- Google automatically scopes results to only what the app has permission to access - we don't need manual folder restrictions
+- This pattern (broad query + client-side filtering) is the CORRECT approach - it minimizes API calls while working within OAuth permission constraints
+- If you think folder scoping might be needed, ask first - broad queries are almost always the right solution
+
+**Svelte 5 Reactive Performance**:
+- `$derived` and `$derived.by()` functions run for EVERY instance of a component
+- If a component appears N times (e.g., BackupButton for each volume), operations inside derived run N times
+- Expensive operations or console logging in derived can cause severe performance issues with repeated components
+- Debug logging is fine when actively debugging an issue, but MUST be removed once that issue is addressed or when switching focus to other work
 
 ### Worker Pool Pattern
 

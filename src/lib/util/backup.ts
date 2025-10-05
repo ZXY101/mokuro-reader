@@ -1,5 +1,5 @@
 import type { VolumeMetadata } from '$lib/types';
-import { driveApiClient } from './google-drive/api-client';
+import { driveApiClient, escapeNameForDriveQuery } from './google-drive/api-client';
 import { driveFilesCache } from './google-drive/drive-files-cache';
 import { createArchiveBlob } from './zip';
 
@@ -15,25 +15,8 @@ export async function uploadCbzToDrive(
   filename: string,
   parentFolderId?: string
 ): Promise<string> {
-  // Convert blob to base64
-  const reader = new FileReader();
-  const base64Promise = new Promise<string>((resolve, reject) => {
-    reader.onload = () => {
-      const result = reader.result as string;
-      // Remove data URL prefix to get just the base64 string
-      const base64 = result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-
-  const base64Content = await base64Promise;
-
-  // Upload using multipart upload
-  const boundary = '-------314159265358979323846';
-  const delimiter = '\r\n--' + boundary + '\r\n';
-  const closeDelimiter = '\r\n--' + boundary + '--';
+  // Use simple resumable upload for large binary files
+  const { access_token } = gapi.auth.getToken();
 
   const metadata = {
     name: filename,
@@ -41,27 +24,43 @@ export async function uploadCbzToDrive(
     ...(parentFolderId && { parents: [parentFolderId] })
   };
 
-  const multipartRequestBody =
-    delimiter +
-    'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-    JSON.stringify(metadata) +
-    delimiter +
-    'Content-Type: application/x-cbz\r\n' +
-    'Content-Transfer-Encoding: base64\r\n\r\n' +
-    base64Content +
-    closeDelimiter;
+  // Step 1: Initiate resumable upload session
+  const initResponse = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(metadata)
+    }
+  );
 
-  const response = await gapi.client.request({
-    path: '/upload/drive/v3/files',
-    method: 'POST',
-    params: { uploadType: 'multipart' },
+  if (!initResponse.ok) {
+    throw new Error(`Upload init failed: ${initResponse.status} ${initResponse.statusText}`);
+  }
+
+  // Step 2: Upload the actual file data
+  const uploadUrl = initResponse.headers.get('Location');
+  if (!uploadUrl) {
+    throw new Error('No upload URL returned');
+  }
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: 'PUT',
     headers: {
-      'Content-Type': 'multipart/related; boundary="' + boundary + '"'
+      'Content-Type': 'application/x-cbz'
     },
-    body: multipartRequestBody
+    body: blob
   });
 
-  return response.result.id;
+  if (!uploadResponse.ok) {
+    throw new Error(`Upload failed: ${uploadResponse.status} ${uploadResponse.statusText}`);
+  }
+
+  const result = await uploadResponse.json();
+  return result.id;
 }
 
 /**
@@ -74,10 +73,12 @@ export async function getOrCreateFolder(
   folderName: string,
   parentFolderId?: string
 ): Promise<string> {
+  const escapedFolderName = escapeNameForDriveQuery(folderName);
+
   // Search for existing folder
   const query = parentFolderId
-    ? `name='${folderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-    : `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    ? `name='${escapedFolderName}' and '${parentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+    : `name='${escapedFolderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
   const files = await driveApiClient.listFiles(query, 'files(id, name)');
 
@@ -99,9 +100,11 @@ export async function findFile(
   fileName: string,
   parentFolderId?: string
 ): Promise<string | null> {
+  const escapedFileName = escapeNameForDriveQuery(fileName);
+
   const query = parentFolderId
-    ? `name='${fileName}' and '${parentFolderId}' in parents and trashed=false`
-    : `name='${fileName}' and trashed=false`;
+    ? `name='${escapedFileName}' and '${parentFolderId}' in parents and trashed=false`
+    : `name='${escapedFileName}' and trashed=false`;
 
   const files = await driveApiClient.listFiles(query, 'files(id, name)');
 
@@ -118,41 +121,81 @@ export async function backupVolumeToDrive(
   volume: VolumeMetadata,
   onProgress?: (step: string) => void
 ): Promise<string> {
-  // Create the series folder
-  onProgress?.('Creating folder...');
-  const rootFolderId = await getOrCreateFolder('mokuro-reader');
-  const seriesFolderId = await getOrCreateFolder(volume.series_title, rootFolderId);
+  let cbzBlob: Blob | null = null;
 
-  // Check if file already exists
-  const fileName = `${volume.volume_title}.cbz`;
-  onProgress?.('Checking for existing file...');
-  const existingFileId = await findFile(fileName, seriesFolderId);
+  try {
+    // Create the series folder
+    onProgress?.('Creating folder...');
+    const rootFolderId = await getOrCreateFolder('mokuro-reader');
+    const seriesFolderId = await getOrCreateFolder(volume.series_title, rootFolderId);
 
-  // Create CBZ using the shared function
-  onProgress?.('Creating archive...');
-  const cbzBlob = await createArchiveBlob([volume]);
+    // Create CBZ using the shared function
+    onProgress?.('Creating archive...');
+    cbzBlob = await createArchiveBlob([volume]);
 
-  // Upload
-  onProgress?.('Uploading to Google Drive...');
-  const fileId = await uploadCbzToDrive(cbzBlob, fileName, seriesFolderId);
+    // Upload
+    const fileName = `${volume.volume_title}.cbz`;
+    onProgress?.('Uploading to Google Drive...');
+    const fileId = await uploadCbzToDrive(cbzBlob, fileName, seriesFolderId);
 
-  // Delete old file if it existed and is different from the new one
-  if (existingFileId && existingFileId !== fileId) {
-    try {
-      await gapi.client.drive.files.delete({ fileId: existingFileId });
-    } catch (error) {
-      console.warn('Failed to delete old file:', error);
+    // Update the cache with the newly uploaded file
+    driveFilesCache.addDriveFile(volume.series_title, volume.volume_title, {
+      fileId,
+      name: fileName,
+      modifiedTime: new Date().toISOString(),
+      size: cbzBlob.size,
+      path: `${volume.series_title}/${fileName}`
+    });
+
+    return fileId;
+  } finally {
+    // Explicit memory cleanup
+    cbzBlob = null;
+
+    // Hint to garbage collector (non-standard but helps in V8/Chrome)
+    if (typeof (globalThis as any).gc === 'function') {
+      (globalThis as any).gc();
+    }
+  }
+}
+
+/**
+ * Backs up multiple volumes to Google Drive with batching and memory management
+ * @param volumes Array of volumes to backup
+ * @param onProgress Optional progress callback (completed, total, currentVolume)
+ * @returns Promise resolving to success/failure counts
+ */
+export async function backupMultipleVolumesToDrive(
+  volumes: VolumeMetadata[],
+  onProgress?: (completed: number, total: number, currentVolume: string) => void
+): Promise<{ succeeded: number; failed: number }> {
+  const BATCH_SIZE = 5; // Process 5 volumes at a time
+  const BATCH_DELAY_MS = 2000; // 2 second delay between batches for GC
+
+  let successCount = 0;
+  let failCount = 0;
+
+  // Process in batches
+  for (let batchStart = 0; batchStart < volumes.length; batchStart += BATCH_SIZE) {
+    const batch = volumes.slice(batchStart, batchStart + BATCH_SIZE);
+
+    // Process each volume in the batch
+    for (const volume of batch) {
+      try {
+        onProgress?.(successCount + failCount, volumes.length, volume.volume_title);
+        await backupVolumeToDrive(volume);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to backup ${volume.volume_title}:`, error);
+        failCount++;
+      }
+    }
+
+    // Delay between batches to allow garbage collection
+    if (batchStart + BATCH_SIZE < volumes.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
 
-  // Update the cache with the newly uploaded file
-  driveFilesCache.addDriveFile(volume.series_title, volume.volume_title, {
-    fileId,
-    name: fileName,
-    modifiedTime: new Date().toISOString(),
-    size: cbzBlob.size,
-    path: `${volume.series_title}/${fileName}`
-  });
-
-  return fileId;
+  return { succeeded: successCount, failed: failCount };
 }

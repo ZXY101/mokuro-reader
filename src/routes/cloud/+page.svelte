@@ -758,6 +758,13 @@
     let completedCount = 0;
     let failedCount = 0;
 
+    volumesToBackup.sort((a, b) => {
+      if (a.series_title === b.series_title) {
+        return a.volume_title.localeCompare(b.volume_title);
+      }
+      return a.series_title.localeCompare(b.series_title);
+    });
+
     for (let i = 0; i < volumesToBackup.length; i++) {
       const volume = volumesToBackup[i];
 
