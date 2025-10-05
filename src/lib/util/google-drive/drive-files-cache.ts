@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { driveApiClient } from './api-client';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
+import { syncService } from './sync-service';
 
 export interface DriveFileMetadata {
   fileId: string;
@@ -168,7 +169,6 @@ class DriveFilesCacheManager {
       this.isFetchingStore.set(false);
 
       // Check if sync was requested after login (do this in finally to ensure fetch is complete)
-      const { GOOGLE_DRIVE_CONFIG } = await import('./constants');
       const shouldSync = typeof window !== 'undefined' &&
         localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN) === 'true';
 
@@ -176,7 +176,6 @@ class DriveFilesCacheManager {
         console.log('Cache loaded, triggering requested sync...');
         localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
 
-        const { syncService } = await import('./sync-service');
         syncService.syncReadProgress().catch(err =>
           console.error('Sync after login failed:', err)
         );
