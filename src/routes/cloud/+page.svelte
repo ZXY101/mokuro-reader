@@ -23,6 +23,8 @@
     API_KEY,
     backupVolumeToDrive
   } from '$lib/util';
+  import { driveState } from '$lib/util/google-drive';
+  import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
   import { Badge, Button, Toggle } from 'flowbite-svelte';
@@ -38,13 +40,21 @@
   let profilesId = $state('');
   let tokenClient = $state(null);
 
+  let state = $state<DriveState>({
+    isAuthenticated: false,
+    isCacheLoading: false,
+    isCacheLoaded: false,
+    isFullyConnected: false
+  });
+
   $effect(() => {
     const unsubscribers = [
       accessTokenStore.subscribe(value => { accessToken = value; }),
       readerFolderIdStore.subscribe(value => { readerFolderId = value.reader; }),
       volumeDataIdStore.subscribe(value => { volumeDataId = value; }),
       profilesIdStore.subscribe(value => { profilesId = value; }),
-      tokenClientStore.subscribe(value => { tokenClient = value; })
+      tokenClientStore.subscribe(value => { tokenClient = value; }),
+      driveState.subscribe(value => { state = value; })
     ];
     return () => unsubscribers.forEach(unsub => unsub());
   });
@@ -808,7 +818,14 @@
   {#if accessToken}
     <div class="flex justify-between items-center gap-6 flex-col">
       <div class="flex justify-between items-center w-full max-w-3xl">
-        <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+        <div class="flex items-center gap-3">
+          <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+          {#if state.isCacheLoading && !state.isCacheLoaded}
+            <Badge color="yellow">Loading Drive data...</Badge>
+          {:else if state.isCacheLoaded}
+            <Badge color="green">Connected</Badge>
+          {/if}
+        </div>
         <Button color="red" on:click={logout}>Log out</Button>
       </div>
       <p class="text-center">

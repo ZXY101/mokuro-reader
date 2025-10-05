@@ -11,7 +11,8 @@
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats } from '$lib/settings';
-  import { tokenManager, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
+  import { driveState, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
+  import type { DriveState } from '$lib/util/google-drive';
   import { CloudArrowUpOutline, TrashBinSolid } from 'flowbite-svelte-icons';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
@@ -45,14 +46,17 @@
   let backingUpSeries = $derived(!!backupProcess);
   let backupProgress = $derived(backupProcess?.status?.match(/(\d+\/\d+)/)?.[1] || '');
 
-  let token = $state('');
+  let state = $state<DriveState>({
+    isAuthenticated: false,
+    isCacheLoading: false,
+    isCacheLoaded: false,
+    isFullyConnected: false
+  });
   $effect(() => {
-    return tokenManager.token.subscribe(value => {
-      token = value;
+    return driveState.subscribe(value => {
+      state = value;
     });
   });
-
-  let isAuthenticated = $derived(token !== '');
 
   // Check if all volumes in series are backed up
   let driveCache = $state(new Map());
@@ -145,7 +149,7 @@
 
   async function onDeleteFromDrive() {
     if (!manga || manga.length === 0) return;
-    if (!isAuthenticated) {
+    if (!state.isAuthenticated) {
       showSnackbar('Please sign in to Google Drive first', 'error');
       return;
     }
@@ -201,7 +205,7 @@
 
   async function backupSeries() {
     if (!manga || manga.length === 0) return;
-    if (!isAuthenticated) {
+    if (!state.isAuthenticated) {
       showSnackbar('Please sign in to Google Drive first', 'error');
       return;
     }
@@ -279,29 +283,38 @@
         </div>
       </div>
       <div class="flex flex-row gap-2 items-start">
-        {#if !allBackedUp}
-          <Button
-            color="light"
-            on:click={backupSeries}
-            disabled={backingUpSeries || !isAuthenticated}
-          >
-            {#if backingUpSeries}
+        {#if state.isAuthenticated}
+          {#if state.isCacheLoading && !state.isCacheLoaded}
+            <Button color="light" disabled={true}>
               <Spinner size="4" class="me-2" />
-              Backing up {backupProgress}
-            {:else}
-              <CloudArrowUpOutline class="w-4 h-4 me-2" />
-              {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
+              Loading Drive status...
+            </Button>
+          {:else}
+            {#if !allBackedUp}
+              <Button
+                color="light"
+                on:click={backupSeries}
+                disabled={backingUpSeries}
+              >
+                {#if backingUpSeries}
+                  <Spinner size="4" class="me-2" />
+                  Backing up {backupProgress}
+                {:else}
+                  <CloudArrowUpOutline class="w-4 h-4 me-2" />
+                  {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
+                {/if}
+              </Button>
             {/if}
-          </Button>
-        {/if}
-        {#if anyBackedUp && isAuthenticated}
-          <Button
-            color="red"
-            on:click={onDeleteFromDrive}
-          >
-            <TrashBinSolid class="w-4 h-4 me-2" />
-            Delete series from Drive
-          </Button>
+            {#if anyBackedUp}
+              <Button
+                color="red"
+                on:click={onDeleteFromDrive}
+              >
+                <TrashBinSolid class="w-4 h-4 me-2" />
+                Delete series from Drive
+              </Button>
+            {/if}
+          {/if}
         {/if}
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
         <Button color="light" on:click={onExtract} disabled={loading}>

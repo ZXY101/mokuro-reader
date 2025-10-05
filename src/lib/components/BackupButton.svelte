@@ -3,9 +3,9 @@
   import { CloudArrowUpOutline, CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { backupVolumeToDrive } from '$lib/util';
   import { showSnackbar } from '$lib/util';
-  import { tokenManager, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
+  import { driveState, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
   import type { VolumeMetadata } from '$lib/types';
-  import type { DriveFileMetadata } from '$lib/util/google-drive';
+  import type { DriveFileMetadata, DriveState } from '$lib/util/google-drive';
 
   interface Props {
     volume: VolumeMetadata;
@@ -17,17 +17,20 @@
   let isBackingUp = $state(false);
   let currentStep = $state('');
 
-  let token = $state('');
+  let state = $state<DriveState>({
+    isAuthenticated: false,
+    isCacheLoading: false,
+    isCacheLoaded: false,
+    isFullyConnected: false
+  });
   $effect(() => {
-    return tokenManager.token.subscribe(value => {
-      token = value;
+    return driveState.subscribe(value => {
+      state = value;
     });
   });
 
-  let isAuthenticated = $derived(token !== '');
-
   // Subscribe to Drive files cache
-  let driveCache = $state<Map<string, DriveFileMetadata>>(new Map());
+  let driveCache = $state<Map<string, DriveFileMetadata[]>>(new Map());
   $effect(() => {
     return driveFilesCache.store.subscribe(value => {
       driveCache = value;
@@ -41,7 +44,7 @@
   async function handleBackup(e: MouseEvent) {
     e.stopPropagation();
 
-    if (!isAuthenticated) {
+    if (!state.isAuthenticated) {
       showSnackbar('Please sign in to Google Drive first', 'error');
       return;
     }
@@ -69,7 +72,7 @@
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation();
 
-    if (!isAuthenticated) {
+    if (!state.isAuthenticated) {
       showSnackbar('Please sign in to Google Drive first', 'error');
       return;
     }
@@ -96,13 +99,25 @@
   }
 </script>
 
-{#if isBackedUp}
+{#if !state.isAuthenticated}
+  <!-- Don't render anything when not authenticated -->
+{:else if state.isCacheLoading && !state.isCacheLoaded}
+  <Button
+    color="light"
+    size="xs"
+    class={className}
+    disabled={true}
+    title="Loading Drive status..."
+  >
+    <Spinner size="4" class="me-2" />
+    Loading...
+  </Button>
+{:else if isBackedUp}
   <Button
     color="red"
     size="xs"
     class={className}
     on:click={handleDelete}
-    disabled={!isAuthenticated}
     title="Delete from Drive (move to trash)"
   >
     <TrashBinSolid class="w-4 h-4 me-2" />
@@ -113,7 +128,7 @@
     color="light"
     size="xs"
     class={className}
-    disabled={isBackingUp || !isAuthenticated}
+    disabled={isBackingUp}
     on:click={handleBackup}
     title="Backup to Google Drive"
   >

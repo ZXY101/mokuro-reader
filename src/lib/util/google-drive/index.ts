@@ -3,12 +3,14 @@ import { tokenManager } from './token-manager';
 import { driveApiClient, DriveApiError } from './api-client';
 import { syncService } from './sync-service';
 import { driveFilesCache } from './drive-files-cache';
+import { driveState } from './drive-state';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
 
 // Re-export the main modules
-export { tokenManager, driveApiClient, DriveApiError, syncService, driveFilesCache, GOOGLE_DRIVE_CONFIG };
+export { tokenManager, driveApiClient, DriveApiError, syncService, driveFilesCache, driveState, GOOGLE_DRIVE_CONFIG };
 export type { TokenInfo, DriveFile, SyncProgress } from './types';
 export type { DriveFileMetadata } from './drive-files-cache';
+export type { DriveState } from './drive-state';
 
 // Backward compatibility exports for old API
 // TODO: Migrate cloud/+page.svelte to use tokenManager, syncService directly
