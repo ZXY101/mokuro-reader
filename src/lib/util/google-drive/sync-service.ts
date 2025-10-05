@@ -71,28 +71,48 @@ class SyncService {
         status: 'Initializing...'
       });
 
-      // Step 1: Ensure folder exists and get volume-data.json from cache
+      // Step 1: Ensure folder exists and get volume-data.json files from cache
       progressTrackerStore.updateProcess(processId, {
         progress: 10,
         status: 'Checking for existing data...'
       });
 
       const readerFolderId = await this.ensureReaderFolderExists();
-      const volumeDataFileId = driveFilesCache.getVolumeDataFileId();
+      const volumeDataFiles = driveFilesCache.getVolumeDataFiles();
+      console.log('Volume data files from cache:', volumeDataFiles);
 
-      // Step 2: Download cloud data if it exists
-      let cloudVolumes = {};
-      if (volumeDataFileId) {
+      // Step 2: Download and merge cloud data from all volume-data.json files
+      let cloudVolumes: any = {};
+      if (volumeDataFiles.length > 0) {
         progressTrackerStore.updateProcess(processId, {
           progress: 30,
-          status: 'Downloading cloud data...'
+          status: `Downloading cloud data (${volumeDataFiles.length} file${volumeDataFiles.length > 1 ? 's' : ''})...`
         });
 
-        try {
-          const cloudData = await driveApiClient.getFileContent(volumeDataFileId);
-          cloudVolumes = parseVolumesFromJson(cloudData);
-        } catch (error) {
-          console.warn('Failed to download cloud data, continuing with local data only');
+        // Merge data from all duplicate files
+        for (const file of volumeDataFiles) {
+          try {
+            const cloudData = await driveApiClient.getFileContent(file.fileId);
+            const fileVolumes = parseVolumesFromJson(cloudData);
+
+            // Merge with newest-wins strategy
+            Object.keys(fileVolumes).forEach(volumeId => {
+              const existing = cloudVolumes[volumeId];
+              const incoming = fileVolumes[volumeId];
+
+              if (!existing) {
+                cloudVolumes[volumeId] = incoming;
+              } else {
+                const existingDate = new Date(existing.lastProgressUpdate).getTime();
+                const incomingDate = new Date(incoming.lastProgressUpdate).getTime();
+                if (incomingDate > existingDate) {
+                  cloudVolumes[volumeId] = incoming;
+                }
+              }
+            });
+          } catch (error) {
+            console.warn(`Failed to download/merge cloud data from file ${file.fileId}:`, error);
+          }
         }
       }
 
@@ -112,17 +132,40 @@ class SyncService {
 
       volumes.update(() => mergedVolumes);
 
-      // Step 5: Upload merged data (only if changed)
+      // Step 5: Upload merged data (only if changed) and clean up duplicates
       const mergedJson = JSON.stringify(mergedVolumes);
       const cloudJson = JSON.stringify(cloudVolumes);
 
-      if (mergedJson !== cloudJson) {
+      if (mergedJson !== cloudJson || volumeDataFiles.length > 1) {
         progressTrackerStore.updateProcess(processId, {
           progress: 90,
-          status: 'Uploading merged data...'
+          status: volumeDataFiles.length > 1
+            ? 'Uploading merged data and cleaning duplicates...'
+            : 'Uploading merged data...'
         });
 
-        await this.uploadVolumeData(mergedVolumes, volumeDataFileId, readerFolderId);
+        // Upload to first file (or create new if none exist)
+        const primaryFileId = volumeDataFiles.length > 0 ? volumeDataFiles[0].fileId : null;
+        console.log('Uploading with primaryFileId:', primaryFileId);
+        const uploadResult = await this.uploadVolumeData(mergedVolumes, primaryFileId, readerFolderId);
+
+        // Delete duplicate files (if any)
+        if (volumeDataFiles.length > 1) {
+          for (let i = 1; i < volumeDataFiles.length; i++) {
+            try {
+              await driveApiClient.deleteFile(volumeDataFiles[i].fileId);
+              driveFilesCache.removeDriveFileById(volumeDataFiles[i].fileId);
+              console.log(`Deleted duplicate volume-data.json file: ${volumeDataFiles[i].fileId}`);
+            } catch (error) {
+              console.warn(`Failed to delete duplicate file ${volumeDataFiles[i].fileId}:`, error);
+            }
+          }
+
+          // Refresh cache after deleting duplicates to ensure consistency
+          driveFilesCache.fetchAllFiles().catch(err =>
+            console.error('Failed to refresh cache after deleting duplicates:', err)
+          );
+        }
       } else {
         progressTrackerStore.updateProcess(processId, {
           progress: 90,
@@ -176,7 +219,7 @@ class SyncService {
 
   private async uploadVolumeData(
     volumeData: any,
-    existingFileId: string,
+    existingFileId: string | null,
     parentFolderId: string
   ): Promise<void> {
     const content = JSON.stringify(volumeData);
@@ -186,7 +229,7 @@ class SyncService {
       ...(existingFileId ? {} : { parents: [parentFolderId] })
     };
 
-    await driveApiClient.uploadFile(content, metadata, existingFileId);
+    await driveApiClient.uploadFile(content, metadata, existingFileId || undefined);
   }
 
   private handleSyncError(error: any, processId: string): void {

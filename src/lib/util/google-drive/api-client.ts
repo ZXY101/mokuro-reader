@@ -173,6 +173,14 @@ class DriveApiClient {
     });
   }
 
+  async deleteFile(fileId: string): Promise<void> {
+    return this.handleApiCall(async () => {
+      await gapi.client.drive.files.delete({
+        fileId
+      });
+    });
+  }
+
   async trashFiles(fileIds: string[]): Promise<void> {
     // Batch delete by trashing each file
     const promises = fileIds.map(fileId => this.trashFile(fileId));
