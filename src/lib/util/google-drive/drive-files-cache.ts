@@ -22,11 +22,21 @@ export interface DriveFileMetadata {
  */
 class DriveFilesCacheManager {
   private cache = writable<Map<string, DriveFileMetadata[]>>(new Map());
+  private isFetchingStore = writable<boolean>(false);
+  private cacheLoadedStore = writable<boolean>(false);
   private isFetching = false;
   private lastFetchTime: number | null = null;
 
   get store() {
     return this.cache;
+  }
+
+  get isFetchingState() {
+    return this.isFetchingStore;
+  }
+
+  get cacheLoaded() {
+    return this.cacheLoadedStore;
   }
 
   getVolumeDataFileId(): string | null {
@@ -54,6 +64,7 @@ class DriveFilesCacheManager {
     }
 
     this.isFetching = true;
+    this.isFetchingStore.set(true);
     try {
       console.log('Fetching all Drive file metadata...');
 
@@ -142,19 +153,8 @@ class DriveFilesCacheManager {
       console.log(`Cached ${cbzFiles.length} .cbz files and ${volumeDataFiles.length} volume-data.json file(s)`);
       this.cache.set(cacheMap);
       this.lastFetchTime = Date.now();
+      this.cacheLoadedStore.set(true);
 
-      // Automatically trigger read progress sync after cache refresh
-      // This ensures we merge and clean up duplicate volume-data.json files
-      if (volumeDataFiles.length > 0) {
-        console.log('Cache loaded, triggering read progress sync...');
-        // Delay slightly to ensure cache is fully propagated
-        setTimeout(async () => {
-          const { syncService } = await import('./sync-service');
-          syncService.syncReadProgress().catch(err =>
-            console.error('Auto-sync after cache refresh failed:', err)
-          );
-        }, 100);
-      }
     } catch (error) {
       console.error('Failed to fetch Drive files cache:', error);
       console.error('Error details:', error);
@@ -165,6 +165,22 @@ class DriveFilesCacheManager {
       // Don't clear cache on error, keep stale data
     } finally {
       this.isFetching = false;
+      this.isFetchingStore.set(false);
+
+      // Check if sync was requested after login (do this in finally to ensure fetch is complete)
+      const { GOOGLE_DRIVE_CONFIG } = await import('./constants');
+      const shouldSync = typeof window !== 'undefined' &&
+        localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN) === 'true';
+
+      if (shouldSync) {
+        console.log('Cache loaded, triggering requested sync...');
+        localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
+
+        const { syncService } = await import('./sync-service');
+        syncService.syncReadProgress().catch(err =>
+          console.error('Sync after login failed:', err)
+        );
+      }
     }
   }
 
@@ -346,6 +362,7 @@ class DriveFilesCacheManager {
    */
   clearCache(): void {
     this.cache.set(new Map());
+    this.cacheLoadedStore.set(false);
     this.lastFetchTime = null;
   }
 
