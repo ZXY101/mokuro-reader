@@ -46,11 +46,7 @@
   }
   
   function handleSync() {
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
-      return;
-    }
-    // Use the syncReadProgress function from the google-drive utility
+    // syncReadProgress handles login if not authenticated or in error state
     syncReadProgress();
   }
   
