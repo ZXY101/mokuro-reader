@@ -20,7 +20,8 @@
     isAuthenticated: false,
     isCacheLoading: false,
     isCacheLoaded: false,
-    isFullyConnected: false
+    isFullyConnected: false,
+    needsAttention: false
   });
 
   // Subscribe to drive state
@@ -85,9 +86,11 @@
       <button
         onclick={navigateToCloud}
         class="flex items-center justify-center w-6 h-6"
-        title={state.isFullyConnected ? "Google Drive - Connected" : state.isAuthenticated ? "Google Drive - Loading..." : "Google Drive - Not connected"}
+        title={state.needsAttention ? "Google Drive - Action Required (click to sign in)" : state.isFullyConnected ? "Google Drive - Connected" : state.isAuthenticated ? "Google Drive - Loading..." : "Google Drive - Not connected"}
       >
-        {#if state.isCacheLoading && !state.isCacheLoaded}
+        {#if state.needsAttention}
+          <CloudArrowUpOutline class="w-6 h-6 text-red-600 hover:text-red-700 cursor-pointer" />
+        {:else if state.isCacheLoading && !state.isCacheLoaded}
           <Spinner size="4" />
         {:else if state.isFullyConnected}
           <CloudArrowUpOutline class="w-6 h-6 text-green-600 hover:text-green-700 cursor-pointer" />

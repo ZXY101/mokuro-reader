@@ -7,6 +7,7 @@ import { syncService } from './sync-service';
 class TokenManager {
   private tokenStore = writable<string>('');
   private tokenClientStore = writable<any>(null);
+  private needsAttentionStore = writable<boolean>(false);
   private refreshIntervalId: number | null = null;
   private isRefreshing = false;
 
@@ -23,6 +24,10 @@ class TokenManager {
 
   get tokenClient() {
     return this.tokenClientStore;
+  }
+
+  get needsAttention() {
+    return this.needsAttentionStore;
   }
 
   private loadPersistedToken(): void {
@@ -79,6 +84,7 @@ class TokenManager {
       else if (timeUntilExpiry <= 0) {
         console.log('Token expired, clearing...');
         this.clearToken();
+        this.needsAttentionStore.set(true);
         showSnackbar('Google Drive session expired. Please sign in again.');
       }
     }, GOOGLE_DRIVE_CONFIG.TOKEN_REFRESH_CHECK_INTERVAL_MS);
@@ -87,6 +93,7 @@ class TokenManager {
   setToken(token: string, expiresIn?: number): void {
     this.tokenStore.set(token);
     this.isRefreshing = false;
+    this.needsAttentionStore.set(false); // Clear attention flag when token is set
 
     if (browser) {
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN, token);
@@ -160,6 +167,7 @@ class TokenManager {
             // Clear auth history to force full consent screen on next attempt
             // This ensures we re-request all permissions properly
             this.clearToken(false);
+            this.needsAttentionStore.set(true);
             showSnackbar('Google Drive access was denied. Please sign in again to grant permissions.');
           } else if (response.error === 'popup_closed') {
             // User closed the popup - don't clear anything, they might retry
@@ -169,6 +177,7 @@ class TokenManager {
             // Other errors (network issues, etc.) - keep auth history but clear token
             // Next sign-in will use minimal prompt since permissions weren't explicitly denied
             this.clearToken(true);
+            this.needsAttentionStore.set(true);
             showSnackbar('Authentication failed. Please try signing in again.');
           }
 

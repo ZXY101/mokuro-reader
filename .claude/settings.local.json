@@ -24,7 +24,9 @@
       "Bash(npm install:*)",
       "Bash(Select-String -Pattern \"Error|error|vite\")",
       "Bash(node:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(git clean:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

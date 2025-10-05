@@ -50,7 +50,8 @@
     isAuthenticated: false,
     isCacheLoading: false,
     isCacheLoaded: false,
-    isFullyConnected: false
+    isFullyConnected: false,
+    needsAttention: false
   });
   $effect(() => {
     return driveState.subscribe(value => {

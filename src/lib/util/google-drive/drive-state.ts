@@ -7,17 +7,19 @@ export interface DriveState {
 	isCacheLoading: boolean;
 	isCacheLoaded: boolean;
 	isFullyConnected: boolean;
+	needsAttention: boolean;
 }
 
 export const driveState: Readable<DriveState> = derived(
-	[tokenManager.token, driveFilesCache.isFetchingState, driveFilesCache.cacheLoaded],
-	([$token, $isFetching, $cacheLoaded]) => {
+	[tokenManager.token, tokenManager.needsAttention, driveFilesCache.isFetchingState, driveFilesCache.cacheLoaded],
+	([$token, $needsAttention, $isFetching, $cacheLoaded]) => {
 		const isAuthenticated = $token !== '';
 		return {
 			isAuthenticated,
 			isCacheLoading: $isFetching,
 			isCacheLoaded: $cacheLoaded,
-			isFullyConnected: isAuthenticated && $cacheLoaded
+			isFullyConnected: isAuthenticated && $cacheLoaded,
+			needsAttention: $needsAttention
 		};
 	}
 );
