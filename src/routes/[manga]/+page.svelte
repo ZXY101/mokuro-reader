@@ -2,6 +2,7 @@
   import { catalog } from '$lib/catalog';
   import { goto } from '$app/navigation';
   import VolumeItem from '$lib/components/VolumeItem.svelte';
+  import PlaceholderVolumeItem from '$lib/components/PlaceholderVolumeItem.svelte';
   import BackupButton from '$lib/components/BackupButton.svelte';
   import { Button, Listgroup, Spinner } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
@@ -13,7 +14,8 @@
   import { deleteVolume, mangaStats } from '$lib/settings';
   import { driveState, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
-  import { CloudArrowUpOutline, TrashBinSolid } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
+  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -22,9 +24,13 @@
     });
   }
 
-  let manga = $derived(
+  let allVolumes = $derived(
     $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga)
   );
+
+  // Separate real volumes from placeholders
+  let manga = $derived(allVolumes?.filter(v => !v.isPlaceholder) || []);
+  let placeholders = $derived(allVolumes?.filter(v => v.isPlaceholder) || []);
 
   let loading = $state(false);
 
@@ -267,6 +273,20 @@
       showSnackbar(`Backed up ${successCount} volumes, ${failCount} failed`, 'error');
     }
   }
+
+  async function downloadAllPlaceholders() {
+    if (!placeholders || placeholders.length === 0) return;
+    if (!state.isAuthenticated) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    try {
+      await downloadSeriesFromDrive(placeholders);
+    } catch (error) {
+      console.error('Failed to download placeholders:', error);
+    }
+  }
 </script>
 
 <svelte:head>
@@ -327,6 +347,21 @@
       {#each manga as volume (volume.volume_uuid)}
         <VolumeItem {volume} />
       {/each}
+
+      {#if placeholders && placeholders.length > 0}
+        <div class="mt-4 mb-2 flex items-center justify-between px-4">
+          <h4 class="text-sm font-semibold text-gray-400">Available in Drive ({placeholders.length})</h4>
+          {#if state.isAuthenticated}
+            <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
+              <DownloadSolid class="w-3 h-3 me-1" />
+              Download all
+            </Button>
+          {/if}
+        </div>
+        {#each placeholders as placeholder (placeholder.volume_uuid)}
+          <PlaceholderVolumeItem volume={placeholder} />
+        {/each}
+      {/if}
     </Listgroup>
   </div>
 {:else}
