@@ -155,17 +155,29 @@ class DriveFilesCacheManager {
       this.lastFetchTime = Date.now();
       this.cacheLoadedStore.set(true);
 
-      // Automatically trigger read progress sync after cache refresh
+      // Check if sync was requested after login
+      const { GOOGLE_DRIVE_CONFIG } = await import('./constants');
+      const shouldSync = typeof window !== 'undefined' &&
+        localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN) === 'true';
+
+      if (shouldSync) {
+        console.log('Cache loaded, triggering requested sync...');
+        localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
+
+        const { syncService } = await import('./sync-service');
+        syncService.syncReadProgress().catch(err =>
+          console.error('Sync after login failed:', err)
+        );
+      }
+      // Automatically trigger read progress sync after cache refresh if we have data
       // This ensures we merge and clean up duplicate volume-data.json files
-      if (volumeDataFiles.length > 0) {
-        console.log('Cache loaded, triggering read progress sync...');
-        // Delay slightly to ensure cache is fully propagated
-        setTimeout(async () => {
-          const { syncService } = await import('./sync-service');
-          syncService.syncReadProgress().catch(err =>
-            console.error('Auto-sync after cache refresh failed:', err)
-          );
-        }, 100);
+      else if (volumeDataFiles.length > 0) {
+        console.log('Cache loaded with volume data, triggering auto-sync...');
+
+        const { syncService } = await import('./sync-service');
+        syncService.syncReadProgress().catch(err =>
+          console.error('Auto-sync after cache refresh failed:', err)
+        );
       }
     } catch (error) {
       console.error('Failed to fetch Drive files cache:', error);

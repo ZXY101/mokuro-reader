@@ -191,21 +191,13 @@ class TokenManager {
           gapi.client.setToken({ access_token });
 
           // Fetch Drive cache after successful login
+          // The cache will automatically trigger sync when loaded if SYNC_AFTER_LOGIN flag is set
           // Import dynamically to avoid circular dependency
           import('./drive-files-cache').then(({ driveFilesCache }) => {
             driveFilesCache.fetchAllFiles().catch(err =>
               console.error('Failed to fetch Drive files cache after login:', err)
             );
           });
-
-          // Check if we need to sync after login
-          if (browser) {
-            const shouldSync = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
-            if (shouldSync === 'true') {
-              localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
-              setTimeout(() => syncService.syncReadProgress(), 500);
-            }
-          }
         }
       }
     });
