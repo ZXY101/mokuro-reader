@@ -2,6 +2,9 @@
   import { volumesWithPlaceholders } from '$lib/catalog';
   import { progress } from '$lib/settings';
   import { CloudArrowUpSolid } from 'flowbite-svelte-icons';
+  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
+  import { driveState } from '$lib/util/google-drive';
+  import { showSnackbar } from '$lib/util';
 
   interface Props {
     series_uuid: string;
@@ -25,17 +28,42 @@
       .sort((a, b) => a.volume_title.localeCompare(b.volume_title))
       .find((item) => item.series_uuid === series_uuid)
   );
+
+  let allSeriesVolumes = $derived(
+    Object.values($volumesWithPlaceholders)
+      .filter(v => v.series_uuid === series_uuid)
+  );
+
   let volume = $derived(firstUnreadVolume ?? firstVolume);
   let isComplete = $derived(!firstUnreadVolume);
   let isPlaceholderOnly = $derived(volume?.isPlaceholder === true);
+
+  async function handleClick(e: MouseEvent) {
+    if (isPlaceholderOnly) {
+      e.preventDefault();
+
+      let authenticated = false;
+      driveState.subscribe(state => {
+        authenticated = state.isAuthenticated;
+      })();
+
+      if (!authenticated) {
+        showSnackbar('Please sign in to Google Drive first', 'error');
+        return;
+      }
+
+      await downloadSeriesFromDrive(allSeriesVolumes);
+    }
+  }
 </script>
 
 {#if volume}
-  <a href={series_uuid}>
+  <a href={series_uuid} onclick={handleClick}>
     <div
       class:text-green-400={isComplete}
       class:opacity-70={isPlaceholderOnly}
       class="flex flex-col gap-[5px] text-center items-center bg-slate-900 pb-1 bg-opacity-50 border border-slate-950 relative"
+      class:cursor-pointer={isPlaceholderOnly}
     >
       {#if isPlaceholderOnly}
         <div class="sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border flex items-center justify-center">
