@@ -31,22 +31,13 @@ export async function initGoogleDriveApi(): Promise<void> {
     await driveApiClient.initialize();
 
     if (tokenManager.isAuthenticated()) {
-      // Fetch Drive files cache for backup status
+      // Set flag to sync after cache loads
+      localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN, 'true');
+
+      // Fetch Drive files cache - will auto-trigger sync when complete
       driveFilesCache.fetchAllFiles().catch(err =>
         console.error('Failed to fetch Drive files cache:', err)
       );
-
-      // Check if we need to sync after login (flag set by syncReadProgress when no token)
-      const shouldSync = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
-      if (shouldSync === 'true') {
-        localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
-        setTimeout(() => syncService.syncReadProgress(), 500);
-      }
-      // Auto-sync on page load if authenticated
-      else {
-        console.log('Auto-syncing on page load...');
-        setTimeout(() => syncService.syncReadProgress(), 500);
-      }
     }
   } catch (error) {
     console.error('Failed to initialize Google Drive API:', error);
