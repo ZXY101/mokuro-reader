@@ -109,38 +109,16 @@
   async function deleteSeriesFromDrive(volumes: VolumeMetadata[]) {
     if (!volumes || volumes.length === 0) return;
 
-    const seriesTitle = volumes[0].series_title;
-
-    // Get any file from the series to find the parent folder
+    // Get any file from the series to find the parent folder ID
     const sampleFile = driveFilesCache.getDriveFile(volumes[0].series_title, volumes[0].volume_title);
-    if (!sampleFile) {
+    if (!sampleFile || !sampleFile.parentId) {
       showSnackbar('Series folder not found in Drive', 'error');
       return;
     }
 
     try {
-      // Get the parent folder ID from the file
-      const fileDetails = await driveApiClient.listFiles(
-        `'${sampleFile.fileId}' in parents`,
-        'files(parents)'
-      );
-
-      // Actually we need to get the file's parent, let me use a different approach
-      // Search for the series folder by name
-      const folders = await driveApiClient.listFiles(
-        `name='${seriesTitle}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        'files(id,name)'
-      );
-
-      if (folders.length === 0) {
-        showSnackbar('Series folder not found in Drive', 'error');
-        return;
-      }
-
-      const folderId = folders[0].id;
-
-      // Trash the entire folder
-      await driveApiClient.trashFile(folderId);
+      // Trash the folder using the ID from cache (no query needed, works with all characters)
+      await driveApiClient.trashFile(sampleFile.parentId);
 
       // Remove all volumes from cache
       for (const vol of volumes) {

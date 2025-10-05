@@ -10,6 +10,7 @@ export interface DriveFileMetadata {
   size?: number;
   path: string; // Relative path like "series/volume.cbz"
   description?: string; // Verified series title for sideloaded files
+  parentId?: string; // Parent folder ID (for deleting series folders)
 }
 
 /**
@@ -125,7 +126,8 @@ class DriveFilesCacheManager {
             modifiedTime: file.modifiedTime || new Date().toISOString(),
             size: file.size ? parseInt(file.size) : undefined,
             path: path,
-            description: file.description
+            description: file.description,
+            parentId: parentId
           };
 
           const existing = cacheMap.get(path);
