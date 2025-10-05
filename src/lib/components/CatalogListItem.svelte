@@ -69,6 +69,11 @@
     if (isPlaceholderOnly) {
       e.preventDefault();
 
+      // Prevent re-clicking during download
+      if (isDownloading) {
+        return;
+      }
+
       let authenticated = false;
       driveState.subscribe(state => {
         authenticated = state.isAuthenticated;
@@ -96,11 +101,13 @@
             {/if}
           </div>
           {#if isPlaceholderOnly}
-            {#if isDownloading}
-              <Spinner size="12" color="blue" />
-            {:else}
-              <DownloadSolid class="w-[50px] h-[70px] text-blue-400" />
-            {/if}
+            <div class="w-[50px] h-[70px] flex items-center justify-center">
+              {#if isDownloading}
+                <Spinner size="12" color="blue" />
+              {:else}
+                <DownloadSolid class="w-[50px] h-[70px] text-blue-400" />
+              {/if}
+            </div>
           {:else if volume.thumbnail}
             <img
               src={URL.createObjectURL(volume.thumbnail)}
