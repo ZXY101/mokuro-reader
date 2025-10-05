@@ -58,17 +58,8 @@ export async function initGoogleDriveApi(): Promise<void> {
 export function signInToGoogleDrive(): void {
   if (!tokenManager.isAuthenticated()) {
     // Will auto-detect if first-time (consent) or re-auth (minimal)
+    // Cache fetch happens automatically in token manager callback
     tokenManager.requestNewToken(false, false);
-
-    // Fetch cache after successful sign-in
-    // Note: This will be called when the token callback fires
-    tokenManager.token.subscribe(token => {
-      if (token) {
-        driveFilesCache.fetchAllFiles().catch(err =>
-          console.error('Failed to fetch Drive files cache after sign-in:', err)
-        );
-      }
-    });
   }
 }
 
