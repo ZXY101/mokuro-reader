@@ -4,6 +4,8 @@ import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { liveQuery } from 'dexie';
 import { derived, readable, type Readable } from 'svelte/store';
 import { deriveSeriesFromVolumes } from '$lib/catalog/catalog';
+import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
+import { generatePlaceholders } from '$lib/catalog/placeholders';
 
 function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
   if (a.volume_title < b.volume_title) {
@@ -34,9 +36,34 @@ export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
   return () => subscription.unsubscribe();
 });
 
+// Merge local volumes with Drive placeholders
+export const volumesWithPlaceholders = derived(
+  [volumes, driveFilesCache.store],
+  ([$volumes, $driveCache], set) => {
+    // Generate placeholders from Drive files
+    const driveFiles = Array.from($driveCache.values()).flat();
+
+    generatePlaceholders(driveFiles).then(placeholders => {
+      // Combine local volumes with placeholders
+      const combined = { ...$volumes };
+
+      for (const placeholder of placeholders) {
+        combined[placeholder.volume_uuid] = placeholder;
+      }
+
+      set(combined);
+    }).catch(error => {
+      console.error('Failed to generate placeholders:', error);
+      // On error, just use local volumes
+      set($volumes);
+    });
+  },
+  {} as Record<string, VolumeMetadata>
+);
+
 // Each derived store needs to be passed as an array if using multiple inputs
-export const catalog = derived([volumes], ([$volumes]) =>
-  deriveSeriesFromVolumes(Object.values($volumes))
+export const catalog = derived([volumesWithPlaceholders], ([$volumesWithPlaceholders]) =>
+  deriveSeriesFromVolumes(Object.values($volumesWithPlaceholders))
 );
 
 export const currentSeries = derived([page, catalog], ([$page, $catalog]) =>
