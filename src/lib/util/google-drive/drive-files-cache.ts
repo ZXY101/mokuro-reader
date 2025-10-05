@@ -9,6 +9,7 @@ export interface DriveFileMetadata {
   modifiedTime: string;
   size?: number;
   path: string; // Relative path like "series/volume.cbz"
+  description?: string; // Verified series title for sideloaded files
 }
 
 /**
@@ -69,10 +70,11 @@ class DriveFilesCacheManager {
     try {
       console.log('Fetching all Drive file metadata...');
 
-      // Get ALL items with no restrictions to debug what we have access to
+      // Get only files owned by the user (guarantees edit permissions)
+      // This filters out viewer-only shared files while keeping shared files with edit access that user owns
       const allItems = await driveApiClient.listFiles(
-        `trashed=false`,
-        'files(id,name,mimeType,modifiedTime,size,parents)'
+        `'me' in owners and trashed=false`,
+        'files(id,name,mimeType,modifiedTime,size,parents,description)'
       );
       console.log('Found items:', allItems);
 
@@ -122,7 +124,8 @@ class DriveFilesCacheManager {
             name: file.name,
             modifiedTime: file.modifiedTime || new Date().toISOString(),
             size: file.size ? parseInt(file.size) : undefined,
-            path: path
+            path: path,
+            description: file.description
           };
 
           const existing = cacheMap.get(path);
@@ -352,6 +355,26 @@ class DriveFilesCacheManager {
       const path = `${seriesTitle}/${volumeTitle}.cbz`;
       const newCache = new Map(cache);
       newCache.delete(path);
+      return newCache;
+    });
+  }
+
+  /**
+   * Update file description in cache
+   */
+  updateFileDescription(fileId: string, description: string): void {
+    this.cache.update((cache) => {
+      const newCache = new Map(cache);
+
+      for (const [path, files] of newCache.entries()) {
+        const updated = files.map(file =>
+          file.fileId === fileId
+            ? { ...file, description }
+            : file
+        );
+        newCache.set(path, updated);
+      }
+
       return newCache;
     });
   }
