@@ -200,6 +200,49 @@ class DriveApiClient {
     await Promise.all(promises);
   }
 
+  /**
+   * Check if the current user can edit a file
+   * Returns false for viewer-only shared files
+   */
+  async canEditFile(fileId: string): Promise<boolean> {
+    return this.handleApiCall(async () => {
+      const { result } = await gapi.client.drive.files.get({
+        fileId,
+        fields: 'capabilities/canEdit'
+      });
+      return result.capabilities?.canEdit ?? false;
+    });
+  }
+
+  /**
+   * Get file metadata
+   * @param fileId The file ID
+   * @param fields Comma-separated list of fields to retrieve (e.g., 'description', 'name,description')
+   */
+  async getFileMetadata(fileId: string, fields: string): Promise<any> {
+    return this.handleApiCall(async () => {
+      const { result } = await gapi.client.drive.files.get({
+        fileId,
+        fields
+      });
+      return result;
+    });
+  }
+
+  /**
+   * Update a file's description field
+   * Used to store verified series title for sideloaded files
+   */
+  async updateFileDescription(fileId: string, description: string): Promise<void> {
+    return this.handleApiCall(async () => {
+      await gapi.client.drive.files.update({
+        fileId,
+        resource: { description },
+        fields: 'id,description'
+      });
+    });
+  }
+
   private getCurrentToken(): string {
     let token = '';
     tokenManager.token.subscribe(value => { token = value; })();

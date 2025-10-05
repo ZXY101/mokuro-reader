@@ -32,6 +32,7 @@
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { catalog } from '$lib/catalog';
   import type { VolumeMetadata } from '$lib/types';
+  import { updateDriveFileDescriptionForEntries } from '$lib/util/update-drive-descriptions';
 
   // Subscribe to stores
   let accessToken = $state('');
@@ -465,17 +466,22 @@
               });
 
               console.log(`Processing ${data.entries.length} decompressed entries from ${data.fileName}`);
-              
+
               // Create File objects for each entry
               const files = data.entries.map(entry => {
                 return new File([entry.data], entry.filename);
               });
-              
+
               console.log(`Created ${files.length} file objects from decompressed entries`);
-              
+
               // Process all the files
               await processFiles(files);
               console.log(`Successfully processed ${files.length} decompressed files from ${data.fileName}`);
+
+              // Update Drive file description if needed (for sideloaded files)
+              // This runs in the background and won't fail the download if it errors
+              updateDriveFileDescriptionForEntries(fileInfo.id, data.fileName, data.entries)
+                .catch(err => console.warn('Background description update failed:', err));
 
               // Mark as completed
               completedFiles++;

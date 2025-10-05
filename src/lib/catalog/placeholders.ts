@@ -21,18 +21,46 @@ function generateUuidFromString(str: string): string {
 }
 
 /**
- * Parse series and volume title from Drive file path
- * Expected format: "SeriesTitle/VolumeTitle.cbz"
+ * Extract series title from description field
+ * Format: "Series: <series name>" on the first line (case-insensitive)
+ * Allows user to add their own notes on subsequent lines
  */
-function parseDrivePath(path: string): { seriesTitle: string; volumeTitle: string } | null {
+function extractSeriesTitleFromDescription(description: string | undefined): string | null {
+  if (!description) return null;
+
+  const lines = description.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Match "Series:" prefix (case-insensitive)
+    const match = trimmed.match(/^series:\s*(.+)$/i);
+    if (match && match[1]) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Parse series and volume title from Drive file path and description
+ * Expected format: "SeriesTitle/VolumeTitle.cbz"
+ * Description overrides folder name if present
+ */
+function parseDrivePath(
+  path: string,
+  description?: string
+): { seriesTitle: string; volumeTitle: string } | null {
   const parts = path.split('/');
   if (parts.length !== 2) return null;
 
-  const seriesTitle = parts[0];
+  const folderName = parts[0];
   const volumeWithExt = parts[1];
 
   // Remove .cbz extension
   const volumeTitle = volumeWithExt.replace(/\.cbz$/i, '');
+
+  // Prefer verified series title from description over folder name
+  const seriesTitle = extractSeriesTitleFromDescription(description) || folderName;
 
   return { seriesTitle, volumeTitle };
 }
@@ -41,7 +69,7 @@ function parseDrivePath(path: string): { seriesTitle: string; volumeTitle: strin
  * Generate placeholder VolumeMetadata for a Drive-only file
  */
 function createPlaceholder(driveFile: DriveFileMetadata, seriesUuid: string): VolumeMetadata | null {
-  const parsed = parseDrivePath(driveFile.path);
+  const parsed = parseDrivePath(driveFile.path, driveFile.description);
   if (!parsed) return null;
 
   const { seriesTitle, volumeTitle } = parsed;
@@ -100,7 +128,7 @@ export async function generatePlaceholders(
   // Generate placeholders
   const placeholders: VolumeMetadata[] = [];
   for (const driveFile of driveOnlyFiles) {
-    const parsed = parseDrivePath(driveFile.path);
+    const parsed = parseDrivePath(driveFile.path, driveFile.description);
     if (!parsed) continue;
 
     // Use existing series UUID if we have local volumes with this series title

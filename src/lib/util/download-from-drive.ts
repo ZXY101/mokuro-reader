@@ -4,6 +4,8 @@ import { progressTrackerStore } from './progress-tracker';
 import { showSnackbar } from './snackbar';
 import { db } from '$lib/catalog/db';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
+import { driveApiClient } from './google-drive/api-client';
+import { driveFilesCache } from './google-drive/drive-files-cache';
 import DownloadWorker from '$lib/workers/download-worker?worker';
 
 interface MokuroData {
@@ -146,6 +148,52 @@ export async function downloadVolumeFromDrive(placeholder: VolumeMetadata): Prom
         await db.volumes.add(metadata);
         await db.volumes_data.add(volumeData);
       });
+    }
+
+    // Update Drive file description if folder name doesn't match series title
+    // This helps with sideloaded files where folder names differ from series titles
+    if (placeholder.driveFileId) {
+      try {
+        // Extract folder name from placeholder's series_title (which came from folder)
+        const folderName = placeholder.series_title;
+        const actualSeriesTitle = mokuroData.title;
+
+        // Only update if they differ and we have write permissions
+        if (folderName !== actualSeriesTitle) {
+          // Get file metadata (capabilities and description) in a single API call
+          const fileMetadata = await driveApiClient.getFileMetadata(
+            placeholder.driveFileId,
+            'capabilities/canEdit,description'
+          );
+          const canEdit = fileMetadata.capabilities?.canEdit ?? false;
+          const currentDescription = fileMetadata.description || '';
+
+          if (!canEdit) {
+            console.log(`Skipping description update for ${placeholder.volume_title} - file is read-only`);
+          } else {
+            // Check if description already has a "Series:" tag (case-insensitive)
+            const hasSeriesTag = /^series:\s*.+/im.test(currentDescription);
+
+            if (hasSeriesTag) {
+              console.log(`Description for ${placeholder.volume_title} already has Series tag, skipping update`);
+            } else {
+              // Append our series tag to the existing description
+              const seriesTag = `Series: ${actualSeriesTitle}`;
+              const newDescription = currentDescription
+                ? `${seriesTag}\n${currentDescription}`
+                : seriesTag;
+
+              console.log(`Updating description for ${placeholder.volume_title}: "${newDescription}"`);
+
+              await driveApiClient.updateFileDescription(placeholder.driveFileId, newDescription);
+              driveFilesCache.updateFileDescription(placeholder.driveFileId, newDescription);
+            }
+          }
+        }
+      } catch (error) {
+        // Log but don't fail the download
+        console.warn('Failed to update Drive file description:', error);
+      }
     }
 
     progressTrackerStore.updateProcess(processId, {
