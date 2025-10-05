@@ -1,9 +1,12 @@
 <script lang="ts">
   import type { VolumeMetadata } from '$lib/types';
   import { Frame, ListgroupItem, Button, Spinner } from 'flowbite-svelte';
-  import { DownloadSolid, CloudArrowUpSolid } from 'flowbite-svelte-icons';
+  import { DownloadSolid, CloudArrowUpSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { downloadVolumeFromDrive } from '$lib/util/download-from-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
+  import { driveApiClient } from '$lib/util/google-drive/api-client';
+  import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
+  import { showSnackbar, promptConfirmation } from '$lib/util';
 
   interface Props {
     volume: VolumeMetadata;
@@ -46,6 +49,28 @@
       console.error('Download failed:', error);
     }
   }
+
+  async function onDeleteClicked(e: Event) {
+    e.stopPropagation();
+
+    promptConfirmation(
+      `Delete ${volName} from Google Drive?`,
+      async () => {
+        try {
+          if (!volume.driveFileId) {
+            throw new Error('No Drive file ID');
+          }
+
+          await driveApiClient.trashFile(volume.driveFileId);
+          driveFilesCache.removeDriveFileById(volume.driveFileId);
+          showSnackbar(`Deleted ${volName} from Drive`, 'success');
+        } catch (error) {
+          console.error('Failed to delete from Drive:', error);
+          showSnackbar(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+        }
+      }
+    );
+  }
 </script>
 
 <Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
@@ -66,6 +91,10 @@
           <Button color="blue" onclick={onDownloadClicked}>
             <DownloadSolid class="w-4 h-4 me-2" />
             Download
+          </Button>
+          <Button color="red" onclick={onDeleteClicked}>
+            <TrashBinSolid class="w-4 h-4 me-2" />
+            Delete from Drive
           </Button>
         {/if}
       </div>

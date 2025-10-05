@@ -265,6 +265,100 @@
       console.error('Failed to download placeholders:', error);
     }
   }
+
+  // Detect duplicates - files with same path but different fileIds
+  let hasDuplicates = $derived.by(() => {
+    if (!placeholders || placeholders.length === 0) return false;
+
+    const pathGroups = new Map<string, VolumeMetadata[]>();
+    for (const placeholder of placeholders) {
+      const path = `${placeholder.series_title}/${placeholder.volume_title}.cbz`;
+      const existing = pathGroups.get(path);
+      if (existing) {
+        existing.push(placeholder);
+      } else {
+        pathGroups.set(path, [placeholder]);
+      }
+    }
+
+    // Check if any group has more than one file
+    for (const group of pathGroups.values()) {
+      if (group.length > 1) return true;
+    }
+    return false;
+  });
+
+  async function deleteDuplicatePlaceholders() {
+    if (!placeholders || placeholders.length === 0) return;
+    if (!state.isAuthenticated) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    // Group by path
+    const pathGroups = new Map<string, VolumeMetadata[]>();
+    for (const placeholder of placeholders) {
+      const path = `${placeholder.series_title}/${placeholder.volume_title}.cbz`;
+      const existing = pathGroups.get(path);
+      if (existing) {
+        existing.push(placeholder);
+      } else {
+        pathGroups.set(path, [placeholder]);
+      }
+    }
+
+    // Find duplicates (groups with more than one file)
+    const duplicatesToDelete: VolumeMetadata[] = [];
+    for (const group of pathGroups.values()) {
+      if (group.length > 1) {
+        // Sort by modified time, keep the most recent
+        group.sort((a, b) => {
+          const timeA = new Date(a.driveModifiedTime || 0).getTime();
+          const timeB = new Date(b.driveModifiedTime || 0).getTime();
+          return timeB - timeA; // Most recent first
+        });
+
+        // Keep first (most recent), delete the rest
+        for (let i = 1; i < group.length; i++) {
+          duplicatesToDelete.push(group[i]);
+        }
+      }
+    }
+
+    if (duplicatesToDelete.length === 0) {
+      showSnackbar('No duplicates found', 'info');
+      return;
+    }
+
+    promptConfirmation(
+      `Delete ${duplicatesToDelete.length} duplicate file(s) from Google Drive? (Keeps most recent version)`,
+      async () => {
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const duplicate of duplicatesToDelete) {
+          try {
+            if (!duplicate.driveFileId) {
+              throw new Error('No Drive file ID');
+            }
+
+            await driveApiClient.trashFile(duplicate.driveFileId);
+            driveFilesCache.removeDriveFileById(duplicate.driveFileId);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to delete ${duplicate.volume_title}:`, error);
+            failCount++;
+          }
+        }
+
+        if (failCount === 0) {
+          showSnackbar(`Deleted ${successCount} duplicate(s)`, 'success');
+        } else {
+          showSnackbar(`Deleted ${successCount} duplicate(s), ${failCount} failed`, 'error');
+        }
+      }
+    );
+  }
 </script>
 
 <svelte:head>
@@ -330,10 +424,18 @@
         <div class="mt-4 mb-2 flex items-center justify-between px-4">
           <h4 class="text-sm font-semibold text-gray-400">Available in Drive ({placeholders.length})</h4>
           {#if state.isAuthenticated}
-            <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
-              <DownloadSolid class="w-3 h-3 me-1" />
-              Download all
-            </Button>
+            <div class="flex gap-2">
+              <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
+                <DownloadSolid class="w-3 h-3 me-1" />
+                Download all
+              </Button>
+              {#if hasDuplicates}
+                <Button size="xs" color="red" on:click={deleteDuplicatePlaceholders}>
+                  <TrashBinSolid class="w-3 h-3 me-1" />
+                  Delete Duplicates
+                </Button>
+              {/if}
+            </div>
           {/if}
         </div>
         {#each placeholders as placeholder (placeholder.volume_uuid)}
