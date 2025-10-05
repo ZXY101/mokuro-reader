@@ -1,7 +1,7 @@
 <script lang="ts">
   import { volumesWithPlaceholders } from '$lib/catalog';
   import { progress } from '$lib/settings';
-  import { CloudArrowUpSolid } from 'flowbite-svelte-icons';
+  import { DownloadSolid } from 'flowbite-svelte-icons';
   import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
   import { driveState } from '$lib/util/google-drive';
   import { showSnackbar } from '$lib/util';
@@ -67,7 +67,7 @@
     >
       {#if isPlaceholderOnly}
         <div class="sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border flex items-center justify-center">
-          <CloudArrowUpSolid class="w-24 h-24 text-blue-400" />
+          <DownloadSolid class="w-24 h-24 text-blue-400" />
         </div>
       {:else if volume.thumbnail}
         <img

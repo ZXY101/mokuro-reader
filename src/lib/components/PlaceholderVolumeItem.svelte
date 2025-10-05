@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { VolumeMetadata } from '$lib/types';
   import { Frame, ListgroupItem, Button, Spinner } from 'flowbite-svelte';
-  import { DownloadSolid, CloudArrowUpSolid, TrashBinSolid } from 'flowbite-svelte-icons';
+  import { DownloadSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { downloadVolumeFromDrive } from '$lib/util/download-from-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { driveApiClient } from '$lib/util/google-drive/api-client';
@@ -75,7 +75,7 @@
 
 <Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
   <ListgroupItem normalClass="py-4 opacity-70">
-    <CloudArrowUpSolid class="w-[50px] h-[70px] text-blue-400 mr-3" />
+    <DownloadSolid class="w-[50px] h-[70px] text-blue-400 mr-3" />
     <div class="flex flex-row gap-5 items-center justify-between w-full">
       <div>
         <p class="font-semibold text-gray-400">{volName}</p>
