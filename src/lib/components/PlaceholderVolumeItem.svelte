@@ -2,7 +2,7 @@
   import type { VolumeMetadata } from '$lib/types';
   import { Frame, ListgroupItem, Button, Spinner } from 'flowbite-svelte';
   import { DownloadSolid, TrashBinSolid } from 'flowbite-svelte-icons';
-  import { downloadVolumeFromDrive } from '$lib/util/download-from-drive';
+  import { downloadQueue } from '$lib/util/download-queue';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { driveApiClient } from '$lib/util/google-drive/api-client';
   import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
@@ -23,7 +23,15 @@
     return `${mb} MB`;
   });
 
-  // Track download state from progress tracker
+  // Track queue state
+  let queueState = $state($downloadQueue);
+  $effect(() => {
+    return downloadQueue.subscribe(value => {
+      queueState = value;
+    });
+  });
+
+  // Track progress from progress tracker (for active downloads)
   let progressState = $state($progressTrackerStore);
   $effect(() => {
     return progressTrackerStore.subscribe(value => {
@@ -36,18 +44,16 @@
     return progressState.processes.find(p => p.id === processId);
   });
 
-  let isDownloading = $derived(!!downloadProcess);
+  // Check both queue and active download states
+  let isQueued = $derived(downloadQueue.isVolumeInQueue(volume.volume_uuid));
+  let isActivelyDownloading = $derived(!!downloadProcess);
+  let isDownloading = $derived(isQueued || isActivelyDownloading);
   let downloadProgress = $derived(downloadProcess?.progress || 0);
   let downloadStatus = $derived(downloadProcess?.status || '');
 
-  async function onDownloadClicked(e: Event) {
+  function onDownloadClicked(e: Event) {
     e.stopPropagation();
-
-    try {
-      await downloadVolumeFromDrive(volume);
-    } catch (error) {
-      console.error('Download failed:', error);
-    }
+    downloadQueue.queueVolume(volume);
   }
 
   async function onDeleteClicked(e: Event) {

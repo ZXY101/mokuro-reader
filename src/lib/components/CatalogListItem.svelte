@@ -6,7 +6,7 @@
   import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
   import { driveState } from '$lib/util/google-drive';
   import { showSnackbar } from '$lib/util';
-  import { progressTrackerStore } from '$lib/util/progress-tracker';
+  import { downloadQueue } from '$lib/util/download-queue';
 
   interface Props {
     series_uuid: string;
@@ -40,29 +40,20 @@
   let isComplete = $derived(!firstUnreadVolume);
   let isPlaceholderOnly = $derived(volume?.isPlaceholder === true);
 
-  // Track download progress
-  let progressState = $state($progressTrackerStore);
+  // Track queue state
+  let queueState = $state($downloadQueue);
   $effect(() => {
-    return progressTrackerStore.subscribe(value => {
-      progressState = value;
+    return downloadQueue.subscribe(value => {
+      queueState = value;
     });
   });
 
-  // Check if this series is downloading
+  // Check if this series is downloading or queued
   let isDownloading = $derived.by(() => {
     if (!volume || !isPlaceholderOnly) return false;
 
-    const seriesProcessId = `download-series-${volume.series_title}`;
-    const hasSeriesDownload = progressState.processes.some(p => p.id === seriesProcessId);
-
-    if (hasSeriesDownload) return true;
-
-    // Check if any individual volume in this series is downloading
-    const volumeIds = allSeriesVolumes
-      .filter(v => v.driveFileId)
-      .map(v => `download-${v.driveFileId}`);
-
-    return progressState.processes.some(p => volumeIds.includes(p.id));
+    const status = downloadQueue.getSeriesQueueStatus(volume.series_title);
+    return status.hasQueued || status.hasDownloading;
   });
 
   async function handleClick(e: MouseEvent) {

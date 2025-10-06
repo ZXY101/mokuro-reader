@@ -220,62 +220,10 @@ export async function downloadVolumeFromDrive(placeholder: VolumeMetadata): Prom
 
 /**
  * Download all volumes in a series from Google Drive
+ * Note: This function now queues volumes instead of downloading directly
  */
 export async function downloadSeriesFromDrive(placeholders: VolumeMetadata[]): Promise<void> {
-  const seriesTitle = placeholders[0]?.series_title;
-  if (!seriesTitle) return;
-
-  const processId = `download-series-${seriesTitle}`;
-
-  try {
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: `Downloading ${seriesTitle}`,
-      progress: 0,
-      status: `0/${placeholders.length} volumes`
-    });
-
-    let successCount = 0;
-    let failCount = 0;
-
-    placeholders.sort((a, b) => {
-      if (a.series_title === b.series_title) {
-        return a.volume_title.localeCompare(b.volume_title, undefined, {
-          numeric: true,
-          sensitivity: 'base'
-        });
-      } else {
-        return a.series_title.localeCompare(b.series_title, undefined, {
-          numeric: true,
-          sensitivity: 'base'
-        });
-      }
-    });
-
-    for (let i = 0; i < placeholders.length; i++) {
-      const placeholder = placeholders[i];
-      const progress = Math.round(((i + 1) / placeholders.length) * 100);
-
-      progressTrackerStore.updateProcess(processId, {
-        progress,
-        status: `${i + 1}/${placeholders.length}: ${placeholder.volume_title}`
-      });
-
-      try {
-        await downloadVolumeFromDrive(placeholder);
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to download ${placeholder.volume_title}:`, error);
-        failCount++;
-      }
-    }
-
-    if (failCount === 0) {
-      showSnackbar(`Successfully downloaded ${successCount} volumes`, 'success');
-    } else {
-      showSnackbar(`Downloaded ${successCount} volumes, ${failCount} failed`, 'error');
-    }
-  } finally {
-    progressTrackerStore.removeProcess(processId);
-  }
+  // Import queue dynamically to avoid circular dependency
+  const { queueSeriesVolumes } = await import('./download-queue');
+  queueSeriesVolumes(placeholders);
 }

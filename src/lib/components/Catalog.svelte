@@ -96,14 +96,20 @@
     series.volumes.every(vol => vol.isPlaceholder)
   ));
 
+  // Collect all placeholder volumes from the entire catalog
+  let allPlaceholderVolumes = $derived(
+    sortedCatalog.flatMap(series =>
+      series.volumes.filter(vol => vol.isPlaceholder)
+    )
+  );
+
   async function downloadAllPlaceholders() {
-    if (!placeholderSeries || placeholderSeries.length === 0) return;
+    if (!allPlaceholderVolumes || allPlaceholderVolumes.length === 0) return;
     if (!state.isAuthenticated) {
       showSnackbar('Please sign in to Google Drive first', 'error');
       return;
     }
 
-    const allPlaceholderVolumes = placeholderSeries.flatMap(series => series.volumes);
     try {
       await downloadSeriesFromDrive(allPlaceholderVolumes);
     } catch (error) {
@@ -173,11 +179,11 @@
         {#if placeholderSeries && placeholderSeries.length > 0}
           <div class="mt-8">
             <div class="flex items-center justify-between px-4 mb-4">
-              <h4 class="text-lg font-semibold text-gray-400">Available in Drive ({placeholderSeries.length})</h4>
-              {#if state.isAuthenticated}
+              <h4 class="text-lg font-semibold text-gray-400">Available in Drive ({placeholderSeries.length} series)</h4>
+              {#if state.isAuthenticated && allPlaceholderVolumes.length > 0}
                 <Button size="sm" color="blue" on:click={downloadAllPlaceholders}>
                   <DownloadSolid class="w-3 h-3 me-1" />
-                  Download all
+                  Download all ({allPlaceholderVolumes.length})
                 </Button>
               {/if}
             </div>
