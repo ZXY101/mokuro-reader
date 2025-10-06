@@ -2,6 +2,7 @@
   import { catalog } from '$lib/catalog';
   import { goto } from '$app/navigation';
   import VolumeItem from '$lib/components/VolumeItem.svelte';
+  import PlaceholderVolumeItem from '$lib/components/PlaceholderVolumeItem.svelte';
   import BackupButton from '$lib/components/BackupButton.svelte';
   import { Button, Listgroup, Spinner } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
@@ -13,7 +14,8 @@
   import { deleteVolume, mangaStats } from '$lib/settings';
   import { driveState, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
-  import { CloudArrowUpOutline, TrashBinSolid } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
+  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -22,9 +24,13 @@
     });
   }
 
-  let manga = $derived(
+  let allVolumes = $derived(
     $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga)
   );
+
+  // Separate real volumes from placeholders
+  let manga = $derived(allVolumes?.filter(v => !v.isPlaceholder) || []);
+  let placeholders = $derived(allVolumes?.filter(v => v.isPlaceholder) || []);
 
   let loading = $state(false);
 
@@ -103,38 +109,16 @@
   async function deleteSeriesFromDrive(volumes: VolumeMetadata[]) {
     if (!volumes || volumes.length === 0) return;
 
-    const seriesTitle = volumes[0].series_title;
-
-    // Get any file from the series to find the parent folder
+    // Get any file from the series to find the parent folder ID
     const sampleFile = driveFilesCache.getDriveFile(volumes[0].series_title, volumes[0].volume_title);
-    if (!sampleFile) {
+    if (!sampleFile || !sampleFile.parentId) {
       showSnackbar('Series folder not found in Drive', 'error');
       return;
     }
 
     try {
-      // Get the parent folder ID from the file
-      const fileDetails = await driveApiClient.listFiles(
-        `'${sampleFile.fileId}' in parents`,
-        'files(parents)'
-      );
-
-      // Actually we need to get the file's parent, let me use a different approach
-      // Search for the series folder by name
-      const folders = await driveApiClient.listFiles(
-        `name='${seriesTitle}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        'files(id,name)'
-      );
-
-      if (folders.length === 0) {
-        showSnackbar('Series folder not found in Drive', 'error');
-        return;
-      }
-
-      const folderId = folders[0].id;
-
-      // Trash the entire folder
-      await driveApiClient.trashFile(folderId);
+      // Trash the folder using the ID from cache (no query needed, works with all characters)
+      await driveApiClient.trashFile(sampleFile.parentId);
 
       // Remove all volumes from cache
       for (const vol of volumes) {
@@ -267,6 +251,100 @@
       showSnackbar(`Backed up ${successCount} volumes, ${failCount} failed`, 'error');
     }
   }
+
+  async function downloadAllPlaceholders() {
+    if (!placeholders || placeholders.length === 0) return;
+    if (!state.isAuthenticated) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    try {
+      await downloadSeriesFromDrive(placeholders);
+    } catch (error) {
+      console.error('Failed to download placeholders:', error);
+    }
+  }
+
+  // Detect duplicate Drive files - multiple Drive files with same path
+  // Looks directly at Drive cache, independent of local download status
+  let duplicateDriveFiles = $derived.by(() => {
+    if (!manga || manga.length === 0) return [];
+
+    // Get all Drive files for this series from cache (regardless of local state)
+    const seriesTitle = manga[0].series_title;
+    const driveFilesForSeries = driveFilesCache.getDriveFilesBySeries(seriesTitle);
+
+    // Group Drive files by path
+    const pathGroups = new Map<string, typeof driveFilesForSeries>();
+    for (const driveFile of driveFilesForSeries) {
+      const existing = pathGroups.get(driveFile.path);
+      if (existing) {
+        existing.push(driveFile);
+      } else {
+        pathGroups.set(driveFile.path, [driveFile]);
+      }
+    }
+
+    // Collect all duplicate files (keep most recent, mark others for deletion)
+    const duplicates: typeof driveFilesForSeries = [];
+    for (const files of pathGroups.values()) {
+      if (files.length > 1) {
+        // Sort by modified time, keep most recent
+        files.sort((a, b) => {
+          const timeA = new Date(a.modifiedTime).getTime();
+          const timeB = new Date(b.modifiedTime).getTime();
+          return timeB - timeA; // Most recent first
+        });
+
+        // Add all but the first (most recent) to duplicates list
+        for (let i = 1; i < files.length; i++) {
+          duplicates.push(files[i]);
+        }
+      }
+    }
+
+    return duplicates;
+  });
+
+  let hasDuplicates = $derived(duplicateDriveFiles.length > 0);
+
+  async function cleanDriveDuplicates() {
+    if (!state.isAuthenticated) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    if (duplicateDriveFiles.length === 0) {
+      showSnackbar('No duplicate Drive files found', 'info');
+      return;
+    }
+
+    promptConfirmation(
+      `Remove ${duplicateDriveFiles.length} duplicates from Drive?\n\nWe'll keep one copy of each volume and remove the duplicates.`,
+      async () => {
+        let successCount = 0;
+        let failCount = 0;
+
+        for (const duplicate of duplicateDriveFiles) {
+          try {
+            await driveApiClient.trashFile(duplicate.fileId);
+            driveFilesCache.removeDriveFileById(duplicate.fileId);
+            successCount++;
+          } catch (error) {
+            console.error(`Failed to delete ${duplicate.name}:`, error);
+            failCount++;
+          }
+        }
+
+        if (failCount === 0) {
+          showSnackbar(`Cleaned up ${successCount} duplicate(s)`, 'success');
+        } else {
+          showSnackbar(`Cleaned up ${successCount}, ${failCount} failed`, 'error');
+        }
+      }
+    );
+  }
 </script>
 
 <svelte:head>
@@ -324,9 +402,34 @@
       </div>
     </div>
     <Listgroup active class="flex-1 h-full w-full">
+      {#if hasDuplicates && state.isAuthenticated}
+        <div class="mb-4 flex items-center justify-between px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded">
+          <h4 class="text-sm font-semibold text-red-600 dark:text-red-400">Duplicates found in Drive ({duplicateDriveFiles.length})</h4>
+          <Button size="xs" color="red" on:click={cleanDriveDuplicates}>
+            <TrashBinSolid class="w-3 h-3 me-1" />
+            Clean Duplicates
+          </Button>
+        </div>
+      {/if}
+
       {#each manga as volume (volume.volume_uuid)}
         <VolumeItem {volume} />
       {/each}
+
+      {#if placeholders && placeholders.length > 0}
+        <div class="mt-4 mb-2 flex items-center justify-between px-4">
+          <h4 class="text-sm font-semibold text-gray-400">Available in Drive ({placeholders.length})</h4>
+          {#if state.isAuthenticated}
+            <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
+              <DownloadSolid class="w-3 h-3 me-1" />
+              Download all
+            </Button>
+          {/if}
+        </div>
+        {#each placeholders as placeholder (placeholder.volume_uuid)}
+          <PlaceholderVolumeItem volume={placeholder} />
+        {/each}
+      {/if}
     </Listgroup>
   </div>
 {:else}

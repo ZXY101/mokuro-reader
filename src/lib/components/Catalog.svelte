@@ -3,12 +3,29 @@
   import { Button, Listgroup, Search } from 'flowbite-svelte';
   import CatalogItem from './CatalogItem.svelte';
   import Loader from './Loader.svelte';
-  import { GridOutline, ListOutline, SortOutline } from 'flowbite-svelte-icons';
+  import { GridOutline, ListOutline, SortOutline, DownloadSolid } from 'flowbite-svelte-icons';
   import { miscSettings, updateMiscSetting, volumes } from '$lib/settings';
   import CatalogListItem from './CatalogListItem.svelte';
   import { isUpgrading } from '$lib/catalog/db';
+  import { driveState } from '$lib/util/google-drive';
+  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
+  import { showSnackbar } from '$lib/util';
+  import type { DriveState } from '$lib/util/google-drive';
 
   let search = $state('');
+
+  let state = $state<DriveState>({
+    isAuthenticated: false,
+    isCacheLoading: false,
+    isCacheLoaded: false,
+    isFullyConnected: false,
+    needsAttention: false
+  });
+  $effect(() => {
+    return driveState.subscribe(value => {
+      state = value;
+    });
+  });
 
   function onLayout() {
     if ($miscSettings.galleryLayout === 'list') {
@@ -69,6 +86,36 @@
         return item.title.toLowerCase().indexOf(search.toLowerCase()) !== -1;
       })
   );
+
+  // Separate local series from placeholder-only series
+  let localSeries = $derived(sortedCatalog.filter(series =>
+    series.volumes.some(vol => !vol.isPlaceholder)
+  ));
+
+  let placeholderSeries = $derived(sortedCatalog.filter(series =>
+    series.volumes.every(vol => vol.isPlaceholder)
+  ));
+
+  // Collect all placeholder volumes from the entire catalog
+  let allPlaceholderVolumes = $derived(
+    sortedCatalog.flatMap(series =>
+      series.volumes.filter(vol => vol.isPlaceholder)
+    )
+  );
+
+  async function downloadAllPlaceholders() {
+    if (!allPlaceholderVolumes || allPlaceholderVolumes.length === 0) return;
+    if (!state.isAuthenticated) {
+      showSnackbar('Please sign in to Google Drive first', 'error');
+      return;
+    }
+
+    try {
+      await downloadSeriesFromDrive(allPlaceholderVolumes);
+    } catch (error) {
+      console.error('Failed to download placeholders:', error);
+    }
+  }
 </script>
 
 {#if $catalog}
@@ -113,19 +160,48 @@
           <p>No results found.</p>
         </div>
       {:else}
+        <!-- Local series -->
         <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
           {#if $miscSettings.galleryLayout === 'grid'}
-            {#each sortedCatalog as { series_uuid } (series_uuid)}
+            {#each localSeries as { series_uuid } (series_uuid)}
               <CatalogItem {series_uuid} />
             {/each}
           {:else}
             <Listgroup active class="w-full">
-              {#each sortedCatalog as { series_uuid } (series_uuid)}
+              {#each localSeries as { series_uuid } (series_uuid)}
                 <CatalogListItem {series_uuid} />
               {/each}
             </Listgroup>
           {/if}
         </div>
+
+        <!-- Placeholder series (Drive only) -->
+        {#if placeholderSeries && placeholderSeries.length > 0}
+          <div class="mt-8">
+            <div class="flex items-center justify-between px-4 mb-4">
+              <h4 class="text-lg font-semibold text-gray-400">Available in Drive ({placeholderSeries.length} series)</h4>
+              {#if state.isAuthenticated && allPlaceholderVolumes.length > 0}
+                <Button size="sm" color="blue" on:click={downloadAllPlaceholders}>
+                  <DownloadSolid class="w-3 h-3 me-1" />
+                  Download all
+                </Button>
+              {/if}
+            </div>
+            <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
+              {#if $miscSettings.galleryLayout === 'grid'}
+                {#each placeholderSeries as { series_uuid } (series_uuid)}
+                  <CatalogItem {series_uuid} />
+                {/each}
+              {:else}
+                <Listgroup active class="w-full">
+                  {#each placeholderSeries as { series_uuid } (series_uuid)}
+                    <CatalogListItem {series_uuid} />
+                  {/each}
+                </Listgroup>
+              {/if}
+            </div>
+          </div>
+        {/if}
       {/if}
     </div>
   {:else}

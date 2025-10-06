@@ -1,6 +1,7 @@
 import { writable } from 'svelte/store';
 import { driveApiClient } from './api-client';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
+import { syncService } from './sync-service';
 
 export interface DriveFileMetadata {
   fileId: string;
@@ -8,6 +9,8 @@ export interface DriveFileMetadata {
   modifiedTime: string;
   size?: number;
   path: string; // Relative path like "series/volume.cbz"
+  description?: string; // Verified series title for sideloaded files
+  parentId?: string; // Parent folder ID (for deleting series folders)
 }
 
 /**
@@ -68,10 +71,11 @@ class DriveFilesCacheManager {
     try {
       console.log('Fetching all Drive file metadata...');
 
-      // Get ALL items with no restrictions to debug what we have access to
+      // Get only files owned by the user (guarantees edit permissions)
+      // This filters out viewer-only shared files while keeping shared files with edit access that user owns
       const allItems = await driveApiClient.listFiles(
-        `trashed=false`,
-        'files(id,name,mimeType,modifiedTime,size,parents)'
+        `'me' in owners and trashed=false`,
+        'files(id,name,mimeType,modifiedTime,size,parents,description)'
       );
       console.log('Found items:', allItems);
 
@@ -121,7 +125,9 @@ class DriveFilesCacheManager {
             name: file.name,
             modifiedTime: file.modifiedTime || new Date().toISOString(),
             size: file.size ? parseInt(file.size) : undefined,
-            path: path
+            path: path,
+            description: file.description,
+            parentId: parentId
           };
 
           const existing = cacheMap.get(path);
@@ -168,7 +174,6 @@ class DriveFilesCacheManager {
       this.isFetchingStore.set(false);
 
       // Check if sync was requested after login (do this in finally to ensure fetch is complete)
-      const { GOOGLE_DRIVE_CONFIG } = await import('./constants');
       const shouldSync = typeof window !== 'undefined' &&
         localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN) === 'true';
 
@@ -176,7 +181,6 @@ class DriveFilesCacheManager {
         console.log('Cache loaded, triggering requested sync...');
         localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
 
-        const { syncService } = await import('./sync-service');
         syncService.syncReadProgress().catch(err =>
           console.error('Sync after login failed:', err)
         );
@@ -353,6 +357,26 @@ class DriveFilesCacheManager {
       const path = `${seriesTitle}/${volumeTitle}.cbz`;
       const newCache = new Map(cache);
       newCache.delete(path);
+      return newCache;
+    });
+  }
+
+  /**
+   * Update file description in cache
+   */
+  updateFileDescription(fileId: string, description: string): void {
+    this.cache.update((cache) => {
+      const newCache = new Map(cache);
+
+      for (const [path, files] of newCache.entries()) {
+        const updated = files.map(file =>
+          file.fileId === fileId
+            ? { ...file, description }
+            : file
+        );
+        newCache.set(path, updated);
+      }
+
       return newCache;
     });
   }

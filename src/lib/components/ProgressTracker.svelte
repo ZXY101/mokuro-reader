@@ -57,14 +57,16 @@
               <div class="text-xs text-gray-600 dark:text-gray-400 mb-1">{process.status}</div>
             {/if}
 
-            <div class="flex justify-between text-xs mb-1">
-              <span>{Math.round(process.progress)}%</span>
-              {#if process.bytesLoaded !== undefined && process.totalBytes !== undefined}
-                <span>{formatBytes(process.bytesLoaded)} / {formatBytes(process.totalBytes)}</span>
-              {/if}
-            </div>
+            {#if process.progress > 0}
+              <div class="flex justify-between text-xs mb-1">
+                <span>{Math.round(process.progress)}%</span>
+                {#if process.bytesLoaded !== undefined && process.totalBytes !== undefined}
+                  <span>{formatBytes(process.bytesLoaded)} / {formatBytes(process.totalBytes)}</span>
+                {/if}
+              </div>
 
-            <Progressbar progress={process.progress.toString()} size="h-2" />
+              <Progressbar progress={process.progress.toString()} size="h-2" />
+            {/if}
           </div>
         {/each}
       </div>

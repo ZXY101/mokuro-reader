@@ -22,6 +22,12 @@ export interface VolumeMetadata {
   page_count: number;
   character_count: number;
   thumbnail?: File;
+
+  // Placeholder fields for Drive-only volumes (not yet downloaded locally)
+  isPlaceholder?: boolean;
+  driveFileId?: string;
+  driveModifiedTime?: string;
+  driveSize?: number;
 }
 
 export interface VolumeData {

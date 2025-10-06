@@ -3,6 +3,7 @@ import { browser } from '$app/environment';
 import { GOOGLE_DRIVE_CONFIG, type TokenInfo } from './constants';
 import { showSnackbar } from '../snackbar';
 import { syncService } from './sync-service';
+import { driveFilesCache } from './drive-files-cache';
 
 class TokenManager {
   private tokenStore = writable<string>('');
@@ -192,12 +193,9 @@ class TokenManager {
 
           // Fetch Drive cache after successful login
           // The cache will automatically trigger sync when loaded if SYNC_AFTER_LOGIN flag is set
-          // Import dynamically to avoid circular dependency
-          import('./drive-files-cache').then(({ driveFilesCache }) => {
-            driveFilesCache.fetchAllFiles().catch(err =>
-              console.error('Failed to fetch Drive files cache after login:', err)
-            );
-          });
+          driveFilesCache.fetchAllFiles().catch(err =>
+            console.error('Failed to fetch Drive files cache after login:', err)
+          );
         }
       }
     });

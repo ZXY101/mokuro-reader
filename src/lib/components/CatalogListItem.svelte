@@ -1,7 +1,12 @@
 <script lang="ts">
-  import { volumes } from '$lib/catalog';
-  import { ListgroupItem } from 'flowbite-svelte';
+  import { volumesWithPlaceholders } from '$lib/catalog';
+  import { ListgroupItem, Spinner } from 'flowbite-svelte';
   import { progress } from '$lib/settings';
+  import { DownloadSolid } from 'flowbite-svelte-icons';
+  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
+  import { driveState } from '$lib/util/google-drive';
+  import { showSnackbar } from '$lib/util';
+  import { downloadQueue } from '$lib/util/download-queue';
 
   interface Props {
     series_uuid: string;
@@ -10,7 +15,8 @@
   let { series_uuid }: Props = $props();
 
   let firstUnreadVolume = $derived(
-    Object.values($volumes)
+    Object.values($volumesWithPlaceholders)
+      .filter(v => !v.isPlaceholder)
       .sort((a, b) => a.volume_title.localeCompare(b.volume_title))
       .find(
         (item) =>
@@ -20,21 +26,80 @@
   );
 
   let firstVolume = $derived(
-    Object.values($volumes)
+    Object.values($volumesWithPlaceholders)
       .sort((a, b) => a.volume_title.localeCompare(b.volume_title))
       .find((item) => item.series_uuid === series_uuid)
   );
+
+  let allSeriesVolumes = $derived(
+    Object.values($volumesWithPlaceholders)
+      .filter(v => v.series_uuid === series_uuid)
+  );
+
   let volume = $derived(firstUnreadVolume ?? firstVolume);
   let isComplete = $derived(!firstUnreadVolume);
+  let isPlaceholderOnly = $derived(volume?.isPlaceholder === true);
+
+  // Track queue state
+  let queueState = $state($downloadQueue);
+  $effect(() => {
+    return downloadQueue.subscribe(value => {
+      queueState = value;
+    });
+  });
+
+  // Check if this series is downloading or queued
+  let isDownloading = $derived.by(() => {
+    if (!volume || !isPlaceholderOnly) return false;
+
+    const status = downloadQueue.getSeriesQueueStatus(volume.series_title);
+    return status.hasQueued || status.hasDownloading;
+  });
+
+  async function handleClick(e: MouseEvent) {
+    if (isPlaceholderOnly) {
+      e.preventDefault();
+
+      // Prevent re-clicking during download
+      if (isDownloading) {
+        return;
+      }
+
+      let authenticated = false;
+      driveState.subscribe(state => {
+        authenticated = state.isAuthenticated;
+      })();
+
+      if (!authenticated) {
+        showSnackbar('Please sign in to Google Drive first', 'error');
+        return;
+      }
+
+      await downloadSeriesFromDrive(allSeriesVolumes);
+    }
+  }
 </script>
 
 {#if volume}
-  <div>
+  <div class:opacity-70={isPlaceholderOnly}>
     <ListgroupItem>
-      <a href={series_uuid} class="h-full w-full">
+      <a href={series_uuid} class="h-full w-full" onclick={handleClick}>
         <div class="flex justify-between items-center">
-          <p class:text-green-400={isComplete} class="font-semibold">{volume.series_title}</p>
-          {#if volume.thumbnail}
+          <div class="flex items-center gap-2">
+            <p class:text-green-400={isComplete} class="font-semibold">{volume.series_title}</p>
+            {#if isPlaceholderOnly}
+              <span class="text-xs text-blue-400">In Drive</span>
+            {/if}
+          </div>
+          {#if isPlaceholderOnly}
+            <div class="w-[50px] h-[70px] flex items-center justify-center">
+              {#if isDownloading}
+                <Spinner size="12" color="blue" />
+              {:else}
+                <DownloadSolid class="w-[50px] h-[70px] text-blue-400" />
+              {/if}
+            </div>
+          {:else if volume.thumbnail}
             <img
               src={URL.createObjectURL(volume.thumbnail)}
               alt="img"
