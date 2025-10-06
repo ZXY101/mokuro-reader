@@ -45,7 +45,7 @@
   });
 
   // Check both queue and active download states
-  let isQueued = $derived(downloadQueue.isVolumeInQueue(volume.volume_uuid));
+  let isQueued = $derived(queueState.some(item => item.volumeUuid === volume.volume_uuid));
   let isActivelyDownloading = $derived(!!downloadProcess);
   let isDownloading = $derived(isQueued || isActivelyDownloading);
   let downloadProgress = $derived(downloadProcess?.progress || 0);

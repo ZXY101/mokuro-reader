@@ -52,8 +52,8 @@
   let isDownloading = $derived.by(() => {
     if (!volume || !isPlaceholderOnly) return false;
 
-    const status = downloadQueue.getSeriesQueueStatus(volume.series_title);
-    return status.hasQueued || status.hasDownloading;
+    const seriesItems = queueState.filter(item => item.seriesTitle === volume.series_title);
+    return seriesItems.length > 0;
   });
 
   async function handleClick(e: MouseEvent) {
