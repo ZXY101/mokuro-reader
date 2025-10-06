@@ -183,7 +183,7 @@
               {#if state.isAuthenticated && allPlaceholderVolumes.length > 0}
                 <Button size="sm" color="blue" on:click={downloadAllPlaceholders}>
                   <DownloadSolid class="w-3 h-3 me-1" />
-                  Download all ({allPlaceholderVolumes.length})
+                  Download all
                 </Button>
               {/if}
             </div>

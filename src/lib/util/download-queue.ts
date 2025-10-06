@@ -1,6 +1,7 @@
 import { writable, get } from 'svelte/store';
 import type { VolumeMetadata } from '$lib/types';
 import { downloadVolumeFromDrive } from './download-from-drive';
+import { progressTrackerStore } from './progress-tracker';
 
 export interface QueueItem {
 	volumeUuid: string;
@@ -21,6 +22,24 @@ interface SeriesQueueStatus {
 // Internal queue state
 const queueStore = writable<QueueItem[]>([]);
 let isProcessing = false;
+
+// Subscribe to queue changes and update progress tracker
+queueStore.subscribe(queue => {
+	const queuedCount = queue.filter(item => item.status === 'queued').length;
+	const downloadingCount = queue.filter(item => item.status === 'downloading').length;
+	const totalCount = queuedCount + downloadingCount;
+
+	if (totalCount > 0) {
+		progressTrackerStore.addProcess({
+			id: 'download-queue-overall',
+			description: 'Download Queue',
+			status: `${queuedCount} in queue, ${downloadingCount} downloading`,
+			progress: 0 // Progress bar won't show meaningful data for growing queue
+		});
+	} else {
+		progressTrackerStore.removeProcess('download-queue-overall');
+	}
+});
 
 /**
  * Add a single volume to the download queue
