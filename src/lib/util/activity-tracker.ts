@@ -19,11 +19,22 @@ class ActivityTracker {
     if (browser) {
       // Subscribe to activity state changes
       this.isActive.subscribe(active => {
+        const wasActive = this.currentActiveState;
+
         if (active) {
           this.callbacks?.onActive();
         } else {
           this.callbacks?.onInactive();
+
+          // Sync only when transitioning from active to inactive
+          if (wasActive && !active && tokenManager.isAuthenticated()) {
+            console.log('Auto-syncing due to inactivity...');
+            syncReadProgress().catch(error => {
+              console.error('Auto-sync failed:', error);
+            });
+          }
         }
+
         this.currentActiveState = active;
       });
     }
@@ -70,21 +81,11 @@ class ActivityTracker {
   /**
    * Handle inactivity timeout
    */
-  private async handleInactivity() {
+  private handleInactivity() {
     console.log('User inactive for', this.timeoutDuration / 60000, 'minutes');
 
-    // Set inactive state (will trigger timer stop via callback)
+    // Set inactive state (will trigger timer stop and sync via callback)
     this.isActive.set(false);
-
-    // Trigger sync if authenticated
-    if (tokenManager.isAuthenticated()) {
-      console.log('Auto-syncing due to inactivity...');
-      try {
-        await syncReadProgress();
-      } catch (error) {
-        console.error('Auto-sync failed:', error);
-      }
-    }
 
     // Clear timeout
     this.timeoutId = null;
