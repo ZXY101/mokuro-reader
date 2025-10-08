@@ -348,9 +348,13 @@
 </script>
 
 <svelte:head>
-  <title>{manga?.[0].series_title || 'Manga'}</title>
+  <title>{manga?.[0]?.series_title || 'Manga'}</title>
 </svelte:head>
-{#if manga && $mangaStats}
+{#if !$catalog || $catalog.length === 0}
+  <div class="flex justify-center items-center p-16">
+    <Spinner size="12" />
+  </div>
+{:else if manga && manga.length > 0 && $mangaStats}
   <div class="p-2 flex flex-col gap-5">
     <div class="flex flex-row justify-between">
       <div class="flex flex-col gap-2">

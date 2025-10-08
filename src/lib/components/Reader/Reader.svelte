@@ -389,10 +389,16 @@
         id="manga-panel"
       >
         {#key page}
-          {#if showSecondPage()}
-            <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} />
+          {#if volumeData}
+            {#if showSecondPage()}
+              <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} />
+            {/if}
+            <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} />
+          {:else}
+            <div class="flex items-center justify-center w-screen h-screen">
+              <Spinner size="12" />
+            </div>
           {/if}
-          <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} />
         {/key}
       </div>
     </Panzoom>
