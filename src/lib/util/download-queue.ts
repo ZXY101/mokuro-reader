@@ -1,7 +1,15 @@
 import { writable, get } from 'svelte/store';
-import type { VolumeMetadata } from '$lib/types';
-import { downloadVolumeFromDrive } from './download-from-drive';
+import type { VolumeMetadata, VolumeData } from '$lib/types';
 import { progressTrackerStore } from './progress-tracker';
+import { WorkerPool, type WorkerTask } from './worker-pool';
+import type { VolumeMetadata as WorkerVolumeMetadata } from './worker-pool';
+import { tokenManager } from './google-drive/token-manager';
+import { showSnackbar } from './snackbar';
+import { db } from '$lib/catalog/db';
+import { generateThumbnail } from '$lib/catalog/thumbnails';
+import { driveApiClient } from './google-drive/api-client';
+import { driveFilesCache } from './google-drive/drive-files-cache';
+import { miscSettings } from '$lib/settings/misc';
 
 export interface QueueItem {
 	volumeUuid: string;
@@ -19,21 +27,37 @@ interface SeriesQueueStatus {
 	downloadingCount: number;
 }
 
+interface MokuroData {
+	version: string;
+	title: string;
+	title_uuid: string;
+	pages: any[];
+	chars: number;
+	volume: string;
+	volume_uuid: string;
+}
+
+interface DecompressedEntry {
+	filename: string;
+	data: ArrayBuffer;
+}
+
 // Internal queue state
 const queueStore = writable<QueueItem[]>([]);
-let isProcessing = false;
+
+// Shared worker pool for all downloads
+let workerPool: WorkerPool | null = null;
+let processingStarted = false;
 
 // Subscribe to queue changes and update progress tracker
 queueStore.subscribe(queue => {
-	const queuedCount = queue.filter(item => item.status === 'queued').length;
-	const downloadingCount = queue.filter(item => item.status === 'downloading').length;
-	const totalCount = queuedCount + downloadingCount;
+	const totalCount = queue.length;
 
 	if (totalCount > 0) {
 		progressTrackerStore.addProcess({
 			id: 'download-queue-overall',
 			description: 'Download Queue',
-			status: `${queuedCount} in queue, ${downloadingCount} downloading`,
+			status: `${totalCount} in queue`,
 			progress: 0 // Progress bar won't show meaningful data for growing queue
 		});
 	} else {
@@ -73,10 +97,9 @@ export function queueVolume(volume: VolumeMetadata): void {
 
 	queueStore.update(q => [...q, queueItem]);
 
-	// Start processing if not already running
-	if (!isProcessing) {
-		processQueue();
-	}
+	// Always call processQueue to handle newly added items
+	// It will only process items with status 'queued'
+	processQueue();
 }
 
 /**
@@ -133,47 +156,287 @@ export function getSeriesQueueStatus(seriesTitle: string): SeriesQueueStatus {
 }
 
 /**
- * Process the queue sequentially (one download at a time)
+ * Initialize worker pool with settings from miscSettings
+ */
+function initializeWorkerPool(): WorkerPool {
+	if (workerPool) {
+		return workerPool;
+	}
+
+	let maxWorkers: number;
+	let memoryLimitMB: number;
+
+	// Get throttle setting
+	let throttleSetting = false;
+	miscSettings.subscribe(value => {
+		throttleSetting = value.throttleDownloads;
+	})();
+
+	if (throttleSetting) {
+		// Throttled mode with reasonable limits
+		maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
+		memoryLimitMB = 500; // 500 MB memory threshold
+		console.log(`Download queue: Throttled mode - ${maxWorkers} workers, ${memoryLimitMB}MB limit`);
+	} else {
+		// Unthrottled mode, use more workers and disable memory limits
+		maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
+		memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
+		console.log(`Download queue: Unthrottled mode - ${maxWorkers} workers, no memory limit`);
+	}
+
+	workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
+	return workerPool;
+}
+
+/**
+ * Process mokuro data and save volume to IndexedDB
+ */
+async function processVolumeData(
+	entries: DecompressedEntry[],
+	placeholder: VolumeMetadata
+): Promise<void> {
+	// Find .mokuro file
+	const mokuroEntry = entries.find(e => e.filename.endsWith('.mokuro'));
+	if (!mokuroEntry) {
+		throw new Error('No .mokuro file found in CBZ');
+	}
+
+	// Parse mokuro JSON
+	const mokuroText = new TextDecoder().decode(mokuroEntry.data);
+	const mokuroData: MokuroData = JSON.parse(mokuroText);
+
+	// Create VolumeMetadata from mokuro data
+	const metadata: VolumeMetadata = {
+		mokuro_version: mokuroData.version,
+		series_title: mokuroData.title,
+		series_uuid: mokuroData.title_uuid,
+		volume_title: mokuroData.volume,
+		volume_uuid: mokuroData.volume_uuid,
+		page_count: mokuroData.pages.length,
+		character_count: mokuroData.chars
+	};
+
+	// Convert image entries to File objects
+	const files: Record<string, File> = {};
+	for (const entry of entries) {
+		if (!entry.filename.endsWith('.mokuro') && !entry.filename.includes('__MACOSX')) {
+			const blob = new Blob([entry.data]);
+			files[entry.filename] = new File([blob], entry.filename);
+		}
+	}
+
+	// Create VolumeData
+	const volumeData: VolumeData = {
+		volume_uuid: mokuroData.volume_uuid,
+		pages: mokuroData.pages,
+		files
+	};
+
+	// Generate thumbnail from first image
+	const fileNames = Object.keys(files).sort((a, b) =>
+		a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
+	);
+	if (fileNames.length > 0) {
+		metadata.thumbnail = await generateThumbnail(files[fileNames[0]]);
+	}
+
+	// Save to IndexedDB
+	const existingVolume = await db.volumes.where('volume_uuid').equals(metadata.volume_uuid).first();
+
+	if (!existingVolume) {
+		await db.transaction('rw', db.volumes, db.volumes_data, async () => {
+			await db.volumes.add(metadata);
+			await db.volumes_data.add(volumeData);
+		});
+	}
+
+	// Update Drive file description if folder name doesn't match series title
+	if (placeholder.driveFileId) {
+		try {
+			const folderName = placeholder.series_title;
+			const actualSeriesTitle = mokuroData.title;
+
+			if (folderName !== actualSeriesTitle) {
+				const fileMetadata = await driveApiClient.getFileMetadata(
+					placeholder.driveFileId,
+					'capabilities/canEdit,description'
+				);
+				const canEdit = fileMetadata.capabilities?.canEdit ?? false;
+				const currentDescription = fileMetadata.description || '';
+
+				if (canEdit) {
+					const hasSeriesTag = /^series:\s*.+/im.test(currentDescription);
+
+					if (!hasSeriesTag) {
+						const seriesTag = `Series: ${actualSeriesTitle}`;
+						const newDescription = currentDescription
+							? `${seriesTag}\n${currentDescription}`
+							: seriesTag;
+
+						await driveApiClient.updateFileDescription(placeholder.driveFileId, newDescription);
+						driveFilesCache.updateFileDescription(placeholder.driveFileId, newDescription);
+					}
+				}
+			}
+		} catch (error) {
+			console.warn('Failed to update Drive file description:', error);
+		}
+	}
+}
+
+/**
+ * Process the queue in parallel using worker pool
  */
 async function processQueue(): Promise<void> {
-	if (isProcessing) {
+	// Always allow processing to check for new queued items
+	// The worker pool handles concurrency limits
+
+	// Initialize worker pool if needed
+	const pool = initializeWorkerPool();
+
+	// Get access token
+	let token = '';
+	tokenManager.token.subscribe(value => {
+		token = value;
+	})();
+
+	if (!token) {
+		console.error('Download queue: No access token available');
 		return;
 	}
 
-	isProcessing = true;
+	const queue = get(queueStore);
 
-	while (true) {
-		const queue = get(queueStore);
-
-		// Find first queued item (not downloading)
-		const nextItem = queue.find(item => item.status === 'queued');
-
-		if (!nextItem) {
-			// Queue is empty or all items are downloading
-			break;
+	// Process all queued items (not already downloading)
+	for (const item of queue) {
+		if (item.status !== 'queued') {
+			continue;
 		}
+
+		// Mark processing as started once we actually start processing
+		processingStarted = true;
 
 		// Mark as downloading
 		queueStore.update(q =>
-			q.map(item =>
-				item.volumeUuid === nextItem.volumeUuid
-					? { ...item, status: 'downloading' as const }
-					: item
-			)
+			q.map(i => (i.volumeUuid === item.volumeUuid ? { ...i, status: 'downloading' as const } : i))
 		);
 
-		try {
-			// Download the volume
-			await downloadVolumeFromDrive(nextItem.volumeMetadata);
-		} catch (error) {
-			console.error(`Failed to download ${nextItem.volumeTitle}:`, error);
-		}
+		const processId = `download-${item.driveFileId}`;
 
-		// Remove from queue after completion (success or failure)
-		queueStore.update(q => q.filter(item => item.volumeUuid !== nextItem.volumeUuid));
+		// Add process tracker
+		progressTrackerStore.addProcess({
+			id: processId,
+			description: `Downloading ${item.volumeTitle}`,
+			progress: 0,
+			status: 'Starting download...'
+		});
+
+		// Estimate memory requirement based on file size
+		const fileSize = item.volumeMetadata.driveSize || 0;
+		const memoryRequirement = Math.max(fileSize * 3, 50 * 1024 * 1024);
+
+		// Create worker metadata
+		const workerMetadata: WorkerVolumeMetadata = {
+			volumeUuid: item.volumeUuid,
+			driveFileId: item.driveFileId,
+			seriesTitle: item.seriesTitle,
+			volumeTitle: item.volumeTitle,
+			driveModifiedTime: item.volumeMetadata.driveModifiedTime,
+			driveSize: item.volumeMetadata.driveSize
+		};
+
+		// Create worker task
+		const task: WorkerTask = {
+			id: item.driveFileId,
+			memoryRequirement,
+			metadata: workerMetadata,
+			data: {
+				fileId: item.driveFileId,
+				fileName: item.volumeTitle + '.cbz',
+				accessToken: token,
+				metadata: workerMetadata
+			},
+			onProgress: data => {
+				const percent = Math.round((data.loaded / data.total) * 100);
+				progressTrackerStore.updateProcess(processId, {
+					progress: percent,
+					status: `Downloading... ${percent}%`
+				});
+			},
+			onComplete: async (data, releaseMemory) => {
+				try {
+					progressTrackerStore.updateProcess(processId, {
+						progress: 90,
+						status: 'Processing files...'
+					});
+
+					// Process volume data and save to DB
+					await processVolumeData(data.entries, item.volumeMetadata);
+
+					progressTrackerStore.updateProcess(processId, {
+						progress: 100,
+						status: 'Download complete'
+					});
+
+					showSnackbar(`Downloaded ${item.volumeTitle} successfully`);
+
+					// Remove from queue
+					queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
+
+					// Clean up progress tracker after delay
+					setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+				} catch (error) {
+					console.error(`Failed to process ${item.volumeTitle}:`, error);
+					progressTrackerStore.updateProcess(processId, {
+						progress: 0,
+						status: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+					});
+					showSnackbar(
+						`Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`
+					);
+
+					// Remove from queue even on error
+					queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
+
+					setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+				} finally {
+					releaseMemory();
+
+					// Check if queue is empty and terminate pool
+					const currentQueue = get(queueStore);
+					if (currentQueue.length === 0 && workerPool) {
+						workerPool.terminate();
+						workerPool = null;
+						processingStarted = false;
+					}
+				}
+			},
+			onError: data => {
+				console.error(`Error downloading ${item.volumeTitle}:`, data.error);
+				progressTrackerStore.updateProcess(processId, {
+					progress: 0,
+					status: `Error: ${data.error}`
+				});
+				showSnackbar(`Failed to download ${item.volumeTitle}`);
+
+				// Remove from queue
+				queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
+
+				setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+
+				// Check if queue is empty and terminate pool
+				const currentQueue = get(queueStore);
+				if (currentQueue.length === 0 && workerPool) {
+					workerPool.terminate();
+					workerPool = null;
+					processingStarted = false;
+				}
+			}
+		};
+
+		// Add task to worker pool
+		pool.addTask(task);
 	}
-
-	isProcessing = false;
 }
 
 // Export the store for reactive subscriptions

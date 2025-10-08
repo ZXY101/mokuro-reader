@@ -6,10 +6,20 @@ import type { Entry } from '@zip.js/zip.js';
 // Define the worker context
 const ctx: Worker = self as any;
 
+interface VolumeMetadata {
+  volumeUuid: string;
+  driveFileId: string;
+  seriesTitle: string;
+  volumeTitle: string;
+  driveModifiedTime?: string;
+  driveSize?: number;
+}
+
 interface DownloadMessage {
   fileId: string;
   fileName: string;
   accessToken: string;
+  metadata?: VolumeMetadata; // Optional metadata for volume downloads
 }
 
 interface ProgressMessage {
@@ -25,6 +35,7 @@ interface CompleteMessage {
   fileName: string;
   data: ArrayBuffer; // Empty buffer since we're sending the decompressed entries
   entries: DecompressedEntry[];
+  metadata?: VolumeMetadata; // Pass through metadata if provided
 }
 
 interface ErrorMessage {
@@ -39,7 +50,7 @@ interface DecompressedEntry {
 }
 
 // Function to download a file from Google Drive
-async function downloadFile(fileId: string, fileName: string, accessToken: string) {
+async function downloadFile(fileId: string, fileName: string, accessToken: string, metadata?: VolumeMetadata) {
   try {
     // First get the file size
     const sizeResponse = await fetch(
@@ -158,7 +169,8 @@ async function downloadFile(fileId: string, fileName: string, accessToken: strin
               fileId,
               fileName,
               data: new ArrayBuffer(0), // Empty buffer since we're sending the decompressed entries
-              entries: decompressedEntries
+              entries: decompressedEntries,
+              metadata // Pass through metadata if provided
             };
             
             console.log(`Worker: Sending complete message for ${fileName} with ${decompressedEntries.length} decompressed entries`);
@@ -211,10 +223,10 @@ ctx.addEventListener('message', async (event) => {
   console.log('Worker: Received message from main thread', event.data);
 
   try {
-    const { fileId, fileName, accessToken } = event.data as DownloadMessage;
+    const { fileId, fileName, accessToken, metadata } = event.data as DownloadMessage;
     console.log(`Worker: Starting download for ${fileName} (${fileId})`);
 
-    await downloadFile(fileId, fileName, accessToken);
+    await downloadFile(fileId, fileName, accessToken, metadata);
     console.log(`Worker: Download function completed for ${fileName}`);
   } catch (error) {
     console.error('Worker: Error in message handler:', error);
