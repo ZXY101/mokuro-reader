@@ -3,10 +3,20 @@
 // Import the worker script using Vite's worker plugin
 import DownloadWorker from '$lib/workers/download-worker.ts?worker';
 
+export interface VolumeMetadata {
+  volumeUuid: string;
+  driveFileId: string;
+  seriesTitle: string;
+  volumeTitle: string;
+  driveModifiedTime?: string;
+  driveSize?: number;
+}
+
 export interface WorkerTask {
   id: string;
   data: any;
   memoryRequirement?: number; // Memory requirement in bytes
+  metadata?: VolumeMetadata; // Optional metadata for volume downloads
   onProgress?: (progress: any) => void;
   onComplete?: (result: any, completeTask: () => void) => void;
   onError?: (error: any) => void;
