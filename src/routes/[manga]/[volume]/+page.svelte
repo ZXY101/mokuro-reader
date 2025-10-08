@@ -5,6 +5,7 @@
   import { initializeVolume, settings, startCount, volumes, volumeSettings } from '$lib/settings';
   import { onMount } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
+  import { Spinner } from 'flowbite-svelte';
 
   let volumeId = $derived($page.params.volume);
   let count: undefined | number = $state(undefined);
@@ -35,4 +36,8 @@
   {#key volumeId}
     <Reader volumeSettings={$volumeSettings[volumeId]} />
   {/key}
+{:else}
+  <div class="flex items-center justify-center w-screen h-screen">
+    <Spinner size="12" />
+  </div>
 {/if}
