@@ -26,6 +26,7 @@
   import { beforeNavigate } from '$app/navigation';
   import { onMount } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
+  import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
 
   // TODO: Refactor this whole mess
   interface Props {
@@ -59,37 +60,47 @@
       if (showSecondPage() && page >= pages.length && newPage > page) {
         return;
       }
+
+      // Clamp to valid page range first
       const pageClamped = clamp(newPage, 1, pages?.length);
-      const { charCount } = getCharCount(pages, pageClamped);
-      if (pageClamped !== newPage) {
+
+      // Only navigate to another volume if we're already at the edge
+      // AND trying to go further in that direction
+      if (newPage < 1 && page === 1) {
+        // Already on first page, trying to go back - navigate to previous volume
         let seriesVolumes = $currentSeries;
         const currentVolumeIndex = seriesVolumes.findIndex(
           (v) => v.volume_uuid === volume.volume_uuid
         );
-        if (newPage < 1) {
-          // open previous volume
-          const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-          if (previousVolume)
-            window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
-          else window.location.href = `/${volume.series_uuid}`;
-        } else if (newPage > pages.length) {
-          // open next volume
-          const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-          if (nextVolume) window.location.href = `/${volume.series_uuid}/${nextVolume.volume_uuid}`;
-          else window.location.href = `/${volume.series_uuid}`;
-        }
-      } else {
-        updateProgress(
-          volume.volume_uuid,
-          pageClamped,
-          charCount,
-          pageClamped === pages.length || pageClamped === pages.length - 1
+        const previousVolume = seriesVolumes[currentVolumeIndex - 1];
+        if (previousVolume)
+          window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
+        else window.location.href = `/${volume.series_uuid}`;
+        return;
+      } else if (newPage > pages.length && page === pages.length) {
+        // Already on last page, trying to go forward - navigate to next volume
+        let seriesVolumes = $currentSeries;
+        const currentVolumeIndex = seriesVolumes.findIndex(
+          (v) => v.volume_uuid === volume.volume_uuid
         );
-        zoomDefault();
-
-        // Record activity for auto-timer and auto-sync
-        activityTracker.recordActivity();
+        const nextVolume = seriesVolumes[currentVolumeIndex + 1];
+        if (nextVolume) window.location.href = `/${volume.series_uuid}/${nextVolume.volume_uuid}`;
+        else window.location.href = `/${volume.series_uuid}`;
+        return;
       }
+
+      // Valid page within this volume - navigate to it
+      const { charCount } = getCharCount(pages, pageClamped);
+      updateProgress(
+        volume.volume_uuid,
+        pageClamped,
+        charCount,
+        pageClamped === pages.length || pageClamped === pages.length - 1
+      );
+      zoomDefault();
+
+      // Record activity for auto-timer and auto-sync
+      activityTracker.recordActivity();
     }
   }
 
@@ -243,18 +254,36 @@
   let pages = $derived(volumeData?.pages || []);
   let page = $derived($progress?.[volume?.volume_uuid || 0] || 1);
   let index = $derived(page - 1);
+
+  // Window size state for reactive auto-detection
+  let windowWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 0);
+  let windowHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 0);
+
+  // Determine if we should show single page based on mode, pages, and screen
+  let useSinglePage = $derived.by(() => {
+    const currentPage = pages?.[index];
+    const nextPage = pages?.[index + 1];
+    const previousPage = index > 0 ? pages?.[index - 1] : undefined;
+
+    // Reference window dimensions to create reactive dependency
+    // This ensures the detection re-runs when window size changes
+    const _width = windowWidth;
+    const _height = windowHeight;
+
+    // Use auto-detection function with width consistency checking
+    return shouldShowSinglePage(volumeSettings.singlePageView, currentPage, nextPage, previousPage);
+  });
+
   let navAmount = $derived(
-    volumeSettings.singlePageView ||
-      (volumeSettings.hasCover && !volumeSettings.singlePageView && index === 0)
-      ? 1
-      : 2
+    useSinglePage || (volumeSettings.hasCover && !useSinglePage && index === 0) ? 1 : 2
   );
+
   let showSecondPage = $derived(() => {
     if (!pages) {
       return false;
     }
 
-    if (volumeSettings.singlePageView || index + 1 >= pages.length) {
+    if (useSinglePage || index + 1 >= pages.length) {
       return false;
     }
 
@@ -294,7 +323,11 @@
 </script>
 
 <svelte:window
-  onresize={zoomDefault}
+  onresize={() => {
+    windowWidth = window.innerWidth;
+    windowHeight = window.innerHeight;
+    zoomDefault();
+  }}
   onkeyup={handleShortcuts}
   ontouchstart={handleTouchStart}
   ontouchend={handlePointerUp}
@@ -307,7 +340,7 @@
     {left}
     {right}
     src1={Object.values(volumeData.files)[index]}
-    src2={!volumeSettings.singlePageView ? Object.values(volumeData.files)[index + 1] : undefined}
+    src2={!useSinglePage ? Object.values(volumeData.files)[index + 1] : undefined}
   />
   <SettingsButton />
   <Cropper />

@@ -4,9 +4,11 @@ import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
 import { currentSeries, currentVolume } from '$lib/catalog';
 
+import type { PageViewMode } from './settings';
+
 export type VolumeSettings = {
   rightToLeft: boolean;
-  singlePageView: boolean;
+  singlePageView: PageViewMode;
   hasCover: boolean;
 };
 
@@ -33,12 +35,12 @@ class VolumeData implements VolumeDataJSON {
   constructor(data: Partial<VolumeDataJSON> = {}) {
     const volumeDefaults = browser
       ? (JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults ?? {
-          singlePageView: false,
+          singlePageView: 'auto',
           rightToLeft: true,
           hasCover: false
         })
       : {
-          singlePageView: false,
+          singlePageView: 'auto',
           rightToLeft: true,
           hasCover: false
         };
@@ -49,11 +51,23 @@ class VolumeData implements VolumeDataJSON {
     this.timeReadInMinutes =
       typeof data.timeReadInMinutes === 'number' ? data.timeReadInMinutes : 0;
     this.lastProgressUpdate = data.lastProgressUpdate || new Date(this.progress).toISOString();
+
+    // Migrate old boolean values to new PageViewMode
+    // Old boolean values are replaced with 'auto' (the new default)
+    let singlePageViewValue: PageViewMode;
+    if (data.settings?.singlePageView !== undefined) {
+      if (typeof data.settings.singlePageView === 'boolean') {
+        // Old boolean value -> use new default 'auto'
+        singlePageViewValue = 'auto';
+      } else {
+        singlePageViewValue = data.settings.singlePageView;
+      }
+    } else {
+      singlePageViewValue = volumeDefaults.singlePageView;
+    }
+
     this.settings = {
-      singlePageView:
-        typeof data.settings?.singlePageView === 'boolean'
-          ? data.settings.singlePageView
-          : volumeDefaults.singlePageView,
+      singlePageView: singlePageViewValue,
       rightToLeft:
         typeof data.settings?.rightToLeft === 'boolean'
           ? data.settings.rightToLeft

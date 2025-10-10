@@ -34,9 +34,11 @@ export type AnkiConnectSettings = {
   triggerMethod: 'rightClick' | 'doubleTap' | 'both';
 };
 
+export type PageViewMode = 'single' | 'dual' | 'auto';
+
 export type VolumeDefaults = {
   rightToLeft: boolean;
-  singlePageView: boolean;
+  singlePageView: PageViewMode;
   hasCover: boolean;
 };
 
@@ -91,7 +93,7 @@ const defaultSettings: Settings = {
   nightMode: false,
   inactivityTimeoutMinutes: 5,
   volumeDefaults: {
-    singlePageView: false,
+    singlePageView: 'auto',
     rightToLeft: true,
     hasCover: false
   },
