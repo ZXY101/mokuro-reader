@@ -60,37 +60,47 @@
       if (showSecondPage() && page >= pages.length && newPage > page) {
         return;
       }
+
+      // Clamp to valid page range first
       const pageClamped = clamp(newPage, 1, pages?.length);
-      const { charCount } = getCharCount(pages, pageClamped);
-      if (pageClamped !== newPage) {
+
+      // Only navigate to another volume if we're already at the edge
+      // AND trying to go further in that direction
+      if (newPage < 1 && page === 1) {
+        // Already on first page, trying to go back - navigate to previous volume
         let seriesVolumes = $currentSeries;
         const currentVolumeIndex = seriesVolumes.findIndex(
           (v) => v.volume_uuid === volume.volume_uuid
         );
-        if (newPage < 1) {
-          // open previous volume
-          const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-          if (previousVolume)
-            window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
-          else window.location.href = `/${volume.series_uuid}`;
-        } else if (newPage > pages.length) {
-          // open next volume
-          const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-          if (nextVolume) window.location.href = `/${volume.series_uuid}/${nextVolume.volume_uuid}`;
-          else window.location.href = `/${volume.series_uuid}`;
-        }
-      } else {
-        updateProgress(
-          volume.volume_uuid,
-          pageClamped,
-          charCount,
-          pageClamped === pages.length || pageClamped === pages.length - 1
+        const previousVolume = seriesVolumes[currentVolumeIndex - 1];
+        if (previousVolume)
+          window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
+        else window.location.href = `/${volume.series_uuid}`;
+        return;
+      } else if (newPage > pages.length && page === pages.length) {
+        // Already on last page, trying to go forward - navigate to next volume
+        let seriesVolumes = $currentSeries;
+        const currentVolumeIndex = seriesVolumes.findIndex(
+          (v) => v.volume_uuid === volume.volume_uuid
         );
-        zoomDefault();
-
-        // Record activity for auto-timer and auto-sync
-        activityTracker.recordActivity();
+        const nextVolume = seriesVolumes[currentVolumeIndex + 1];
+        if (nextVolume) window.location.href = `/${volume.series_uuid}/${nextVolume.volume_uuid}`;
+        else window.location.href = `/${volume.series_uuid}`;
+        return;
       }
+
+      // Valid page within this volume - navigate to it
+      const { charCount } = getCharCount(pages, pageClamped);
+      updateProgress(
+        volume.volume_uuid,
+        pageClamped,
+        charCount,
+        pageClamped === pages.length || pageClamped === pages.length - 1
+      );
+      zoomDefault();
+
+      // Record activity for auto-timer and auto-sync
+      activityTracker.recordActivity();
     }
   }
 
