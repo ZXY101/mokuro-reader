@@ -255,6 +255,11 @@
     const nextPage = pages?.[index + 1];
     const previousPage = index > 0 ? pages?.[index - 1] : undefined;
 
+    // Reference window dimensions to create reactive dependency
+    // This ensures the detection re-runs when window size changes
+    const _width = windowWidth;
+    const _height = windowHeight;
+
     // Use auto-detection function with width consistency checking
     return shouldShowSinglePage(volumeSettings.singlePageView, currentPage, nextPage, previousPage);
   });
