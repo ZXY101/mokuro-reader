@@ -23,7 +23,7 @@
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
-  import { beforeNavigate } from '$app/navigation';
+  import { beforeNavigate, goto } from '$app/navigation';
   import { onMount } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
@@ -42,13 +42,58 @@
   }
 
   function left(_e: any, ingoreTimeOut?: boolean) {
-    const newPage = volumeSettings.rightToLeft ? page + navAmount : page - navAmount;
-    changePage(newPage, ingoreTimeOut);
+    if (volumeSettings.rightToLeft) {
+      // RTL: left is forward
+      const newPage = page + navAmount;
+      changePage(newPage, ingoreTimeOut);
+    } else {
+      // LTR: left is backward - check target page mode
+      const newPage = calculateBackwardTarget(page);
+      changePage(newPage, ingoreTimeOut);
+    }
   }
 
   function right(_e: any, ingoreTimeOut?: boolean) {
-    const newPage = volumeSettings.rightToLeft ? page - navAmount : page + navAmount;
-    changePage(newPage, ingoreTimeOut);
+    if (volumeSettings.rightToLeft) {
+      // RTL: right is backward - check target page mode
+      const newPage = calculateBackwardTarget(page);
+      changePage(newPage, ingoreTimeOut);
+    } else {
+      // LTR: right is forward
+      const newPage = page + navAmount;
+      changePage(newPage, ingoreTimeOut);
+    }
+  }
+
+  // Calculate target page when navigating backward, accounting for single-page exceptions
+  function calculateBackwardTarget(currentPage: number): number {
+    const targetIndex = currentPage - 2; // Try going back by current navAmount (assuming dual)
+
+    if (targetIndex < 0) {
+      return currentPage - 1; // Just go back 1 if we're near the start
+    }
+
+    const targetPage = pages?.[targetIndex];
+    const targetNextPage = pages?.[targetIndex + 1];
+    const targetPreviousPage = targetIndex > 0 ? pages?.[targetIndex - 1] : undefined;
+
+    // Check if the target page should be shown in single mode
+    const targetShouldBeSingle = shouldShowSinglePage(
+      volumeSettings.singlePageView,
+      targetPage,
+      targetNextPage,
+      targetPreviousPage,
+      targetIndex === 0,
+      volumeSettings.hasCover
+    );
+
+    if (targetShouldBeSingle) {
+      // Target is a single-page exception, only go back by 1
+      return currentPage - 1;
+    } else {
+      // Target is dual-page, go back by current navAmount
+      return currentPage - navAmount;
+    }
   }
 
   function changePage(newPage: number, ingoreTimeOut = false) {
@@ -74,8 +119,8 @@
         );
         const previousVolume = seriesVolumes[currentVolumeIndex - 1];
         if (previousVolume)
-          window.location.href = `/${volume.series_uuid}/${previousVolume.volume_uuid}`;
-        else window.location.href = `/${volume.series_uuid}`;
+          goto(`/${volume.series_uuid}/${previousVolume.volume_uuid}`, { invalidateAll: true });
+        else goto(`/${volume.series_uuid}`);
         return;
       } else if (newPage > pages.length && page === pages.length) {
         // Already on last page, trying to go forward - navigate to next volume
@@ -84,8 +129,8 @@
           (v) => v.volume_uuid === volume.volume_uuid
         );
         const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-        if (nextVolume) window.location.href = `/${volume.series_uuid}/${nextVolume.volume_uuid}`;
-        else window.location.href = `/${volume.series_uuid}`;
+        if (nextVolume) goto(`/${volume.series_uuid}/${nextVolume.volume_uuid}`, { invalidateAll: true });
+        else goto(`/${volume.series_uuid}`);
         return;
       }
 
@@ -148,7 +193,7 @@
         toggleFullScreen();
         return;
       case 'Escape':
-        window.location.href = `/${volume.series_uuid}`;
+        goto(`/${volume.series_uuid}`);
         return;
       default:
         break;
@@ -271,7 +316,14 @@
     const _height = windowHeight;
 
     // Use auto-detection function with width consistency checking
-    return shouldShowSinglePage(volumeSettings.singlePageView, currentPage, nextPage, previousPage);
+    return shouldShowSinglePage(
+      volumeSettings.singlePageView,
+      currentPage,
+      nextPage,
+      previousPage,
+      index === 0, // isFirstPage
+      volumeSettings.hasCover
+    );
   });
 
   let navAmount = $derived(
@@ -335,7 +387,7 @@
 <svelte:head>
   <title>{volume?.volume_title || 'Volume'}</title>
 </svelte:head>
-{#if volume && pages && volumeData}
+{#if volume && pages && pages.length > 0 && volumeData}
   <QuickActions
     {left}
     {right}
@@ -424,9 +476,9 @@
         {#key page}
           {#if volumeData}
             {#if showSecondPage()}
-              <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} />
+              <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} volumeUuid={volume.volume_uuid} />
             {/if}
-            <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} />
+            <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} volumeUuid={volume.volume_uuid} />
           {:else}
             <div class="flex items-center justify-center w-screen h-screen">
               <Spinner size="12" />

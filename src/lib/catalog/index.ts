@@ -82,14 +82,17 @@ export const currentVolume = derived([page, volumes], ([$page, $volumes]) => {
 export const currentVolumeData: Readable<VolumeData | undefined> = derived(
   [currentVolume],
   ([$currentVolume], set) => {
+    // CRITICAL: Immediately clear old data synchronously to prevent state leaks
+    // This ensures old volume data doesn't persist during the async gap
+    set(undefined);
+
     if ($currentVolume) {
       db.volumes_data.get($currentVolume.volume_uuid).then((data) => {
         if (data) {
-          set(data as VolumeData);
+          set(data);
         }
       });
-    } else {
-      set(undefined);
     }
-  }
+  },
+  undefined // Initial value
 );
