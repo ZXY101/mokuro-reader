@@ -305,10 +305,23 @@
   let windowHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 0);
 
   // Determine if we should show single page based on mode, pages, and screen
+  // Force calculation to wait for all data by using a single derived with explicit dependencies
   let useSinglePage = $derived.by(() => {
-    const currentPage = pages?.[index];
-    const nextPage = pages?.[index + 1];
-    const previousPage = index > 0 ? pages?.[index - 1] : undefined;
+    // Explicit dependency on all required reactive values
+    // This ensures we don't calculate until everything is loaded
+    const vol = volume;
+    const pgs = pages;
+    const idx = index;
+    const prog = $progress;
+
+    // Wait for all data to exist
+    if (!vol || !pgs || pgs.length === 0 || !prog || prog[vol.volume_uuid] === undefined) {
+      return true; // Safe default while loading
+    }
+
+    const currentPage = pgs[idx];
+    const nextPage = pgs[idx + 1];
+    const previousPage = idx > 0 ? pgs[idx - 1] : undefined;
 
     // Reference window dimensions to create reactive dependency
     // This ensures the detection re-runs when window size changes
@@ -321,7 +334,7 @@
       currentPage,
       nextPage,
       previousPage,
-      index === 0, // isFirstPage
+      idx === 0, // isFirstPage
       volumeSettings.hasCover
     );
   });
@@ -387,7 +400,7 @@
 <svelte:head>
   <title>{volume?.volume_title || 'Volume'}</title>
 </svelte:head>
-{#if volume && pages && pages.length > 0 && volumeData}
+{#if volume && pages && pages.length > 0 && volumeData && $progress?.[volume.volume_uuid] !== undefined}
   <QuickActions
     {left}
     {right}
