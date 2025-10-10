@@ -7,9 +7,10 @@
   interface Props {
     page: Page;
     src: File;
+    volumeUuid: string;
   }
 
-  let { page, src }: Props = $props();
+  let { page, src, volumeUuid }: Props = $props();
 
   let textBoxes = $derived(
     page.blocks
@@ -82,7 +83,7 @@
   }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`textBox-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`${volumeUuid}-textBox-${index}`)}
   <div
     class="textBox"
     style:width

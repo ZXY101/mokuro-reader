@@ -1,36 +1,48 @@
-<!-- @migration-task Error while migrating Svelte code: Can't migrate code with afterUpdate. Please migrate by hand. -->
 <script lang="ts">
   import type { Page } from '$lib/types';
-  import { afterUpdate, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import TextBoxes from './TextBoxes.svelte';
   import { zoomDefault } from '$lib/panzoom';
 
-  export let page: Page;
-  export let src: File;
+  interface Props {
+    page: Page;
+    src: File;
+    volumeUuid: string;
+  }
 
-  $: url = src ? `url(${URL.createObjectURL(src)})` : '';
+  let { page, src, volumeUuid }: Props = $props();
 
-  let legacy: HTMLElement | null;
+  let url = $state('');
+
+  // Track blob URL and clean up properly to prevent memory leaks
+  $effect(() => {
+    let currentBlobUrl: string | null = null;
+
+    // Create new blob URL
+    if (src) {
+      currentBlobUrl = URL.createObjectURL(src);
+      url = `url(${currentBlobUrl})`;
+    } else {
+      url = '';
+    }
+
+    // Cleanup function runs on effect re-run or component unmount
+    return () => {
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+      }
+    };
+  });
 
   onMount(() => {
-    legacy = document.getElementById('popupAbout');
     zoomDefault();
 
     return () => {
+      // Small delay to ensure smooth transition
       setTimeout(() => {
         zoomDefault();
       }, 10);
     };
-  });
-
-  $: {
-    if (legacy) {
-      legacy.style.backgroundImage = url;
-    }
-  }
-
-  afterUpdate(() => {
-    zoomDefault();
   });
 </script>
 
@@ -41,5 +53,5 @@
   style:background-image={url}
   class="relative"
 >
-  <TextBoxes {page} {src} />
+  <TextBoxes {page} {src} {volumeUuid} />
 </div>

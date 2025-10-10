@@ -45,7 +45,9 @@ export function shouldShowSinglePage(
   mode: PageViewMode,
   currentPage: Page | undefined,
   nextPage: Page | undefined,
-  previousPage: Page | undefined
+  previousPage: Page | undefined,
+  isFirstPage: boolean = false,
+  hasCover: boolean = false
 ): boolean {
   // Explicit mode overrides
   if (mode === 'single') return true;
@@ -53,6 +55,12 @@ export function shouldShowSinglePage(
 
   // Auto mode logic
   if (mode === 'auto') {
+    // Special case: First page with cover should always be single
+    // This ensures covers don't get paired with spreads or other exceptions
+    if (isFirstPage && hasCover) {
+      return true;
+    }
+
     // Portrait orientation → single page
     if (isPortraitOrientation()) {
       return true;

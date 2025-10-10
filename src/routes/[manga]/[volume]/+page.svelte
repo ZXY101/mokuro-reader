@@ -16,21 +16,37 @@
   let volumeId = $derived($page.params.volume);
   let count: undefined | number = $state(undefined);
 
-  onMount(() => {
+  // Initialize volume when volumeId changes (reactive to navigation)
+  $effect(() => {
     if (!$volumes?.[volumeId]) {
       initializeVolume(volumeId);
     }
+  });
 
-    // Auto-start timer when volume opens (user intends to read)
-    count = startCount(volumeId);
-    // Record initial activity to start the inactivity timeout
+  // Start/restart timer when volumeId changes
+  $effect(() => {
+    // Record activity when volume changes
     activityTracker.recordActivity();
 
+    // Start timer for this volume
+    count = startCount(volumeId);
+
+    // Cleanup: clear the interval when volumeId changes or component unmounts
     return () => {
       if (count) {
         clearInterval(count);
         count = undefined;
       }
+    };
+  });
+
+  onMount(() => {
+    // Set up activity tracker timeout
+    activityTracker.setTimeoutDuration($settings.inactivityTimeoutMinutes);
+
+    return () => {
+      // Stop activity tracker when component unmounts
+      activityTracker.stop();
     };
   });
 </script>
