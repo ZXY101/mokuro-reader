@@ -24,7 +24,7 @@
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
   import { beforeNavigate, goto } from '$app/navigation';
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
 
@@ -142,7 +142,6 @@
         charCount,
         pageClamped === pages.length || pageClamped === pages.length - 1
       );
-      zoomDefault();
 
       // Record activity for auto-timer and auto-sync
       activityTracker.recordActivity();
@@ -272,6 +271,28 @@
   // Update timeout duration when settings change
   $effect(() => {
     activityTracker.setTimeoutDuration($settings.inactivityTimeoutMinutes);
+  });
+
+  // Apply zoom after page changes or settings changes
+  // This ensures proper scaling and centering when page dimensions or layout settings change
+  $effect(() => {
+    const pg = page;
+    const pgs = pages;
+    const pz = $panzoomStore;
+
+    // Add dependencies on settings that affect layout and zoom
+    const zoomMode = $settings.zoomDefault;
+    const pageMode = volumeSettings.singlePageView;
+    const hasCover = volumeSettings.hasCover;
+    const rtl = volumeSettings.rightToLeft;
+
+    // Wait for all required data and panzoom instance to be ready
+    if (pg && pgs && pgs.length > 0 && pz) {
+      // Wait for next tick to ensure DOM has completed layout calculations for the new page/settings
+      tick().then(() => {
+        zoomDefault();
+      });
+    }
   });
 
   beforeNavigate(() => {
