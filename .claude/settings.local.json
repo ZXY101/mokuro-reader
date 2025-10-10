@@ -32,7 +32,10 @@
       "Bash(gh pr diff:*)",
       "Bash(timeout 2 npm run preview)",
       "WebFetch(domain:developers.google.com)",
-      "Bash(gh pr edit:*)"
+      "Bash(gh pr edit:*)",
+      "Bash(lsof:*)",
+      "Bash(kill:*)",
+      "Bash(npm run check:*)"
     ],
     "deny": [],
     "ask": []

@@ -26,6 +26,7 @@
   import { beforeNavigate } from '$app/navigation';
   import { onMount } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
+  import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
 
   // TODO: Refactor this whole mess
   interface Props {
@@ -243,18 +244,31 @@
   let pages = $derived(volumeData?.pages || []);
   let page = $derived($progress?.[volume?.volume_uuid || 0] || 1);
   let index = $derived(page - 1);
+
+  // Window size state for reactive auto-detection
+  let windowWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 0);
+  let windowHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 0);
+
+  // Determine if we should show single page based on mode, pages, and screen
+  let useSinglePage = $derived.by(() => {
+    const currentPage = pages?.[index];
+    const nextPage = pages?.[index + 1];
+    const previousPage = index > 0 ? pages?.[index - 1] : undefined;
+
+    // Use auto-detection function with width consistency checking
+    return shouldShowSinglePage(volumeSettings.singlePageView, currentPage, nextPage, previousPage);
+  });
+
   let navAmount = $derived(
-    volumeSettings.singlePageView ||
-      (volumeSettings.hasCover && !volumeSettings.singlePageView && index === 0)
-      ? 1
-      : 2
+    useSinglePage || (volumeSettings.hasCover && !useSinglePage && index === 0) ? 1 : 2
   );
+
   let showSecondPage = $derived(() => {
     if (!pages) {
       return false;
     }
 
-    if (volumeSettings.singlePageView || index + 1 >= pages.length) {
+    if (useSinglePage || index + 1 >= pages.length) {
       return false;
     }
 
@@ -294,7 +308,11 @@
 </script>
 
 <svelte:window
-  onresize={zoomDefault}
+  onresize={() => {
+    windowWidth = window.innerWidth;
+    windowHeight = window.innerHeight;
+    zoomDefault();
+  }}
   onkeyup={handleShortcuts}
   ontouchstart={handleTouchStart}
   ontouchend={handlePointerUp}
@@ -307,7 +325,7 @@
     {left}
     {right}
     src1={Object.values(volumeData.files)[index]}
-    src2={!volumeSettings.singlePageView ? Object.values(volumeData.files)[index + 1] : undefined}
+    src2={!useSinglePage ? Object.values(volumeData.files)[index + 1] : undefined}
   />
   <SettingsButton />
   <Cropper />
