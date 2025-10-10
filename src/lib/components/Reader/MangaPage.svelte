@@ -1,8 +1,6 @@
 <script lang="ts">
   import type { Page } from '$lib/types';
-  import { onMount } from 'svelte';
   import TextBoxes from './TextBoxes.svelte';
-  import { zoomDefault } from '$lib/panzoom';
 
   interface Props {
     page: Page;
@@ -31,17 +29,6 @@
       if (currentBlobUrl) {
         URL.revokeObjectURL(currentBlobUrl);
       }
-    };
-  });
-
-  onMount(() => {
-    zoomDefault();
-
-    return () => {
-      // Small delay to ensure smooth transition
-      setTimeout(() => {
-        zoomDefault();
-      }, 10);
     };
   });
 </script>
