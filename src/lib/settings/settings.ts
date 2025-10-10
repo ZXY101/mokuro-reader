@@ -95,7 +95,7 @@ const defaultSettings: Settings = {
   volumeDefaults: {
     singlePageView: 'auto',
     rightToLeft: true,
-    hasCover: false
+    hasCover: true
   },
   ankiConnectSettings: {
     enabled: false,

@@ -2,7 +2,13 @@
   import { page } from '$app/stores';
   import Reader from '$lib/components/Reader/Reader.svelte';
   import Timer from '$lib/components/Reader/Timer.svelte';
-  import { initializeVolume, settings, startCount, volumes, volumeSettings } from '$lib/settings';
+  import {
+    effectiveVolumeSettings,
+    initializeVolume,
+    settings,
+    startCount,
+    volumes
+  } from '$lib/settings';
   import { onMount } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { Spinner } from 'flowbite-svelte';
@@ -29,12 +35,12 @@
   });
 </script>
 
-{#if $volumeSettings[volumeId]}
+{#if $effectiveVolumeSettings[volumeId]}
   {#if $settings.showTimer}
     <Timer bind:count {volumeId} />
   {/if}
   {#key volumeId}
-    <Reader volumeSettings={$volumeSettings[volumeId]} />
+    <Reader volumeSettings={$effectiveVolumeSettings[volumeId]} />
   {/key}
 {:else}
   <div class="flex items-center justify-center w-screen h-screen">

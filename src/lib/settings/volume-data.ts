@@ -3,13 +3,14 @@ import { derived, writable } from 'svelte/store';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
 import { currentSeries, currentVolume } from '$lib/catalog';
+import { settings as globalSettings } from './settings';
 
 import type { PageViewMode } from './settings';
 
 export type VolumeSettings = {
-  rightToLeft: boolean;
-  singlePageView: PageViewMode;
-  hasCover: boolean;
+  rightToLeft?: boolean;
+  singlePageView?: PageViewMode;
+  hasCover?: boolean;
 };
 
 export type VolumeSettingsKey = keyof VolumeSettings;
@@ -33,18 +34,6 @@ class VolumeData implements VolumeDataJSON {
   lastProgressUpdate: string;
 
   constructor(data: Partial<VolumeDataJSON> = {}) {
-    const volumeDefaults = browser
-      ? (JSON.parse(localStorage.getItem('settings') || '{}').volumeDefaults ?? {
-          singlePageView: 'auto',
-          rightToLeft: true,
-          hasCover: false
-        })
-      : {
-          singlePageView: 'auto',
-          rightToLeft: true,
-          hasCover: false
-        };
-
     this.progress = typeof data.progress === 'number' ? data.progress : 0;
     this.chars = typeof data.chars === 'number' ? data.chars : 0;
     this.completed = !!data.completed;
@@ -52,31 +41,27 @@ class VolumeData implements VolumeDataJSON {
       typeof data.timeReadInMinutes === 'number' ? data.timeReadInMinutes : 0;
     this.lastProgressUpdate = data.lastProgressUpdate || new Date(this.progress).toISOString();
 
+    // Only store explicitly set values, leave others undefined to fall back to global defaults
+    this.settings = {};
+
     // Migrate old boolean values to new PageViewMode
-    // Old boolean values are replaced with 'auto' (the new default)
-    let singlePageViewValue: PageViewMode;
     if (data.settings?.singlePageView !== undefined) {
       if (typeof data.settings.singlePageView === 'boolean') {
-        // Old boolean value -> use new default 'auto'
-        singlePageViewValue = 'auto';
+        // Old boolean value -> migrate to 'auto'
+        this.settings.singlePageView = 'auto';
       } else {
-        singlePageViewValue = data.settings.singlePageView;
+        this.settings.singlePageView = data.settings.singlePageView;
       }
-    } else {
-      singlePageViewValue = volumeDefaults.singlePageView;
     }
 
-    this.settings = {
-      singlePageView: singlePageViewValue,
-      rightToLeft:
-        typeof data.settings?.rightToLeft === 'boolean'
-          ? data.settings.rightToLeft
-          : volumeDefaults.rightToLeft,
-      hasCover:
-        typeof data.settings?.hasCover === 'boolean'
-          ? data.settings.hasCover
-          : volumeDefaults.hasCover
-    };
+    // Only store if explicitly provided
+    if (typeof data.settings?.rightToLeft === 'boolean') {
+      this.settings.rightToLeft = data.settings.rightToLeft;
+    }
+
+    if (typeof data.settings?.hasCover === 'boolean') {
+      this.settings.hasCover = data.settings.hasCover;
+    }
   }
 
   static fromJSON(json: any): VolumeData {
@@ -216,6 +201,31 @@ export const volumeSettings = derived(volumes, ($volumes) => {
 
   return settings;
 });
+
+// Effective settings that merge volume-specific overrides with current global defaults
+export const effectiveVolumeSettings = derived(
+  [volumes, globalSettings],
+  ([$volumes, $globalSettings]) => {
+    const effective: Record<
+      string,
+      { rightToLeft: boolean; singlePageView: PageViewMode; hasCover: boolean }
+    > = {};
+
+    if ($volumes) {
+      Object.keys($volumes).forEach((key) => {
+        const volumeSettings = $volumes[key].settings;
+        effective[key] = {
+          rightToLeft: volumeSettings.rightToLeft ?? $globalSettings.volumeDefaults.rightToLeft,
+          singlePageView:
+            volumeSettings.singlePageView ?? $globalSettings.volumeDefaults.singlePageView,
+          hasCover: volumeSettings.hasCover ?? $globalSettings.volumeDefaults.hasCover
+        };
+      });
+    }
+
+    return effective;
+  }
+);
 
 export function updateVolumeSetting(volume: string, key: VolumeSettingsKey, value: any) {
   volumes.update((prev) => {
