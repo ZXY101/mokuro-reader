@@ -2,10 +2,10 @@
   import { page } from '$app/stores';
   import { zoomDefault } from '$lib/panzoom';
   import {
+    effectiveVolumeSettings,
     updateProgress,
     updateVolumeSetting,
     volumes,
-    volumeSettings,
     type VolumeSettingsKey,
     type PageViewMode
   } from '$lib/settings';
@@ -13,7 +13,7 @@
 
   const volumeId = $page.params.volume;
 
-  let settings = $derived($volumeSettings[$page.params.volume]);
+  let settings = $derived($effectiveVolumeSettings[$page.params.volume]);
 
   let toggles = $derived([
     { key: 'rightToLeft', text: 'Right to left', value: settings.rightToLeft },
