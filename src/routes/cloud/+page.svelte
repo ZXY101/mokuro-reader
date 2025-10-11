@@ -34,6 +34,9 @@
   import type { VolumeMetadata } from '$lib/types';
   import { updateDriveFileDescriptionForEntries } from '$lib/util/update-drive-descriptions';
 
+  // Import multi-provider sync
+  import { providerManager, megaProvider, webdavProvider } from '$lib/util/sync';
+
   // Subscribe to stores
   let accessToken = $state('');
   let readerFolderId = $state('');
@@ -60,6 +63,20 @@
     ];
     return () => unsubscribers.forEach(unsub => unsub());
   });
+
+  // Tab management
+  let activeTab = $state<'google' | 'mega' | 'webdav'>('google');
+
+  // MEGA login state
+  let megaEmail = $state('');
+  let megaPassword = $state('');
+  let megaLoading = $state(false);
+
+  // WebDAV login state
+  let webdavUrl = $state('');
+  let webdavUsername = $state('');
+  let webdavPassword = $state('');
+  let webdavLoading = $state(false);
 
   // Use constants from the google-drive utility
   const type = 'application/json';
@@ -732,6 +749,57 @@
     }
   }
 
+  // MEGA handlers
+  async function handleMegaLogin() {
+    megaLoading = true;
+    try {
+      await megaProvider.login({ email: megaEmail, password: megaPassword });
+      showSnackbar('Connected to MEGA');
+      providerManager.updateStatus();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(message);
+    } finally {
+      megaLoading = false;
+    }
+  }
+
+  async function handleMegaLogout() {
+    await megaProvider.logout();
+    megaEmail = '';
+    megaPassword = '';
+    providerManager.updateStatus();
+    showSnackbar('Logged out of MEGA');
+  }
+
+  // WebDAV handlers
+  async function handleWebDAVLogin() {
+    webdavLoading = true;
+    try {
+      await webdavProvider.login({
+        serverUrl: webdavUrl,
+        username: webdavUsername,
+        password: webdavPassword
+      });
+      showSnackbar('Connected to WebDAV');
+      providerManager.updateStatus();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(message);
+    } finally {
+      webdavLoading = false;
+    }
+  }
+
+  async function handleWebDAVLogout() {
+    await webdavProvider.logout();
+    webdavUrl = '';
+    webdavUsername = '';
+    webdavPassword = '';
+    providerManager.updateStatus();
+    showSnackbar('Logged out of WebDAV');
+  }
+
   async function backupAllSeries() {
     if (!accessToken) {
       showSnackbar('Please sign in to Google Drive first', 'error');
@@ -822,19 +890,43 @@
 </svelte:head>
 
 <div class="p-2 h-[90svh]">
-  {#if accessToken}
-    <div class="flex justify-between items-center gap-6 flex-col">
-      <div class="flex justify-between items-center w-full max-w-3xl">
-        <div class="flex items-center gap-3">
-          <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
-          {#if state.isCacheLoading && !state.isCacheLoaded}
-            <Badge color="yellow">Loading Drive data...</Badge>
-          {:else if state.isCacheLoaded}
-            <Badge color="green">Connected</Badge>
-          {/if}
+  <!-- Tab navigation -->
+  <div class="flex justify-center mb-6 gap-2">
+    <Button
+      color={activeTab === 'google' ? 'blue' : 'alternative'}
+      on:click={() => activeTab = 'google'}
+    >
+      Google Drive
+    </Button>
+    <Button
+      color={activeTab === 'mega' ? 'blue' : 'alternative'}
+      on:click={() => activeTab = 'mega'}
+    >
+      MEGA
+    </Button>
+    <Button
+      color={activeTab === 'webdav' ? 'blue' : 'alternative'}
+      on:click={() => activeTab = 'webdav'}
+    >
+      WebDAV
+    </Button>
+  </div>
+
+  <!-- Google Drive Tab -->
+  {#if activeTab === 'google'}
+    {#if accessToken}
+      <div class="flex justify-between items-center gap-6 flex-col">
+        <div class="flex justify-between items-center w-full max-w-3xl">
+          <div class="flex items-center gap-3">
+            <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+            {#if state.isCacheLoading && !state.isCacheLoaded}
+              <Badge color="yellow">Loading Drive data...</Badge>
+            {:else if state.isCacheLoaded}
+              <Badge color="green">Connected</Badge>
+            {/if}
+          </div>
+          <Button color="red" on:click={logout}>Log out</Button>
         </div>
-        <Button color="red" on:click={logout}>Log out</Button>
-      </div>
       <p class="text-center">
         Add your zipped manga files (ZIP or CBZ) to the <span class="text-primary-700"
           >{READER_FOLDER}</span
@@ -899,17 +991,148 @@
         </div>
       </div>
     </div>
-  {:else}
-    <div class="flex justify-center pt-0 sm:pt-32">
-      <button
-        class="w-full border rounded-lg border-slate-600 p-10 border-opacity-50 hover:bg-slate-800 max-w-3xl"
-        onclick={signIn}
-      >
-        <div class="flex sm:flex-row flex-col gap-2 items-center justify-center">
-          <GoogleSolid size="lg" />
-          <h2 class="text-lg">Connect to Google Drive</h2>
+    {:else}
+      <div class="flex justify-center pt-0 sm:pt-32">
+        <button
+          class="w-full border rounded-lg border-slate-600 p-10 border-opacity-50 hover:bg-slate-800 max-w-3xl"
+          onclick={signIn}
+        >
+          <div class="flex sm:flex-row flex-col gap-2 items-center justify-center">
+            <GoogleSolid size="lg" />
+            <h2 class="text-lg">Connect to Google Drive</h2>
+          </div>
+        </button>
+      </div>
+    {/if}
+  {/if}
+
+  <!-- MEGA Tab -->
+  {#if activeTab === 'mega'}
+    <div class="flex justify-center items-center flex-col gap-6">
+      <div class="w-full max-w-3xl">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-3xl font-semibold">MEGA Cloud Storage</h2>
+          {#if megaProvider.isAuthenticated()}
+            <Badge color="green">Connected</Badge>
+          {/if}
         </div>
-      </button>
+
+        {#if megaProvider.isAuthenticated()}
+          <div class="flex flex-col gap-4">
+            <p class="text-center text-green-400">Connected to MEGA</p>
+            <Button color="red" on:click={handleMegaLogout}>Log out</Button>
+          </div>
+        {:else}
+          <form
+            onsubmit={(e) => {
+              e.preventDefault();
+              handleMegaLogin();
+            }}
+            class="flex flex-col gap-4"
+          >
+            <input
+              type="email"
+              bind:value={megaEmail}
+              placeholder="Email"
+              required
+              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
+            />
+            <input
+              type="password"
+              bind:value={megaPassword}
+              placeholder="Password"
+              required
+              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
+            />
+            <Button type="submit" disabled={megaLoading} color="blue">
+              {megaLoading ? 'Connecting...' : 'Connect'}
+            </Button>
+          </form>
+
+          <div class="mt-6 p-4 bg-gray-800 rounded-lg">
+            <h3 class="font-semibold mb-2">About MEGA</h3>
+            <ul class="text-sm text-gray-300 space-y-1">
+              <li>20GB free storage</li>
+              <li>End-to-end encryption</li>
+              <li>No token expiry (persistent login)</li>
+              <li>
+                <a href="https://mega.nz/register" target="_blank" class="text-blue-400 hover:underline">
+                  Create MEGA account
+                </a>
+              </li>
+            </ul>
+          </div>
+        {/if}
+      </div>
+    </div>
+  {/if}
+
+  <!-- WebDAV Tab -->
+  {#if activeTab === 'webdav'}
+    <div class="flex justify-center items-center flex-col gap-6">
+      <div class="w-full max-w-3xl">
+        <div class="flex justify-between items-center mb-4">
+          <h2 class="text-3xl font-semibold">WebDAV Server</h2>
+          {#if webdavProvider.isAuthenticated()}
+            <Badge color="green">Connected</Badge>
+          {/if}
+        </div>
+
+        {#if webdavProvider.isAuthenticated()}
+          <div class="flex flex-col gap-4">
+            <p class="text-center text-green-400">Connected to WebDAV</p>
+            <Button color="red" on:click={handleWebDAVLogout}>Log out</Button>
+          </div>
+        {:else}
+          <form
+            onsubmit={(e) => {
+              e.preventDefault();
+              handleWebDAVLogin();
+            }}
+            class="flex flex-col gap-4"
+          >
+            <input
+              type="url"
+              bind:value={webdavUrl}
+              placeholder="Server URL (e.g., https://cloud.example.com/remote.php/dav)"
+              required
+              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
+            />
+            <input
+              type="text"
+              bind:value={webdavUsername}
+              placeholder="Username"
+              required
+              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
+            />
+            <input
+              type="password"
+              bind:value={webdavPassword}
+              placeholder="Password or App Token"
+              required
+              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
+            />
+            <Button type="submit" disabled={webdavLoading} color="blue">
+              {webdavLoading ? 'Connecting...' : 'Connect'}
+            </Button>
+          </form>
+
+          <div class="mt-6 p-4 bg-gray-800 rounded-lg">
+            <h3 class="font-semibold mb-2">WebDAV Configuration</h3>
+            <p class="text-sm text-gray-300 mb-2">Works with:</p>
+            <ul class="text-sm text-gray-300 space-y-1 ml-4">
+              <li>Nextcloud</li>
+              <li>ownCloud</li>
+              <li>Synology NAS</li>
+              <li>QNAP NAS</li>
+              <li>Any WebDAV-compatible server</li>
+            </ul>
+            <p class="text-sm text-gray-400 mt-3">
+              <strong>Security tip:</strong> Use an app-specific password instead of your main account password.
+            </p>
+          </div>
+        {/if}
+      </div>
     </div>
   {/if}
 </div>
