@@ -255,12 +255,21 @@
   }
 
   onMount(() => {
-    if ($settings.defaultFullscreen) {
-      document.documentElement.requestFullscreen();
-    }
-
     // Set the timeout duration from settings
     activityTracker.setTimeoutDuration($settings.inactivityTimeoutMinutes);
+
+    // Enter fullscreen on initial load if defaultFullscreen setting is enabled
+    if ($settings.defaultFullscreen && !document.fullscreenElement) {
+      tick().then(() => {
+        requestAnimationFrame(() => {
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen().catch((err) => {
+              console.error('Failed to enter fullscreen:', err);
+            });
+          }
+        });
+      });
+    }
 
     return () => {
       // Stop activity tracker when component unmounts
@@ -296,10 +305,6 @@
   });
 
   beforeNavigate(() => {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    }
-
     if (volume) {
       const { charCount, lineCount } = getCharCount(pages, page);
 

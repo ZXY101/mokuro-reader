@@ -8,6 +8,10 @@ let container: HTMLElement | undefined;
 
 export const panzoomStore = writable<PanZoom | undefined>(undefined);
 
+// Session-only store to track fullscreen state across volume navigation
+// undefined = not set yet (initial load), true/false = explicit state from user or navigation
+export const sessionFullscreenState = writable<boolean | undefined>(undefined);
+
 export function initPanzoom(node: HTMLElement) {
   container = node;
   pz = panzoom(node, {
@@ -214,7 +218,9 @@ export function keepInBounds() {
 export function toggleFullScreen() {
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen();
+    sessionFullscreenState.set(true);
   } else if (document.exitFullscreen) {
     document.exitFullscreen();
+    sessionFullscreenState.set(false);
   }
 }
