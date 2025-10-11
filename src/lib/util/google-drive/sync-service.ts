@@ -53,6 +53,36 @@ class SyncService {
     return files.length > 0 ? files[0].id : '';
   }
 
+  // Layer 1: Ensure token is valid and won't expire during sync
+  private async ensureTokenValid(): Promise<boolean> {
+    if (!tokenManager.isAuthenticated()) {
+      return false;
+    }
+
+    const timeLeft = tokenManager.getTimeUntilExpiry();
+
+    // If token expires in less than 2 minutes, try to refresh it silently
+    if (timeLeft !== null && timeLeft < 2 * 60 * 1000) {
+      console.log('⚡ Token expiring soon, pre-validating before sync...');
+
+      try {
+        // Attempt silent refresh (will use existing SSO session)
+        tokenManager.reAuthenticate();
+
+        // Give it a moment to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check if still authenticated after refresh attempt
+        return tokenManager.isAuthenticated();
+      } catch (error) {
+        console.error('Failed to pre-validate token:', error);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   async syncReadProgress(): Promise<void> {
     if (!tokenManager.isAuthenticated()) {
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN, 'true');
@@ -61,8 +91,17 @@ class SyncService {
       return;
     }
 
+    // Layer 1: Pre-validate token before sync
+    const tokenValid = await this.ensureTokenValid();
+    if (!tokenValid) {
+      showSnackbar('Session expired. Please sign in again to sync.');
+      localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN, 'true');
+      tokenManager.requestNewToken(false, false);
+      return;
+    }
+
     const processId = 'sync-read-progress';
-    
+
     try {
       progressTrackerStore.addProcess({
         id: processId,

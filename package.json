@@ -52,7 +52,9 @@
     "@vercel/analytics": "^1.5.0",
     "@zip.js/zip.js": "^2.7.57",
     "dexie": "^4.0.1-alpha.25",
+    "megajs": "^1.3.9",
     "panzoom": "^9.4.3",
-    "svelte-easy-crop": "^4.0.0"
+    "svelte-easy-crop": "^4.0.0",
+    "webdav": "^5.8.0"
   }
 }

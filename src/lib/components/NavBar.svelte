@@ -8,7 +8,7 @@
   import Icon from '$lib/assets/icon.webp';
   import { onMount } from 'svelte';
   import { showSnackbar, syncReadProgress } from '$lib/util';
-  import { driveState } from '$lib/util/google-drive';
+  import { driveState, tokenManager } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
 
   // Use $state to make these reactive
@@ -24,12 +24,32 @@
     needsAttention: false
   });
 
+  // Layer 1: Track token expiry for debug display
+  let tokenMinutesLeft = $state<number | null>(null);
+
   // Subscribe to drive state
   $effect(() => {
     const unsubscribe = driveState.subscribe(value => {
       state = value;
     });
     return unsubscribe;
+  });
+
+  // Update token minutes every 10 seconds when authenticated
+  $effect(() => {
+    if (!state.isAuthenticated) {
+      tokenMinutesLeft = null;
+      return;
+    }
+
+    const updateTokenTime = () => {
+      tokenMinutesLeft = tokenManager.getExpiryMinutes();
+    };
+
+    updateTokenTime(); // Initial update
+    const interval = setInterval(updateTokenTime, 10000); // Update every 10 seconds
+
+    return () => clearInterval(interval);
   });
 
   // Define event handlers
@@ -49,7 +69,15 @@
     // syncReadProgress handles login if not authenticated or in error state
     syncReadProgress();
   }
-  
+
+  // Layer 1: Manual token refresh handler
+  function handleTokenRefresh() {
+    if (state.isAuthenticated) {
+      tokenManager.reAuthenticate();
+      showSnackbar('Refreshing Google Drive session...');
+    }
+  }
+
   // Token changes are handled automatically by tokenManager
   // No need to manually listen to localStorage changes
 
@@ -96,6 +124,18 @@
           <CloudArrowUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
         {/if}
       </button>
+      {#if state.isAuthenticated && tokenMinutesLeft !== null}
+        <button
+          onclick={handleTokenRefresh}
+          class="flex items-center justify-center px-2 py-1 rounded text-xs font-mono cursor-pointer transition-colors
+            {tokenMinutesLeft > 30 ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20' :
+             tokenMinutesLeft > 10 ? 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' :
+             'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20'}"
+          title="Token expires in {tokenMinutesLeft} minutes. Click to refresh now."
+        >
+          {tokenMinutesLeft}m
+        </button>
+      {/if}
       <button
         onclick={handleSync}
         class="flex items-center justify-center w-6 h-6"
