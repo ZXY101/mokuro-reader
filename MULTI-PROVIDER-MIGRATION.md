@@ -40,9 +40,9 @@ interface SyncProvider {
 ## Remaining Work 🚧
 
 ### Phase 1: Implement Provider Methods
-- [ ] MEGA volume storage (upload/download/list/delete CBZ files)
+- [x] MEGA volume storage (upload/download/list/delete CBZ files) ✅
 - [ ] WebDAV volume storage (upload/download/list/delete CBZ files)
-- [ ] Google Drive provider wrapper (wrap existing Drive code)
+- [x] Google Drive provider wrapper (wrap existing Drive code) ✅
 
 ### Phase 2: Unified Cloud Manager
 - [ ] Create `unified-cloud-manager.ts`
