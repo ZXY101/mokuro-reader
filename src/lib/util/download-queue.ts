@@ -10,10 +10,15 @@ import { generateThumbnail } from '$lib/catalog/thumbnails';
 import { driveApiClient } from './google-drive/api-client';
 import { driveFilesCache } from './google-drive/drive-files-cache';
 import { miscSettings } from '$lib/settings/misc';
+import { unifiedCloudManager } from './sync/unified-cloud-manager';
+import { getCloudFileId, getCloudProvider, getCloudSize, getCloudModifiedTime } from './cloud-fields';
+import type { ProviderType } from './sync/provider-interface';
+import { BlobReader, ZipReader, Uint8ArrayWriter } from '@zip.js/zip.js';
 
 export interface QueueItem {
 	volumeUuid: string;
-	driveFileId: string;
+	cloudFileId: string;
+	cloudProvider: ProviderType;
 	seriesTitle: string;
 	volumeTitle: string;
 	volumeMetadata: VolumeMetadata;
@@ -69,16 +74,19 @@ queueStore.subscribe(queue => {
  * Add a single volume to the download queue
  */
 export function queueVolume(volume: VolumeMetadata): void {
-	if (!volume.isPlaceholder || !volume.driveFileId) {
-		console.warn('Can only queue placeholder volumes with Drive file IDs');
+	const cloudFileId = getCloudFileId(volume);
+	const cloudProvider = getCloudProvider(volume);
+
+	if (!volume.isPlaceholder || !cloudFileId || !cloudProvider) {
+		console.warn('Can only queue placeholder volumes with cloud file IDs');
 		return;
 	}
 
 	const queue = get(queueStore);
 
-	// Check for duplicates by volumeUuid or driveFileId
+	// Check for duplicates by volumeUuid or cloudFileId
 	const isDuplicate = queue.some(
-		item => item.volumeUuid === volume.volume_uuid || item.driveFileId === volume.driveFileId
+		item => item.volumeUuid === volume.volume_uuid || item.cloudFileId === cloudFileId
 	);
 
 	if (isDuplicate) {
@@ -88,7 +96,8 @@ export function queueVolume(volume: VolumeMetadata): void {
 
 	const queueItem: QueueItem = {
 		volumeUuid: volume.volume_uuid,
-		driveFileId: volume.driveFileId,
+		cloudFileId,
+		cloudProvider,
 		seriesTitle: volume.series_title,
 		volumeTitle: volume.volume_title,
 		volumeMetadata: volume,
@@ -106,7 +115,10 @@ export function queueVolume(volume: VolumeMetadata): void {
  * Add multiple volumes from a series to the queue
  */
 export function queueSeriesVolumes(volumes: VolumeMetadata[]): void {
-	const placeholders = volumes.filter(v => v.isPlaceholder && v.driveFileId);
+	const placeholders = volumes.filter(v => {
+		const cloudFileId = getCloudFileId(v);
+		return v.isPlaceholder && cloudFileId;
+	});
 
 	if (placeholders.length === 0) {
 		console.warn('No placeholder volumes to queue');
@@ -186,6 +198,29 @@ function initializeWorkerPool(): WorkerPool {
 
 	workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
 	return workerPool;
+}
+
+/**
+ * Decompress a CBZ file blob into entries
+ */
+async function decompressCbz(blob: Blob): Promise<DecompressedEntry[]> {
+	const reader = new BlobReader(blob);
+	const zipReader = new ZipReader(reader);
+	const entries = await zipReader.getEntries();
+
+	const decompressed: DecompressedEntry[] = [];
+	for (const entry of entries) {
+		if (entry.directory) continue;
+
+		const uint8Array = await entry.getData(new Uint8ArrayWriter());
+		decompressed.push({
+			filename: entry.filename,
+			data: uint8Array.buffer
+		});
+	}
+
+	await zipReader.close();
+	return decompressed;
 }
 
 /**
