@@ -16,6 +16,9 @@
   import type { DriveState } from '$lib/util/google-drive';
   import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
   import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
+  import { backupMultipleVolumesToCloud } from '$lib/util/backup';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { providerManager } from '$lib/util/sync';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -65,7 +68,7 @@
     });
   });
 
-  // Check if all volumes in series are backed up
+  // Check if all volumes in series are backed up (using unified cloud manager)
   let driveCache = $state(new Map());
   $effect(() => {
     return driveFilesCache.store.subscribe(value => {
@@ -73,14 +76,17 @@
     });
   });
 
+  // Check if any provider is authenticated
+  let hasAnyProvider = $derived(providerManager.hasAnyProvider());
+
   let allBackedUp = $derived.by(() => {
     if (!manga || manga.length === 0) return false;
-    return manga.every(vol => driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`));
+    return manga.every(vol => unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title));
   });
 
   let anyBackedUp = $derived.by(() => {
     if (!manga || manga.length === 0) return false;
-    return manga.some(vol => driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`));
+    return manga.some(vol => unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title));
   });
 
   async function confirmDelete(deleteStats = false, deleteDrive = false) {
@@ -190,8 +196,11 @@
 
   async function backupSeries() {
     if (!manga || manga.length === 0) return;
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+
+    // Check if any provider is authenticated
+    const provider = unifiedCloudManager.getDefaultProvider();
+    if (!provider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
 
@@ -203,9 +212,9 @@
     const currentSeriesTitle = manga[0].series_title;
     const currentProcessId = `backup-series-${currentSeriesTitle}`;
 
-    // Filter out already backed up volumes
+    // Filter out already backed up volumes using unified cloud manager
     const volumesToBackup = manga.filter(vol =>
-      !driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`)
+      !unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title)
     );
 
     if (volumesToBackup.length === 0) {
@@ -215,40 +224,33 @@
 
     progressTrackerStore.addProcess({
       id: currentProcessId,
-      description: `Backing up ${currentSeriesTitle}`,
+      description: `Backing up ${currentSeriesTitle} to ${provider.name}`,
       progress: 0,
       status: `0/${volumesToBackup.length} volumes`
     });
 
-    let successCount = 0;
-    let failCount = 0;
-
-    try {
-      for (let i = 0; i < volumesToBackup.length; i++) {
-        const volume = volumesToBackup[i];
-        const progress = Math.round(((i + 1) / volumesToBackup.length) * 100);
-
+    // Use the batch backup function with progress tracking
+    const result = await backupMultipleVolumesToCloud(
+      volumesToBackup,
+      provider.type,
+      (completed, total, currentVolume) => {
+        const progress = (completed / total) * 100;
         progressTrackerStore.updateProcess(currentProcessId, {
           progress,
-          status: `${i + 1}/${volumesToBackup.length}: ${volume.volume_title}`
+          status: `${completed}/${total}: ${currentVolume}`
         });
-
-        try {
-          await backupVolumeToDrive(volume);
-          successCount++;
-        } catch (error) {
-          console.error(`Failed to backup ${volume.volume_title}:`, error);
-          failCount++;
-        }
       }
-    } finally {
-      progressTrackerStore.removeProcess(currentProcessId);
-    }
+    );
 
-    if (failCount === 0) {
-      showSnackbar(`Successfully backed up ${successCount} volumes`, 'success');
+    progressTrackerStore.removeProcess(currentProcessId);
+
+    // Refresh cloud files to show newly backed up volumes
+    await unifiedCloudManager.fetchAllCloudVolumes();
+
+    if (result.failed === 0) {
+      showSnackbar(`Successfully backed up ${result.succeeded} volumes`, 'success');
     } else {
-      showSnackbar(`Backed up ${successCount} volumes, ${failCount} failed`, 'error');
+      showSnackbar(`Backed up ${result.succeeded} volumes, ${result.failed} failed`, 'error');
     }
   }
 
@@ -366,37 +368,30 @@
         </div>
       </div>
       <div class="flex flex-row gap-2 items-start">
-        {#if state.isAuthenticated}
-          {#if state.isCacheLoading && !state.isCacheLoaded}
-            <Button color="light" disabled={true}>
-              <Spinner size="4" class="me-2" />
-              Loading Drive status...
+        {#if hasAnyProvider}
+          {#if !allBackedUp}
+            <Button
+              color="light"
+              on:click={backupSeries}
+              disabled={backingUpSeries}
+            >
+              {#if backingUpSeries}
+                <Spinner size="4" class="me-2" />
+                Backing up {backupProgress}
+              {:else}
+                <CloudArrowUpOutline class="w-4 h-4 me-2" />
+                {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to cloud'}
+              {/if}
             </Button>
-          {:else}
-            {#if !allBackedUp}
-              <Button
-                color="light"
-                on:click={backupSeries}
-                disabled={backingUpSeries}
-              >
-                {#if backingUpSeries}
-                  <Spinner size="4" class="me-2" />
-                  Backing up {backupProgress}
-                {:else}
-                  <CloudArrowUpOutline class="w-4 h-4 me-2" />
-                  {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
-                {/if}
-              </Button>
-            {/if}
-            {#if anyBackedUp}
-              <Button
-                color="red"
-                on:click={onDeleteFromDrive}
-              >
-                <TrashBinSolid class="w-4 h-4 me-2" />
-                Delete series from Drive
-              </Button>
-            {/if}
+          {/if}
+          {#if anyBackedUp && state.isAuthenticated}
+            <Button
+              color="red"
+              on:click={onDeleteFromDrive}
+            >
+              <TrashBinSolid class="w-4 h-4 me-2" />
+              Delete series from Drive
+            </Button>
           {/if}
         {/if}
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
