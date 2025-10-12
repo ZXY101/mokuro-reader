@@ -4,6 +4,7 @@
   import { backupVolumeToCloud } from '$lib/util/backup';
   import { showSnackbar } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { providerManager } from '$lib/util/sync';
   import type { VolumeMetadata } from '$lib/types';
   import type { ProviderType } from '$lib/util/sync/provider-interface';
   import type { CloudVolumeWithProvider } from '$lib/util/sync/unified-cloud-manager';
@@ -30,10 +31,21 @@
     return () => unsubscribers.forEach(unsub => unsub());
   });
 
-  // Check if this volume exists in any cloud provider
-  let cloudFile = $derived(
-    unifiedCloudManager.getCloudFile(volume.series_title, volume.volume_title)
-  );
+  // Subscribe to provider manager status for reactive authentication state
+  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
+  $effect(() => {
+    return providerManager.status.subscribe(value => {
+      providerStatus = value;
+    });
+  });
+  let hasAuthenticatedProvider = $derived(providerStatus.hasAnyAuthenticated);
+
+  // Check if this volume exists in any cloud provider (reactive to cloudFiles changes)
+  let cloudFile = $derived.by(() => {
+    // This derived explicitly depends on cloudFiles state
+    const path = `${volume.series_title}/${volume.volume_title}.cbz`;
+    return cloudFiles.find(f => f.path === path);
+  });
   let isBackedUp = $derived(cloudFile !== undefined);
   let backupProvider = $derived(cloudFile?.provider);
 
@@ -42,9 +54,6 @@
     const provider = unifiedCloudManager.getDefaultProvider();
     return provider ? provider.type : null;
   }
-
-  // Check if any provider is authenticated
-  let hasAuthenticatedProvider = $derived(getDefaultProvider() !== null);
 
   async function handleBackup(e: MouseEvent) {
     e.stopPropagation();

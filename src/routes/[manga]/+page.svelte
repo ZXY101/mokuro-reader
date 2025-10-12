@@ -12,7 +12,7 @@
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats } from '$lib/settings';
-  import { driveState, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
+  import { driveState, driveFilesCache } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
   import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
   import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
@@ -76,17 +76,54 @@
     });
   });
 
-  // Check if any provider is authenticated
-  let hasAnyProvider = $derived(providerManager.hasAnyAuthenticated());
+  // Subscribe to unified cloud cache updates
+  let cloudFiles = $state<any[]>([]);
 
-  let allBackedUp = $derived.by(() => {
-    if (!manga || manga.length === 0) return false;
-    return manga.every(vol => unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title));
+  $effect(() => {
+    return unifiedCloudManager.cloudFiles.subscribe(value => {
+      console.log('[Series Page] Cloud files updated:', value.length, 'files');
+      cloudFiles = value;
+    });
   });
 
-  let anyBackedUp = $derived.by(() => {
-    if (!manga || manga.length === 0) return false;
-    return manga.some(vol => unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title));
+  // Subscribe to provider manager status for reactive authentication state
+  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
+  $effect(() => {
+    return providerManager.status.subscribe(value => {
+      console.log('[Series Page] Provider status updated:', value.hasAnyAuthenticated, value);
+      providerStatus = value;
+    });
+  });
+  let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
+
+  // Debug logging for reactive values
+  $effect(() => {
+    console.log('[Series Page] Reactive values - hasAnyProvider:', hasAnyProvider, 'allBackedUp:', allBackedUp, 'anyBackedUp:', anyBackedUp);
+  });
+
+  // Use $effect to manually compute these values when cloudFiles changes
+  let allBackedUp = $state(false);
+  let anyBackedUp = $state(false);
+
+  $effect(() => {
+    // This effect runs whenever cloudFiles changes
+    if (!manga || manga.length === 0) {
+      allBackedUp = false;
+      anyBackedUp = false;
+      return;
+    }
+
+    allBackedUp = manga.every(vol => {
+      const path = `${vol.series_title}/${vol.volume_title}.cbz`;
+      return cloudFiles.some(f => f.path === path);
+    });
+
+    anyBackedUp = manga.some(vol => {
+      const path = `${vol.series_title}/${vol.volume_title}.cbz`;
+      return cloudFiles.some(f => f.path === path);
+    });
+
+    console.log('[Series Page] Backup status computed - allBackedUp:', allBackedUp, 'anyBackedUp:', anyBackedUp, 'cloudFiles:', cloudFiles.length);
   });
 
   async function confirmDelete(deleteStats = false, deleteDrive = false) {
@@ -115,43 +152,53 @@
   async function deleteSeriesFromDrive(volumes: VolumeMetadata[]) {
     if (!volumes || volumes.length === 0) return;
 
-    // Get any file from the series to find the parent folder ID
-    const sampleFile = driveFilesCache.getDriveFile(volumes[0].series_title, volumes[0].volume_title);
-    if (!sampleFile || !sampleFile.parentId) {
-      showSnackbar('Series folder not found in Drive', 'error');
+    const seriesTitle = volumes[0].series_title;
+
+    // Check if any volumes are backed up
+    const backedUpVolumes = cloudFiles.filter(f => {
+      const path = f.path;
+      return path.startsWith(`${seriesTitle}/`);
+    });
+
+    if (backedUpVolumes.length === 0) {
+      showSnackbar('No volumes found in cloud', 'info');
       return;
     }
 
     try {
-      // Trash the folder using the ID from cache (no query needed, works with all characters)
-      await driveApiClient.trashFile(sampleFile.parentId);
+      // Use the new deleteSeriesFolder method which deletes the entire folder
+      // The unified manager automatically updates its cache, so no need to fetch again
+      const result = await unifiedCloudManager.deleteSeriesFolder(seriesTitle);
 
-      // Remove all volumes from cache
-      for (const vol of volumes) {
-        driveFilesCache.removeDriveFile(vol.series_title, vol.volume_title);
+      if (result.failed === 0) {
+        showSnackbar(`Deleted ${result.succeeded} volume(s) from cloud`, 'success');
+      } else {
+        showSnackbar(`Deleted ${result.succeeded} volume(s), ${result.failed} failed`, 'error');
       }
-
-      showSnackbar(`Moved series folder to Drive trash`, 'success');
     } catch (error) {
-      console.error('Failed to delete series from Drive:', error);
-      showSnackbar('Failed to delete from Drive', 'error');
+      console.error('Failed to delete series from cloud:', error);
+      showSnackbar('Failed to delete from cloud', 'error');
+      // Refresh cache to restore correct state on error
+      await unifiedCloudManager.fetchAllCloudVolumes();
     }
   }
 
   async function onDeleteFromDrive() {
     if (!manga || manga.length === 0) return;
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+
+    // Check if any provider is authenticated
+    if (!hasAnyProvider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
 
     if (!anyBackedUp) {
-      showSnackbar('No backups found in Drive', 'info');
+      showSnackbar('No backups found in cloud', 'info');
       return;
     }
 
     promptConfirmation(
-      `Delete ${manga[0].series_title} from Google Drive?`,
+      `Delete ${manga[0].series_title} from cloud storage?`,
       async () => {
         await deleteSeriesFromDrive(manga);
       }
@@ -368,6 +415,7 @@
         </div>
       </div>
       <div class="flex flex-row gap-2 items-start">
+        <!-- Debug: hasAnyProvider={hasAnyProvider}, allBackedUp={allBackedUp}, anyBackedUp={anyBackedUp} -->
         {#if hasAnyProvider}
           {#if !allBackedUp}
             <Button
@@ -384,13 +432,13 @@
               {/if}
             </Button>
           {/if}
-          {#if anyBackedUp && state.isAuthenticated}
+          {#if anyBackedUp}
             <Button
               color="red"
               on:click={onDeleteFromDrive}
             >
               <TrashBinSolid class="w-4 h-4 me-2" />
-              Delete series from Drive
+              Delete series from cloud
             </Button>
           {/if}
         {/if}

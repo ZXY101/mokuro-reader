@@ -277,19 +277,25 @@ export async function backupMultipleVolumesToCloud(
     for (const volume of batch) {
       try {
         onProgress?.(successCount + failCount, volumes.length, volume.volume_title);
-        await backupVolumeToCloud(volume, provider);
+        await backupVolumeToCloud(volume, provider, (step) => {
+          console.log(`[Backup] ${volume.volume_title}: ${step}`);
+        });
         successCount++;
+        console.log(`[Backup] Successfully backed up ${volume.volume_title} (${successCount}/${volumes.length})`);
       } catch (error) {
-        console.error(`Failed to backup ${volume.volume_title} to ${provider}:`, error);
+        console.error(`[Backup] Failed to backup ${volume.volume_title} to ${provider}:`, error);
         failCount++;
+        // Continue with next volume instead of stopping
       }
     }
 
     // Delay between batches to allow garbage collection
     if (batchStart + BATCH_SIZE < volumes.length) {
+      console.log(`[Backup] Batch complete, pausing for GC...`);
       await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
   }
 
+  console.log(`[Backup] Complete: ${successCount} succeeded, ${failCount} failed`);
   return { succeeded: successCount, failed: failCount };
 }

@@ -2,7 +2,8 @@ import { writable, derived, type Readable } from 'svelte/store';
 import type { SyncProvider, CloudVolumeMetadata, ProviderType } from './provider-interface';
 import { googleDriveProvider } from './providers/google-drive/google-drive-provider';
 import { megaProvider } from './providers/mega/mega-provider';
-// import { webdavProvider } from './providers/webdav/webdav-provider';
+import { webdavProvider } from './providers/webdav/webdav-provider';
+import { unifiedSyncService, type SyncOptions, type SyncResult } from './unified-sync-service';
 
 /**
  * Unified Cloud Manager
@@ -21,8 +22,8 @@ export interface CloudVolumeWithProvider extends CloudVolumeMetadata {
 class UnifiedCloudManager {
 	private providers: SyncProvider[] = [
 		googleDriveProvider,
-		megaProvider
-		// webdavProvider // TODO: Add when WebDAV implementation is complete
+		megaProvider,
+		webdavProvider
 	];
 
 	private cloudFilesStore = writable<CloudVolumeWithProvider[]>([]);
@@ -223,6 +224,71 @@ class UnifiedCloudManager {
 	}
 
 	/**
+	 * Delete an entire series folder (all volumes in the series)
+	 * This will delete the series folder itself, not individual files
+	 */
+	async deleteSeriesFolder(seriesTitle: string): Promise<{ succeeded: number; failed: number }> {
+		// Get all volumes for this series
+		const seriesVolumes = this.getCloudVolumesBySeries(seriesTitle);
+
+		if (seriesVolumes.length === 0) {
+			return { succeeded: 0, failed: 0 };
+		}
+
+		// Group by provider
+		const volumesByProvider = new Map<ProviderType, CloudVolumeWithProvider[]>();
+		for (const volume of seriesVolumes) {
+			const existing = volumesByProvider.get(volume.provider);
+			if (existing) {
+				existing.push(volume);
+			} else {
+				volumesByProvider.set(volume.provider, [volume]);
+			}
+		}
+
+		let successCount = 0;
+		let failCount = 0;
+
+		// For each provider, delete the series folder
+		for (const [providerType, volumes] of volumesByProvider.entries()) {
+			const provider = this.getProvider(providerType);
+			if (!provider) {
+				failCount += volumes.length;
+				continue;
+			}
+
+			// Check if provider has a deleteSeriesFolder method
+			if ('deleteSeriesFolder' in provider && typeof provider.deleteSeriesFolder === 'function') {
+				try {
+					await (provider as any).deleteSeriesFolder(seriesTitle);
+					successCount += volumes.length;
+
+					// Remove all volumes from cache
+					for (const volume of volumes) {
+						this.removeFromCache(volume.fileId);
+					}
+				} catch (error) {
+					console.error(`Failed to delete series folder from ${providerType}:`, error);
+					failCount += volumes.length;
+				}
+			} else {
+				// Fallback: delete individual files if provider doesn't support folder deletion
+				for (const volume of volumes) {
+					try {
+						await this.deleteVolumeCbz(volume.fileId);
+						successCount++;
+					} catch (error) {
+						console.error(`Failed to delete ${volume.path}:`, error);
+						failCount++;
+					}
+				}
+			}
+		}
+
+		return { succeeded: successCount, failed: failCount };
+	}
+
+	/**
 	 * Check if a volume exists in any provider by path
 	 */
 	existsInCloud(seriesTitle: string, volumeTitle: string): boolean {
@@ -297,6 +363,47 @@ class UnifiedCloudManager {
 				v.fileId === fileId ? { ...v, ...updates } : v
 			);
 		});
+	}
+
+	/**
+	 * Sync progress (volume data and optionally profiles) with all authenticated providers
+	 */
+	async syncProgress(options?: SyncOptions): Promise<SyncResult> {
+		return await unifiedSyncService.syncAllProviders(this.providers, options);
+	}
+
+	/**
+	 * Sync with a specific provider
+	 */
+	async syncWithProvider(providerType: ProviderType, options?: SyncOptions): Promise<SyncResult> {
+		const provider = this.getProvider(providerType);
+		if (!provider) {
+			return {
+				totalProviders: 0,
+				succeeded: 0,
+				failed: 1,
+				results: [{
+					provider: providerType,
+					success: false,
+					error: 'Provider not found'
+				}]
+			};
+		}
+
+		const result = await unifiedSyncService.syncProvider(provider, options);
+		return {
+			totalProviders: 1,
+			succeeded: result.success ? 1 : 0,
+			failed: result.success ? 0 : 1,
+			results: [result]
+		};
+	}
+
+	/**
+	 * Check if sync is currently in progress
+	 */
+	get isSyncing(): Readable<boolean> {
+		return unifiedSyncService.isSyncing;
 	}
 }
 

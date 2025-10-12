@@ -1,7 +1,6 @@
 import { browser } from '$app/environment';
 import { writable } from 'svelte/store';
-import { syncReadProgress } from './google-drive';
-import { tokenManager } from './google-drive/token-manager';
+import { unifiedCloudManager } from './sync/unified-cloud-manager';
 
 type ActivityCallback = {
   onActive: () => void;
@@ -27,9 +26,11 @@ class ActivityTracker {
           this.callbacks?.onInactive();
 
           // Sync only when transitioning from active to inactive
-          if (wasActive && !active && tokenManager.isAuthenticated()) {
+          // Check if any provider is authenticated
+          const authenticatedProviders = unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated());
+          if (wasActive && !active && authenticatedProviders.length > 0) {
             console.log('Auto-syncing due to inactivity...');
-            syncReadProgress().catch(error => {
+            unifiedCloudManager.syncProgress({ silent: true }).catch(error => {
               console.error('Auto-sync failed:', error);
             });
           }

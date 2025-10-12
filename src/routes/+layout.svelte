@@ -20,9 +20,12 @@
 
   inject({ mode: dev ? 'development' : 'production' });
 
-  // Initialize sync providers on app startup
+  // Initialize sync providers on app startup (non-blocking)
   onMount(() => {
-    initializeProviders();
+    // Fire and forget - don't block app initialization
+    initializeProviders().catch((error) => {
+      console.error('Failed to initialize providers:', error);
+    });
   });
 </script>
 

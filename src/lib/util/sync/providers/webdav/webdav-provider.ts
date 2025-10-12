@@ -24,11 +24,22 @@ export class WebDAVProvider implements SyncProvider {
 	readonly name = 'WebDAV';
 
 	private client: WebDAVClient | null = null;
+	private initPromise: Promise<void>;
 
 	constructor() {
 		if (browser) {
-			this.loadPersistedCredentials();
+			this.initPromise = this.loadPersistedCredentials();
+		} else {
+			this.initPromise = Promise.resolve();
 		}
+	}
+
+	/**
+	 * Wait for provider initialization to complete
+	 * Use this to ensure credentials have been restored before checking authentication
+	 */
+	async whenReady(): Promise<void> {
+		await this.initPromise;
 	}
 
 	isAuthenticated(): boolean {

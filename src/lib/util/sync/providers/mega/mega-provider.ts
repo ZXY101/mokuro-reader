@@ -24,11 +24,22 @@ export class MegaProvider implements SyncProvider {
 
 	private storage: any = null;
 	private mokuroFolder: any = null;
+	private initPromise: Promise<void>;
 
 	constructor() {
 		if (browser) {
-			this.loadPersistedCredentials();
+			this.initPromise = this.loadPersistedCredentials();
+		} else {
+			this.initPromise = Promise.resolve();
 		}
+	}
+
+	/**
+	 * Wait for provider initialization to complete
+	 * Use this to ensure credentials have been restored before checking authentication
+	 */
+	async whenReady(): Promise<void> {
+		await this.initPromise;
 	}
 
 	isAuthenticated(): boolean {
@@ -203,7 +214,7 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	private async loadPersistedCredentials(): Promise<void> {
+	async loadPersistedCredentials(): Promise<void> {
 		if (!browser) return;
 
 		const email = localStorage.getItem(STORAGE_KEYS.EMAIL);
@@ -255,12 +266,10 @@ export class MegaProvider implements SyncProvider {
 			// In megajs, all files are available via storage.files
 			const files = Object.values(this.storage.files || {});
 
-			// Find root folder (has no parent)
-			const rootFiles = files.filter((f: any) => !f.parent && f.directory);
-
-			// Find mokuro-reader folder in root
+			// Find mokuro-reader folder anywhere, regardless of parent
+			// Note: We don't check parent because MEGA's root folder location varies by account/locale
 			let mokuroFolder = files.find(
-				(f: any) => f.name === MOKURO_FOLDER && f.directory && !f.parent
+				(f: any) => f.name === MOKURO_FOLDER && f.directory
 			);
 
 			if (!mokuroFolder) {
@@ -385,7 +394,28 @@ export class MegaProvider implements SyncProvider {
 			// Get all files from storage
 			const files = Object.values(this.storage.files || {});
 
-			// Filter CBZ files that are in mokuro-reader folder or its subfolders
+			// DEBUG: Log what we're seeing in MEGA
+			console.log(`🔍 MEGA Debug: Total files/folders in storage: ${files.length}`);
+			const rootItems = files.filter((f: any) => !f.parent);
+			console.log(`🔍 MEGA Debug: Root items: ${rootItems.length}`);
+			rootItems.forEach((item: any) => {
+				console.log(`  - ${item.directory ? '[DIR]' : '[FILE]'} ${item.name}`);
+			});
+
+			const allCbzFiles = files.filter((f: any) => !f.directory && (f.name || '').toLowerCase().endsWith('.cbz'));
+			console.log(`🔍 MEGA Debug: Total CBZ files anywhere: ${allCbzFiles.length}`);
+			allCbzFiles.slice(0, 5).forEach((f: any) => {
+				console.log(`  - ${f.name} (parent: ${f.parent?.name || 'root'})`);
+			});
+
+			// Find ALL mokuro-reader folders (there may be multiple from different sessions)
+			// Note: We don't check parent because MEGA's root folder location varies by account/locale
+			const mokuroFolders = files.filter(
+				(f: any) => f.name === MOKURO_FOLDER && f.directory
+			);
+			console.log(`🔍 MEGA Debug: Found ${mokuroFolders.length} mokuro-reader folder(s)`);
+
+			// Filter CBZ files that are in ANY mokuro-reader folder or its subfolders
 			const cbzFiles: import('../../provider-interface').CloudVolumeMetadata[] = [];
 
 			for (const file of files) {
@@ -396,14 +426,23 @@ export class MegaProvider implements SyncProvider {
 				const name = (file as any).name || '';
 				if (!name.toLowerCase().endsWith('.cbz')) continue;
 
-				// Check if file is in mokuro-reader folder or subfolder
+				// Check if file is in ANY mokuro-reader folder or subfolder
 				let parent = (file as any).parent;
 				let pathParts: string[] = [];
 				let foundMokuroRoot = false;
+				let isInTrash = false;
 
-				// Walk up the tree to build path and verify it's under mokuro-reader
+				// Walk up the tree to build path and verify it's under a mokuro-reader folder
 				while (parent) {
-					if (parent === this.mokuroFolder) {
+					// Check if any parent is the Rubbish Bin (trash)
+					if (parent.name === 'Rubbish Bin') {
+						isInTrash = true;
+						break;
+					}
+
+					// Check if this parent is ANY mokuro-reader folder
+					const isMokuroFolder = mokuroFolders.some((mf: any) => mf === parent);
+					if (isMokuroFolder) {
 						foundMokuroRoot = true;
 						break;
 					}
@@ -413,7 +452,10 @@ export class MegaProvider implements SyncProvider {
 					parent = parent.parent;
 				}
 
-				// If we found mokuro root, this file is under mokuro-reader
+				// Skip files in trash
+				if (isInTrash) continue;
+
+				// If we found mokuro root, this file is under a mokuro-reader folder
 				if (foundMokuroRoot) {
 					// Build path as "SeriesTitle/VolumeTitle.cbz"
 					pathParts.push(name);
@@ -627,6 +669,48 @@ export class MegaProvider implements SyncProvider {
 		} catch (error) {
 			throw new ProviderError(
 				`Failed to delete volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'mega',
+				'DELETE_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	/**
+	 * Delete an entire series folder
+	 */
+	async deleteSeriesFolder(seriesTitle: string): Promise<void> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			await this.ensureMokuroFolder();
+
+			// Find the series folder
+			const children = await this.listFolder(this.mokuroFolder);
+			const seriesFolder = children.find((f: any) => f.name === seriesTitle && f.directory);
+
+			if (!seriesFolder) {
+				console.log(`Series folder '${seriesTitle}' not found in MEGA`);
+				return;
+			}
+
+			// Delete the folder (recursive delete)
+			await new Promise<void>((resolve, reject) => {
+				seriesFolder.delete(true, (error: Error | null) => {
+					if (error) {
+						reject(error);
+					} else {
+						console.log(`✅ Deleted series folder '${seriesTitle}' from MEGA`);
+						resolve();
+					}
+				});
+			});
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to delete series folder: ${error instanceof Error ? error.message : 'Unknown error'}`,
 				'mega',
 				'DELETE_FAILED',
 				false,

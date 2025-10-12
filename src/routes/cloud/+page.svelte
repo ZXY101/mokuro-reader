@@ -66,8 +66,10 @@
     return () => unsubscribers.forEach(unsub => unsub());
   });
 
-  // Check which provider (if any) is authenticated
-  let hasAnyProvider = $derived(accessToken || megaProvider.isAuthenticated() || webdavProvider.isAuthenticated());
+  // Check which provider (if any) is authenticated (platform-agnostic)
+  let hasAnyProvider = $derived(
+    unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated()).length > 0
+  );
 
   // MEGA login state
   let megaEmail = $state('');
@@ -186,11 +188,6 @@
       }
     }
   }
-
-  onMount(() => {
-    // Clear service worker cache for Google Drive downloads
-    clearServiceWorkerCache();
-  });
 
   async function createPicker() {
     // Ensure reader folder exists first
@@ -700,18 +697,43 @@
   }
   
   onMount(async () => {
+    console.log('🔵 onMount: Starting cloud page initialization');
+
     // Clear service worker cache for Google Drive downloads
+    console.log('🔵 onMount: Clearing service worker cache');
     clearServiceWorkerCache();
+
+    // Wait for MEGA/WebDAV providers to finish initializing
+    // This ensures credentials have been restored before we check authentication
+    console.log('🔵 onMount: Waiting for providers to be ready...');
+    await Promise.all([
+      megaProvider.whenReady(),
+      webdavProvider.whenReady()
+    ]);
+    console.log('🔵 onMount: Providers are ready');
+
+    // Check authentication status for all providers
+    const megaAuth = megaProvider.isAuthenticated();
+    const webdavAuth = webdavProvider.isAuthenticated();
+    const gdriveAuth = !!accessToken;
+    console.log(`🔵 onMount: Authentication status - MEGA: ${megaAuth}, WebDAV: ${webdavAuth}, GDrive: ${gdriveAuth}`);
+
+    // Use the unified cloud manager's method to check if any provider is authenticated
+    const authenticatedProviders = unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated());
+    console.log(`🔵 onMount: ${authenticatedProviders.length} provider(s) authenticated:`, authenticatedProviders.map(p => p.name).join(', '));
 
     // Fetch cloud files if any provider is authenticated
     // This handles page refresh or restored login sessions
-    if (hasAnyProvider) {
+    if (authenticatedProviders.length > 0) {
       try {
+        console.log('🔵 onMount: Calling fetchAllCloudVolumes...');
         await unifiedCloudManager.fetchAllCloudVolumes();
-        console.log('Cloud cache populated on mount');
+        console.log('✅ onMount: Cloud cache populated successfully');
       } catch (error) {
-        console.warn('Failed to fetch cloud volumes on mount:', error);
+        console.warn('❌ onMount: Failed to fetch cloud volumes:', error);
       }
+    } else {
+      console.log('🔵 onMount: No providers authenticated, skipping cache fetch');
     }
   });
 

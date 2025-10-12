@@ -407,6 +407,53 @@ export class GoogleDriveProvider implements SyncProvider {
 	}
 
 	/**
+	 * Delete an entire series folder
+	 */
+	async deleteSeriesFolder(seriesTitle: string): Promise<void> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// Ensure reader folder exists to get its ID
+			const readerFolderId = await this.ensureReaderFolder();
+
+			// Find the series folder using escapeNameForDriveQuery
+			const { escapeNameForDriveQuery } = await import('$lib/util/google-drive/api-client');
+			const escapedName = escapeNameForDriveQuery(seriesTitle);
+			const query = `'${readerFolderId}' in parents and name='${escapedName}' and mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}' and trashed=false`;
+
+			const folders = await driveApiClient.listFiles(query, 'files(id)');
+
+			if (folders.length === 0) {
+				console.log(`Series folder '${seriesTitle}' not found in Google Drive`);
+				return;
+			}
+
+			// Delete the folder
+			const folderId = folders[0].id;
+			await driveApiClient.deleteFile(folderId);
+
+			// Remove all files in this series from cache
+			const allFiles = driveFilesCache.getAllDriveFiles();
+			const filesToRemove = allFiles.filter(file => file.path.startsWith(`${seriesTitle}/`));
+			for (const file of filesToRemove) {
+				driveFilesCache.removeDriveFileById(file.fileId);
+			}
+
+			console.log(`✅ Deleted series folder '${seriesTitle}' from Google Drive`);
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to delete series folder: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'google-drive',
+				'DELETE_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	/**
 	 * Ensure the mokuro-reader folder exists in Google Drive
 	 */
 	private async ensureReaderFolder(): Promise<string> {

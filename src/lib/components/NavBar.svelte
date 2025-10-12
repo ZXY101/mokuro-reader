@@ -7,9 +7,10 @@
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
   import { onMount } from 'svelte';
-  import { showSnackbar, syncReadProgress } from '$lib/util';
+  import { showSnackbar } from '$lib/util';
   import { driveState, tokenManager } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
 
   // Use $state to make these reactive
   let settingsHidden = $state(true);
@@ -27,12 +28,28 @@
   // Layer 1: Track token expiry for debug display
   let tokenMinutesLeft = $state<number | null>(null);
 
+  // Track if any cloud providers are authenticated
+  let hasAuthenticatedProviders = $state<boolean>(false);
+
   // Subscribe to drive state
   $effect(() => {
     const unsubscribe = driveState.subscribe(value => {
       state = value;
     });
     return unsubscribe;
+  });
+
+  // Check for authenticated providers periodically
+  $effect(() => {
+    const checkProviders = () => {
+      const authenticated = unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated());
+      hasAuthenticatedProviders = authenticated.length > 0;
+    };
+
+    checkProviders(); // Initial check
+    const interval = setInterval(checkProviders, 5000); // Check every 5 seconds
+
+    return () => clearInterval(interval);
   });
 
   // Update token minutes every 10 seconds when authenticated
@@ -66,8 +83,11 @@
   }
   
   function handleSync() {
-    // syncReadProgress handles login if not authenticated or in error state
-    syncReadProgress();
+    // Sync with all authenticated providers
+    unifiedCloudManager.syncProgress().catch(error => {
+      console.error('Manual sync failed:', error);
+      showSnackbar('Sync failed');
+    });
   }
 
   // Layer 1: Manual token refresh handler
@@ -136,13 +156,15 @@
           {tokenMinutesLeft}m
         </button>
       {/if}
-      <button
-        onclick={handleSync}
-        class="flex items-center justify-center w-6 h-6"
-        title={state.isAuthenticated ? "Sync read progress with Google Drive" : "Sign in to sync"}
-      >
-        <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
-      </button>
+      {#if hasAuthenticatedProviders}
+        <button
+          onclick={handleSync}
+          class="flex items-center justify-center w-6 h-6"
+          title="Sync read progress with cloud providers"
+        >
+          <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+        </button>
+      {/if}
     </div>
   </Navbar>
 </div>
