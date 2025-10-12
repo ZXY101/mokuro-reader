@@ -2,6 +2,8 @@ import type { VolumeMetadata } from '$lib/types';
 import { driveApiClient, escapeNameForDriveQuery } from './google-drive/api-client';
 import { driveFilesCache } from './google-drive/drive-files-cache';
 import { createArchiveBlob } from './zip';
+import { unifiedCloudManager } from './sync/unified-cloud-manager';
+import type { ProviderType } from './sync/provider-interface';
 
 /**
  * Uploads a CBZ blob to Google Drive
@@ -187,6 +189,98 @@ export async function backupMultipleVolumesToDrive(
         successCount++;
       } catch (error) {
         console.error(`Failed to backup ${volume.volume_title}:`, error);
+        failCount++;
+      }
+    }
+
+    // Delay between batches to allow garbage collection
+    if (batchStart + BATCH_SIZE < volumes.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+    }
+  }
+
+  return { succeeded: successCount, failed: failCount };
+}
+
+//
+// ========================================
+// MULTI-PROVIDER BACKUP FUNCTIONS (NEW)
+// ========================================
+//
+
+/**
+ * Backs up a volume to any cloud provider via unified cloud manager
+ * @param volume The volume to backup
+ * @param provider The cloud provider to upload to ('google-drive', 'mega', 'webdav')
+ * @param onProgress Optional progress callback
+ * @returns Promise resolving to the uploaded file ID
+ */
+export async function backupVolumeToCloud(
+  volume: VolumeMetadata,
+  provider: ProviderType,
+  onProgress?: (step: string) => void
+): Promise<string> {
+  let cbzBlob: Blob | null = null;
+
+  try {
+    // Create CBZ using the shared function
+    onProgress?.('Creating archive...');
+    cbzBlob = await createArchiveBlob([volume]);
+
+    // Build cloud path (SeriesTitle/VolumeTitle.cbz)
+    const path = `${volume.series_title}/${volume.volume_title}.cbz`;
+
+    // Upload via unified cloud manager (auto-routes to correct provider)
+    onProgress?.(`Uploading to ${provider}...`);
+    const fileId = await unifiedCloudManager.uploadVolumeCbz(
+      provider,
+      path,
+      cbzBlob
+    );
+
+    // Cache is automatically updated by unified cloud manager
+    return fileId;
+  } finally {
+    // Explicit memory cleanup
+    cbzBlob = null;
+
+    // Hint to garbage collector (non-standard but helps in V8/Chrome)
+    if (typeof (globalThis as any).gc === 'function') {
+      (globalThis as any).gc();
+    }
+  }
+}
+
+/**
+ * Backs up multiple volumes to any cloud provider with batching and memory management
+ * @param volumes Array of volumes to backup
+ * @param provider The cloud provider to upload to
+ * @param onProgress Optional progress callback (completed, total, currentVolume)
+ * @returns Promise resolving to success/failure counts
+ */
+export async function backupMultipleVolumesToCloud(
+  volumes: VolumeMetadata[],
+  provider: ProviderType,
+  onProgress?: (completed: number, total: number, currentVolume: string) => void
+): Promise<{ succeeded: number; failed: number }> {
+  const BATCH_SIZE = 5; // Process 5 volumes at a time
+  const BATCH_DELAY_MS = 2000; // 2 second delay between batches for GC
+
+  let successCount = 0;
+  let failCount = 0;
+
+  // Process in batches
+  for (let batchStart = 0; batchStart < volumes.length; batchStart += BATCH_SIZE) {
+    const batch = volumes.slice(batchStart, batchStart + BATCH_SIZE);
+
+    // Process each volume in the batch
+    for (const volume of batch) {
+      try {
+        onProgress?.(successCount + failCount, volumes.length, volume.volume_title);
+        await backupVolumeToCloud(volume, provider);
+        successCount++;
+      } catch (error) {
+        console.error(`Failed to backup ${volume.volume_title} to ${provider}:`, error);
         failCount++;
       }
     }
