@@ -77,7 +77,7 @@
   });
 
   // Check if any provider is authenticated
-  let hasAnyProvider = $derived(providerManager.hasAnyProvider());
+  let hasAnyProvider = $derived(providerManager.hasAnyAuthenticated());
 
   let allBackedUp = $derived.by(() => {
     if (!manga || manga.length === 0) return false;
