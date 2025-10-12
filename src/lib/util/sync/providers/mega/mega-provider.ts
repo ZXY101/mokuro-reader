@@ -371,6 +371,298 @@ export class MegaProvider implements SyncProvider {
 			});
 		});
 	}
+
+	// VOLUME STORAGE METHODS
+
+	async listCloudVolumes(): Promise<import('../../provider-interface').CloudVolumeMetadata[]> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			await this.ensureMokuroFolder();
+
+			// Get all files from storage
+			const files = Object.values(this.storage.files || {});
+
+			// Filter CBZ files that are in mokuro-reader folder or its subfolders
+			const cbzFiles: import('../../provider-interface').CloudVolumeMetadata[] = [];
+
+			for (const file of files) {
+				// Skip non-files
+				if ((file as any).directory) continue;
+
+				// Check if file is a CBZ
+				const name = (file as any).name || '';
+				if (!name.toLowerCase().endsWith('.cbz')) continue;
+
+				// Check if file is in mokuro-reader folder or subfolder
+				let parent = (file as any).parent;
+				let pathParts: string[] = [];
+				let foundMokuroRoot = false;
+
+				// Walk up the tree to build path and verify it's under mokuro-reader
+				while (parent) {
+					if (parent === this.mokuroFolder) {
+						foundMokuroRoot = true;
+						break;
+					}
+					if (parent.name) {
+						pathParts.unshift(parent.name);
+					}
+					parent = parent.parent;
+				}
+
+				// If we found mokuro root, this file is under mokuro-reader
+				if (foundMokuroRoot) {
+					// Build path as "SeriesTitle/VolumeTitle.cbz"
+					pathParts.push(name);
+					const path = pathParts.join('/');
+
+					// Get file metadata
+					const fileId = (file as any).nodeId || (file as any).id || '';
+					const modifiedTime = (file as any).timestamp
+						? new Date((file as any).timestamp * 1000).toISOString()
+						: new Date().toISOString();
+					const size = (file as any).size || 0;
+
+					cbzFiles.push({
+						fileId,
+						path,
+						modifiedTime,
+						size
+					});
+				}
+			}
+
+			console.log(`✅ Listed ${cbzFiles.length} CBZ files from MEGA`);
+			return cbzFiles;
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to list cloud volumes: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'mega',
+				'LIST_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	async uploadVolumeCbz(
+		path: string,
+		blob: Blob,
+		description?: string
+	): Promise<string> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			await this.ensureMokuroFolder();
+
+			// Parse path: "SeriesTitle/VolumeTitle.cbz"
+			const pathParts = path.split('/');
+			const fileName = pathParts.pop() || path;
+			const seriesFolderName = pathParts.join('/');
+
+			// Find or create series folder if path includes subfolder
+			let targetFolder = this.mokuroFolder;
+			if (seriesFolderName) {
+				targetFolder = await this.ensureSeriesFolder(seriesFolderName);
+			}
+
+			// Convert Blob to ArrayBuffer
+			const arrayBuffer = await blob.arrayBuffer();
+			const buffer = new Uint8Array(arrayBuffer);
+
+			// Check if file already exists
+			const children = await this.listFolder(targetFolder);
+			const existingFile = children.find((f: any) => f.name === fileName && !f.directory);
+
+			// Delete existing file if found
+			if (existingFile) {
+				await new Promise<void>((resolve, reject) => {
+					existingFile.delete(true, (error: Error | null) => {
+						if (error) reject(error);
+						else resolve();
+					});
+				});
+			}
+
+			// Upload new file
+			return new Promise((resolve, reject) => {
+				targetFolder.upload(
+					{
+						name: fileName,
+						size: buffer.length
+					},
+					buffer,
+					(error: Error | null, file: any) => {
+						if (error) {
+							reject(error);
+						} else {
+							const fileId = file?.nodeId || file?.id || '';
+							console.log(`✅ Uploaded ${fileName} to MEGA (${fileId})`);
+							resolve(fileId);
+						}
+					}
+				);
+			});
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to upload volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'mega',
+				'UPLOAD_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	async downloadVolumeCbz(
+		fileId: string,
+		onProgress?: (loaded: number, total: number) => void
+	): Promise<Blob> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// Find the file by ID
+			const files = Object.values(this.storage.files || {});
+			const file = files.find(
+				(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
+			);
+
+			if (!file) {
+				throw new Error('File not found');
+			}
+
+			return new Promise((resolve, reject) => {
+				const fileObj = file as any;
+
+				// Use download with progress callback if provided
+				if (onProgress) {
+					// MEGA.js download supports progress via stream options
+					const stream = fileObj.download({ returnCiphertext: false });
+
+					const chunks: Uint8Array[] = [];
+					let loaded = 0;
+					const total = fileObj.size || 0;
+
+					stream.on('data', (chunk: Uint8Array) => {
+						chunks.push(chunk);
+						loaded += chunk.length;
+						onProgress(loaded, total);
+					});
+
+					stream.on('end', () => {
+						// Combine all chunks into a single Uint8Array
+						const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+						const combined = new Uint8Array(totalLength);
+						let offset = 0;
+						for (const chunk of chunks) {
+							combined.set(chunk, offset);
+							offset += chunk.length;
+						}
+
+						const blob = new Blob([combined], { type: 'application/zip' });
+						console.log(`✅ Downloaded ${fileObj.name} from MEGA`);
+						resolve(blob);
+					});
+
+					stream.on('error', (error: Error) => {
+						reject(error);
+					});
+				} else {
+					// Simple download without progress
+					fileObj.download((error: Error | null, data: Uint8Array) => {
+						if (error) {
+							reject(error);
+						} else {
+							const blob = new Blob([data], { type: 'application/zip' });
+							console.log(`✅ Downloaded ${fileObj.name} from MEGA`);
+							resolve(blob);
+						}
+					});
+				}
+			});
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to download volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'mega',
+				'DOWNLOAD_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	async deleteVolumeCbz(fileId: string): Promise<void> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// Find the file by ID
+			const files = Object.values(this.storage.files || {});
+			const file = files.find(
+				(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
+			);
+
+			if (!file) {
+				throw new Error('File not found');
+			}
+
+			return new Promise((resolve, reject) => {
+				(file as any).delete(true, (error: Error | null) => {
+					if (error) {
+						reject(error);
+					} else {
+						console.log(`✅ Deleted file from MEGA (${fileId})`);
+						resolve();
+					}
+				});
+			});
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to delete volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'mega',
+				'DELETE_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	/**
+	 * Ensure a series folder exists (may be nested path like "Series/Subseries")
+	 */
+	private async ensureSeriesFolder(folderPath: string): Promise<any> {
+		const pathParts = folderPath.split('/').filter(Boolean);
+		let currentFolder = this.mokuroFolder;
+
+		for (const folderName of pathParts) {
+			// Check if subfolder exists
+			const children = await this.listFolder(currentFolder);
+			let subfolder = children.find((f: any) => f.name === folderName && f.directory);
+
+			if (!subfolder) {
+				// Create subfolder under current folder
+				subfolder = await new Promise((resolve, reject) => {
+					currentFolder.mkdir(folderName, (error: Error | null, folder: any) => {
+						if (error) reject(error);
+						else resolve(folder);
+					});
+				});
+				console.log(`Created folder: ${folderName}`);
+			}
+
+			currentFolder = subfolder;
+		}
+
+		return currentFolder;
+	}
 }
 
 export const megaProvider = new MegaProvider();
