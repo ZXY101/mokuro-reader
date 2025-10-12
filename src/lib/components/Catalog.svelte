@@ -7,25 +7,18 @@
   import { miscSettings, updateMiscSetting, volumes } from '$lib/settings';
   import CatalogListItem from './CatalogListItem.svelte';
   import { isUpgrading } from '$lib/catalog/db';
-  import { driveState } from '$lib/util/google-drive';
-  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { queueSeriesVolumes } from '$lib/util/download-queue';
+  import { getCloudProvider } from '$lib/util/cloud-fields';
   import { showSnackbar } from '$lib/util';
-  import type { DriveState } from '$lib/util/google-drive';
+  import type { ProviderType } from '$lib/util/sync/provider-interface';
 
   let search = $state('');
 
-  let state = $state<DriveState>({
-    isAuthenticated: false,
-    isCacheLoading: false,
-    isCacheLoaded: false,
-    isFullyConnected: false,
-    needsAttention: false
-  });
-  $effect(() => {
-    return driveState.subscribe(value => {
-      state = value;
-    });
-  });
+  // Check if any cloud provider is authenticated
+  let hasAuthenticatedProvider = $derived(
+    unifiedCloudManager.getDefaultProvider() !== null
+  );
 
   function onLayout() {
     if ($miscSettings.galleryLayout === 'list') {
@@ -103,17 +96,39 @@
     )
   );
 
+  // Count placeholders by provider for UI display
+  let placeholdersByProvider = $derived.by(() => {
+    const counts: Record<string, number> = {};
+    for (const vol of allPlaceholderVolumes) {
+      const provider = getCloudProvider(vol) || 'unknown';
+      counts[provider] = (counts[provider] || 0) + 1;
+    }
+    return counts;
+  });
+
+  // Format provider breakdown for display (e.g., "3 Drive • 2 MEGA")
+  let providerBreakdown = $derived.by(() => {
+    const providerNames: Record<string, string> = {
+      'google-drive': 'Drive',
+      'mega': 'MEGA',
+      'webdav': 'WebDAV'
+    };
+    return Object.entries(placeholdersByProvider)
+      .map(([provider, count]) => `${count} ${providerNames[provider] || provider}`)
+      .join(' • ');
+  });
+
   async function downloadAllPlaceholders() {
     if (!allPlaceholderVolumes || allPlaceholderVolumes.length === 0) return;
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+    if (!hasAuthenticatedProvider) {
+      showSnackbar('Please connect to a cloud storage provider first');
       return;
     }
 
     try {
-      await downloadSeriesFromDrive(allPlaceholderVolumes);
+      queueSeriesVolumes(allPlaceholderVolumes);
     } catch (error) {
-      console.error('Failed to download placeholders:', error);
+      console.error('Failed to queue placeholders for download:', error);
     }
   }
 </script>
@@ -175,12 +190,17 @@
           {/if}
         </div>
 
-        <!-- Placeholder series (Drive only) -->
+        <!-- Placeholder series (Cloud providers) -->
         {#if placeholderSeries && placeholderSeries.length > 0}
           <div class="mt-8">
             <div class="flex items-center justify-between px-4 mb-4">
-              <h4 class="text-lg font-semibold text-gray-400">Available in Drive ({placeholderSeries.length} series)</h4>
-              {#if state.isAuthenticated && allPlaceholderVolumes.length > 0}
+              <div>
+                <h4 class="text-lg font-semibold text-gray-400">Available in Cloud ({placeholderSeries.length} series)</h4>
+                {#if providerBreakdown}
+                  <p class="text-sm text-gray-500 mt-1">{providerBreakdown}</p>
+                {/if}
+              </div>
+              {#if hasAuthenticatedProvider && allPlaceholderVolumes.length > 0}
                 <Button size="sm" color="blue" on:click={downloadAllPlaceholders}>
                   <DownloadSolid class="w-3 h-3 me-1" />
                   Download all
