@@ -210,12 +210,12 @@ async function decompressCbz(blob: Blob): Promise<DecompressedEntry[]> {
 
 	const decompressed: DecompressedEntry[] = [];
 	for (const entry of entries) {
-		if (entry.directory) continue;
+		if (entry.directory || !entry.getData) continue;
 
 		const uint8Array = await entry.getData(new Uint8ArrayWriter());
 		decompressed.push({
 			filename: entry.filename,
-			data: uint8Array.buffer
+			data: uint8Array.buffer as ArrayBuffer
 		});
 	}
 
@@ -285,15 +285,19 @@ async function processVolumeData(
 		});
 	}
 
-	// Update Drive file description if folder name doesn't match series title
-	if (placeholder.driveFileId) {
+	// Update cloud file description if folder name doesn't match series title
+	const cloudFileId = getCloudFileId(placeholder);
+	const cloudProvider = getCloudProvider(placeholder);
+
+	if (cloudFileId && cloudProvider) {
 		try {
 			const folderName = placeholder.series_title;
 			const actualSeriesTitle = mokuroData.title;
 
-			if (folderName !== actualSeriesTitle) {
+			if (folderName !== actualSeriesTitle && cloudProvider === 'google-drive') {
+				// Only Drive supports description updates currently
 				const fileMetadata = await driveApiClient.getFileMetadata(
-					placeholder.driveFileId,
+					cloudFileId,
 					'capabilities/canEdit,description'
 				);
 				const canEdit = fileMetadata.capabilities?.canEdit ?? false;
@@ -308,25 +312,51 @@ async function processVolumeData(
 							? `${seriesTag}\n${currentDescription}`
 							: seriesTag;
 
-						await driveApiClient.updateFileDescription(placeholder.driveFileId, newDescription);
-						driveFilesCache.updateFileDescription(placeholder.driveFileId, newDescription);
+						await driveApiClient.updateFileDescription(cloudFileId, newDescription);
+						driveFilesCache.updateFileDescription(cloudFileId, newDescription);
+
+						// Also update unified cloud manager cache
+						unifiedCloudManager.updateCacheEntry(cloudFileId, {
+							description: newDescription
+						});
 					}
 				}
 			}
 		} catch (error) {
-			console.warn('Failed to update Drive file description:', error);
+			console.warn('Failed to update cloud file description:', error);
 		}
 	}
 }
 
 /**
- * Process the queue in parallel using worker pool
+ * Handle download errors consistently
  */
-async function processQueue(): Promise<void> {
-	// Always allow processing to check for new queued items
-	// The worker pool handles concurrency limits
+function handleDownloadError(item: QueueItem, processId: string, errorMessage: string): void {
+	progressTrackerStore.updateProcess(processId, {
+		progress: 0,
+		status: `Error: ${errorMessage}`
+	});
+	showSnackbar(`Failed to download ${item.volumeTitle}: ${errorMessage}`);
+	queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
+	setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+}
 
-	// Initialize worker pool if needed
+/**
+ * Check if queue is empty and terminate worker pool if so
+ */
+function checkAndTerminatePool(): void {
+	const currentQueue = get(queueStore);
+	if (currentQueue.length === 0 && workerPool) {
+		workerPool.terminate();
+		workerPool = null;
+		processingStarted = false;
+	}
+}
+
+/**
+ * Process Drive download using worker pool (high-performance parallel downloads)
+ */
+async function processDriveDownload(item: QueueItem, processId: string): Promise<void> {
 	const pool = initializeWorkerPool();
 
 	// Get access token
@@ -336,19 +366,139 @@ async function processQueue(): Promise<void> {
 	})();
 
 	if (!token) {
-		console.error('Download queue: No access token available');
+		console.error('Download queue: No access token for Drive');
+		handleDownloadError(item, processId, 'No access token available');
 		return;
 	}
 
+	// Estimate memory requirement
+	const fileSize = getCloudSize(item.volumeMetadata) || 0;
+	const memoryRequirement = Math.max(fileSize * 3, 50 * 1024 * 1024);
+
+	// Create worker metadata (still uses legacy Drive fields for worker)
+	const workerMetadata: WorkerVolumeMetadata = {
+		volumeUuid: item.volumeUuid,
+		driveFileId: item.cloudFileId, // Map cloudFileId to driveFileId for worker
+		seriesTitle: item.seriesTitle,
+		volumeTitle: item.volumeTitle,
+		driveModifiedTime: getCloudModifiedTime(item.volumeMetadata) ?? undefined,
+		driveSize: getCloudSize(item.volumeMetadata) ?? undefined
+	};
+
+	// Create worker task
+	const task: WorkerTask = {
+		id: item.cloudFileId,
+		memoryRequirement,
+		metadata: workerMetadata,
+		data: {
+			fileId: item.cloudFileId,
+			fileName: item.volumeTitle + '.cbz',
+			accessToken: token,
+			metadata: workerMetadata
+		},
+		onProgress: data => {
+			const percent = Math.round((data.loaded / data.total) * 100);
+			progressTrackerStore.updateProcess(processId, {
+				progress: percent,
+				status: `Downloading... ${percent}%`
+			});
+		},
+		onComplete: async (data, releaseMemory) => {
+			try {
+				progressTrackerStore.updateProcess(processId, {
+					progress: 90,
+					status: 'Processing files...'
+				});
+
+				await processVolumeData(data.entries, item.volumeMetadata);
+
+				progressTrackerStore.updateProcess(processId, {
+					progress: 100,
+					status: 'Download complete'
+				});
+
+				showSnackbar(`Downloaded ${item.volumeTitle} successfully`);
+				queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
+				setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+			} catch (error) {
+				console.error(`Failed to process ${item.volumeTitle}:`, error);
+				handleDownloadError(item, processId, error instanceof Error ? error.message : 'Unknown error');
+			} finally {
+				releaseMemory();
+				checkAndTerminatePool();
+			}
+		},
+		onError: data => {
+			console.error(`Error downloading ${item.volumeTitle}:`, data.error);
+			handleDownloadError(item, processId, data.error);
+			checkAndTerminatePool();
+		}
+	};
+
+	pool.addTask(task);
+}
+
+/**
+ * Process non-Drive download (MEGA, WebDAV) using unified cloud manager
+ */
+async function processNonDriveDownload(item: QueueItem, processId: string): Promise<void> {
+	try {
+		// Download CBZ blob via unified cloud manager
+		const blob = await unifiedCloudManager.downloadVolumeCbz(
+			item.cloudFileId,
+			(loaded, total) => {
+				const percent = Math.round((loaded / total) * 100);
+				progressTrackerStore.updateProcess(processId, {
+					progress: percent * 0.9, // Reserve 10% for processing
+					status: `Downloading... ${percent}%`
+				});
+			}
+		);
+
+		progressTrackerStore.updateProcess(processId, {
+			progress: 90,
+			status: 'Decompressing...'
+		});
+
+		// Decompress CBZ
+		const entries = await decompressCbz(blob);
+
+		progressTrackerStore.updateProcess(processId, {
+			progress: 95,
+			status: 'Processing files...'
+		});
+
+		// Process volume data
+		await processVolumeData(entries, item.volumeMetadata);
+
+		progressTrackerStore.updateProcess(processId, {
+			progress: 100,
+			status: 'Download complete'
+		});
+
+		showSnackbar(`Downloaded ${item.volumeTitle} successfully`);
+		queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
+		setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+	} catch (error) {
+		console.error(`Failed to download ${item.volumeTitle}:`, error);
+		handleDownloadError(item, processId, error instanceof Error ? error.message : 'Unknown error');
+	}
+}
+
+/**
+ * Process the queue - route downloads based on cloud provider
+ * (Google Drive uses worker pool, MEGA/WebDAV use unified cloud manager)
+ */
+async function processQueue(): Promise<void> {
 	const queue = get(queueStore);
 
-	// Process all queued items (not already downloading)
+	// Process all queued items
 	for (const item of queue) {
 		if (item.status !== 'queued') {
 			continue;
 		}
 
-		// Mark processing as started once we actually start processing
+		// Mark processing as started
 		processingStarted = true;
 
 		// Mark as downloading
@@ -356,9 +506,9 @@ async function processQueue(): Promise<void> {
 			q.map(i => (i.volumeUuid === item.volumeUuid ? { ...i, status: 'downloading' as const } : i))
 		);
 
-		const processId = `download-${item.driveFileId}`;
+		const processId = `download-${item.cloudFileId}`;
 
-		// Add process tracker
+		// Add progress tracker
 		progressTrackerStore.addProcess({
 			id: processId,
 			description: `Downloading ${item.volumeTitle}`,
@@ -366,111 +516,12 @@ async function processQueue(): Promise<void> {
 			status: 'Starting download...'
 		});
 
-		// Estimate memory requirement based on file size
-		const fileSize = item.volumeMetadata.driveSize || 0;
-		const memoryRequirement = Math.max(fileSize * 3, 50 * 1024 * 1024);
-
-		// Create worker metadata
-		const workerMetadata: WorkerVolumeMetadata = {
-			volumeUuid: item.volumeUuid,
-			driveFileId: item.driveFileId,
-			seriesTitle: item.seriesTitle,
-			volumeTitle: item.volumeTitle,
-			driveModifiedTime: item.volumeMetadata.driveModifiedTime,
-			driveSize: item.volumeMetadata.driveSize
-		};
-
-		// Create worker task
-		const task: WorkerTask = {
-			id: item.driveFileId,
-			memoryRequirement,
-			metadata: workerMetadata,
-			data: {
-				fileId: item.driveFileId,
-				fileName: item.volumeTitle + '.cbz',
-				accessToken: token,
-				metadata: workerMetadata
-			},
-			onProgress: data => {
-				const percent = Math.round((data.loaded / data.total) * 100);
-				progressTrackerStore.updateProcess(processId, {
-					progress: percent,
-					status: `Downloading... ${percent}%`
-				});
-			},
-			onComplete: async (data, releaseMemory) => {
-				try {
-					progressTrackerStore.updateProcess(processId, {
-						progress: 90,
-						status: 'Processing files...'
-					});
-
-					// Process volume data and save to DB
-					await processVolumeData(data.entries, item.volumeMetadata);
-
-					progressTrackerStore.updateProcess(processId, {
-						progress: 100,
-						status: 'Download complete'
-					});
-
-					showSnackbar(`Downloaded ${item.volumeTitle} successfully`);
-
-					// Remove from queue
-					queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
-
-					// Clean up progress tracker after delay
-					setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-				} catch (error) {
-					console.error(`Failed to process ${item.volumeTitle}:`, error);
-					progressTrackerStore.updateProcess(processId, {
-						progress: 0,
-						status: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-					});
-					showSnackbar(
-						`Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`
-					);
-
-					// Remove from queue even on error
-					queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
-
-					setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-				} finally {
-					releaseMemory();
-
-					// Check if queue is empty and terminate pool
-					const currentQueue = get(queueStore);
-					if (currentQueue.length === 0 && workerPool) {
-						workerPool.terminate();
-						workerPool = null;
-						processingStarted = false;
-					}
-				}
-			},
-			onError: data => {
-				console.error(`Error downloading ${item.volumeTitle}:`, data.error);
-				progressTrackerStore.updateProcess(processId, {
-					progress: 0,
-					status: `Error: ${data.error}`
-				});
-				showSnackbar(`Failed to download ${item.volumeTitle}`);
-
-				// Remove from queue
-				queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
-
-				setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-				// Check if queue is empty and terminate pool
-				const currentQueue = get(queueStore);
-				if (currentQueue.length === 0 && workerPool) {
-					workerPool.terminate();
-					workerPool = null;
-					processingStarted = false;
-				}
-			}
-		};
-
-		// Add task to worker pool
-		pool.addTask(task);
+		// Route based on provider
+		if (item.cloudProvider === 'google-drive') {
+			await processDriveDownload(item, processId);
+		} else {
+			await processNonDriveDownload(item, processId);
+		}
 	}
 }
 
