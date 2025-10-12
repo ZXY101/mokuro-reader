@@ -35,7 +35,8 @@
       "Bash(gh pr edit:*)",
       "Bash(lsof:*)",
       "Bash(kill:*)",
-      "Bash(npm run check:*)"
+      "Bash(npm run check:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

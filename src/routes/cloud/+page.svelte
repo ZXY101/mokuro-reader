@@ -702,6 +702,17 @@
   onMount(async () => {
     // Clear service worker cache for Google Drive downloads
     clearServiceWorkerCache();
+
+    // Fetch cloud files if any provider is authenticated
+    // This handles page refresh or restored login sessions
+    if (hasAnyProvider) {
+      try {
+        await unifiedCloudManager.fetchAllCloudVolumes();
+        console.log('Cloud cache populated on mount');
+      } catch (error) {
+        console.warn('Failed to fetch cloud volumes on mount:', error);
+      }
+    }
   });
 
   async function onDownloadProfiles() {
@@ -756,8 +767,16 @@
     megaLoading = true;
     try {
       await megaProvider.login({ email: megaEmail, password: megaPassword });
-      showSnackbar('Connected to MEGA');
       providerManager.updateStatus();
+
+      // Populate unified cache for rest of app to use
+      showSnackbar('Connected to MEGA - loading cloud data...');
+      await unifiedCloudManager.fetchAllCloudVolumes();
+      showSnackbar('MEGA connected');
+
+      // Clear form and trigger reactivity
+      megaEmail = '';
+      megaPassword = '';
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(message);
@@ -806,8 +825,17 @@
         username: webdavUsername,
         password: webdavPassword
       });
-      showSnackbar('Connected to WebDAV');
       providerManager.updateStatus();
+
+      // Populate unified cache for rest of app to use
+      showSnackbar('Connected to WebDAV - loading cloud data...');
+      await unifiedCloudManager.fetchAllCloudVolumes();
+      showSnackbar('WebDAV connected');
+
+      // Clear form and trigger reactivity
+      webdavUrl = '';
+      webdavUsername = '';
+      webdavPassword = '';
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(message);
@@ -1157,6 +1185,13 @@
               Sync read progress
             </Button>
 
+            <Button
+              color="purple"
+              on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
+            >
+              Backup all series to cloud
+            </Button>
+
             <div class="mt-4 p-4 bg-gray-800 rounded-lg">
               <h3 class="font-semibold mb-2">About MEGA</h3>
               <ul class="text-sm text-gray-300 space-y-1">
@@ -1187,6 +1222,13 @@
 
             <Button color="blue" on:click={handleWebDAVSync}>
               Sync read progress
+            </Button>
+
+            <Button
+              color="purple"
+              on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
+            >
+              Backup all series to cloud
             </Button>
 
             <div class="mt-4 p-4 bg-gray-800 rounded-lg">
