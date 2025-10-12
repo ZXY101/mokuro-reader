@@ -1,11 +1,12 @@
 <script lang="ts">
   import { Button, Spinner } from 'flowbite-svelte';
-  import { CloudArrowUpOutline, CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
-  import { backupVolumeToDrive } from '$lib/util';
+  import { CloudArrowUpOutline, TrashBinSolid } from 'flowbite-svelte-icons';
+  import { backupVolumeToCloud } from '$lib/util/backup';
   import { showSnackbar } from '$lib/util';
-  import { driveState, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import type { VolumeMetadata } from '$lib/types';
-  import type { DriveFileMetadata, DriveState } from '$lib/util/google-drive';
+  import type { ProviderType } from '$lib/util/sync/provider-interface';
+  import type { CloudVolumeWithProvider } from '$lib/util/sync/unified-cloud-manager';
 
   interface Props {
     volume: VolumeMetadata;
@@ -17,36 +18,40 @@
   let isBackingUp = $state(false);
   let currentStep = $state('');
 
-  let state = $state<DriveState>({
-    isAuthenticated: false,
-    isCacheLoading: false,
-    isCacheLoaded: false,
-    isFullyConnected: false,
-    needsAttention: false
-  });
+  // Subscribe to unified cloud files
+  let cloudFiles = $state<CloudVolumeWithProvider[]>([]);
+  let isFetching = $state(false);
+
   $effect(() => {
-    return driveState.subscribe(value => {
-      state = value;
-    });
+    const unsubscribers = [
+      unifiedCloudManager.cloudFiles.subscribe(value => { cloudFiles = value; }),
+      unifiedCloudManager.isFetching.subscribe(value => { isFetching = value; })
+    ];
+    return () => unsubscribers.forEach(unsub => unsub());
   });
 
-  // Subscribe to Drive files cache
-  let driveCache = $state<Map<string, DriveFileMetadata[]>>(new Map());
-  $effect(() => {
-    return driveFilesCache.store.subscribe(value => {
-      driveCache = value;
-    });
-  });
+  // Check if this volume exists in any cloud provider
+  let cloudFile = $derived(
+    unifiedCloudManager.getCloudFile(volume.series_title, volume.volume_title)
+  );
+  let isBackedUp = $derived(cloudFile !== undefined);
+  let backupProvider = $derived(cloudFile?.provider);
 
-  // Check if this volume exists in Drive (by parent/filename path)
-  let expectedPath = $derived(`${volume.series_title}/${volume.volume_title}.cbz`);
-  let isBackedUp = $derived(driveCache.has(expectedPath));
+  // Get default provider for backup
+  function getDefaultProvider(): ProviderType | null {
+    const provider = unifiedCloudManager.getDefaultProvider();
+    return provider ? provider.type : null;
+  }
+
+  // Check if any provider is authenticated
+  let hasAuthenticatedProvider = $derived(getDefaultProvider() !== null);
 
   async function handleBackup(e: MouseEvent) {
     e.stopPropagation();
 
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+    const provider = getDefaultProvider();
+    if (!provider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
 
@@ -57,10 +62,13 @@
 
     isBackingUp = true;
     try {
-      await backupVolumeToDrive(volume, (step) => {
+      await backupVolumeToCloud(volume, provider, (step) => {
         currentStep = step;
       });
       showSnackbar('Backup completed successfully', 'success');
+
+      // Refresh cloud files to show the new backup
+      await unifiedCloudManager.fetchAllCloudVolumes();
     } catch (error) {
       console.error('Backup failed:', error);
       showSnackbar(`Backup failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
@@ -73,42 +81,44 @@
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation();
 
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
-      return;
-    }
-
-    if (!isBackedUp) {
+    if (!cloudFile) {
       showSnackbar('Volume not backed up', 'info');
       return;
     }
 
-    const driveFile = driveFilesCache.getDriveFile(volume.series_title, volume.volume_title);
-    if (!driveFile) {
-      showSnackbar('File not found in Drive', 'error');
-      return;
-    }
-
     try {
-      await driveApiClient.trashFile(driveFile.fileId);
-      driveFilesCache.removeDriveFile(volume.series_title, volume.volume_title);
-      showSnackbar('Moved to Drive trash', 'success');
+      await unifiedCloudManager.deleteVolumeCbz(cloudFile.fileId);
+      showSnackbar(`Deleted from ${cloudFile.provider}`, 'success');
     } catch (error) {
       console.error('Delete failed:', error);
       showSnackbar(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
   }
+
+  // Provider display names
+  function getProviderDisplayName(provider: ProviderType): string {
+    switch (provider) {
+      case 'google-drive':
+        return 'Drive';
+      case 'mega':
+        return 'MEGA';
+      case 'webdav':
+        return 'WebDAV';
+      default:
+        return 'Cloud';
+    }
+  }
 </script>
 
-{#if !state.isAuthenticated}
+{#if !hasAuthenticatedProvider}
   <!-- Don't render anything when not authenticated -->
-{:else if state.isCacheLoading && !state.isCacheLoaded}
+{:else if isFetching && cloudFiles.length === 0}
   <Button
     color="light"
     size="xs"
     class={className}
     disabled={true}
-    title="Loading Drive status..."
+    title="Loading cloud status..."
   >
     <Spinner size="4" class="me-2" />
     Loading...
@@ -119,10 +129,10 @@
     size="xs"
     class={className}
     on:click={handleDelete}
-    title="Delete from Drive (move to trash)"
+    title={`Delete from ${backupProvider ? getProviderDisplayName(backupProvider) : 'cloud'}`}
   >
     <TrashBinSolid class="w-4 h-4 me-2" />
-    Delete from Drive
+    Delete from {backupProvider ? getProviderDisplayName(backupProvider) : 'cloud'}
   </Button>
 {:else}
   <Button
@@ -131,14 +141,14 @@
     class={className}
     disabled={isBackingUp}
     on:click={handleBackup}
-    title="Backup to Google Drive"
+    title="Backup to cloud storage"
   >
     {#if isBackingUp}
       <Spinner size="4" class="me-2" />
       {currentStep || 'Backing up...'}
     {:else}
       <CloudArrowUpOutline class="w-4 h-4 me-2" />
-      Backup to Drive
+      Backup to Cloud
     {/if}
   </Button>
 {/if}

@@ -21,9 +21,10 @@
     syncService,
     READER_FOLDER,
     CLIENT_ID,
-    API_KEY,
-    backupVolumeToDrive
+    API_KEY
   } from '$lib/util';
+  import { backupMultipleVolumesToCloud } from '$lib/util/backup';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { driveState } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
@@ -848,13 +849,12 @@
   }
 
   async function backupAllSeries() {
-    if (!accessToken) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+    // Get default provider
+    const provider = unifiedCloudManager.getDefaultProvider();
+    if (!provider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
-
-    // Import driveFilesCache
-    const { driveFilesCache } = await import('$lib/util/google-drive');
 
     // Get all volumes from catalog
     const allVolumes: VolumeMetadata[] = [];
@@ -869,7 +869,7 @@
 
     // Filter out already backed up volumes
     const volumesToBackup = allVolumes.filter(vol =>
-      !driveFilesCache.existsInDrive(vol.series_title, vol.volume_title)
+      !unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title)
     );
 
     const skippedCount = allVolumes.length - volumesToBackup.length;
@@ -879,17 +879,7 @@
       return;
     }
 
-    const processId = 'backup-all';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: `Backing up ${volumesToBackup.length} volumes`,
-      progress: 0,
-      status: skippedCount > 0 ? `Skipping ${skippedCount} already backed up` : 'Starting backup...'
-    });
-
-    let completedCount = 0;
-    let failedCount = 0;
-
+    // Sort volumes by series and volume title
     volumesToBackup.sort((a, b) => {
       if (a.series_title === b.series_title) {
         return a.volume_title.localeCompare(b.volume_title);
@@ -897,37 +887,44 @@
       return a.series_title.localeCompare(b.series_title);
     });
 
-    for (let i = 0; i < volumesToBackup.length; i++) {
-      const volume = volumesToBackup[i];
+    const processId = 'backup-all';
+    progressTrackerStore.addProcess({
+      id: processId,
+      description: `Backing up ${volumesToBackup.length} volumes to ${provider.name}`,
+      progress: 0,
+      status: skippedCount > 0 ? `Skipping ${skippedCount} already backed up` : 'Starting backup...'
+    });
 
-      try {
+    // Use the batch backup function with progress tracking
+    const result = await backupMultipleVolumesToCloud(
+      volumesToBackup,
+      provider.type,
+      (completed, total, currentVolume) => {
+        const progress = (completed / total) * 100;
         progressTrackerStore.updateProcess(processId, {
-          progress: (i / volumesToBackup.length) * 100,
-          status: `Backing up ${volume.series_title} - ${volume.volume_title}...`
+          progress,
+          status: `Backing up: ${currentVolume} (${completed}/${total})`
         });
-
-        await backupVolumeToDrive(volume);
-        completedCount++;
-      } catch (error) {
-        console.error(`Failed to backup ${volume.volume_title}:`, error);
-        failedCount++;
       }
-    }
+    );
 
     progressTrackerStore.updateProcess(processId, {
       progress: 100,
-      status: `Backup complete (${completedCount} succeeded, ${failedCount} failed${skippedCount > 0 ? `, ${skippedCount} skipped` : ''})`
+      status: `Backup complete (${result.succeeded} succeeded, ${result.failed} failed${skippedCount > 0 ? `, ${skippedCount} skipped` : ''})`
     });
+
+    // Refresh cloud files to show newly backed up volumes
+    await unifiedCloudManager.fetchAllCloudVolumes();
 
     setTimeout(() => progressTrackerStore.removeProcess(processId), 5000);
 
-    if (failedCount === 0) {
+    if (result.failed === 0) {
       const message = skippedCount > 0
-        ? `${completedCount} volumes backed up, ${skippedCount} already backed up`
+        ? `${result.succeeded} volumes backed up, ${skippedCount} already backed up`
         : 'All volumes backed up successfully';
       showSnackbar(message, 'success');
     } else {
-      showSnackbar(`Backup completed with ${failedCount} failures`, 'error');
+      showSnackbar(`Backup completed with ${result.failed} failures`, 'error');
     }
   }
 </script>
@@ -1115,34 +1112,9 @@
         <div class="flex-col gap-2 flex">
           <Button
             color="purple"
-            on:click={() => promptConfirmation('Backup all series to Google Drive?', backupAllSeries)}
+            on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
           >
-            Backup all series to Drive
-          </Button>
-        </div>
-        <div class="flex-col gap-2 flex">
-          <Button
-            color="dark"
-            on:click={() => promptConfirmation('Upload profiles?', onUploadProfiles)}
-          >
-            Upload profiles
-          </Button>
-          {#if profilesId}
-            <Button
-              color="alternative"
-              on:click={() =>
-                promptConfirmation('Download and overwrite profiles?', onDownloadProfiles)}
-            >
-              Download profiles
-            </Button>
-          {/if}
-        </div>
-        <div class="flex-col gap-2 flex">
-          <Button
-            color="purple"
-            on:click={() => promptConfirmation('Backup all series to Google Drive?', backupAllSeries)}
-          >
-            Backup all series to Drive
+            Backup all series to cloud
           </Button>
         </div>
         <div class="flex-col gap-2 flex">
