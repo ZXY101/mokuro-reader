@@ -1,12 +1,13 @@
 <script lang="ts">
   import type { VolumeMetadata } from '$lib/types';
-  import { Frame, ListgroupItem, Button, Spinner } from 'flowbite-svelte';
+  import { Frame, ListgroupItem, Button, Spinner, Badge } from 'flowbite-svelte';
   import { DownloadSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { downloadQueue } from '$lib/util/download-queue';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
-  import { driveApiClient } from '$lib/util/google-drive/api-client';
-  import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
   import { showSnackbar, promptConfirmation } from '$lib/util';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { getCloudFileId, getCloudProvider, getCloudSize } from '$lib/util/cloud-fields';
+  import type { ProviderType } from '$lib/util/sync/provider-interface';
 
   interface Props {
     volume: VolumeMetadata;
@@ -16,12 +17,47 @@
 
   const volName = decodeURI(volume.volume_title);
 
+  // Get cloud metadata using helpers
+  const cloudFileId = getCloudFileId(volume);
+  const cloudProvider = getCloudProvider(volume);
+  const cloudSize = getCloudSize(volume);
+
   // Format file size
   let sizeDisplay = $derived.by(() => {
-    if (!volume.driveSize) return 'Unknown size';
-    const mb = (volume.driveSize / (1024 * 1024)).toFixed(1);
+    if (!cloudSize) return 'Unknown size';
+    const mb = (cloudSize / (1024 * 1024)).toFixed(1);
     return `${mb} MB`;
   });
+
+  // Provider display helpers
+  function getProviderDisplayName(provider: ProviderType): string {
+    switch (provider) {
+      case 'google-drive':
+        return 'Drive';
+      case 'mega':
+        return 'MEGA';
+      case 'webdav':
+        return 'WebDAV';
+      default:
+        return 'Cloud';
+    }
+  }
+
+  function getProviderBadgeColor(provider: ProviderType): string {
+    switch (provider) {
+      case 'google-drive':
+        return 'blue';
+      case 'mega':
+        return 'purple';
+      case 'webdav':
+        return 'green';
+      default:
+        return 'dark';
+    }
+  }
+
+  const providerName = cloudProvider ? getProviderDisplayName(cloudProvider) : 'Cloud';
+  const badgeColor = cloudProvider ? getProviderBadgeColor(cloudProvider) : 'dark';
 
   // Track queue state
   let queueState = $state($downloadQueue);
@@ -39,7 +75,7 @@
     });
   });
 
-  let processId = $derived(`download-${volume.driveFileId}`);
+  let processId = $derived(`download-${cloudFileId}`);
   let downloadProcess = $derived.by(() => {
     return progressState.processes.find(p => p.id === processId);
   });
@@ -60,19 +96,18 @@
     e.stopPropagation();
 
     promptConfirmation(
-      `Delete ${volName} from Google Drive?`,
+      `Delete ${volName} from ${providerName}?`,
       async () => {
         try {
-          if (!volume.driveFileId) {
-            throw new Error('No Drive file ID');
+          if (!cloudFileId) {
+            throw new Error('No cloud file ID');
           }
 
-          await driveApiClient.trashFile(volume.driveFileId);
-          driveFilesCache.removeDriveFileById(volume.driveFileId);
-          showSnackbar(`Deleted ${volName} from Drive`, 'success');
+          await unifiedCloudManager.deleteVolumeCbz(cloudFileId);
+          showSnackbar(`Deleted ${volName} from ${providerName}`);
         } catch (error) {
-          console.error('Failed to delete from Drive:', error);
-          showSnackbar(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+          console.error(`Failed to delete from ${providerName}:`, error);
+          showSnackbar(`Failed to delete: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
     );
@@ -85,7 +120,10 @@
     <div class="flex flex-row gap-5 items-center justify-between w-full">
       <div>
         <p class="font-semibold text-gray-400">{volName}</p>
-        <p class="text-sm text-gray-500">In Drive • {sizeDisplay}</p>
+        <div class="flex items-center gap-2">
+          <p class="text-sm text-gray-500">In Cloud • {sizeDisplay}</p>
+          <Badge color={badgeColor} class="text-xs">{providerName}</Badge>
+        </div>
       </div>
       <div class="flex gap-2 items-center">
         {#if isDownloading}
@@ -100,7 +138,7 @@
           </Button>
           <Button color="red" onclick={onDeleteClicked}>
             <TrashBinSolid class="w-4 h-4 me-2" />
-            Delete from Drive
+            Delete
           </Button>
         {/if}
       </div>
