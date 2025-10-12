@@ -65,8 +65,8 @@
     return () => unsubscribers.forEach(unsub => unsub());
   });
 
-  // Tab management
-  let activeTab = $state<'google' | 'mega' | 'webdav'>('google');
+  // Check which provider (if any) is authenticated
+  let hasAnyProvider = $derived(accessToken || megaProvider.isAuthenticated() || webdavProvider.isAuthenticated());
 
   // MEGA login state
   let megaEmail = $state('');
@@ -937,31 +937,132 @@
 </svelte:head>
 
 <div class="p-2 h-[90svh]">
-  <!-- Tab navigation -->
-  <div class="flex justify-center mb-6 gap-2">
-    <Button
-      color={activeTab === 'google' ? 'blue' : 'alternative'}
-      on:click={() => activeTab = 'google'}
-    >
-      Google Drive
-    </Button>
-    <Button
-      color={activeTab === 'mega' ? 'blue' : 'alternative'}
-      on:click={() => activeTab = 'mega'}
-    >
-      MEGA
-    </Button>
-    <Button
-      color={activeTab === 'webdav' ? 'blue' : 'alternative'}
-      on:click={() => activeTab = 'webdav'}
-    >
-      WebDAV
-    </Button>
-  </div>
+  {#if !hasAnyProvider}
+    <!-- Provider Selection Screen (like sign-in options) -->
+    <div class="flex justify-center pt-0 sm:pt-20">
+      <div class="w-full max-w-md">
+        <h2 class="text-2xl font-semibold text-center mb-8">Choose a Cloud Storage Provider</h2>
 
-  <!-- Google Drive Tab -->
-  {#if activeTab === 'google'}
+        <div class="flex flex-col gap-3">
+          <!-- Google Drive Option -->
+          <button
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
+            onclick={signIn}
+          >
+            <div class="flex items-center gap-4">
+              <GoogleSolid size="xl" />
+              <div class="text-left flex-1">
+                <div class="font-semibold text-lg">Google Drive</div>
+                <div class="text-sm text-gray-400">15GB free • Requires re-auth every hour</div>
+              </div>
+            </div>
+          </button>
+
+          <!-- MEGA Option -->
+          <button
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
+            onclick={() => {
+              // Show MEGA login form
+              const megaForm = document.getElementById('mega-login-form');
+              if (megaForm) megaForm.classList.toggle('hidden');
+            }}
+          >
+            <div class="flex items-center gap-4">
+              <div class="w-8 h-8 flex items-center justify-center text-2xl">M</div>
+              <div class="text-left flex-1">
+                <div class="font-semibold text-lg">MEGA</div>
+                <div class="text-sm text-gray-400">20GB free • Persistent login</div>
+              </div>
+            </div>
+          </button>
+
+          <div id="mega-login-form" class="hidden pl-12 pr-4 pb-4">
+            <form
+              onsubmit={(e) => {
+                e.preventDefault();
+                handleMegaLogin();
+              }}
+              class="flex flex-col gap-3"
+            >
+              <input
+                type="email"
+                bind:value={megaEmail}
+                placeholder="Email"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <input
+                type="password"
+                bind:value={megaPassword}
+                placeholder="Password"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <Button type="submit" disabled={megaLoading} color="blue" size="sm">
+                {megaLoading ? 'Connecting...' : 'Connect to MEGA'}
+              </Button>
+            </form>
+          </div>
+
+          <!-- WebDAV Option -->
+          <button
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
+            onclick={() => {
+              // Show WebDAV login form
+              const webdavForm = document.getElementById('webdav-login-form');
+              if (webdavForm) webdavForm.classList.toggle('hidden');
+            }}
+          >
+            <div class="flex items-center gap-4">
+              <div class="w-8 h-8 flex items-center justify-center text-2xl">W</div>
+              <div class="text-left flex-1">
+                <div class="font-semibold text-lg">WebDAV</div>
+                <div class="text-sm text-gray-400">Nextcloud, ownCloud, NAS • Persistent login</div>
+              </div>
+            </div>
+          </button>
+
+          <div id="webdav-login-form" class="hidden pl-12 pr-4 pb-4">
+            <form
+              onsubmit={(e) => {
+                e.preventDefault();
+                handleWebDAVLogin();
+              }}
+              class="flex flex-col gap-3"
+            >
+              <input
+                type="url"
+                bind:value={webdavUrl}
+                placeholder="Server URL (e.g., https://cloud.example.com/remote.php/dav)"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <input
+                type="text"
+                bind:value={webdavUsername}
+                placeholder="Username"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <input
+                type="password"
+                bind:value={webdavPassword}
+                placeholder="Password or App Token"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <Button type="submit" disabled={webdavLoading} color="blue" size="sm">
+                {webdavLoading ? 'Connecting...' : 'Connect to WebDAV'}
+              </Button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  {:else}
+    <!-- Connected Provider Interface -->
     {#if accessToken}
+      <!-- Google Drive Connected -->
       <div class="flex justify-between items-center gap-6 flex-col">
         <div class="flex justify-between items-center w-full max-w-3xl">
           <div class="flex items-center gap-3">
@@ -1036,152 +1137,97 @@
             </Button>
           {/if}
         </div>
-      </div>
-    </div>
-    {:else}
-      <div class="flex justify-center pt-0 sm:pt-32">
-        <button
-          class="w-full border rounded-lg border-slate-600 p-10 border-opacity-50 hover:bg-slate-800 max-w-3xl"
-          onclick={signIn}
-        >
-          <div class="flex sm:flex-row flex-col gap-2 items-center justify-center">
-            <GoogleSolid size="lg" />
-            <h2 class="text-lg">Connect to Google Drive</h2>
-          </div>
-        </button>
-      </div>
-    {/if}
-  {/if}
-
-  <!-- MEGA Tab -->
-  {#if activeTab === 'mega'}
-    <div class="flex justify-center items-center flex-col gap-6">
-      <div class="w-full max-w-3xl">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-3xl font-semibold">MEGA Cloud Storage</h2>
-          {#if megaProvider.isAuthenticated()}
-            <Badge color="green">Connected</Badge>
+        <div class="flex-col gap-2 flex">
+          <Button
+            color="purple"
+            on:click={() => promptConfirmation('Backup all series to Google Drive?', backupAllSeries)}
+          >
+            Backup all series to Drive
+          </Button>
+        </div>
+        <div class="flex-col gap-2 flex">
+          <Button
+            color="dark"
+            on:click={() => promptConfirmation('Upload profiles?', onUploadProfiles)}
+          >
+            Upload profiles
+          </Button>
+          {#if profilesId}
+            <Button
+              color="alternative"
+              on:click={() =>
+                promptConfirmation('Download and overwrite profiles?', onDownloadProfiles)}
+            >
+              Download profiles
+            </Button>
           {/if}
         </div>
-
-        {#if megaProvider.isAuthenticated()}
-          <div class="flex flex-col gap-4">
-            <p class="text-center text-green-400">Connected to MEGA</p>
-            <Button color="blue" on:click={handleMegaSync}>Sync read progress</Button>
+      </div>
+    </div>
+    {:else if megaProvider.isAuthenticated()}
+      <!-- MEGA Connected -->
+      <div class="flex justify-center items-center flex-col gap-6">
+        <div class="w-full max-w-3xl">
+          <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+              <h2 class="text-3xl font-semibold">MEGA Cloud Storage</h2>
+              <Badge color="green">Connected</Badge>
+            </div>
             <Button color="red" on:click={handleMegaLogout}>Log out</Button>
           </div>
-        {:else}
-          <form
-            onsubmit={(e) => {
-              e.preventDefault();
-              handleMegaLogin();
-            }}
-            class="flex flex-col gap-4"
-          >
-            <input
-              type="email"
-              bind:value={megaEmail}
-              placeholder="Email"
-              required
-              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
-            />
-            <input
-              type="password"
-              bind:value={megaPassword}
-              placeholder="Password"
-              required
-              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
-            />
-            <Button type="submit" disabled={megaLoading} color="blue">
-              {megaLoading ? 'Connecting...' : 'Connect'}
-            </Button>
-          </form>
 
-          <div class="mt-6 p-4 bg-gray-800 rounded-lg">
-            <h3 class="font-semibold mb-2">About MEGA</h3>
-            <ul class="text-sm text-gray-300 space-y-1">
-              <li>20GB free storage</li>
-              <li>End-to-end encryption</li>
-              <li>No token expiry (persistent login)</li>
-              <li>
-                <a href="https://mega.nz/register" target="_blank" class="text-blue-400 hover:underline">
-                  Create MEGA account
-                </a>
-              </li>
-            </ul>
-          </div>
-        {/if}
-      </div>
-    </div>
-  {/if}
-
-  <!-- WebDAV Tab -->
-  {#if activeTab === 'webdav'}
-    <div class="flex justify-center items-center flex-col gap-6">
-      <div class="w-full max-w-3xl">
-        <div class="flex justify-between items-center mb-4">
-          <h2 class="text-3xl font-semibold">WebDAV Server</h2>
-          {#if webdavProvider.isAuthenticated()}
-            <Badge color="green">Connected</Badge>
-          {/if}
-        </div>
-
-        {#if webdavProvider.isAuthenticated()}
           <div class="flex flex-col gap-4">
-            <p class="text-center text-green-400">Connected to WebDAV</p>
-            <Button color="blue" on:click={handleWebDAVSync}>Sync read progress</Button>
+            <p class="text-center text-gray-300 mb-2">
+              Your read progress is synced with MEGA cloud storage.
+            </p>
+
+            <Button color="blue" on:click={handleMegaSync}>
+              Sync read progress
+            </Button>
+
+            <div class="mt-4 p-4 bg-gray-800 rounded-lg">
+              <h3 class="font-semibold mb-2">About MEGA</h3>
+              <ul class="text-sm text-gray-300 space-y-1">
+                <li>20GB free storage</li>
+                <li>End-to-end encryption</li>
+                <li>Persistent login (no re-authentication needed)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    {:else if webdavProvider.isAuthenticated()}
+      <!-- WebDAV Connected -->
+      <div class="flex justify-center items-center flex-col gap-6">
+        <div class="w-full max-w-3xl">
+          <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+              <h2 class="text-3xl font-semibold">WebDAV Server</h2>
+              <Badge color="green">Connected</Badge>
+            </div>
             <Button color="red" on:click={handleWebDAVLogout}>Log out</Button>
           </div>
-        {:else}
-          <form
-            onsubmit={(e) => {
-              e.preventDefault();
-              handleWebDAVLogin();
-            }}
-            class="flex flex-col gap-4"
-          >
-            <input
-              type="url"
-              bind:value={webdavUrl}
-              placeholder="Server URL (e.g., https://cloud.example.com/remote.php/dav)"
-              required
-              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
-            />
-            <input
-              type="text"
-              bind:value={webdavUsername}
-              placeholder="Username"
-              required
-              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
-            />
-            <input
-              type="password"
-              bind:value={webdavPassword}
-              placeholder="Password or App Token"
-              required
-              class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5"
-            />
-            <Button type="submit" disabled={webdavLoading} color="blue">
-              {webdavLoading ? 'Connecting...' : 'Connect'}
-            </Button>
-          </form>
 
-          <div class="mt-6 p-4 bg-gray-800 rounded-lg">
-            <h3 class="font-semibold mb-2">WebDAV Configuration</h3>
-            <p class="text-sm text-gray-300 mb-2">Works with:</p>
-            <ul class="text-sm text-gray-300 space-y-1 ml-4">
-              <li>Nextcloud</li>
-              <li>ownCloud</li>
-              <li>Synology NAS</li>
-              <li>QNAP NAS</li>
-              <li>Any WebDAV-compatible server</li>
-            </ul>
-            <p class="text-sm text-gray-400 mt-3">
-              <strong>Security tip:</strong> Use an app-specific password instead of your main account password.
+          <div class="flex flex-col gap-4">
+            <p class="text-center text-gray-300 mb-2">
+              Your read progress is synced with your WebDAV server.
             </p>
+
+            <Button color="blue" on:click={handleWebDAVSync}>
+              Sync read progress
+            </Button>
+
+            <div class="mt-4 p-4 bg-gray-800 rounded-lg">
+              <h3 class="font-semibold mb-2">WebDAV Server</h3>
+              <ul class="text-sm text-gray-300 space-y-1">
+                <li>Compatible with Nextcloud, ownCloud, and NAS devices</li>
+                <li>Persistent login (no re-authentication needed)</li>
+                <li>Self-hosted and private</li>
+              </ul>
+            </div>
           </div>
-        {/if}
+        </div>
       </div>
-    </div>
+    {/if}
   {/if}
 </div>

@@ -68,6 +68,9 @@ export class MegaProvider implements SyncProvider {
 				);
 			});
 
+			// Wait for storage to be ready
+			await this.waitForReady();
+
 			// Ensure mokuro folder exists
 			await this.ensureMokuroFolder();
 
@@ -218,24 +221,57 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
+	private waitForReady(): Promise<void> {
+		return new Promise((resolve, reject) => {
+			// If storage is already ready, resolve immediately
+			if (this.storage.ready) {
+				resolve();
+				return;
+			}
+
+			// Wait for ready event
+			const timeout = setTimeout(() => {
+				reject(new Error('Timeout waiting for MEGA storage to be ready'));
+			}, 30000); // 30 second timeout
+
+			this.storage.once('ready', () => {
+				clearTimeout(timeout);
+				resolve();
+			});
+
+			// Also listen for error events
+			this.storage.once('error', (error: Error) => {
+				clearTimeout(timeout);
+				reject(error);
+			});
+		});
+	}
+
 	private async ensureMokuroFolder(): Promise<void> {
 		if (this.mokuroFolder) return;
 
 		try {
-			// Search for existing folder
-			const root = this.storage.root;
-			const children = await this.listFolder(root);
+			// Access root folder using storage.files object
+			// In megajs, all files are available via storage.files
+			const files = Object.values(this.storage.files || {});
 
-			let folder = children.find((f: any) => f.name === MOKURO_FOLDER && f.directory);
+			// Find root folder (has no parent)
+			const rootFiles = files.filter((f: any) => !f.parent && f.directory);
 
-			if (!folder) {
-				// Create folder
-				folder = await this.createFolder(MOKURO_FOLDER, root);
+			// Find mokuro-reader folder in root
+			let mokuroFolder = files.find(
+				(f: any) => f.name === MOKURO_FOLDER && f.directory && !f.parent
+			);
+
+			if (!mokuroFolder) {
+				// Create folder using storage.mkdir
+				mokuroFolder = await this.createFolder(MOKURO_FOLDER);
 				console.log('Created mokuro-reader folder in MEGA');
 			}
 
-			this.mokuroFolder = folder;
+			this.mokuroFolder = mokuroFolder;
 		} catch (error) {
+			console.error('ensureMokuroFolder error:', error);
 			throw new ProviderError(
 				`Failed to ensure mokuro folder exists: ${error instanceof Error ? error.message : 'Unknown error'}`,
 				'mega',
@@ -246,18 +282,23 @@ export class MegaProvider implements SyncProvider {
 
 	private listFolder(folder: any): Promise<any[]> {
 		return new Promise((resolve, reject) => {
-			folder.children((error: Error | null, children: any[]) => {
-				if (error) reject(error);
-				else resolve(children || []);
-			});
+			// Get all files from storage
+			const files = Object.values(this.storage.files || {});
+
+			// Filter files that are children of this folder
+			const children = files.filter((f: any) => f.parent === folder);
+			resolve(children);
 		});
 	}
 
-	private createFolder(name: string, parent: any): Promise<any> {
+	private createFolder(name: string): Promise<any> {
 		return new Promise((resolve, reject) => {
-			const folder = parent.mkdir(name, (error: Error | null) => {
-				if (error) reject(error);
-				else resolve(folder);
+			this.storage.mkdir(name, (error: Error | null, folder: any) => {
+				if (error) {
+					reject(error);
+				} else {
+					resolve(folder);
+				}
 			});
 		});
 	}
@@ -265,23 +306,23 @@ export class MegaProvider implements SyncProvider {
 	private async uploadFile(filename: string, content: string): Promise<void> {
 		await this.ensureMokuroFolder();
 
-		return new Promise((resolve, reject) => {
-			// Check if file already exists and delete it
-			this.mokuroFolder.children((error: Error | null, children: any[]) => {
-				if (error) {
-					reject(error);
-					return;
-				}
-
-				const existingFile = children?.find((f: any) => f.name === filename && !f.directory);
+		return new Promise(async (resolve, reject) => {
+			try {
+				// Check if file already exists using storage.files
+				const children = await this.listFolder(this.mokuroFolder);
+				const existingFile = children.find((f: any) => f.name === filename && !f.directory);
 
 				const uploadNew = () => {
+					// Convert string to Uint8Array (browser-compatible)
+					const encoder = new TextEncoder();
+					const contentBuffer = encoder.encode(content);
+
 					this.mokuroFolder.upload(
 						{
 							name: filename,
-							size: content.length
+							size: contentBuffer.length
 						},
-						Buffer.from(content),
+						contentBuffer,
 						(error: Error | null) => {
 							if (error) reject(error);
 							else resolve();
@@ -301,7 +342,9 @@ export class MegaProvider implements SyncProvider {
 				} else {
 					uploadNew();
 				}
-			});
+			} catch (error) {
+				reject(error);
+			}
 		});
 	}
 
@@ -316,9 +359,15 @@ export class MegaProvider implements SyncProvider {
 		}
 
 		return new Promise((resolve, reject) => {
-			file.download((error: Error | null, data: Buffer) => {
-				if (error) reject(error);
-				else resolve(data.toString('utf-8'));
+			file.download((error: Error | null, data: Uint8Array) => {
+				if (error) {
+					reject(error);
+				} else {
+					// Convert Uint8Array to string (browser-compatible)
+					const decoder = new TextDecoder('utf-8');
+					const text = decoder.decode(data);
+					resolve(text);
+				}
 			});
 		});
 	}

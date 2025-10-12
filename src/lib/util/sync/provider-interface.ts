@@ -20,6 +20,22 @@ export interface ProviderCredentials {
 	[key: string]: any;
 }
 
+/**
+ * Metadata for a cloud-stored volume (CBZ file)
+ */
+export interface CloudVolumeMetadata {
+	/** Provider-specific file ID */
+	fileId: string;
+	/** Path in format "SeriesTitle/VolumeTitle.cbz" */
+	path: string;
+	/** File modification timestamp */
+	modifiedTime: string;
+	/** File size in bytes */
+	size: number;
+	/** Optional description/metadata */
+	description?: string;
+}
+
 export interface SyncProvider {
 	/** Provider type identifier */
 	readonly type: ProviderType;
@@ -65,6 +81,39 @@ export interface SyncProvider {
 	 * @returns Profile data object or null if not found
 	 */
 	downloadProfiles(): Promise<any | null>;
+
+	// VOLUME STORAGE METHODS
+	/**
+	 * List all CBZ files in cloud storage
+	 * @returns Array of cloud volume metadata
+	 */
+	listCloudVolumes(): Promise<CloudVolumeMetadata[]>;
+
+	/**
+	 * Upload a CBZ file to cloud storage
+	 * @param path Target path "SeriesTitle/VolumeTitle.cbz"
+	 * @param blob CBZ file data
+	 * @param description Optional file description
+	 * @returns File ID in cloud storage
+	 */
+	uploadVolumeCbz(path: string, blob: Blob, description?: string): Promise<string>;
+
+	/**
+	 * Download a CBZ file from cloud storage
+	 * @param fileId Cloud file ID
+	 * @param onProgress Optional progress callback (loaded, total)
+	 * @returns CBZ file data
+	 */
+	downloadVolumeCbz(
+		fileId: string,
+		onProgress?: (loaded: number, total: number) => void
+	): Promise<Blob>;
+
+	/**
+	 * Delete a CBZ file from cloud storage
+	 * @param fileId Cloud file ID
+	 */
+	deleteVolumeCbz(fileId: string): Promise<void>;
 }
 
 export class ProviderError extends Error {
