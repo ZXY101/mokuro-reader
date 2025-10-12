@@ -4,7 +4,7 @@ import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { liveQuery } from 'dexie';
 import { derived, readable, type Readable } from 'svelte/store';
 import { deriveSeriesFromVolumes } from '$lib/catalog/catalog';
-import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
+import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
 import { generatePlaceholders } from '$lib/catalog/placeholders';
 
 function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
@@ -36,14 +36,12 @@ export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
   return () => subscription.unsubscribe();
 });
 
-// Merge local volumes with Drive placeholders
+// Merge local volumes with cloud placeholders
 export const volumesWithPlaceholders = derived(
-  [volumes, driveFilesCache.store],
-  ([$volumes, $driveCache], set) => {
-    // Generate placeholders from Drive files
-    const driveFiles = Array.from($driveCache.values()).flat();
-
-    generatePlaceholders(driveFiles).then(placeholders => {
+  [volumes, unifiedCloudManager.cloudFiles],
+  ([$volumes, $cloudFiles], set) => {
+    // Generate placeholders from cloud files
+    generatePlaceholders($cloudFiles).then(placeholders => {
       // Combine local volumes with placeholders
       const combined = { ...$volumes };
 

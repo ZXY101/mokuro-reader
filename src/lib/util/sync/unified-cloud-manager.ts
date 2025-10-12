@@ -14,7 +14,7 @@ import { megaProvider } from './providers/mega/mega-provider';
  * This is the abstraction layer that makes the rest of the app provider-agnostic.
  */
 
-interface CloudVolumeWithProvider extends CloudVolumeMetadata {
+export interface CloudVolumeWithProvider extends CloudVolumeMetadata {
 	provider: ProviderType;
 }
 
