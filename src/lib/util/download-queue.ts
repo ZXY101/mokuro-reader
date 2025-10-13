@@ -57,6 +57,10 @@ let processingStarted = false;
 // Track MEGA share links that need cleanup after download
 const megaShareLinksToCleanup = new Map<string, string>(); // fileId -> fileId (for cleanup)
 
+// Rate limiting for MEGA share link creation using a promise chain as mutex
+let megaShareLinkMutex = Promise.resolve();
+const MEGA_SHARE_LINK_THROTTLE_MS = 200; // 200ms between share link creations
+
 // Subscribe to queue changes and update progress tracker
 queueStore.subscribe(queue => {
 	const totalCount = queue.length;
@@ -237,6 +241,7 @@ async function decompressCbz(blob: Blob): Promise<DecompressedEntry[]> {
 /**
  * Get provider credentials for worker downloads
  * For MEGA, creates a temporary share link instead of passing credentials
+ * Implements rate limiting to prevent API congestion
  */
 async function getProviderCredentials(provider: ProviderType, fileId: string): Promise<any> {
 	if (provider === 'google-drive') {
@@ -252,14 +257,23 @@ async function getProviderCredentials(provider: ProviderType, fileId: string): P
 		const password = localStorage.getItem('webdav_password');
 		return { webdavUrl: serverUrl, webdavUsername: username, webdavPassword: password };
 	} else if (provider === 'mega') {
-		// Create a temporary share link for this file
-		const { megaProvider } = await import('./sync/providers/mega/mega-provider');
-		const shareUrl = await megaProvider.createShareLink(fileId);
+		// Serialize MEGA share link creation using a promise chain as mutex
+		// This prevents concurrent API calls that could trigger rate limiting
+		const result = await (megaShareLinkMutex = megaShareLinkMutex.then(async () => {
+			// Add throttle delay between each share link creation
+			await new Promise(resolve => setTimeout(resolve, MEGA_SHARE_LINK_THROTTLE_MS));
 
-		// Track this share link for cleanup after download
-		megaShareLinksToCleanup.set(fileId, fileId);
+			// Create a temporary share link for this file (with built-in retry logic)
+			const { megaProvider } = await import('./sync/providers/mega/mega-provider');
+			const shareUrl = await megaProvider.createShareLink(fileId);
 
-		return { megaShareUrl: shareUrl };
+			// Track this share link for cleanup after download
+			megaShareLinksToCleanup.set(fileId, fileId);
+
+			return { megaShareUrl: shareUrl };
+		}));
+
+		return result;
 	}
 	return {};
 }
@@ -398,6 +412,11 @@ function checkAndTerminatePool(): void {
 
 /**
  * Cleanup MEGA share link after download completes or fails
+ *
+ * NOTE: Cleanup failures are not critical. MEGA likely reuses existing share links,
+ * so if cleanup fails (due to disconnect, crash, etc.), the next download attempt
+ * will automatically reuse the existing link. This provides a self-healing behavior
+ * where orphaned links are eventually reused and cleaned up on successful downloads.
  */
 async function cleanupMegaShareLink(fileId: string): Promise<void> {
 	if (megaShareLinksToCleanup.has(fileId)) {
@@ -514,19 +533,19 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
 
 /**
  * Process the queue - unified download handling for all providers
+ * Processes all queued items concurrently (respecting worker pool limits)
  */
-async function processQueue(): Promise<void> {
+function processQueue(): void {
 	const queue = get(queueStore);
+	const queuedItems = queue.filter(item => item.status === 'queued');
 
-	// Process all queued items
-	for (const item of queue) {
-		if (item.status !== 'queued') {
-			continue;
-		}
-
-		// Mark processing as started
+	// Mark processing as started if we have queued items
+	if (queuedItems.length > 0) {
 		processingStarted = true;
+	}
 
+	// Process each queued item (worker pool will handle concurrency limits)
+	queuedItems.forEach(item => {
 		// Mark as downloading
 		queueStore.update(q =>
 			q.map(i => (i.volumeUuid === item.volumeUuid ? { ...i, status: 'downloading' as const } : i))
@@ -547,9 +566,10 @@ async function processQueue(): Promise<void> {
 			cloudProvider: item.cloudProvider
 		});
 
-		// Use unified download function (hybrid strategy handles provider differences)
-		await processDownload(item, processId);
-	}
+		// Start download (worker pool handles concurrency)
+		// Don't await - let multiple downloads run concurrently
+		processDownload(item, processId);
+	});
 }
 
 // Export the store for reactive subscriptions

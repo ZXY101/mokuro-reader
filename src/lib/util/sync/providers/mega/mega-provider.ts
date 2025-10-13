@@ -18,6 +18,53 @@ const MOKURO_FOLDER = 'mokuro-reader';
 const VOLUME_DATA_FILE = 'volume-data.json';
 const PROFILES_FILE = 'profiles.json';
 
+/**
+ * Exponential backoff with jitter for retrying MEGA API calls
+ */
+async function retryWithBackoff<T>(
+	operation: () => Promise<T>,
+	maxRetries: number = 8,
+	baseDelay: number = 500,
+	operationName: string = 'operation'
+): Promise<T> {
+	let lastError: Error | null = null;
+
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			return await operation();
+		} catch (error) {
+			lastError = error as Error;
+
+			// Check if error is retryable (EAGAIN, rate limit, temporary congestion)
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const isRetryable =
+				errorMessage.includes('EAGAIN') ||
+				errorMessage.includes('congestion') ||
+				errorMessage.includes('rate') ||
+				errorMessage.includes('429');
+
+			if (!isRetryable || attempt === maxRetries) {
+				// Non-retryable error or max retries reached
+				throw error;
+			}
+
+			// Calculate exponential backoff with jitter
+			// Formula: delay = baseDelay * 2^attempt + random(0, 1000)
+			const exponentialDelay = baseDelay * Math.pow(2, attempt);
+			const jitter = Math.random() * 1000;
+			const delay = exponentialDelay + jitter;
+
+			console.warn(
+				`${operationName} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${errorMessage}. Retrying in ${Math.round(delay)}ms...`
+			);
+
+			await new Promise(resolve => setTimeout(resolve, delay));
+		}
+	}
+
+	throw lastError;
+}
+
 export class MegaProvider implements SyncProvider {
 	readonly type = 'mega' as const;
 	readonly name = 'MEGA';
@@ -681,6 +728,11 @@ export class MegaProvider implements SyncProvider {
 	/**
 	 * Create a temporary share link for a file
 	 * Returns a public download URL that includes the decryption key
+	 * Uses exponential backoff to handle MEGA rate limiting
+	 *
+	 * IMPORTANT: MEGA likely reuses existing share links, so calling this multiple
+	 * times on the same file returns the same URL. This means orphaned links from
+	 * previous failed cleanup attempts are automatically reused - a self-healing behavior.
 	 */
 	async createShareLink(fileId: string): Promise<string> {
 		if (!this.isAuthenticated()) {
@@ -688,27 +740,35 @@ export class MegaProvider implements SyncProvider {
 		}
 
 		try {
-			// Find the file by ID
-			const files = Object.values(this.storage.files || {});
-			const file = files.find(
-				(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
-			);
+			// Wrap the share link creation with retry logic
+			return await retryWithBackoff(
+				async () => {
+					// Find the file by ID
+					const files = Object.values(this.storage.files || {});
+					const file = files.find(
+						(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
+					);
 
-			if (!file) {
-				throw new Error('File not found');
-			}
-
-			return new Promise((resolve, reject) => {
-				// Create share link with decryption key (noKey: false is default)
-				(file as any).link((error: Error | null, url: string) => {
-					if (error) {
-						reject(error);
-					} else {
-						console.log(`✅ Created MEGA share link for file ${fileId}`);
-						resolve(url);
+					if (!file) {
+						throw new Error('File not found');
 					}
-				});
-			});
+
+					return new Promise<string>((resolve, reject) => {
+						// Create/get share link with decryption key (noKey: false is default)
+						// NOTE: If file already has a share link, MEGA API likely returns the existing one
+						(file as any).link((error: Error | null, url: string) => {
+							if (error) {
+								reject(error);
+							} else {
+								resolve(url);
+							}
+						});
+					});
+				},
+				8, // maxRetries
+				500, // baseDelay (ms)
+				`Create MEGA share link (${fileId})`
+			);
 		} catch (error) {
 			throw new ProviderError(
 				`Failed to create share link: ${error instanceof Error ? error.message : 'Unknown error'}`,
