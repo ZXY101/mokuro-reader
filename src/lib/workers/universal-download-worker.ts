@@ -356,6 +356,10 @@ ctx.addEventListener('message', async (event) => {
 			}
 
 			console.log(`Worker: Download complete for ${fileName}`);
+
+			// Immediately convert to ArrayBuffer to prevent blob invalidation under memory pressure
+			const arrayBuffer = await blob.arrayBuffer();
+			blob = new Blob([arrayBuffer]);
 		} else {
 			// Mode 2: Decompress only (blob already downloaded by main thread)
 			fileId = message.fileId;

@@ -177,7 +177,7 @@ export function getSeriesQueueStatus(seriesTitle: string): SeriesQueueStatus {
 }
 
 /**
- * Initialize worker pool with settings from miscSettings
+ * Initialize worker pool based on user-configured RAM setting
  */
 function initializeWorkerPool(): WorkerPool {
 	if (workerPool) {
@@ -187,23 +187,22 @@ function initializeWorkerPool(): WorkerPool {
 	let maxWorkers: number;
 	let memoryLimitMB: number;
 
-	// Get throttle setting
-	let throttleSetting = false;
+	// Get user's RAM configuration
+	let deviceRamGB = 4; // Default
 	miscSettings.subscribe(value => {
-		throttleSetting = value.throttleDownloads;
+		deviceRamGB = value.deviceRamGB;
 	})();
 
-	if (throttleSetting) {
-		// Throttled mode with reasonable limits
-		maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
-		memoryLimitMB = 500; // 500 MB memory threshold
-		console.log(`Download queue: Throttled mode - ${maxWorkers} workers, ${memoryLimitMB}MB limit`);
-	} else {
-		// Unthrottled mode, use more workers and disable memory limits
-		maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
-		memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
-		console.log(`Download queue: Unthrottled mode - ${maxWorkers} workers, no memory limit`);
-	}
+	// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
+	memoryLimitMB = (deviceRamGB * 1024) / 8;
+
+	// Worker count: scale with RAM, minimum 2, cap at 8
+	// Use 1.5x RAM in GB as base (e.g., 4GB = 6 workers, 16GB = 24 workers → capped at 8)
+	// Cap at 8 to avoid overwhelming cloud services and saturating network bandwidth
+	const calculatedWorkers = Math.max(2, Math.floor(deviceRamGB * 1.5));
+	maxWorkers = Math.min(8, calculatedWorkers);
+
+	console.log(`Download queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
 
 	workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
 	return workerPool;
@@ -416,7 +415,8 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
 		const credentials = await getProviderCredentials(provider.type, item.cloudFileId);
 
 		// Estimate memory requirement (download + decompress + processing overhead)
-		const memoryRequirement = Math.max(fileSize * 4, 50 * 1024 * 1024);
+		// More accurate multiplier: compressed file + decompressed data + working memory
+		const memoryRequirement = Math.max(fileSize * 2.8, 50 * 1024 * 1024);
 
 		// Create worker metadata
 		const workerMetadata: WorkerVolumeMetadata = {

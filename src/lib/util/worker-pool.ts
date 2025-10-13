@@ -35,6 +35,8 @@ export class WorkerPool {
     this.maxConcurrent = Math.max(1, Math.min(maxConcurrent, navigator.hardwareConcurrency || 4));
     this.maxMemoryUsage = maxMemoryMB * 1024 * 1024; // Convert MB to bytes - this is a threshold, not a hard limit
 
+    console.log(`Worker pool: ${this.maxConcurrent} workers, ${maxMemoryMB}MB limit`);
+
     // Initialize workers
     for (let i = 0; i < this.maxConcurrent; i++) {
       this.addWorker();
@@ -63,7 +65,6 @@ export class WorkerPool {
       }
 
       const data = event.data;
-      console.log(`Worker pool: Received message of type ${data.type} for task ${taskId}`, data);
 
       if (data.type === 'progress' && task.onProgress) {
         task.onProgress(data);

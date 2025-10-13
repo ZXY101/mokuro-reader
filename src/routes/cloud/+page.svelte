@@ -29,7 +29,7 @@
   import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
-  import { Badge, Button, Toggle } from 'flowbite-svelte';
+  import { Badge, Button, Radio } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { catalog } from '$lib/catalog';
@@ -353,29 +353,8 @@
     });
 
     // Create a worker pool for parallel downloads
-    // Use navigator.hardwareConcurrency to determine optimal number of workers
-    // but limit to a reasonable number to avoid overwhelming the browser
-    let maxWorkers;
-    let memoryLimitMB;
-    
-    if ($miscSettings.throttleDownloads) {
-      // Throttled mode with reasonable limits
-      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
-      // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
-      // This is not a hard limit - tasks that individually need more than 500MB can still run
-      // It just prevents starting new tasks when the current pool already exceeds 500MB
-      memoryLimitMB = 500; // 500 MB memory threshold
-      console.log(
-        `Throttled downloads: Using ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
-      );
-    } else {
-      // Unthrottled mode, use more workers and disable memory limits
-      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
-      memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
-      console.log(`Unthrottled downloads: Using ${maxWorkers} workers with no memory limit`);
-    }
-    
-    const workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
+    // Worker pool will use settings from miscSettings.deviceRamGB
+    const workerPool = new WorkerPool();
 
     // Track download progress
     const fileProgress: { [fileId: string]: number } = {};
@@ -1151,19 +1130,15 @@
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
 
         <div class="flex flex-col gap-2">
-          <div class="flex items-center gap-2">
-            <Toggle
-              size="small"
-              checked={$miscSettings.throttleDownloads}
-              on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
-            >
-              <span class="flex items-center gap-2">
-                Throttle downloads for stability
-              </span>
-            </Toggle>
+          <label class="text-sm font-medium">Device RAM Configuration</label>
+          <div class="flex gap-4">
+            <Radio name="ram-config" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
+            <Radio name="ram-config" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
+            <Radio name="ram-config" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
+            <Radio name="ram-config" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
           </div>
-          <p class="text-xs text-gray-500 ml-1">
-            Helps prevent crashes on low memory devices or for extremely large downloads.
+          <p class="text-xs text-gray-500">
+            Configure your device's RAM to optimize download performance and prevent memory issues.
           </p>
         </div>
 
@@ -1221,19 +1196,15 @@
             </p>
 
             <div class="flex flex-col gap-2">
-              <div class="flex items-center gap-2">
-                <Toggle
-                  size="small"
-                  checked={$miscSettings.throttleDownloads}
-                  on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
-                >
-                  <span class="flex items-center gap-2">
-                    Throttle downloads for stability
-                  </span>
-                </Toggle>
+              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="flex gap-4">
+                <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
+                <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
+                <Radio name="ram-config-mega" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
+                <Radio name="ram-config-mega" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
               </div>
-              <p class="text-xs text-gray-500 ml-1">
-                Helps prevent crashes on low memory devices or for extremely large downloads.
+              <p class="text-xs text-gray-500">
+                Configure your device's RAM to optimize download performance and prevent memory issues.
               </p>
             </div>
 
@@ -1277,19 +1248,15 @@
             </p>
 
             <div class="flex flex-col gap-2">
-              <div class="flex items-center gap-2">
-                <Toggle
-                  size="small"
-                  checked={$miscSettings.throttleDownloads}
-                  on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
-                >
-                  <span class="flex items-center gap-2">
-                    Throttle downloads for stability
-                  </span>
-                </Toggle>
+              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="flex gap-4">
+                <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
+                <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
+                <Radio name="ram-config-mega" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
+                <Radio name="ram-config-mega" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
               </div>
-              <p class="text-xs text-gray-500 ml-1">
-                Helps prevent crashes on low memory devices or for extremely large downloads.
+              <p class="text-xs text-gray-500">
+                Configure your device's RAM to optimize download performance and prevent memory issues.
               </p>
             </div>
 
