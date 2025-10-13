@@ -21,6 +21,7 @@ const PROFILES_FILE = 'profiles.json';
 export class MegaProvider implements SyncProvider {
 	readonly type = 'mega' as const;
 	readonly name = 'MEGA';
+	readonly supportsWorkerDownload = false; // Requires Storage instance, downloads in main thread
 
 	private storage: any = null;
 	private mokuroFolder: any = null;

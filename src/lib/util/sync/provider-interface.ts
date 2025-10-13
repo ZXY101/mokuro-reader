@@ -43,6 +43,13 @@ export interface SyncProvider {
 	/** Human-readable provider name */
 	readonly name: string;
 
+	/**
+	 * Indicates if this provider supports direct downloads in web workers.
+	 * - true: Workers can download directly (Google Drive, WebDAV)
+	 * - false: Main thread must download, workers decompress only (MEGA)
+	 */
+	readonly supportsWorkerDownload: boolean;
+
 	/** Check if user is currently authenticated */
 	isAuthenticated(): boolean;
 

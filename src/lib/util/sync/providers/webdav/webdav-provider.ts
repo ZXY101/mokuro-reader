@@ -22,6 +22,7 @@ const PROFILES_FILE = '/mokuro-reader/profiles.json';
 export class WebDAVProvider implements SyncProvider {
 	readonly type = 'webdav' as const;
 	readonly name = 'WebDAV';
+	readonly supportsWorkerDownload = true; // Workers can download directly with Basic Auth
 
 	private client: WebDAVClient | null = null;
 	private initPromise: Promise<void>;

@@ -1220,6 +1220,23 @@
               Your read progress is synced with MEGA cloud storage.
             </p>
 
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <Toggle
+                  size="small"
+                  checked={$miscSettings.throttleDownloads}
+                  on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
+                >
+                  <span class="flex items-center gap-2">
+                    Throttle downloads for stability
+                  </span>
+                </Toggle>
+              </div>
+              <p class="text-xs text-gray-500 ml-1">
+                Helps prevent crashes on low memory devices or for extremely large downloads.
+              </p>
+            </div>
+
             <Button color="blue" on:click={handleMegaSync}>
               Sync read progress
             </Button>
@@ -1258,6 +1275,23 @@
             <p class="text-center text-gray-300 mb-2">
               Your read progress is synced with your WebDAV server.
             </p>
+
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <Toggle
+                  size="small"
+                  checked={$miscSettings.throttleDownloads}
+                  on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
+                >
+                  <span class="flex items-center gap-2">
+                    Throttle downloads for stability
+                  </span>
+                </Toggle>
+              </div>
+              <p class="text-xs text-gray-500 ml-1">
+                Helps prevent crashes on low memory devices or for extremely large downloads.
+              </p>
+            </div>
 
             <Button color="blue" on:click={handleWebDAVSync}>
               Sync read progress

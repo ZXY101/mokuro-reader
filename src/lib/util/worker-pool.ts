@@ -1,7 +1,7 @@
-// Worker pool for managing parallel downloads
+// Worker pool for managing parallel downloads and decompression
 
 // Import the worker script using Vite's worker plugin
-import DownloadWorker from '$lib/workers/download-worker.ts?worker';
+import UniversalDownloadWorker from '$lib/workers/universal-download-worker.ts?worker';
 
 export interface VolumeMetadata {
   volumeUuid: string;
@@ -43,7 +43,7 @@ export class WorkerPool {
 
   private addWorker() {
     // Create a new worker using Vite's worker instantiation
-    const worker = new DownloadWorker();
+    const worker = new UniversalDownloadWorker();
 
     worker.onmessage = (event) => {
       const taskId = this.workerTaskMap.get(worker);

@@ -16,6 +16,7 @@ import { getOrCreateFolder, uploadCbzToDrive } from '$lib/util/backup';
 export class GoogleDriveProvider implements SyncProvider {
 	readonly type = 'google-drive' as const;
 	readonly name = 'Google Drive';
+	readonly supportsWorkerDownload = true; // Workers can download directly with access token
 
 	private readerFolderId: string | null = null;
 
