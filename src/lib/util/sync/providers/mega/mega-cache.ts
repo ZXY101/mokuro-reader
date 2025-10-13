@@ -1,4 +1,4 @@
-import { writable } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 import type { CloudCache } from '../../cloud-cache-interface';
 import type { CloudVolumeMetadata } from '../../provider-interface';
 import { megaProvider } from './mega-provider';
@@ -18,7 +18,14 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 	private loadedFlag = false;
 
 	get store() {
-		return this.cache;
+		// Convert Map store to Array store for CloudCache interface compatibility
+		return derived(this.cache, ($cache) => {
+			const result: CloudVolumeMetadata[] = [];
+			for (const files of $cache.values()) {
+				result.push(...files);
+			}
+			return result;
+		});
 	}
 
 	get isFetchingState() {

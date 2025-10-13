@@ -36,7 +36,8 @@
       "Bash(lsof:*)",
       "Bash(kill:*)",
       "Bash(npm run check:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(function\" errors when trying to display MEGA cloud files.\n\nFixed by converting the internal Map to an array in the store getter,\nmatching the pattern used by Google Drive cache.\n\nChanges:\n- Import ''derived'' from svelte/store in MEGA cache\n- Convert cache.store getter to derive from internal Map\n- Flatten Map values into a single array of CloudVolumeMetadata\n\nThis fixes MEGA login not updating cloud page views and placeholders\nnot showing after authentication.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
     ],
     "deny": [],
     "ask": []
