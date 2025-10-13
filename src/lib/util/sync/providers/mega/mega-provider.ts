@@ -2,6 +2,8 @@ import { browser } from '$app/environment';
 import type { SyncProvider, ProviderCredentials, ProviderStatus } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import { Storage } from 'megajs';
+import { providerManager } from '../../provider-manager';
+import { cacheManager } from '../../cache-manager';
 
 interface MegaCredentials {
 	email: string;
@@ -92,6 +94,17 @@ export class MegaProvider implements SyncProvider {
 			}
 
 			console.log('✅ MEGA login successful');
+
+			// Update provider manager to set this as the current provider
+			await providerManager.setCurrentProvider(this);
+
+			// Populate cache after successful login
+			try {
+				await cacheManager.fetchAll();
+				console.log('✅ MEGA cache populated after login');
+			} catch (cacheError) {
+				console.error('Failed to populate MEGA cache after login:', cacheError);
+			}
 		} catch (error) {
 			this.storage = null;
 			this.mokuroFolder = null;
@@ -116,6 +129,9 @@ export class MegaProvider implements SyncProvider {
 		}
 
 		console.log('MEGA logged out');
+
+		// Update provider manager to trigger reactive updates
+		providerManager.updateStatus();
 	}
 
 	async uploadVolumeData(data: any): Promise<void> {
