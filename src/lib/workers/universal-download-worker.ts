@@ -1,7 +1,7 @@
 // Universal worker for downloading and decompressing cloud volumes
 // Worker downloads from provider and decompresses (Google Drive, WebDAV, MEGA)
 
-import { BlobReader, ZipReader, BlobWriter, getMimeType } from '@zip.js/zip.js';
+import { Uint8ArrayReader, ZipReader, BlobWriter, getMimeType } from '@zip.js/zip.js';
 import { File as MegaFile } from 'megajs';
 
 // Define the worker context
@@ -77,12 +77,13 @@ interface DecompressedEntry {
 
 /**
  * Download from Google Drive using access token
+ * Returns ArrayBuffer directly to avoid intermediate Blob creation and disk writes
  */
 async function downloadFromGoogleDrive(
 	fileId: string,
 	accessToken: string,
 	onProgress: (loaded: number, total: number) => void
-): Promise<Blob> {
+): Promise<ArrayBuffer> {
 	// First get the file size
 	const sizeResponse = await fetch(
 		`https://www.googleapis.com/drive/v3/files/${fileId}?fields=size`,
@@ -117,7 +118,7 @@ async function downloadFromGoogleDrive(
 
 		xhr.onload = () => {
 			if (xhr.status >= 200 && xhr.status < 300) {
-				resolve(new Blob([xhr.response]));
+				resolve(xhr.response as ArrayBuffer);
 			} else {
 				reject(new Error(`HTTP error ${xhr.status}: ${xhr.statusText}`));
 			}
@@ -129,6 +130,7 @@ async function downloadFromGoogleDrive(
 
 /**
  * Download from WebDAV server using Basic Auth
+ * Returns ArrayBuffer directly to avoid intermediate Blob creation and disk writes
  */
 async function downloadFromWebDAV(
 	fileId: string,
@@ -136,7 +138,7 @@ async function downloadFromWebDAV(
 	username: string,
 	password: string,
 	onProgress: (loaded: number, total: number) => void
-): Promise<Blob> {
+): Promise<ArrayBuffer> {
 	const fullUrl = `${url}${fileId}`;
 	const authHeader = 'Basic ' + btoa(`${username}:${password}`);
 
@@ -169,7 +171,7 @@ async function downloadFromWebDAV(
 		onProgress(receivedLength, contentLength || receivedLength);
 	}
 
-	// Combine chunks into a single blob
+	// Combine chunks into a single ArrayBuffer
 	const combinedLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
 	const combined = new Uint8Array(combinedLength);
 	let offset = 0;
@@ -178,17 +180,18 @@ async function downloadFromWebDAV(
 		offset += chunk.length;
 	}
 
-	return new Blob([combined]);
+	return combined.buffer;
 }
 
 /**
  * Download from MEGA using a share link via the MEGA API
  * The share link includes the decryption key, MEGA API handles download
+ * Returns ArrayBuffer directly to avoid intermediate Blob creation and disk writes
  */
 async function downloadFromMega(
 	shareUrl: string,
 	onProgress: (loaded: number, total: number) => void
-): Promise<Blob> {
+): Promise<ArrayBuffer> {
 	return new Promise((resolve, reject) => {
 		try {
 			// Load file from share link using MEGA API
@@ -215,7 +218,7 @@ async function downloadFromMega(
 				});
 
 				stream.on('end', () => {
-					// Combine all chunks into a single Uint8Array
+					// Combine all chunks into a single ArrayBuffer
 					const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
 					const combined = new Uint8Array(totalLength);
 					let offset = 0;
@@ -224,8 +227,7 @@ async function downloadFromMega(
 						offset += chunk.length;
 					}
 
-					const blob = new Blob([combined], { type: 'application/zip' });
-					resolve(blob);
+					resolve(combined.buffer);
 				});
 
 				stream.on('error', (error: Error) => {
@@ -239,13 +241,14 @@ async function downloadFromMega(
 }
 
 /**
- * Decompress a CBZ file blob into entries
+ * Decompress a CBZ file from ArrayBuffer into entries
+ * Keeps everything in memory without creating intermediate Blob objects
  */
-async function decompressCbz(blob: Blob): Promise<DecompressedEntry[]> {
+async function decompressCbz(arrayBuffer: ArrayBuffer): Promise<DecompressedEntry[]> {
 	console.log(`Worker: Decompressing CBZ...`);
 
-	// Create a zip reader
-	const zipReader = new ZipReader(new BlobReader(blob));
+	// Create a zip reader directly from ArrayBuffer
+	const zipReader = new ZipReader(new Uint8ArrayReader(new Uint8Array(arrayBuffer)));
 
 	// Get all entries from the zip file
 	const entries = await zipReader.getEntries();
@@ -285,7 +288,7 @@ ctx.addEventListener('message', async (event) => {
 	console.log('Worker: Received message', message.mode);
 
 	try {
-		let blob: Blob;
+		let arrayBuffer: ArrayBuffer;
 		let fileId: string;
 		let fileName: string;
 		let metadata: VolumeMetadata | undefined;
@@ -298,12 +301,12 @@ ctx.addEventListener('message', async (event) => {
 
 			console.log(`Worker: Starting download for ${fileName} (${fileId})`);
 
-			// Download based on provider
+			// Download based on provider - all return ArrayBuffer directly
 			if (message.provider === 'google-drive') {
 				if (!message.credentials.accessToken) {
 					throw new Error('Missing access token for Google Drive');
 				}
-				blob = await downloadFromGoogleDrive(
+				arrayBuffer = await downloadFromGoogleDrive(
 					fileId,
 					message.credentials.accessToken,
 					(loaded, total) => {
@@ -320,7 +323,7 @@ ctx.addEventListener('message', async (event) => {
 				if (!message.credentials.webdavUrl || !message.credentials.webdavUsername || !message.credentials.webdavPassword) {
 					throw new Error('Missing WebDAV credentials');
 				}
-				blob = await downloadFromWebDAV(
+				arrayBuffer = await downloadFromWebDAV(
 					fileId,
 					message.credentials.webdavUrl,
 					message.credentials.webdavUsername,
@@ -339,7 +342,7 @@ ctx.addEventListener('message', async (event) => {
 				if (!message.credentials.megaShareUrl) {
 					throw new Error('Missing MEGA share URL');
 				}
-				blob = await downloadFromMega(
+				arrayBuffer = await downloadFromMega(
 					message.credentials.megaShareUrl,
 					(loaded, total) => {
 						const progressMessage: ProgressMessage = {
@@ -356,21 +359,17 @@ ctx.addEventListener('message', async (event) => {
 			}
 
 			console.log(`Worker: Download complete for ${fileName}`);
-
-			// Immediately convert to ArrayBuffer to prevent blob invalidation under memory pressure
-			const arrayBuffer = await blob.arrayBuffer();
-			blob = new Blob([arrayBuffer]);
 		} else {
-			// Mode 2: Decompress only (blob already downloaded by main thread)
+			// Mode 2: Decompress only (ArrayBuffer already downloaded by main thread)
 			fileId = message.fileId;
 			fileName = message.fileName;
 			metadata = message.metadata;
-			blob = new Blob([message.blob]);
-			console.log(`Worker: Received pre-downloaded blob for ${fileName}`);
+			arrayBuffer = message.blob;
+			console.log(`Worker: Received pre-downloaded data for ${fileName}`);
 		}
 
-		// Decompress the blob
-		const entries = await decompressCbz(blob);
+		// Decompress the ArrayBuffer
+		const entries = await decompressCbz(arrayBuffer);
 
 		// Send completion message
 		const completeMessage: CompleteMessage = {
