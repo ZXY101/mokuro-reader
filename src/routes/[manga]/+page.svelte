@@ -85,6 +85,11 @@
     return unifiedCloudManager.cloudFiles.subscribe(value => {
       console.log('[Series Page] Cloud files updated:', value.length, 'files');
       cloudFiles = value;
+      // If we get files and weren't fetching, cache must already be loaded
+      if (value.length > 0 && !wasFetching) {
+        cacheHasLoaded = true;
+        console.log('[Series Page] Cache already loaded (has files)');
+      }
     });
   });
 
@@ -95,9 +100,14 @@
       // Mark cache as loaded when fetching transitions from true to false
       if (wasFetching && !isFetching) {
         cacheHasLoaded = true;
-        console.log('[Series Page] Cache has loaded');
+        console.log('[Series Page] Cache has loaded (fetch complete)');
       }
       wasFetching = isFetching;
+      // Also mark as loaded if not fetching and we have files
+      if (!isFetching && cloudFiles.length > 0) {
+        cacheHasLoaded = true;
+        console.log('[Series Page] Cache already loaded (not fetching + has files)');
+      }
     });
   });
 
