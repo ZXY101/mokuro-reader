@@ -307,11 +307,24 @@ async function processVolumeData(
 	};
 
 	// Convert image entries to File objects
+	// Create File objects directly from ArrayBuffers with proper MIME types
 	const files: Record<string, File> = {};
 	for (const entry of entries) {
 		if (!entry.filename.endsWith('.mokuro') && !entry.filename.includes('__MACOSX')) {
-			const blob = new Blob([entry.data]);
-			files[entry.filename] = new File([blob], entry.filename);
+			// Determine MIME type from file extension
+			const extension = entry.filename.toLowerCase().split('.').pop() || '';
+			const mimeTypes: Record<string, string> = {
+				'jpg': 'image/jpeg',
+				'jpeg': 'image/jpeg',
+				'png': 'image/png',
+				'gif': 'image/gif',
+				'webp': 'image/webp',
+				'bmp': 'image/bmp'
+			};
+			const mimeType = mimeTypes[extension] || 'application/octet-stream';
+
+			// Create File directly from ArrayBuffer with proper MIME type
+			files[entry.filename] = new File([entry.data], entry.filename, { type: mimeType });
 		}
 	}
 
