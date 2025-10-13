@@ -721,6 +721,48 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	/**
+	 * Delete a share link for a file
+	 * This removes the public share link to prevent clutter
+	 */
+	async deleteShareLink(fileId: string): Promise<void> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// Find the file by ID
+			const files = Object.values(this.storage.files || {});
+			const file = files.find(
+				(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
+			);
+
+			if (!file) {
+				throw new Error('File not found');
+			}
+
+			return new Promise((resolve, reject) => {
+				// Unshare the file (removes the share link)
+				(file as any).unshare((error: Error | null) => {
+					if (error) {
+						reject(error);
+					} else {
+						console.log(`✅ Deleted MEGA share link for file ${fileId}`);
+						resolve();
+					}
+				});
+			});
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to delete share link: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'mega',
+				'UNSHARE_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	/**
 	 * Delete an entire series folder
 	 */
 	async deleteSeriesFolder(seriesTitle: string): Promise<void> {

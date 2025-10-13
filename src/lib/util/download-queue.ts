@@ -54,6 +54,9 @@ const queueStore = writable<QueueItem[]>([]);
 let workerPool: WorkerPool | null = null;
 let processingStarted = false;
 
+// Track MEGA share links that need cleanup after download
+const megaShareLinksToCleanup = new Map<string, string>(); // fileId -> fileId (for cleanup)
+
 // Subscribe to queue changes and update progress tracker
 queueStore.subscribe(queue => {
 	const totalCount = queue.length;
@@ -252,6 +255,10 @@ async function getProviderCredentials(provider: ProviderType, fileId: string): P
 		// Create a temporary share link for this file
 		const { megaProvider } = await import('./sync/providers/mega/mega-provider');
 		const shareUrl = await megaProvider.createShareLink(fileId);
+
+		// Track this share link for cleanup after download
+		megaShareLinksToCleanup.set(fileId, fileId);
+
 		return { megaShareUrl: shareUrl };
 	}
 	return {};
@@ -390,6 +397,23 @@ function checkAndTerminatePool(): void {
 }
 
 /**
+ * Cleanup MEGA share link after download completes or fails
+ */
+async function cleanupMegaShareLink(fileId: string): Promise<void> {
+	if (megaShareLinksToCleanup.has(fileId)) {
+		try {
+			const { megaProvider } = await import('./sync/providers/mega/mega-provider');
+			await megaProvider.deleteShareLink(fileId);
+			megaShareLinksToCleanup.delete(fileId);
+		} catch (error) {
+			console.warn(`Failed to cleanup MEGA share link for ${fileId}:`, error);
+			// Still remove from tracking to prevent memory leak
+			megaShareLinksToCleanup.delete(fileId);
+		}
+	}
+}
+
+/**
  * Process download using workers for all providers
  * - Google Drive: Workers download with OAuth token and decompress
  * - WebDAV: Workers download with Basic Auth and decompress
@@ -469,12 +493,16 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
 					console.error(`Failed to process ${item.volumeTitle}:`, error);
 					handleDownloadError(item, processId, error instanceof Error ? error.message : 'Unknown error');
 				} finally {
+					// Cleanup MEGA share link if this was a MEGA download
+					await cleanupMegaShareLink(item.cloudFileId);
 					releaseMemory();
 					checkAndTerminatePool();
 				}
 			},
-			onError: data => {
+			onError: async data => {
 				console.error(`Error downloading ${item.volumeTitle}:`, data.error);
+				// Cleanup MEGA share link if this was a MEGA download
+				await cleanupMegaShareLink(item.cloudFileId);
 				handleDownloadError(item, processId, data.error);
 				checkAndTerminatePool();
 			}
