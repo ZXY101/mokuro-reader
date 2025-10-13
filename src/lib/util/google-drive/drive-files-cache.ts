@@ -34,14 +34,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
   private lastFetchTime: number | null = null;
 
   get store() {
-    // Convert Map store to Array store for CloudCache interface compatibility
-    return derived(this.cache, ($cache) => {
-      const result: DriveFileMetadata[] = [];
-      for (const files of $cache.values()) {
-        result.push(...files);
-      }
-      return result;
-    });
+    // Return Map grouped by series for efficient series-based operations
+    return this.cache;
   }
 
   get isFetchingState() {
@@ -120,10 +114,10 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
       console.log('Folder names:', foundFolderNames);
 
       // Build cache from files using the folder map
-      // All entries are arrays to support Drive's duplicate file names
+      // Group by series title (folder name) for efficient series-based operations
       const cacheMap = new Map<string, DriveFileMetadata[]>();
 
-      // Add .cbz files (group by path in case of duplicates)
+      // Add .cbz files (group by series title)
       for (const file of cbzFiles) {
         const parentId = file.parents?.[0];
         const parentName = parentId ? folderNames.get(parentId) : null;
@@ -140,11 +134,12 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
             parentId: parentId
           };
 
-          const existing = cacheMap.get(path);
+          // Group by series title (parentName) instead of full path
+          const existing = cacheMap.get(parentName);
           if (existing) {
             existing.push(metadata);
           } else {
-            cacheMap.set(path, [metadata]);
+            cacheMap.set(parentName, [metadata]);
           }
         }
       }
@@ -247,8 +242,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    const files = currentCache.get(path);
-    return files !== undefined && files.length > 0;
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.some(f => f.path === path) || false;
   }
 
   /**
@@ -262,8 +257,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    const files = currentCache.get(path);
-    return files && files.length > 0 ? files[0] : undefined;
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.find(f => f.path === path);
   }
 
   /**
@@ -277,7 +272,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    return currentCache.get(path) || [];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.filter(f => f.path === path) || [];
   }
 
   /**
@@ -307,11 +303,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
       currentCache = value;
     })();
 
-    const result: DriveFileMetadata[] = [];
-    for (const files of currentCache.values()) {
-      result.push(...files.filter((file) => file.path.startsWith(`${seriesTitle}/`)));
-    }
-    return result;
+    // With series-grouped cache, just get the series directly (O(1) lookup)
+    return currentCache.get(seriesTitle) || [];
   }
 
   /**
@@ -319,9 +312,9 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
    */
   addDriveFile(seriesTitle: string, volumeTitle: string, metadata: DriveFileMetadata): void {
     this.cache.update((cache) => {
-      const path = `${seriesTitle}/${volumeTitle}.cbz`;
       const newCache = new Map(cache);
-      const existing = newCache.get(path);
+      // Group by series title instead of full path
+      const existing = newCache.get(seriesTitle);
 
       if (existing) {
         // Check if this file ID already exists, replace it
@@ -332,7 +325,7 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
           existing.push(metadata);
         }
       } else {
-        newCache.set(path, [metadata]);
+        newCache.set(seriesTitle, [metadata]);
       }
 
       return newCache;
@@ -366,7 +359,17 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
     this.cache.update((cache) => {
       const path = `${seriesTitle}/${volumeTitle}.cbz`;
       const newCache = new Map(cache);
-      newCache.delete(path);
+      const seriesFiles = newCache.get(seriesTitle);
+
+      if (seriesFiles) {
+        const filtered = seriesFiles.filter(f => f.path !== path);
+        if (filtered.length === 0) {
+          newCache.delete(seriesTitle);
+        } else {
+          newCache.set(seriesTitle, filtered);
+        }
+      }
+
       return newCache;
     });
   }
@@ -428,8 +431,10 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
       currentCache = value;
     })();
 
-    const files = currentCache.get(path);
-    return files !== undefined && files.length > 0;
+    // Extract series title from path and find within that series
+    const seriesTitle = path.split('/')[0];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.some(f => f.path === path) || false;
   }
 
   /**
@@ -442,8 +447,10 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
       currentCache = value;
     })();
 
-    const files = currentCache.get(path);
-    return files && files.length > 0 ? files[0] : null;
+    // Extract series title from path and find within that series
+    const seriesTitle = path.split('/')[0];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.find(f => f.path === path) || null;
   }
 
   /**
@@ -456,7 +463,10 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
       currentCache = value;
     })();
 
-    return currentCache.get(path) || [];
+    // Extract series title from path and find all matches within that series
+    const seriesTitle = path.split('/')[0];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.filter(f => f.path === path) || [];
   }
 
   /**

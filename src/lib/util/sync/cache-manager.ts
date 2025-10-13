@@ -85,12 +85,13 @@ class CacheManager {
 
 	/**
 	 * Reactive store containing files from the active provider's cache
-	 * Returns an empty array if no provider is active
+	 * Returns a Map<seriesTitle, files[]> for efficient series-based operations
+	 * Returns an empty Map if no provider is active
 	 */
-	get allFiles(): Readable<any[]> {
+	get allFiles(): Readable<Map<string, any[]>> {
 		return derived(this.activeCacheStore, ($activeCache, set) => {
 			if (!$activeCache) {
-				set([]);
+				set(new Map());
 				return;
 			}
 			// Subscribe to the active cache's store
@@ -98,7 +99,7 @@ class CacheManager {
 				set(files);
 			});
 			return unsubscribe;
-		}, []);
+		}, new Map());
 	}
 
 	/**

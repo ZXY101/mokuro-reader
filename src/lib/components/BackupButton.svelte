@@ -20,7 +20,7 @@
   let currentStep = $state('');
 
   // Subscribe to unified cloud files
-  let cloudFiles = $state<CloudVolumeWithProvider[]>([]);
+  let cloudFiles = $state<Map<string, CloudVolumeWithProvider[]>>(new Map());
   let isFetching = $state(false);
 
   $effect(() => {
@@ -42,12 +42,22 @@
 
   // Check if this volume exists in any cloud provider (reactive to cloudFiles changes)
   let cloudFile = $derived.by(() => {
-    // This derived explicitly depends on cloudFiles state
+    // Efficient O(1) lookup: Get series files from Map by series title
     const path = `${volume.series_title}/${volume.volume_title}.cbz`;
-    return cloudFiles.find(f => f.path === path);
+    const seriesFiles = cloudFiles.get(volume.series_title) || [];
+    return seriesFiles.find(f => f.path === path);
   });
   let isBackedUp = $derived(cloudFile !== undefined);
   let backupProvider = $derived(cloudFile?.provider);
+
+  // Count total files in the Map for isFetching check
+  let totalFiles = $derived.by(() => {
+    let count = 0;
+    for (const files of cloudFiles.values()) {
+      count += files.length;
+    }
+    return count;
+  });
 
   // Get default provider for backup
   function getDefaultProvider(): ProviderType | null {
@@ -121,7 +131,7 @@
 
 {#if !hasAuthenticatedProvider}
   <!-- Don't render anything when not authenticated -->
-{:else if isFetching && cloudFiles.length === 0}
+{:else if isFetching && totalFiles === 0}
   <Button
     color="light"
     size="xs"

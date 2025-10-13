@@ -1,4 +1,4 @@
-import { writable, derived } from 'svelte/store';
+import { writable } from 'svelte/store';
 import type { CloudCache } from '../../cloud-cache-interface';
 import type { CloudVolumeMetadata } from '../../provider-interface';
 import { megaProvider } from './mega-provider';
@@ -6,10 +6,8 @@ import { megaProvider } from './mega-provider';
 /**
  * MEGA Cache Wrapper
  *
- * MEGA caches files internally via storage.files, so this is just a thin wrapper
- * that implements CloudCache interface by delegating to megaProvider.listCloudVolumes()
- *
- * This allows cacheManager to work with MEGA without duplicating its internal cache.
+ * Returns Map<seriesTitle, CloudVolumeMetadata[]> for efficient series-based operations.
+ * Cache is grouped by series folder names extracted from file paths.
  */
 class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 	private cache = writable<Map<string, CloudVolumeMetadata[]>>(new Map());
@@ -18,14 +16,8 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 	private loadedFlag = false;
 
 	get store() {
-		// Convert Map store to Array store for CloudCache interface compatibility
-		return derived(this.cache, ($cache) => {
-			const result: CloudVolumeMetadata[] = [];
-			for (const files of $cache.values()) {
-				result.push(...files);
-			}
-			return result;
-		});
+		// Return Map grouped by series for efficient series-based operations
+		return this.cache;
 	}
 
 	get isFetchingState() {
@@ -53,20 +45,23 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 			// Query MEGA provider (which reads from its internal storage.files cache)
 			const volumes = await megaProvider.listCloudVolumes();
 
-			// Group by path (to match Drive's structure which supports duplicates)
+			// Group by series title (extracted from path: "SeriesTitle/VolumeTitle.cbz")
 			const cacheMap = new Map<string, CloudVolumeMetadata[]>();
 			for (const volume of volumes) {
-				const existing = cacheMap.get(volume.path);
+				// Extract series title from path
+				const seriesTitle = volume.path.split('/')[0];
+
+				const existing = cacheMap.get(seriesTitle);
 				if (existing) {
 					existing.push(volume);
 				} else {
-					cacheMap.set(volume.path, [volume]);
+					cacheMap.set(seriesTitle, [volume]);
 				}
 			}
 
 			this.cache.set(cacheMap);
 			this.loadedFlag = true;
-			console.log(`✅ MEGA cache populated with ${volumes.length} files`);
+			console.log(`✅ MEGA cache populated with ${volumes.length} files in ${cacheMap.size} series`);
 		} catch (error) {
 			console.error('Failed to fetch MEGA cache:', error);
 		} finally {
@@ -81,8 +76,10 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 			currentCache = value;
 		})();
 
-		const files = currentCache.get(path);
-		return files !== undefined && files.length > 0;
+		// Extract series title from path and find within that series
+		const seriesTitle = path.split('/')[0];
+		const seriesFiles = currentCache.get(seriesTitle);
+		return seriesFiles?.some(f => f.path === path) || false;
 	}
 
 	get(path: string): CloudVolumeMetadata | null {
@@ -91,8 +88,10 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 			currentCache = value;
 		})();
 
-		const files = currentCache.get(path);
-		return files && files.length > 0 ? files[0] : null;
+		// Extract series title from path and find within that series
+		const seriesTitle = path.split('/')[0];
+		const seriesFiles = currentCache.get(seriesTitle);
+		return seriesFiles?.find(f => f.path === path) || null;
 	}
 
 	getAll(path: string): CloudVolumeMetadata[] {
@@ -101,7 +100,10 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 			currentCache = value;
 		})();
 
-		return currentCache.get(path) || [];
+		// Extract series title from path and find all matches within that series
+		const seriesTitle = path.split('/')[0];
+		const seriesFiles = currentCache.get(seriesTitle);
+		return seriesFiles?.filter(f => f.path === path) || [];
 	}
 
 	getBySeries(seriesTitle: string): CloudVolumeMetadata[] {

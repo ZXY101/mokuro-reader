@@ -77,16 +77,16 @@
   });
 
   // Subscribe to unified cloud cache updates
-  let cloudFiles = $state<any[]>([]);
+  let cloudFiles = $state<Map<string, any[]>>(new Map());
   let cacheHasLoaded = $state(false);
   let wasFetching = $state(false);
 
   $effect(() => {
     return unifiedCloudManager.cloudFiles.subscribe(value => {
-      console.log('[Series Page] Cloud files updated:', value.length, 'files');
+      console.log('[Series Page] Cloud files updated:', value.size, 'series');
       cloudFiles = value;
       // If we get files and weren't fetching, cache must already be loaded
-      if (value.length > 0 && !wasFetching) {
+      if (value.size > 0 && !wasFetching) {
         cacheHasLoaded = true;
         console.log('[Series Page] Cache already loaded (has files)');
       }
@@ -104,7 +104,7 @@
       }
       wasFetching = isFetching;
       // Also mark as loaded if not fetching and we have files
-      if (!isFetching && cloudFiles.length > 0) {
+      if (!isFetching && cloudFiles.size > 0) {
         cacheHasLoaded = true;
         console.log('[Series Page] Cache already loaded (not fetching + has files)');
       }
@@ -144,17 +144,21 @@
       return;
     }
 
+    // Efficient O(1) lookup: Get series files from Map by series title
+    const seriesTitle = manga[0].series_title;
+    const seriesFiles = cloudFiles.get(seriesTitle) || [];
+
     allBackedUp = manga.every(vol => {
       const path = `${vol.series_title}/${vol.volume_title}.cbz`;
-      return cloudFiles.some(f => f.path === path);
+      return seriesFiles.some(f => f.path === path);
     });
 
     anyBackedUp = manga.some(vol => {
       const path = `${vol.series_title}/${vol.volume_title}.cbz`;
-      return cloudFiles.some(f => f.path === path);
+      return seriesFiles.some(f => f.path === path);
     });
 
-    console.log('[Series Page] Backup status computed - allBackedUp:', allBackedUp, 'anyBackedUp:', anyBackedUp, 'cloudFiles:', cloudFiles.length);
+    console.log('[Series Page] Backup status computed - allBackedUp:', allBackedUp, 'anyBackedUp:', anyBackedUp, 'seriesFiles:', seriesFiles.length);
   });
 
   async function confirmDelete(deleteStats = false, deleteDrive = false) {
@@ -185,11 +189,8 @@
 
     const seriesTitle = volumes[0].series_title;
 
-    // Check if any volumes are backed up
-    const backedUpVolumes = cloudFiles.filter(f => {
-      const path = f.path;
-      return path.startsWith(`${seriesTitle}/`);
-    });
+    // Check if any volumes are backed up (efficient O(1) Map lookup)
+    const backedUpVolumes = cloudFiles.get(seriesTitle) || [];
 
     if (backedUpVolumes.length === 0) {
       showSnackbar('No volumes found in cloud', 'info');
@@ -334,13 +335,17 @@
 
   async function downloadAllPlaceholders() {
     if (!placeholders || placeholders.length === 0) return;
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+
+    // Check if any cloud provider is authenticated
+    if (!hasAnyProvider) {
+      showSnackbar('Please sign in to a cloud storage provider first', 'error');
       return;
     }
 
     try {
-      await downloadSeriesFromDrive(placeholders);
+      // Use the download queue to handle placeholders
+      const { queueSeriesVolumes } = await import('$lib/util/download-queue');
+      queueSeriesVolumes(placeholders);
     } catch (error) {
       console.error('Failed to download placeholders:', error);
     }
@@ -496,8 +501,8 @@
 
       {#if placeholders && placeholders.length > 0}
         <div class="mt-4 mb-2 flex items-center justify-between px-4">
-          <h4 class="text-sm font-semibold text-gray-400">Available in Drive ({placeholders.length})</h4>
-          {#if state.isAuthenticated}
+          <h4 class="text-sm font-semibold text-gray-400">Available in Cloud ({placeholders.length})</h4>
+          {#if hasAnyProvider}
             <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
               <DownloadSolid class="w-3 h-3 me-1" />
               Download all

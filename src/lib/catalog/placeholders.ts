@@ -100,7 +100,7 @@ function createPlaceholder(cloudFile: CloudVolumeWithProvider, seriesUuid: strin
  * Returns placeholder VolumeMetadata for files that exist in cloud but not locally
  */
 export async function generatePlaceholders(
-  cloudFiles: CloudVolumeWithProvider[]
+  cloudFilesMap: Map<string, CloudVolumeWithProvider[]>
 ): Promise<VolumeMetadata[]> {
   // Skip during SSR/build - IndexedDB is not available
   if (!browser) {
@@ -121,6 +121,12 @@ export async function generatePlaceholders(
     if (!seriesTitleToUuid.has(vol.series_title)) {
       seriesTitleToUuid.set(vol.series_title, vol.series_uuid);
     }
+  }
+
+  // Flatten Map values into a single array
+  const cloudFiles: CloudVolumeWithProvider[] = [];
+  for (const files of cloudFilesMap.values()) {
+    cloudFiles.push(...files);
   }
 
   // Find cloud-only files

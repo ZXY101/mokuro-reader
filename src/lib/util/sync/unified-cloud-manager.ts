@@ -29,19 +29,24 @@ class UnifiedCloudManager {
 
 	/**
 	 * Store containing cloud volumes from the current provider
+	 * Returns Map<seriesTitle, CloudVolumeWithProvider[]> for efficient series-based operations
 	 * Delegates to cacheManager and adds provider field to each file
 	 */
-	get cloudFiles(): Readable<CloudVolumeWithProvider[]> {
-		return derived(cacheManager.allFiles, ($files) => {
+	get cloudFiles(): Readable<Map<string, CloudVolumeWithProvider[]>> {
+		return derived(cacheManager.allFiles, ($filesMap) => {
 			const provider = this.getActiveProvider();
-			if (!provider) return [];
+			if (!provider) return new Map();
 
-			// Add provider field to each file
-			return $files.map(file => ({
-				...file,
-				provider: provider.type
-			}));
-		}, []);
+			// Add provider field to each file in the map
+			const resultMap = new Map<string, CloudVolumeWithProvider[]>();
+			for (const [seriesTitle, files] of $filesMap.entries()) {
+				resultMap.set(seriesTitle, files.map(file => ({
+					...file,
+					provider: provider.type
+				})));
+			}
+			return resultMap;
+		}, new Map());
 	}
 
 	/**
@@ -127,6 +132,12 @@ class UnifiedCloudManager {
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
 		const provider = this.getActiveProvider();
+		console.log('[Unified Cloud Manager] downloadVolumeCbz:', {
+			fileId,
+			activeProvider: provider?.type,
+			hasProvider: !!provider
+		});
+
 		if (!provider) {
 			throw new Error(`No cloud provider authenticated`);
 		}

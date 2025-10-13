@@ -77,6 +77,15 @@ export function queueVolume(volume: VolumeMetadata): void {
 	const cloudFileId = getCloudFileId(volume);
 	const cloudProvider = getCloudProvider(volume);
 
+	console.log('[Download Queue] queueVolume called:', {
+		isPlaceholder: volume.isPlaceholder,
+		volumeTitle: volume.volume_title,
+		cloudFileId,
+		cloudProvider,
+		volumeCloudProvider: volume.cloudProvider,
+		volumeDriveFileId: volume.driveFileId
+	});
+
 	if (!volume.isPlaceholder || !cloudFileId || !cloudProvider) {
 		console.warn('Can only queue placeholder volumes with cloud file IDs');
 		return;
@@ -519,6 +528,12 @@ async function processQueue(): Promise<void> {
 		});
 
 		// Route based on provider
+		console.log('[Download Queue] Routing download:', {
+			volumeTitle: item.volumeTitle,
+			cloudProvider: item.cloudProvider,
+			willUseDriveWorker: item.cloudProvider === 'google-drive'
+		});
+
 		if (item.cloudProvider === 'google-drive') {
 			await processDriveDownload(item, processId);
 		} else {

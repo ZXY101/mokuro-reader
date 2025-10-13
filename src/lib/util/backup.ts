@@ -222,10 +222,9 @@ export async function backupVolumeToCloud(
     // Build cloud path (SeriesTitle/VolumeTitle.cbz)
     const path = `${volume.series_title}/${volume.volume_title}.cbz`;
 
-    // Upload via unified cloud manager (auto-routes to correct provider)
+    // Upload via unified cloud manager (auto-routes to current active provider)
     onProgress?.(`Uploading to ${provider}...`);
     const fileId = await unifiedCloudManager.uploadVolumeCbz(
-      provider,
       path,
       cbzBlob
     );
