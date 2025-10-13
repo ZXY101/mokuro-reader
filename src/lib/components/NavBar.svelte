@@ -42,8 +42,8 @@
   // Check for authenticated providers periodically
   $effect(() => {
     const checkProviders = () => {
-      const authenticated = unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated());
-      hasAuthenticatedProviders = authenticated.length > 0;
+      const activeProvider = unifiedCloudManager.getActiveProvider();
+      hasAuthenticatedProviders = activeProvider !== null;
     };
 
     checkProviders(); // Initial check

@@ -1,6 +1,5 @@
 import type { VolumeMetadata } from '$lib/types';
 import { driveApiClient, escapeNameForDriveQuery } from './google-drive/api-client';
-import { driveFilesCache } from './google-drive/drive-files-cache';
 import { createArchiveBlob } from './zip';
 import { unifiedCloudManager } from './sync/unified-cloud-manager';
 import type { ProviderType } from './sync/provider-interface';
@@ -140,14 +139,7 @@ export async function backupVolumeToDrive(
     onProgress?.('Uploading to Google Drive...');
     const fileId = await uploadCbzToDrive(cbzBlob, fileName, seriesFolderId);
 
-    // Update the cache with the newly uploaded file
-    driveFilesCache.addDriveFile(volume.series_title, volume.volume_title, {
-      fileId,
-      name: fileName,
-      modifiedTime: new Date().toISOString(),
-      size: cbzBlob.size,
-      path: `${volume.series_title}/${fileName}`
-    });
+    console.log(`✅ Uploaded ${fileName} to Google Drive (${fileId})`);
 
     return fileId;
   } finally {

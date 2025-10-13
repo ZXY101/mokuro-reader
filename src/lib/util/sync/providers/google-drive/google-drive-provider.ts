@@ -3,7 +3,6 @@ import type { SyncProvider, ProviderStatus, CloudVolumeMetadata } from '../../pr
 import { ProviderError } from '../../provider-interface';
 import { tokenManager } from '$lib/util/google-drive/token-manager';
 import { driveApiClient } from '$lib/util/google-drive/api-client';
-import { driveFilesCache, type DriveFileMetadata } from '$lib/util/google-drive/drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
 import { parseVolumesFromJson } from '$lib/settings';
 import { getOrCreateFolder, uploadCbzToDrive } from '$lib/util/backup';
@@ -68,9 +67,6 @@ export class GoogleDriveProvider implements SyncProvider {
 				});
 			});
 
-			// Fetch Drive files cache after login
-			await driveFilesCache.fetchAllFiles();
-
 			console.log('✅ Google Drive login successful');
 		} catch (error) {
 			throw new ProviderError(
@@ -84,7 +80,6 @@ export class GoogleDriveProvider implements SyncProvider {
 
 	async logout(): Promise<void> {
 		tokenManager.clearToken();
-		driveFilesCache.clearCache();
 		this.readerFolderId = null;
 		console.log('Google Drive logged out');
 	}
@@ -98,9 +93,12 @@ export class GoogleDriveProvider implements SyncProvider {
 			// Ensure reader folder exists
 			const folderId = await this.ensureReaderFolder();
 
-			// Get existing file ID from cache
-			const volumeDataFiles = driveFilesCache.getVolumeDataFiles();
-			const existingFileId = volumeDataFiles.length > 0 ? volumeDataFiles[0].fileId : null;
+			// Query for existing volume-data.json file
+			const files = await driveApiClient.listFiles(
+				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA}' and trashed=false`,
+				'files(id)'
+			);
+			const existingFileId = files.length > 0 ? files[0].id : null;
 
 			// Upload (create or update)
 			const content = JSON.stringify(data);
@@ -129,14 +127,21 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 
 		try {
-			// Get file ID from cache
-			const fileId = driveFilesCache.getVolumeDataFileId();
-			if (!fileId) {
+			// Ensure reader folder exists
+			const folderId = await this.ensureReaderFolder();
+
+			// Query for volume-data.json file
+			const files = await driveApiClient.listFiles(
+				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA}' and trashed=false`,
+				'files(id)'
+			);
+
+			if (files.length === 0) {
 				return null;
 			}
 
 			// Download and parse
-			const content = await driveApiClient.getFileContent(fileId);
+			const content = await driveApiClient.getFileContent(files[0].id);
 			return parseVolumesFromJson(content);
 		} catch (error) {
 			// File not found is not an error
@@ -237,19 +242,47 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 
 		try {
-			// Get all Drive files from cache
-			const driveFiles = driveFilesCache.getAllDriveFiles();
+			console.log('Querying Google Drive for CBZ files...');
 
-			// Filter to only CBZ files and convert to CloudVolumeMetadata format
-			const cloudVolumes = driveFiles
-				.filter((file: DriveFileMetadata) => file.name.endsWith('.cbz'))
-				.map((file: DriveFileMetadata) => ({
-					fileId: file.fileId,
-					path: file.path,
-					modifiedTime: file.modifiedTime,
-					size: file.size || 0,
-					description: file.description
-				}));
+			// Query Drive API directly for all files owned by user
+			const allItems = await driveApiClient.listFiles(
+				`'me' in owners and trashed=false`,
+				'files(id,name,mimeType,modifiedTime,size,parents,description)'
+			);
+
+			// Build folder map (folder ID -> folder name)
+			const folderNames = new Map<string, string>();
+			const cbzFiles: any[] = [];
+
+			for (const item of allItems) {
+				if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
+					folderNames.set(item.id, item.name);
+				} else if (item.name.endsWith('.cbz')) {
+					cbzFiles.push(item);
+				}
+			}
+
+			console.log(`Found ${cbzFiles.length} CBZ files and ${folderNames.size} folders`);
+
+			// Transform CBZ files to CloudVolumeMetadata format with paths
+			const cloudVolumes: CloudVolumeMetadata[] = [];
+
+			for (const file of cbzFiles) {
+				const parentId = file.parents?.[0];
+				const parentName = parentId ? folderNames.get(parentId) : null;
+
+				// Only include files that have a parent folder (series folder)
+				if (parentName) {
+					const path = `${parentName}/${file.name}`;
+					cloudVolumes.push({
+						fileId: file.id,
+						path: path,
+						modifiedTime: file.modifiedTime || new Date().toISOString(),
+						size: file.size ? parseInt(file.size) : 0,
+						description: file.description
+					});
+				}
+			}
 
 			console.log(`✅ Listed ${cloudVolumes.length} CBZ files from Google Drive`);
 			return cloudVolumes;
@@ -289,17 +322,6 @@ export class GoogleDriveProvider implements SyncProvider {
 
 			// Upload the CBZ file
 			const fileId = await uploadCbzToDrive(blob, fileName, targetFolderId);
-
-			// Update the cache
-			driveFilesCache.addDriveFile(seriesTitle || 'mokuro-reader', fileName.replace('.cbz', ''), {
-				fileId,
-				name: fileName,
-				modifiedTime: new Date().toISOString(),
-				size: blob.size,
-				path,
-				description,
-				parentId: targetFolderId
-			});
 
 			// Update file description if provided
 			if (description) {
@@ -391,9 +413,6 @@ export class GoogleDriveProvider implements SyncProvider {
 			// Delete from Drive
 			await driveApiClient.deleteFile(fileId);
 
-			// Remove from cache
-			driveFilesCache.removeDriveFileById(fileId);
-
 			console.log(`✅ Deleted file from Google Drive (${fileId})`);
 		} catch (error) {
 			throw new ProviderError(
@@ -433,13 +452,6 @@ export class GoogleDriveProvider implements SyncProvider {
 			// Delete the folder
 			const folderId = folders[0].id;
 			await driveApiClient.deleteFile(folderId);
-
-			// Remove all files in this series from cache
-			const allFiles = driveFilesCache.getAllDriveFiles();
-			const filesToRemove = allFiles.filter(file => file.path.startsWith(`${seriesTitle}/`));
-			for (const file of filesToRemove) {
-				driveFilesCache.removeDriveFileById(file.fileId);
-			}
 
 			console.log(`✅ Deleted series folder '${seriesTitle}' from Google Drive`);
 		} catch (error) {

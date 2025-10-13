@@ -78,11 +78,26 @@
 
   // Subscribe to unified cloud cache updates
   let cloudFiles = $state<any[]>([]);
+  let cacheHasLoaded = $state(false);
+  let wasFetching = $state(false);
 
   $effect(() => {
     return unifiedCloudManager.cloudFiles.subscribe(value => {
       console.log('[Series Page] Cloud files updated:', value.length, 'files');
       cloudFiles = value;
+    });
+  });
+
+  // Track when fetching completes to know when cache is loaded
+  $effect(() => {
+    return unifiedCloudManager.isFetching.subscribe(isFetching => {
+      console.log('[Series Page] isFetching:', isFetching, 'wasFetching:', wasFetching);
+      // Mark cache as loaded when fetching transitions from true to false
+      if (wasFetching && !isFetching) {
+        cacheHasLoaded = true;
+        console.log('[Series Page] Cache has loaded');
+      }
+      wasFetching = isFetching;
     });
   });
 
@@ -92,9 +107,15 @@
     return providerManager.status.subscribe(value => {
       console.log('[Series Page] Provider status updated:', value.hasAnyAuthenticated, value);
       providerStatus = value;
+      // Reset cache loaded state when provider changes
+      if (!value.hasAnyAuthenticated) {
+        cacheHasLoaded = false;
+        wasFetching = false;
+      }
     });
   });
   let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
+  let isCloudReady = $derived(hasAnyProvider && cacheHasLoaded);
 
   // Debug logging for reactive values
   $effect(() => {
@@ -415,8 +436,8 @@
         </div>
       </div>
       <div class="flex flex-row gap-2 items-start">
-        <!-- Debug: hasAnyProvider={hasAnyProvider}, allBackedUp={allBackedUp}, anyBackedUp={anyBackedUp} -->
-        {#if hasAnyProvider}
+        <!-- Debug: hasAnyProvider={hasAnyProvider}, cacheHasLoaded={cacheHasLoaded}, isCloudReady={isCloudReady}, allBackedUp={allBackedUp}, anyBackedUp={anyBackedUp} -->
+        {#if isCloudReady}
           {#if !allBackedUp}
             <Button
               color="light"

@@ -3,7 +3,7 @@ import { browser } from '$app/environment';
 import { GOOGLE_DRIVE_CONFIG, type TokenInfo } from './constants';
 import { showSnackbar } from '../snackbar';
 import { syncService } from './sync-service';
-import { driveFilesCache } from './drive-files-cache';
+import { providerManager } from '../sync/provider-manager';
 
 class TokenManager {
   private tokenStore = writable<string>('');
@@ -171,6 +171,9 @@ class TokenManager {
     if (typeof gapi !== 'undefined' && gapi.client) {
       gapi.client.setToken(null);
     }
+
+    // Update provider manager to trigger reactive updates
+    providerManager.updateStatus();
   }
 
   async revokeToken(token: string): Promise<void> {
@@ -231,11 +234,8 @@ class TokenManager {
           this.setToken(access_token, expires_in);
           gapi.client.setToken({ access_token });
 
-          // Fetch Drive cache after successful login
-          // The cache will automatically trigger sync when loaded if SYNC_AFTER_LOGIN flag is set
-          driveFilesCache.fetchAllFiles().catch(err =>
-            console.error('Failed to fetch Drive files cache after login:', err)
-          );
+          // Update provider manager to trigger reactive updates
+          providerManager.updateStatus();
         }
       }
     });

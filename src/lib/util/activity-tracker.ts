@@ -27,8 +27,8 @@ class ActivityTracker {
 
           // Sync only when transitioning from active to inactive
           // Check if any provider is authenticated
-          const authenticatedProviders = unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated());
-          if (wasActive && !active && authenticatedProviders.length > 0) {
+          const hasActiveProvider = unifiedCloudManager.getActiveProvider() !== null;
+          if (wasActive && !active && hasActiveProvider) {
             console.log('Auto-syncing due to inactivity...');
             unifiedCloudManager.syncProgress({ silent: true }).catch(error => {
               console.error('Auto-sync failed:', error);

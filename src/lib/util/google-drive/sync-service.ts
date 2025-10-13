@@ -4,7 +4,6 @@ import { parseVolumesFromJson, volumes } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import { driveApiClient, DriveApiError, escapeNameForDriveQuery } from './api-client';
 import { tokenManager } from './token-manager';
-import { driveFilesCache } from './drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG, type SyncProgress } from './constants';
 
 class SyncService {
@@ -117,8 +116,13 @@ class SyncService {
       });
 
       const readerFolderId = await this.ensureReaderFolderExists();
-      const volumeDataFiles = driveFilesCache.getVolumeDataFiles();
-      console.log('Volume data files from cache:', volumeDataFiles);
+
+      // Query Drive API directly for volume-data.json files
+      const volumeDataQuery = `'${readerFolderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA}' and trashed=false`;
+      const volumeDataFilesRaw = await driveApiClient.listFiles(volumeDataQuery, 'files(id,name)');
+      const volumeDataFiles = volumeDataFilesRaw.map(file => ({ fileId: file.id, name: file.name }));
+
+      console.log('Volume data files from Drive API:', volumeDataFiles);
 
       // Step 2: Download and merge cloud data from all volume-data.json files
       let cloudVolumes: any = {};
@@ -193,17 +197,11 @@ class SyncService {
           for (let i = 1; i < volumeDataFiles.length; i++) {
             try {
               await driveApiClient.deleteFile(volumeDataFiles[i].fileId);
-              driveFilesCache.removeDriveFileById(volumeDataFiles[i].fileId);
               console.log(`Deleted duplicate volume-data.json file: ${volumeDataFiles[i].fileId}`);
             } catch (error) {
               console.warn(`Failed to delete duplicate file ${volumeDataFiles[i].fileId}:`, error);
             }
           }
-
-          // Refresh cache after deleting duplicates to ensure consistency
-          driveFilesCache.fetchAllFiles().catch(err =>
-            console.error('Failed to refresh cache after deleting duplicates:', err)
-          );
         }
       } else {
         progressTrackerStore.updateProcess(processId, {

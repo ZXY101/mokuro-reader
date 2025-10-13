@@ -6,9 +6,11 @@
 
 export * from './provider-interface';
 export * from './provider-manager';
+export * from './cloud-cache-interface';
+export { cacheManager } from './cache-manager';
+export type { GenericCloudFile } from './cache-manager';
 
 // Export provider instances
+export { googleDriveProvider } from './providers/google-drive/google-drive-provider';
 export { megaProvider } from './providers/mega/mega-provider';
 export { webdavProvider } from './providers/webdav/webdav-provider';
-
-// Note: Google Drive provider will be added after refactoring

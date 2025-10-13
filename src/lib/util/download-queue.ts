@@ -313,9 +313,11 @@ async function processVolumeData(
 							: seriesTag;
 
 						await driveApiClient.updateFileDescription(cloudFileId, newDescription);
-						driveFilesCache.updateFileDescription(cloudFileId, newDescription);
 
-						// Also update unified cloud manager cache
+
+					// Also update driveFilesCache
+					driveFilesCache.updateFileDescription(cloudFileId, newDescription);
+						// Update unified cloud manager cache
 						unifiedCloudManager.updateCacheEntry(cloudFileId, {
 							description: newDescription
 						});

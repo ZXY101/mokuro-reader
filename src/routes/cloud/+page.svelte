@@ -66,10 +66,19 @@
     return () => unsubscribers.forEach(unsub => unsub());
   });
 
-  // Check which provider (if any) is authenticated (platform-agnostic)
-  let hasAnyProvider = $derived(
-    unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated()).length > 0
-  );
+  // Subscribe to provider manager status for reactive authentication state
+  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
+  $effect(() => {
+    return providerManager.status.subscribe(value => {
+      providerStatus = value;
+    });
+  });
+
+  // Reactive provider authentication checks - now using provider manager for all providers
+  let googleDriveAuth = $derived(providerStatus.providers['google-drive']?.isAuthenticated || false);
+  let megaAuth = $derived(providerStatus.providers['mega']?.isAuthenticated || false);
+  let webdavAuth = $derived(providerStatus.providers['webdav']?.isAuthenticated || false);
+  let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
 
   // MEGA login state
   let megaEmail = $state('');
@@ -696,45 +705,10 @@
     await syncReadProgress();
   }
   
-  onMount(async () => {
-    console.log('🔵 onMount: Starting cloud page initialization');
-
+  onMount(() => {
     // Clear service worker cache for Google Drive downloads
-    console.log('🔵 onMount: Clearing service worker cache');
+    // This is cloud-page-specific and not part of global init
     clearServiceWorkerCache();
-
-    // Wait for MEGA/WebDAV providers to finish initializing
-    // This ensures credentials have been restored before we check authentication
-    console.log('🔵 onMount: Waiting for providers to be ready...');
-    await Promise.all([
-      megaProvider.whenReady(),
-      webdavProvider.whenReady()
-    ]);
-    console.log('🔵 onMount: Providers are ready');
-
-    // Check authentication status for all providers
-    const megaAuth = megaProvider.isAuthenticated();
-    const webdavAuth = webdavProvider.isAuthenticated();
-    const gdriveAuth = !!accessToken;
-    console.log(`🔵 onMount: Authentication status - MEGA: ${megaAuth}, WebDAV: ${webdavAuth}, GDrive: ${gdriveAuth}`);
-
-    // Use the unified cloud manager's method to check if any provider is authenticated
-    const authenticatedProviders = unifiedCloudManager.getAllProviders().filter(p => p.isAuthenticated());
-    console.log(`🔵 onMount: ${authenticatedProviders.length} provider(s) authenticated:`, authenticatedProviders.map(p => p.name).join(', '));
-
-    // Fetch cloud files if any provider is authenticated
-    // This handles page refresh or restored login sessions
-    if (authenticatedProviders.length > 0) {
-      try {
-        console.log('🔵 onMount: Calling fetchAllCloudVolumes...');
-        await unifiedCloudManager.fetchAllCloudVolumes();
-        console.log('✅ onMount: Cloud cache populated successfully');
-      } catch (error) {
-        console.warn('❌ onMount: Failed to fetch cloud volumes:', error);
-      }
-    } else {
-      console.log('🔵 onMount: No providers authenticated, skipping cache fetch');
-    }
   });
 
   async function onDownloadProfiles() {
@@ -784,12 +758,51 @@
     }
   }
 
+  // Google Drive handlers
+  async function handleGoogleDriveLogin() {
+    try {
+      // Trigger OAuth flow
+      signIn();
+
+      // Wait for authentication to complete by watching the accessToken store
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Login timeout'));
+        }, 90000); // 90 second timeout for OAuth popup
+
+        const unsubscribe = accessTokenStore.subscribe(token => {
+          if (token) {
+            clearTimeout(timeout);
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+
+      // Set as current provider (auto-logs out any other provider)
+      const provider = providerManager.getProviderInstance('google-drive');
+      if (provider) {
+        await providerManager.setCurrentProvider(provider);
+      }
+
+      // After successful login, populate unified cache for placeholders
+      showSnackbar('Connected to Google Drive - loading cloud data...');
+      await unifiedCloudManager.fetchAllCloudVolumes();
+      showSnackbar('Google Drive connected');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Login failed';
+      showSnackbar(message);
+    }
+  }
+
   // MEGA handlers
   async function handleMegaLogin() {
     megaLoading = true;
     try {
       await megaProvider.login({ email: megaEmail, password: megaPassword });
-      providerManager.updateStatus();
+
+      // Set as current provider (auto-logs out any other provider)
+      await providerManager.setCurrentProvider(megaProvider);
 
       // Populate unified cache for rest of app to use
       showSnackbar('Connected to MEGA - loading cloud data...');
@@ -811,6 +824,7 @@
     await megaProvider.logout();
     megaEmail = '';
     megaPassword = '';
+    unifiedCloudManager.clearCache();
     providerManager.updateStatus();
     showSnackbar('Logged out of MEGA');
   }
@@ -847,7 +861,9 @@
         username: webdavUsername,
         password: webdavPassword
       });
-      providerManager.updateStatus();
+
+      // Set as current provider (auto-logs out any other provider)
+      await providerManager.setCurrentProvider(webdavProvider);
 
       // Populate unified cache for rest of app to use
       showSnackbar('Connected to WebDAV - loading cloud data...');
@@ -871,6 +887,7 @@
     webdavUrl = '';
     webdavUsername = '';
     webdavPassword = '';
+    unifiedCloudManager.clearCache();
     providerManager.updateStatus();
     showSnackbar('Logged out of WebDAV');
   }
@@ -994,7 +1011,7 @@
           <!-- Google Drive Option -->
           <button
             class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
-            onclick={signIn}
+            onclick={handleGoogleDriveLogin}
           >
             <div class="flex items-center gap-4">
               <GoogleSolid size="xl" />
@@ -1108,7 +1125,7 @@
     </div>
   {:else}
     <!-- Connected Provider Interface -->
-    {#if accessToken}
+    {#if googleDriveAuth}
       <!-- Google Drive Connected -->
       <div class="flex justify-between items-center gap-6 flex-col">
         <div class="flex justify-between items-center w-full max-w-3xl">
@@ -1186,7 +1203,7 @@
         </div>
       </div>
     </div>
-    {:else if megaProvider.isAuthenticated()}
+    {:else if megaAuth}
       <!-- MEGA Connected -->
       <div class="flex justify-center items-center flex-col gap-6">
         <div class="w-full max-w-3xl">
@@ -1225,7 +1242,7 @@
           </div>
         </div>
       </div>
-    {:else if webdavProvider.isAuthenticated()}
+    {:else if webdavAuth}
       <!-- WebDAV Connected -->
       <div class="flex justify-center items-center flex-col gap-6">
         <div class="w-full max-w-3xl">

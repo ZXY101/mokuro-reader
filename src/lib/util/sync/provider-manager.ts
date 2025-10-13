@@ -1,14 +1,28 @@
-import { writable, derived, type Readable } from 'svelte/store';
+import { writable, type Readable } from 'svelte/store';
 import type { SyncProvider, ProviderType, ProviderStatus } from './provider-interface';
+import { cacheManager } from './cache-manager';
 
 export interface MultiProviderStatus {
 	providers: Record<ProviderType, ProviderStatus | null>;
 	hasAnyAuthenticated: boolean;
 	needsAttention: boolean;
+	currentProviderType: ProviderType | null;
 }
 
+/**
+ * Provider Manager - Single Provider Design
+ *
+ * Manages ONE active cloud storage provider at a time.
+ * Only one provider can be authenticated simultaneously.
+ * Switching providers automatically logs out the previous one.
+ */
 class ProviderManager {
-	private providers: Map<ProviderType, SyncProvider> = new Map();
+	// THE provider - only one can be active
+	private currentProvider: SyncProvider | null = null;
+
+	// Registry for looking up provider instances by type (they exist as singletons)
+	private providerRegistry: Map<ProviderType, SyncProvider> = new Map();
+
 	private statusStore = writable<MultiProviderStatus>({
 		providers: {
 			'google-drive': null,
@@ -16,162 +30,106 @@ class ProviderManager {
 			webdav: null
 		},
 		hasAnyAuthenticated: false,
-		needsAttention: false
+		needsAttention: false,
+		currentProviderType: null
 	});
 
-	/** Observable store for multi-provider status */
+	/** Observable store for provider status */
 	get status(): Readable<MultiProviderStatus> {
 		return this.statusStore;
 	}
 
 	/**
-	 * Register a sync provider
+	 * Register a provider instance in the registry
+	 * This doesn't make it active - just makes it available for lookup
 	 * @param provider The provider instance to register
 	 */
 	registerProvider(provider: SyncProvider): void {
-		this.providers.set(provider.type, provider);
+		this.providerRegistry.set(provider.type, provider);
 		this.updateStatus();
 	}
 
 	/**
-	 * Get a specific provider by type
+	 * Initialize by detecting any already-authenticated provider
+	 * Called once on app startup
+	 */
+	initializeCurrentProvider(): void {
+		if (this.currentProvider) return; // Already set
+
+		// Check each registered provider to see if it's already authenticated
+		for (const provider of this.providerRegistry.values()) {
+			if (provider.isAuthenticated()) {
+				this.setCurrentProvider(provider);
+				console.log(`✅ Detected existing auth: ${provider.type}`);
+				return;
+			}
+		}
+	}
+
+	/**
+	 * Set the current provider (THE provider)
+	 * Logs out the previous provider if switching
+	 * @param provider The provider instance to make current
+	 */
+	async setCurrentProvider(provider: SyncProvider): Promise<void> {
+		// Logout previous provider if switching
+		if (this.currentProvider && this.currentProvider.type !== provider.type) {
+			console.log(`🔄 Switching from ${this.currentProvider.type} to ${provider.type}`);
+			try {
+				await this.currentProvider.logout();
+			} catch (error) {
+				console.error(`Failed to logout ${this.currentProvider.type}:`, error);
+			}
+		}
+
+		// Set THE provider
+		this.currentProvider = provider;
+
+		// Update cache to use this provider's cache
+		cacheManager.setActiveProvider(provider.type);
+
+		this.updateStatus();
+	}
+
+	/**
+	 * Get THE current provider
+	 * @returns The active provider or null
+	 */
+	getActiveProvider(): SyncProvider | null {
+		// Only return if still authenticated
+		return this.currentProvider?.isAuthenticated() ? this.currentProvider : null;
+	}
+
+	/**
+	 * Get provider instance by type (for login operations)
 	 * @param type Provider type
-	 * @returns Provider instance or undefined
 	 */
-	getProvider(type: ProviderType): SyncProvider | undefined {
-		return this.providers.get(type);
-	}
-
-	/**
-	 * Get all registered providers
-	 * @returns Array of all provider instances
-	 */
-	getAllProviders(): SyncProvider[] {
-		return Array.from(this.providers.values());
-	}
-
-	/**
-	 * Get all authenticated providers
-	 * @returns Array of authenticated provider instances
-	 */
-	getAuthenticatedProviders(): SyncProvider[] {
-		return this.getAllProviders().filter((p) => p.isAuthenticated());
+	getProviderInstance(type: ProviderType): SyncProvider | undefined {
+		return this.providerRegistry.get(type);
 	}
 
 	/**
 	 * Check if any provider is authenticated
 	 */
 	hasAnyAuthenticated(): boolean {
-		return this.getAuthenticatedProviders().length > 0;
+		return this.getActiveProvider() !== null;
 	}
 
 	/**
-	 * Upload volume data to all authenticated providers
-	 * @param data Volume data to upload
-	 * @returns Object with results for each provider
+	 * Logout the current provider
 	 */
-	async uploadVolumeDataToAll(data: any): Promise<Record<string, { success: boolean; error?: string }>> {
-		const authenticatedProviders = this.getAuthenticatedProviders();
-		const results: Record<string, { success: boolean; error?: string }> = {};
-
-		await Promise.allSettled(
-			authenticatedProviders.map(async (provider) => {
-				try {
-					await provider.uploadVolumeData(data);
-					results[provider.type] = { success: true };
-				} catch (error) {
-					results[provider.type] = {
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error'
-					};
-				}
-			})
-		);
-
-		return results;
+	async logout(): Promise<void> {
+		if (this.currentProvider) {
+			await this.currentProvider.logout();
+			this.currentProvider = null;
+			cacheManager.clearAll();
+			this.updateStatus();
+		}
 	}
 
-	/**
-	 * Download and merge volume data from all authenticated providers
-	 * Newest data wins (based on lastProgressUpdate timestamp)
-	 * @returns Merged volume data
-	 */
-	async downloadAndMergeVolumeData(): Promise<any> {
-		const authenticatedProviders = this.getAuthenticatedProviders();
-		const allData: any[] = [];
-
-		// Download from all providers
-		await Promise.allSettled(
-			authenticatedProviders.map(async (provider) => {
-				try {
-					const data = await provider.downloadVolumeData();
-					if (data) {
-						allData.push(data);
-					}
-				} catch (error) {
-					console.error(`Failed to download from ${provider.type}:`, error);
-				}
-			})
-		);
-
-		// Merge all data (newest wins)
-		return this.mergeVolumeData(allData);
-	}
 
 	/**
-	 * Upload profile data to all authenticated providers
-	 * @param data Profile data to upload
-	 * @returns Object with results for each provider
-	 */
-	async uploadProfilesToAll(data: any): Promise<Record<string, { success: boolean; error?: string }>> {
-		const authenticatedProviders = this.getAuthenticatedProviders();
-		const results: Record<string, { success: boolean; error?: string }> = {};
-
-		await Promise.allSettled(
-			authenticatedProviders.map(async (provider) => {
-				try {
-					await provider.uploadProfiles(data);
-					results[provider.type] = { success: true };
-				} catch (error) {
-					results[provider.type] = {
-						success: false,
-						error: error instanceof Error ? error.message : 'Unknown error'
-					};
-				}
-			})
-		);
-
-		return results;
-	}
-
-	/**
-	 * Download and merge profile data from all authenticated providers
-	 * @returns Merged profile data
-	 */
-	async downloadAndMergeProfiles(): Promise<any> {
-		const authenticatedProviders = this.getAuthenticatedProviders();
-		const allData: any[] = [];
-
-		await Promise.allSettled(
-			authenticatedProviders.map(async (provider) => {
-				try {
-					const data = await provider.downloadProfiles();
-					if (data) {
-						allData.push(data);
-					}
-				} catch (error) {
-					console.error(`Failed to download profiles from ${provider.type}:`, error);
-				}
-			})
-		);
-
-		// For profiles, we can just use the first valid one or merge them
-		// Simple strategy: return the first one found
-		return allData.length > 0 ? allData[0] : null;
-	}
-
-	/**
-	 * Update the status store with current provider states
+	 * Update the status store with current provider state
 	 */
 	updateStatus(): void {
 		const status: MultiProviderStatus = {
@@ -181,61 +139,19 @@ class ProviderManager {
 				webdav: null
 			},
 			hasAnyAuthenticated: false,
-			needsAttention: false
+			needsAttention: false,
+			currentProviderType: this.currentProvider?.type ?? null
 		};
 
-		for (const provider of this.providers.values()) {
+		// Update status for all registered providers (shows their individual states)
+		for (const provider of this.providerRegistry.values()) {
 			status.providers[provider.type] = provider.getStatus();
 		}
 
 		status.hasAnyAuthenticated = this.hasAnyAuthenticated();
-		status.needsAttention = Object.values(status.providers).some(
-			(p) => p && p.needsAttention
-		);
+		status.needsAttention = this.currentProvider?.getStatus().needsAttention ?? false;
 
 		this.statusStore.set(status);
-	}
-
-	/**
-	 * Merge volume data from multiple sources
-	 * Newest data wins (based on lastProgressUpdate timestamp)
-	 */
-	private mergeVolumeData(dataSources: any[]): any {
-		if (dataSources.length === 0) return {};
-		if (dataSources.length === 1) return dataSources[0];
-
-		const merged: any = {};
-		const allVolumeIds = new Set<string>();
-
-		// Collect all volume IDs
-		for (const data of dataSources) {
-			if (data && typeof data === 'object') {
-				Object.keys(data).forEach((id) => allVolumeIds.add(id));
-			}
-		}
-
-		// Merge each volume (newest wins)
-		for (const volumeId of allVolumeIds) {
-			let newestVolume: any = null;
-			let newestDate = 0;
-
-			for (const data of dataSources) {
-				const volume = data?.[volumeId];
-				if (volume && volume.lastProgressUpdate) {
-					const date = new Date(volume.lastProgressUpdate).getTime();
-					if (date > newestDate) {
-						newestDate = date;
-						newestVolume = volume;
-					}
-				}
-			}
-
-			if (newestVolume) {
-				merged[volumeId] = newestVolume;
-			}
-		}
-
-		return merged;
 	}
 }
 
