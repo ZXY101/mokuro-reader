@@ -1,7 +1,7 @@
 // Universal worker for downloading and decompressing cloud volumes
 // Worker downloads from provider and decompresses (Google Drive, WebDAV, MEGA)
 
-import { Uint8ArrayReader, ZipReader, BlobWriter, getMimeType } from '@zip.js/zip.js';
+import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader, getMimeType } from '@zip.js/zip.js';
 import { File as MegaFile } from 'megajs';
 
 // Define the worker context
@@ -261,13 +261,12 @@ async function decompressCbz(arrayBuffer: ArrayBuffer): Promise<DecompressedEntr
 		if (entry.directory) continue;
 
 		try {
-			const mime = getMimeType(entry.filename);
-			const entryBlob: Blob = await entry.getData!(new BlobWriter(mime));
-			const buffer = await entryBlob.arrayBuffer();
+			// Decompress directly to Uint8Array without creating intermediate Blob
+			const uint8Array = await entry.getData!(new Uint8ArrayWriter());
 
 			decompressedEntries.push({
 				filename: entry.filename,
-				data: buffer
+				data: uint8Array.buffer as ArrayBuffer
 			});
 		} catch (entryError) {
 			console.error(`Worker: Error extracting entry ${entry.filename}:`, entryError);
