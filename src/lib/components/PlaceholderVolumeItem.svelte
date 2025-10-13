@@ -129,7 +129,7 @@
         {#if isDownloading}
           <Button color="light" disabled={true}>
             <Spinner size="4" class="me-2" />
-            {downloadProgress}%
+            {Math.round(downloadProgress)}%
           </Button>
         {:else}
           <Button color="blue" onclick={onDownloadClicked}>
