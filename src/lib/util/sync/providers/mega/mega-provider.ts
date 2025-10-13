@@ -21,7 +21,7 @@ const PROFILES_FILE = 'profiles.json';
 export class MegaProvider implements SyncProvider {
 	readonly type = 'mega' as const;
 	readonly name = 'MEGA';
-	readonly supportsWorkerDownload = false; // Requires Storage instance, downloads in main thread
+	readonly supportsWorkerDownload = true; // Workers can download via MEGA API from share links
 
 	private storage: any = null;
 	private mokuroFolder: any = null;
@@ -672,6 +672,48 @@ export class MegaProvider implements SyncProvider {
 				`Failed to delete volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
 				'mega',
 				'DELETE_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	/**
+	 * Create a temporary share link for a file
+	 * Returns a public download URL that includes the decryption key
+	 */
+	async createShareLink(fileId: string): Promise<string> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// Find the file by ID
+			const files = Object.values(this.storage.files || {});
+			const file = files.find(
+				(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
+			);
+
+			if (!file) {
+				throw new Error('File not found');
+			}
+
+			return new Promise((resolve, reject) => {
+				// Create share link with decryption key (noKey: false is default)
+				(file as any).link((error: Error | null, url: string) => {
+					if (error) {
+						reject(error);
+					} else {
+						console.log(`✅ Created MEGA share link for file ${fileId}`);
+						resolve(url);
+					}
+				});
+			});
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to create share link: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'mega',
+				'LINK_FAILED',
 				false,
 				true
 			);

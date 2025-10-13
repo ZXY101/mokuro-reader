@@ -234,8 +234,9 @@ async function decompressCbz(blob: Blob): Promise<DecompressedEntry[]> {
 
 /**
  * Get provider credentials for worker downloads
+ * For MEGA, creates a temporary share link instead of passing credentials
  */
-function getProviderCredentials(provider: ProviderType): any {
+async function getProviderCredentials(provider: ProviderType, fileId: string): Promise<any> {
 	if (provider === 'google-drive') {
 		let token = '';
 		tokenManager.token.subscribe(value => {
@@ -248,6 +249,11 @@ function getProviderCredentials(provider: ProviderType): any {
 		const username = localStorage.getItem('webdav_username');
 		const password = localStorage.getItem('webdav_password');
 		return { webdavUrl: serverUrl, webdavUsername: username, webdavPassword: password };
+	} else if (provider === 'mega') {
+		// Create a temporary share link for this file
+		const { megaProvider } = await import('./sync/providers/mega/mega-provider');
+		const shareUrl = await megaProvider.createShareLink(fileId);
+		return { megaShareUrl: shareUrl };
 	}
 	return {};
 }
@@ -385,9 +391,10 @@ function checkAndTerminatePool(): void {
 }
 
 /**
- * Process download using hybrid strategy based on provider capabilities
- * - Providers that support worker downloads (Drive, WebDAV): Workers handle download + decompress
- * - Providers that don't (MEGA): Main thread downloads, workers decompress
+ * Process download using workers for all providers
+ * - Google Drive: Workers download with OAuth token and decompress
+ * - WebDAV: Workers download with Basic Auth and decompress
+ * - MEGA: Workers download from share link via MEGA API and decompress
  */
 async function processDownload(item: QueueItem, processId: string): Promise<void> {
 	const provider = unifiedCloudManager.getActiveProvider();
@@ -402,11 +409,11 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
 
 	// Check if provider supports worker downloads
 	if (provider.supportsWorkerDownload) {
-		// Strategy 1: Worker handles download + decompress (Drive, WebDAV)
+		// Strategy 1: Worker handles download + decompress (Drive, WebDAV, MEGA)
 		console.log(`[Download Queue] Using worker download for ${provider.name}`);
 
-		// Get provider credentials
-		const credentials = getProviderCredentials(provider.type);
+		// Get provider credentials (for MEGA, this creates a temporary share link)
+		const credentials = await getProviderCredentials(provider.type, item.cloudFileId);
 
 		// Estimate memory requirement (download + decompress + processing overhead)
 		const memoryRequirement = Math.max(fileSize * 4, 50 * 1024 * 1024);
@@ -474,107 +481,6 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
 		};
 
 		pool.addTask(task);
-	} else {
-		// Strategy 2: Main thread downloads, worker decompresses (MEGA)
-		// Wait for worker completion to limit downloads to 1 at a time (prevents OOM on low memory devices)
-		console.log(`[Download Queue] Using main thread download for ${provider.name}`);
-
-		try {
-			// Download CBZ blob in main thread via unified cloud manager
-			const blob = await unifiedCloudManager.downloadVolumeCbz(
-				item.cloudFileId,
-				(loaded, total) => {
-					const percent = Math.round((loaded / total) * 100);
-					progressTrackerStore.updateProcess(processId, {
-						progress: percent * 0.7, // 0-70% for download
-						status: `Downloading... ${percent}%`
-					});
-				}
-			);
-
-			progressTrackerStore.updateProcess(processId, {
-				progress: 70,
-				status: 'Preparing decompression...'
-			});
-
-			// Convert blob to ArrayBuffer for worker
-			const arrayBuffer = await blob.arrayBuffer();
-
-			// Estimate memory requirement (decompress + processing overhead)
-			const memoryRequirement = Math.max(blob.size * 3, 50 * 1024 * 1024);
-
-			// Create worker metadata
-			const workerMetadata: WorkerVolumeMetadata = {
-				volumeUuid: item.volumeUuid,
-				driveFileId: item.cloudFileId,
-				seriesTitle: item.seriesTitle,
-				volumeTitle: item.volumeTitle,
-				driveModifiedTime: getCloudModifiedTime(item.volumeMetadata) ?? undefined,
-				driveSize: getCloudSize(item.volumeMetadata) ?? undefined
-			};
-
-			// Wait for worker to decompress before continuing to next download
-			await new Promise<void>((resolve, reject) => {
-				const task: WorkerTask = {
-					id: item.cloudFileId,
-					memoryRequirement,
-					metadata: workerMetadata,
-					data: {
-						mode: 'decompress-only',
-						fileId: item.cloudFileId,
-						fileName: item.volumeTitle + '.cbz',
-						blob: arrayBuffer,
-						metadata: workerMetadata
-					},
-					onProgress: data => {
-						// Decompression progress (70-95%)
-						progressTrackerStore.updateProcess(processId, {
-							progress: 70 + (data.progress || 0) * 0.25,
-							status: 'Decompressing...'
-						});
-					},
-					onComplete: async (data, releaseMemory) => {
-						try {
-							progressTrackerStore.updateProcess(processId, {
-								progress: 95,
-								status: 'Processing files...'
-							});
-
-							await processVolumeData(data.entries, item.volumeMetadata);
-
-							progressTrackerStore.updateProcess(processId, {
-								progress: 100,
-								status: 'Download complete'
-							});
-
-							showSnackbar(`Downloaded ${item.volumeTitle} successfully`);
-							queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
-							setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-							resolve(); // Signal completion
-						} catch (error) {
-							console.error(`Failed to process ${item.volumeTitle}:`, error);
-							handleDownloadError(item, processId, error instanceof Error ? error.message : 'Unknown error');
-							reject(error);
-						} finally {
-							releaseMemory();
-							checkAndTerminatePool();
-						}
-					},
-					onError: data => {
-						console.error(`Error decompressing ${item.volumeTitle}:`, data.error);
-						handleDownloadError(item, processId, data.error);
-						checkAndTerminatePool();
-						reject(new Error(data.error));
-					}
-				};
-
-				pool.addTask(task);
-			});
-		} catch (error) {
-			console.error(`Failed to download ${item.volumeTitle}:`, error);
-			handleDownloadError(item, processId, error instanceof Error ? error.message : 'Unknown error');
-		}
 	}
 }
 

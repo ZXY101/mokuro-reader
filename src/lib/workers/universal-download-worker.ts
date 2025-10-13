@@ -1,9 +1,8 @@
 // Universal worker for downloading and decompressing cloud volumes
-// Supports two modes:
-// 1. download-and-decompress: Worker downloads from provider and decompresses (Google Drive, WebDAV)
-// 2. decompress-only: Main thread downloads, worker decompresses (MEGA)
+// Worker downloads from provider and decompresses (Google Drive, WebDAV, MEGA)
 
 import { BlobReader, ZipReader, BlobWriter, getMimeType } from '@zip.js/zip.js';
+import { File as MegaFile } from 'megajs';
 
 // Define the worker context
 const ctx: Worker = self as any;
@@ -19,7 +18,7 @@ interface VolumeMetadata {
 
 interface DownloadAndDecompressMessage {
 	mode: 'download-and-decompress';
-	provider: 'google-drive' | 'webdav';
+	provider: 'google-drive' | 'webdav' | 'mega';
 	fileId: string;
 	fileName: string;
 	credentials: ProviderCredentials;
@@ -44,6 +43,9 @@ interface ProviderCredentials {
 	webdavUrl?: string;
 	webdavUsername?: string;
 	webdavPassword?: string;
+
+	// MEGA
+	megaShareUrl?: string;
 }
 
 interface ProgressMessage {
@@ -180,6 +182,63 @@ async function downloadFromWebDAV(
 }
 
 /**
+ * Download from MEGA using a share link via the MEGA API
+ * The share link includes the decryption key, MEGA API handles download
+ */
+async function downloadFromMega(
+	shareUrl: string,
+	onProgress: (loaded: number, total: number) => void
+): Promise<Blob> {
+	return new Promise((resolve, reject) => {
+		try {
+			// Load file from share link using MEGA API
+			const file = MegaFile.fromURL(shareUrl);
+
+			// Load file metadata
+			file.loadAttributes((error) => {
+				if (error) {
+					reject(new Error(`MEGA metadata failed: ${error.message}`));
+					return;
+				}
+
+				const totalSize = file.size || 0;
+
+				// Download file with progress tracking
+				const stream = file.download();
+				const chunks: Uint8Array[] = [];
+				let loaded = 0;
+
+				stream.on('data', (chunk: Uint8Array) => {
+					chunks.push(chunk);
+					loaded += chunk.length;
+					onProgress(loaded, totalSize);
+				});
+
+				stream.on('end', () => {
+					// Combine all chunks into a single Uint8Array
+					const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
+					const combined = new Uint8Array(totalLength);
+					let offset = 0;
+					for (const chunk of chunks) {
+						combined.set(chunk, offset);
+						offset += chunk.length;
+					}
+
+					const blob = new Blob([combined], { type: 'application/zip' });
+					resolve(blob);
+				});
+
+				stream.on('error', (error: Error) => {
+					reject(new Error(`MEGA download failed: ${error.message}`));
+				});
+			});
+		} catch (error) {
+			reject(new Error(`MEGA initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
+		}
+	});
+}
+
+/**
  * Decompress a CBZ file blob into entries
  */
 async function decompressCbz(blob: Blob): Promise<DecompressedEntry[]> {
@@ -266,6 +325,22 @@ ctx.addEventListener('message', async (event) => {
 					message.credentials.webdavUrl,
 					message.credentials.webdavUsername,
 					message.credentials.webdavPassword,
+					(loaded, total) => {
+						const progressMessage: ProgressMessage = {
+							type: 'progress',
+							fileId,
+							loaded,
+							total
+						};
+						ctx.postMessage(progressMessage);
+					}
+				);
+			} else if (message.provider === 'mega') {
+				if (!message.credentials.megaShareUrl) {
+					throw new Error('Missing MEGA share URL');
+				}
+				blob = await downloadFromMega(
+					message.credentials.megaShareUrl,
 					(loaded, total) => {
 						const progressMessage: ProgressMessage = {
 							type: 'progress',
