@@ -1049,17 +1049,16 @@
 
           <!-- WebDAV Option -->
           <button
-            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
-            onclick={() => {
-              // Show WebDAV login form
-              const webdavForm = document.getElementById('webdav-login-form');
-              if (webdavForm) webdavForm.classList.toggle('hidden');
-            }}
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 opacity-50 cursor-not-allowed"
+            disabled
           >
             <div class="flex items-center gap-4">
               <div class="w-8 h-8 flex items-center justify-center text-2xl">W</div>
               <div class="text-left flex-1">
-                <div class="font-semibold text-lg">WebDAV</div>
+                <div class="flex items-center gap-2">
+                  <div class="font-semibold text-lg">WebDAV</div>
+                  <Badge color="yellow">Under Development</Badge>
+                </div>
                 <div class="text-sm text-gray-400">Nextcloud, ownCloud, NAS • Persistent login</div>
               </div>
             </div>
