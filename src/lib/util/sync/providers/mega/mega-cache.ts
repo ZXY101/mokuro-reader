@@ -155,9 +155,15 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 				// Check if this file ID already exists, replace it
 				const index = existing.findIndex(f => f.fileId === metadata.fileId);
 				if (index >= 0) {
-					existing[index] = metadata;
+					// Create new array with replacement (immutable)
+					newCache.set(path, [
+						...existing.slice(0, index),
+						metadata,
+						...existing.slice(index + 1)
+					]);
 				} else {
-					existing.push(metadata);
+					// Create new array with addition (immutable)
+					newCache.set(path, [...existing, metadata]);
 				}
 			} else {
 				newCache.set(path, [metadata]);

@@ -23,8 +23,8 @@
     CLIENT_ID,
     API_KEY
   } from '$lib/util';
-  import { backupMultipleVolumesToCloud } from '$lib/util/backup';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { backupQueue } from '$lib/util/backup-queue';
   import { driveState } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
@@ -925,53 +925,14 @@
       return;
     }
 
-    // Sort volumes by series and volume title
-    volumesToBackup.sort((a, b) => {
-      if (a.series_title === b.series_title) {
-        return a.volume_title.localeCompare(b.volume_title);
-      }
-      return a.series_title.localeCompare(b.series_title);
-    });
+    // Add all volumes to the backup queue
+    backupQueue.queueSeriesVolumesForBackup(volumesToBackup, provider.type);
 
-    const processId = 'backup-all';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: `Backing up ${volumesToBackup.length} volumes to ${provider.name}`,
-      progress: 0,
-      status: skippedCount > 0 ? `Skipping ${skippedCount} already backed up` : 'Starting backup...'
-    });
-
-    // Use the batch backup function with progress tracking
-    const result = await backupMultipleVolumesToCloud(
-      volumesToBackup,
-      provider.type,
-      (completed, total, currentVolume) => {
-        const progress = (completed / total) * 100;
-        progressTrackerStore.updateProcess(processId, {
-          progress,
-          status: `Backing up: ${currentVolume} (${completed}/${total})`
-        });
-      }
-    );
-
-    progressTrackerStore.updateProcess(processId, {
-      progress: 100,
-      status: `Backup complete (${result.succeeded} succeeded, ${result.failed} failed${skippedCount > 0 ? `, ${skippedCount} skipped` : ''})`
-    });
-
-    // Refresh cloud files to show newly backed up volumes
-    await unifiedCloudManager.fetchAllCloudVolumes();
-
-    setTimeout(() => progressTrackerStore.removeProcess(processId), 5000);
-
-    if (result.failed === 0) {
-      const message = skippedCount > 0
-        ? `${result.succeeded} volumes backed up, ${skippedCount} already backed up`
-        : 'All volumes backed up successfully';
-      showSnackbar(message, 'success');
-    } else {
-      showSnackbar(`Backup completed with ${result.failed} failures`, 'error');
-    }
+    // Show notification
+    const message = skippedCount > 0
+      ? `Added ${volumesToBackup.length} volumes to backup queue (${skippedCount} already backed up)`
+      : `Added ${volumesToBackup.length} volumes to backup queue`;
+    showSnackbar(message, 'success');
   }
 </script>
 

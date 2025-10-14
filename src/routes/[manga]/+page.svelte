@@ -6,7 +6,7 @@
   import BackupButton from '$lib/components/BackupButton.svelte';
   import { Button, Listgroup, Spinner } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
-  import { promptConfirmation, zipManga, showSnackbar, backupVolumeToDrive } from '$lib/util';
+  import { promptConfirmation, zipManga, showSnackbar } from '$lib/util';
   import { promptExtraction } from '$lib/util/modals';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { page } from '$app/stores';
@@ -16,7 +16,7 @@
   import type { DriveState } from '$lib/util/google-drive';
   import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
   import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
-  import { backupMultipleVolumesToCloud } from '$lib/util/backup';
+  import { backupQueue } from '$lib/util/backup-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
 
@@ -36,24 +36,6 @@
   let placeholders = $derived(allVolumes?.filter(v => v.isPlaceholder) || []);
 
   let loading = $state(false);
-
-  // Track backup state from progress tracker
-  let progressState = $state($progressTrackerStore);
-  $effect(() => {
-    return progressTrackerStore.subscribe(value => {
-      progressState = value;
-    });
-  });
-
-  let seriesTitle = $derived(manga?.[0]?.series_title || '');
-  let processId = $derived(`backup-series-${seriesTitle}`);
-
-  let backupProcess = $derived.by(() => {
-    return progressState.processes.find(p => p.id === processId);
-  });
-
-  let backingUpSeries = $derived(!!backupProcess);
-  let backupProgress = $derived(backupProcess?.status?.match(/(\d+\/\d+)/)?.[1] || '');
 
   let state = $state<DriveState>({
     isAuthenticated: false,
@@ -283,14 +265,6 @@
       return;
     }
 
-    // If already backing up, don't start again
-    if (backingUpSeries) {
-      return;
-    }
-
-    const currentSeriesTitle = manga[0].series_title;
-    const currentProcessId = `backup-series-${currentSeriesTitle}`;
-
     // Filter out already backed up volumes using unified cloud manager
     const volumesToBackup = manga.filter(vol =>
       !unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title)
@@ -301,36 +275,10 @@
       return;
     }
 
-    progressTrackerStore.addProcess({
-      id: currentProcessId,
-      description: `Backing up ${currentSeriesTitle} to ${provider.name}`,
-      progress: 0,
-      status: `0/${volumesToBackup.length} volumes`
-    });
+    // Add volumes to backup queue
+    backupQueue.queueSeriesVolumesForBackup(volumesToBackup, provider.type);
 
-    // Use the batch backup function with progress tracking
-    const result = await backupMultipleVolumesToCloud(
-      volumesToBackup,
-      provider.type,
-      (completed, total, currentVolume) => {
-        const progress = (completed / total) * 100;
-        progressTrackerStore.updateProcess(currentProcessId, {
-          progress,
-          status: `${completed}/${total}: ${currentVolume}`
-        });
-      }
-    );
-
-    progressTrackerStore.removeProcess(currentProcessId);
-
-    // Refresh cloud files to show newly backed up volumes
-    await unifiedCloudManager.fetchAllCloudVolumes();
-
-    if (result.failed === 0) {
-      showSnackbar(`Successfully backed up ${result.succeeded} volumes`, 'success');
-    } else {
-      showSnackbar(`Backed up ${result.succeeded} volumes, ${result.failed} failed`, 'error');
-    }
+    showSnackbar(`Added ${volumesToBackup.length} volume(s) to backup queue`, 'success');
   }
 
   async function downloadAllPlaceholders() {
@@ -457,15 +405,9 @@
             <Button
               color="light"
               on:click={backupSeries}
-              disabled={backingUpSeries}
             >
-              {#if backingUpSeries}
-                <Spinner size="4" class="me-2" />
-                Backing up {backupProgress}
-              {:else}
-                <CloudArrowUpOutline class="w-4 h-4 me-2" />
-                {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to cloud'}
-              {/if}
+              <CloudArrowUpOutline class="w-4 h-4 me-2" />
+              {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to cloud'}
             </Button>
           {/if}
           {#if anyBackedUp}

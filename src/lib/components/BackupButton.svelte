@@ -1,13 +1,14 @@
 <script lang="ts">
   import { Button, Spinner } from 'flowbite-svelte';
   import { CloudArrowUpOutline, TrashBinSolid } from 'flowbite-svelte-icons';
-  import { backupVolumeToCloud } from '$lib/util/backup';
   import { showSnackbar } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
   import type { VolumeMetadata } from '$lib/types';
-  import type { ProviderType } from '$lib/util/sync/provider-interface';
   import type { CloudVolumeWithProvider } from '$lib/util/sync/unified-cloud-manager';
+  import { backupQueue, isVolumeInBackupQueue } from '$lib/util/backup-queue';
+  import { progressTrackerStore } from '$lib/util/progress-tracker';
+  import type { Process } from '$lib/util/progress-tracker';
 
   interface Props {
     volume: VolumeMetadata;
@@ -15,9 +16,6 @@
   }
 
   let { volume, class: className }: Props = $props();
-
-  let isBackingUp = $state(false);
-  let currentStep = $state('');
 
   // Subscribe to unified cloud files
   let cloudFiles = $state<Map<string, CloudVolumeWithProvider[]>>(new Map());
@@ -40,15 +38,40 @@
   });
   let hasAuthenticatedProvider = $derived(providerStatus.hasAnyAuthenticated);
 
+  // Subscribe to backup queue
+  let queueItems = $state<any[]>([]);
+  $effect(() => {
+    return backupQueue.subscribe(value => {
+      queueItems = value;
+    });
+  });
+
+  // Subscribe to progress tracker
+  let processes = $state<Process[]>([]);
+  $effect(() => {
+    return progressTrackerStore.subscribe(value => {
+      processes = value.processes;
+    });
+  });
+
   // Check if this volume exists in any cloud provider (reactive to cloudFiles changes)
   let cloudFile = $derived.by(() => {
-    // Efficient O(1) lookup: Get series files from Map by series title
     const path = `${volume.series_title}/${volume.volume_title}.cbz`;
     const seriesFiles = cloudFiles.get(volume.series_title) || [];
     return seriesFiles.find(f => f.path === path);
   });
   let isBackedUp = $derived(cloudFile !== undefined);
   let backupProvider = $derived(cloudFile?.provider);
+
+  // Check if this volume is in the backup queue
+  let queueItem = $derived(queueItems.find(item => item.volumeUuid === volume.volume_uuid));
+  let isQueued = $derived(queueItem?.status === 'queued');
+  let isBackingUp = $derived(queueItem?.status === 'backing-up');
+
+  // Get progress for this volume's backup
+  let backupProcess = $derived(processes.find(p => p.id === `backup-${volume.volume_uuid}`));
+  let backupProgress = $derived(backupProcess?.progress || 0);
+  let backupStatus = $derived(backupProcess?.status || '');
 
   // Count total files in the Map for isFetching check
   let totalFiles = $derived.by(() => {
@@ -59,16 +82,10 @@
     return count;
   });
 
-  // Get default provider for backup
-  function getDefaultProvider(): ProviderType | null {
-    const provider = unifiedCloudManager.getDefaultProvider();
-    return provider ? provider.type : null;
-  }
-
   async function handleBackup(e: MouseEvent) {
     e.stopPropagation();
 
-    const provider = getDefaultProvider();
+    const provider = unifiedCloudManager.getDefaultProvider();
     if (!provider) {
       showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
@@ -79,22 +96,14 @@
       return;
     }
 
-    isBackingUp = true;
-    try {
-      await backupVolumeToCloud(volume, provider, (step) => {
-        currentStep = step;
-      });
-      showSnackbar('Backup completed successfully', 'success');
-
-      // Refresh cloud files to show the new backup
-      await unifiedCloudManager.fetchAllCloudVolumes();
-    } catch (error) {
-      console.error('Backup failed:', error);
-      showSnackbar(`Backup failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-    } finally {
-      isBackingUp = false;
-      currentStep = '';
+    if (isQueued || isBackingUp) {
+      showSnackbar('Volume already in backup queue', 'info');
+      return;
     }
+
+    // Add to backup queue
+    backupQueue.queueVolumeForBackup(volume);
+    showSnackbar(`Added ${volume.volume_title} to backup queue`, 'info');
   }
 
   async function handleDelete(e: MouseEvent) {
@@ -115,7 +124,7 @@
   }
 
   // Provider display names
-  function getProviderDisplayName(provider: ProviderType): string {
+  function getProviderDisplayName(provider: string): string {
     switch (provider) {
       case 'google-drive':
         return 'Drive';
@@ -153,21 +162,37 @@
     <TrashBinSolid class="w-4 h-4 me-2" />
     Delete from {backupProvider ? getProviderDisplayName(backupProvider) : 'cloud'}
   </Button>
+{:else if isQueued}
+  <Button
+    color="light"
+    size="xs"
+    class={className}
+    disabled={true}
+    title="Queued for backup"
+  >
+    <Spinner size="4" class="me-2" />
+    Queued
+  </Button>
+{:else if isBackingUp}
+  <Button
+    color="light"
+    size="xs"
+    class={className}
+    disabled={true}
+    title={backupStatus}
+  >
+    <Spinner size="4" class="me-2" />
+    {Math.round(backupProgress)}% - {backupStatus}
+  </Button>
 {:else}
   <Button
     color="light"
     size="xs"
     class={className}
-    disabled={isBackingUp}
     on:click={handleBackup}
     title="Backup to cloud storage"
   >
-    {#if isBackingUp}
-      <Spinner size="4" class="me-2" />
-      {currentStep || 'Backing up...'}
-    {:else}
-      <CloudArrowUpOutline class="w-4 h-4 me-2" />
-      Backup to Cloud
-    {/if}
+    <CloudArrowUpOutline class="w-4 h-4 me-2" />
+    Backup to Cloud
   </Button>
 {/if}
