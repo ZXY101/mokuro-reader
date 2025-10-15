@@ -13,6 +13,12 @@
 
   let { series_uuid }: Props = $props();
 
+  // Get active provider's display name
+  let providerDisplayName = $derived.by(() => {
+    const provider = unifiedCloudManager.getActiveProvider();
+    return provider?.name || 'Cloud';
+  });
+
   let firstUnreadVolume = $derived(
     Object.values($volumesWithPlaceholders)
       .filter(v => !v.isPlaceholder)
@@ -85,7 +91,7 @@
           <div class="flex items-center gap-2">
             <p class:text-green-400={isComplete} class="font-semibold">{volume.series_title}</p>
             {#if isPlaceholderOnly}
-              <span class="text-xs text-blue-400">In Cloud</span>
+              <span class="text-xs text-blue-400">In {providerDisplayName}</span>
             {/if}
           </div>
           {#if isPlaceholderOnly}

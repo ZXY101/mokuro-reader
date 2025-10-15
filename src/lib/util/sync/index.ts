@@ -9,6 +9,8 @@ export * from './provider-manager';
 export * from './cloud-cache-interface';
 export { cacheManager } from './cache-manager';
 export type { GenericCloudFile } from './cache-manager';
+export { unifiedProviderState } from './unified-provider-state';
+export type { UnifiedProviderState } from './unified-provider-state';
 
 // Export provider instances
 export { googleDriveProvider } from './providers/google-drive/google-drive-provider';

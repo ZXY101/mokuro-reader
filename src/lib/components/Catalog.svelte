@@ -20,6 +20,12 @@
     unifiedCloudManager.getDefaultProvider() !== null
   );
 
+  // Get active provider's display name
+  let providerDisplayName = $derived.by(() => {
+    const provider = unifiedCloudManager.getActiveProvider();
+    return provider?.name || 'cloud storage';
+  });
+
   function onLayout() {
     if ($miscSettings.galleryLayout === 'list') {
       updateMiscSetting('galleryLayout', 'grid');
@@ -195,7 +201,7 @@
           <div class="mt-8">
             <div class="flex items-center justify-between px-4 mb-4">
               <div>
-                <h4 class="text-lg font-semibold text-gray-400">Available in Cloud ({placeholderSeries.length} series)</h4>
+                <h4 class="text-lg font-semibold text-gray-400">Available in {providerDisplayName} ({placeholderSeries.length} series)</h4>
                 {#if providerBreakdown}
                   <p class="text-sm text-gray-500 mt-1">{providerBreakdown}</p>
                 {/if}

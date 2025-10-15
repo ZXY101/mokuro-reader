@@ -123,19 +123,11 @@
     }
   }
 
-  // Provider display names
-  function getProviderDisplayName(provider: string): string {
-    switch (provider) {
-      case 'google-drive':
-        return 'Drive';
-      case 'mega':
-        return 'MEGA';
-      case 'webdav':
-        return 'WebDAV';
-      default:
-        return 'Cloud';
-    }
-  }
+  // Get active provider's display name
+  let providerDisplayName = $derived.by(() => {
+    const provider = unifiedCloudManager.getActiveProvider();
+    return provider?.name || 'cloud';
+  });
 </script>
 
 {#if !hasAuthenticatedProvider}
@@ -157,10 +149,10 @@
     size="xs"
     class={className}
     on:click={handleDelete}
-    title={`Delete from ${backupProvider ? getProviderDisplayName(backupProvider) : 'cloud'}`}
+    title={`Delete from ${providerDisplayName}`}
   >
     <TrashBinSolid class="w-4 h-4 me-2" />
-    Delete from {backupProvider ? getProviderDisplayName(backupProvider) : 'cloud'}
+    Delete from {providerDisplayName}
   </Button>
 {:else if isQueued}
   <Button
@@ -190,9 +182,9 @@
     size="xs"
     class={className}
     on:click={handleBackup}
-    title="Backup to cloud storage"
+    title={`Backup to ${providerDisplayName}`}
   >
     <CloudArrowUpOutline class="w-4 h-4 me-2" />
-    Backup to Cloud
+    Backup to {providerDisplayName}
   </Button>
 {/if}

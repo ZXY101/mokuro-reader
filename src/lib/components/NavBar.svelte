@@ -8,42 +8,52 @@
   import Icon from '$lib/assets/icon.webp';
   import { onMount } from 'svelte';
   import { showSnackbar } from '$lib/util';
-  import { driveState, tokenManager } from '$lib/util/google-drive';
-  import type { DriveState } from '$lib/util/google-drive';
+  import { tokenManager } from '$lib/util/google-drive';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { unifiedProviderState } from '$lib/util/sync/unified-provider-state';
+  import type { UnifiedProviderState } from '$lib/util/sync/unified-provider-state';
 
   // Use $state to make these reactive
   let settingsHidden = $state(true);
   let uploadModalOpen = $state(false);
   let isReader = $state(false);
 
-  let state = $state<DriveState>({
+  let state = $state<UnifiedProviderState>({
     isAuthenticated: false,
     isCacheLoading: false,
     isCacheLoaded: false,
     isFullyConnected: false,
-    needsAttention: false
+    needsAttention: false,
+    statusMessage: 'No provider connected'
   });
 
-  // Layer 1: Track token expiry for debug display
+  // Google Drive specific: Track token expiry for debug display
   let tokenMinutesLeft = $state<number | null>(null);
+  let isGoogleDrive = $state<boolean>(false);
 
   // Track if any cloud providers are authenticated
   let hasAuthenticatedProviders = $state<boolean>(false);
 
-  // Subscribe to drive state
+  // Get active provider's display name
+  let providerDisplayName = $derived.by(() => {
+    const provider = unifiedCloudManager.getActiveProvider();
+    return provider?.name || 'cloud';
+  });
+
+  // Subscribe to unified provider state
   $effect(() => {
-    const unsubscribe = driveState.subscribe(value => {
+    const unsubscribe = unifiedProviderState.subscribe(value => {
       state = value;
     });
     return unsubscribe;
   });
 
-  // Check for authenticated providers periodically
+  // Check for authenticated providers and determine provider type
   $effect(() => {
     const checkProviders = () => {
       const activeProvider = unifiedCloudManager.getActiveProvider();
       hasAuthenticatedProviders = activeProvider !== null;
+      isGoogleDrive = activeProvider?.type === 'google-drive';
     };
 
     checkProviders(); // Initial check
@@ -52,9 +62,9 @@
     return () => clearInterval(interval);
   });
 
-  // Update token minutes every 10 seconds when authenticated
+  // Google Drive specific: Update token minutes every 10 seconds when authenticated
   $effect(() => {
-    if (!state.isAuthenticated) {
+    if (!isGoogleDrive || !state.isAuthenticated) {
       tokenMinutesLeft = null;
       return;
     }
@@ -90,16 +100,13 @@
     });
   }
 
-  // Layer 1: Manual token refresh handler
+  // Google Drive specific: Manual token refresh handler
   function handleTokenRefresh() {
-    if (state.isAuthenticated) {
+    if (isGoogleDrive && state.isAuthenticated) {
       tokenManager.reAuthenticate();
-      showSnackbar('Refreshing Google Drive session...');
+      showSnackbar(`Refreshing ${providerDisplayName} session...`);
     }
   }
-
-  // Token changes are handled automatically by tokenManager
-  // No need to manually listen to localStorage changes
 
   afterNavigate(() => {
     isReader = $page.route.id === '/[manga]/[volume]';
@@ -130,7 +137,7 @@
       <button
         onclick={navigateToCloud}
         class="flex items-center justify-center w-6 h-6"
-        title={state.needsAttention ? "Google Drive - Action Required (click to sign in)" : state.isFullyConnected ? "Google Drive - Connected" : state.isAuthenticated ? "Google Drive - Loading..." : "Google Drive - Not connected"}
+        title={state.needsAttention ? `${providerDisplayName} - Action Required (click to sign in)` : state.isFullyConnected ? `${providerDisplayName} - Connected` : state.isAuthenticated ? `${providerDisplayName} - Loading...` : `${providerDisplayName} - Not connected`}
       >
         {#if state.needsAttention}
           <CloudArrowUpOutline class="w-6 h-6 text-red-600 hover:text-red-700 cursor-pointer" />
@@ -144,7 +151,7 @@
           <CloudArrowUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
         {/if}
       </button>
-      {#if state.isAuthenticated && tokenMinutesLeft !== null}
+      {#if isGoogleDrive && state.isAuthenticated && tokenMinutesLeft !== null}
         <button
           onclick={handleTokenRefresh}
           class="flex items-center justify-center px-2 py-1 rounded text-xs font-mono cursor-pointer transition-colors
@@ -160,7 +167,7 @@
         <button
           onclick={handleSync}
           class="flex items-center justify-center w-6 h-6"
-          title="Sync read progress with cloud providers"
+          title={`Sync read progress with ${providerDisplayName}`}
         >
           <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
         </button>
