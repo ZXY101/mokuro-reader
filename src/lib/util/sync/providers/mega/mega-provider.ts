@@ -307,11 +307,8 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	private async ensureMokuroFolder(): Promise<void> {
-		if (this.mokuroFolder) return;
-
 		try {
-			// Access root folder using storage.files object
-			// In megajs, all files are available via storage.files
+			// Always get fresh reference from storage.files to avoid stale references
 			const files = Object.values(this.storage.files || {});
 
 			// Find mokuro-reader folder anywhere, regardless of parent
