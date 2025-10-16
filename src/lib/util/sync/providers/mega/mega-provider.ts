@@ -306,7 +306,7 @@ export class MegaProvider implements SyncProvider {
 		});
 	}
 
-	private async ensureMokuroFolder(): Promise<void> {
+	private async ensureMokuroFolder(): Promise<any> {
 		try {
 			// Always get fresh reference from storage.files to avoid stale references
 			const files = Object.values(this.storage.files || {});
@@ -323,7 +323,11 @@ export class MegaProvider implements SyncProvider {
 				console.log('Created mokuro-reader folder in MEGA');
 			}
 
+			// Cache for cleanup on logout, but don't use for operations
 			this.mokuroFolder = mokuroFolder;
+
+			// Return fresh reference for immediate use
+			return mokuroFolder;
 		} catch (error) {
 			console.error('ensureMokuroFolder error:', error);
 			throw new ProviderError(
@@ -358,12 +362,12 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	private async uploadFile(filename: string, content: string): Promise<void> {
-		await this.ensureMokuroFolder();
+		const mokuroFolder = await this.ensureMokuroFolder();
 
 		return new Promise(async (resolve, reject) => {
 			try {
 				// Check if file already exists using storage.files
-				const children = await this.listFolder(this.mokuroFolder);
+				const children = await this.listFolder(mokuroFolder);
 				const existingFile = children.find((f: any) => f.name === filename && !f.directory);
 
 				const uploadNew = () => {
@@ -371,7 +375,7 @@ export class MegaProvider implements SyncProvider {
 					const encoder = new TextEncoder();
 					const contentBuffer = encoder.encode(content);
 
-					this.mokuroFolder.upload(
+					mokuroFolder.upload(
 						{
 							name: filename,
 							size: contentBuffer.length
@@ -403,9 +407,9 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	private async downloadFile(filename: string): Promise<string | null> {
-		await this.ensureMokuroFolder();
+		const mokuroFolder = await this.ensureMokuroFolder();
 
-		const children = await this.listFolder(this.mokuroFolder);
+		const children = await this.listFolder(mokuroFolder);
 		const file = children.find((f: any) => f.name === filename && !f.directory);
 
 		if (!file) {
@@ -545,7 +549,7 @@ export class MegaProvider implements SyncProvider {
 		}
 
 		try {
-			await this.ensureMokuroFolder();
+			const mokuroFolder = await this.ensureMokuroFolder();
 
 			// Parse path: "SeriesTitle/VolumeTitle.cbz"
 			const pathParts = path.split('/');
@@ -553,9 +557,9 @@ export class MegaProvider implements SyncProvider {
 			const seriesFolderName = pathParts.join('/');
 
 			// Find or create series folder if path includes subfolder
-			let targetFolder = this.mokuroFolder;
+			let targetFolder = mokuroFolder;
 			if (seriesFolderName) {
-				targetFolder = await this.ensureSeriesFolder(seriesFolderName);
+				targetFolder = await this.ensureSeriesFolder(seriesFolderName, mokuroFolder);
 			}
 
 			// Convert Blob to ArrayBuffer
@@ -828,10 +832,10 @@ export class MegaProvider implements SyncProvider {
 		}
 
 		try {
-			await this.ensureMokuroFolder();
+			const mokuroFolder = await this.ensureMokuroFolder();
 
 			// Find the series folder
-			const children = await this.listFolder(this.mokuroFolder);
+			const children = await this.listFolder(mokuroFolder);
 			const seriesFolder = children.find((f: any) => f.name === seriesTitle && f.directory);
 
 			if (!seriesFolder) {
@@ -864,9 +868,9 @@ export class MegaProvider implements SyncProvider {
 	/**
 	 * Ensure a series folder exists (may be nested path like "Series/Subseries")
 	 */
-	private async ensureSeriesFolder(folderPath: string): Promise<any> {
+	private async ensureSeriesFolder(folderPath: string, mokuroFolder: any): Promise<any> {
 		const pathParts = folderPath.split('/').filter(Boolean);
-		let currentFolder = this.mokuroFolder;
+		let currentFolder = mokuroFolder;
 
 		for (const folderName of pathParts) {
 			// Check if subfolder exists
