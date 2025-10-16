@@ -1,7 +1,7 @@
-// Worker pool for managing parallel downloads
+// Worker pool for managing parallel downloads and decompression
 
-// Import the worker script using Vite's worker plugin
-import DownloadWorker from '$lib/workers/download-worker.ts?worker';
+// Import the worker scripts using Vite's worker plugin
+import UniversalDownloadWorker from '$lib/workers/universal-download-worker.ts?worker';
 
 export interface VolumeMetadata {
   volumeUuid: string;
@@ -14,13 +14,17 @@ export interface VolumeMetadata {
 
 export interface WorkerTask {
   id: string;
-  data: any;
+  data?: any; // Direct data to send to worker (if prepareData is not used)
+  prepareData?: () => Promise<any>; // Lazy data preparation function (called just before worker starts)
   memoryRequirement?: number; // Memory requirement in bytes
   metadata?: VolumeMetadata; // Optional metadata for volume downloads
   onProgress?: (progress: any) => void;
   onComplete?: (result: any, completeTask: () => void) => void;
   onError?: (error: any) => void;
 }
+
+// Type for worker constructor
+type WorkerConstructor = new () => Worker;
 
 export class WorkerPool {
   private workers: Worker[] = [];
@@ -30,10 +34,14 @@ export class WorkerPool {
   private maxConcurrent: number;
   private currentMemoryUsage: number = 0;
   private maxMemoryUsage: number = 500 * 1024 * 1024; // 500 MB threshold (not a hard limit)
+  private workerConstructor: WorkerConstructor;
 
-  constructor(workerUrl?: string, maxConcurrent = 4, maxMemoryMB = 500) {
+  constructor(workerConstructor?: WorkerConstructor, maxConcurrent = 4, maxMemoryMB = 500) {
+    this.workerConstructor = workerConstructor || UniversalDownloadWorker;
     this.maxConcurrent = Math.max(1, Math.min(maxConcurrent, navigator.hardwareConcurrency || 4));
     this.maxMemoryUsage = maxMemoryMB * 1024 * 1024; // Convert MB to bytes - this is a threshold, not a hard limit
+
+    console.log(`Worker pool: ${this.maxConcurrent} workers, ${maxMemoryMB}MB limit`);
 
     // Initialize workers
     for (let i = 0; i < this.maxConcurrent; i++) {
@@ -42,8 +50,8 @@ export class WorkerPool {
   }
 
   private addWorker() {
-    // Create a new worker using Vite's worker instantiation
-    const worker = new DownloadWorker();
+    // Create a new worker using the provided constructor
+    const worker = new this.workerConstructor();
 
     worker.onmessage = (event) => {
       const taskId = this.workerTaskMap.get(worker);
@@ -63,7 +71,6 @@ export class WorkerPool {
       }
 
       const data = event.data;
-      console.log(`Worker pool: Received message of type ${data.type} for task ${taskId}`, data);
 
       if (data.type === 'progress' && task.onProgress) {
         task.onProgress(data);
@@ -165,10 +172,38 @@ export class WorkerPool {
     }
   }
 
-  private assignTaskToWorker(worker: Worker, task: WorkerTask) {
+  private async assignTaskToWorker(worker: Worker, task: WorkerTask) {
     this.activeTasks.set(task.id, task);
     this.workerTaskMap.set(worker, task.id);
-    worker.postMessage(task.data);
+
+    try {
+      // If task has prepareData function, call it to get the data just-in-time
+      let data = task.data;
+      if (task.prepareData) {
+        console.log(`Worker pool: Preparing data for task ${task.id}...`);
+        data = await task.prepareData();
+      }
+
+      if (!data) {
+        throw new Error('No data provided for worker task');
+      }
+
+      worker.postMessage(data);
+    } catch (error) {
+      console.error(`Worker pool: Error preparing data for task ${task.id}:`, error);
+
+      // Call onError if available
+      if (task.onError) {
+        task.onError({
+          type: 'error',
+          fileId: task.id,
+          error: error instanceof Error ? error.message : 'Failed to prepare task data'
+        });
+      }
+
+      // Clean up the failed task
+      this.completeTask(worker);
+    }
   }
 
   public addTask(task: WorkerTask) {

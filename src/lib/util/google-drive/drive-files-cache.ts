@@ -1,7 +1,8 @@
-import { writable } from 'svelte/store';
+import { writable, derived } from 'svelte/store';
 import { driveApiClient } from './api-client';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
 import { syncService } from './sync-service';
+import type { CloudCache } from '../sync/cloud-cache-interface';
 
 export interface DriveFileMetadata {
   fileId: string;
@@ -22,15 +23,18 @@ export interface DriveFileMetadata {
  *
  * The cache is populated with a single bulk API call and lives only for the session.
  * It does NOT track local files - only what exists in Google Drive.
+ *
+ * Implements CloudCache interface for multi-provider architecture compatibility.
  */
-class DriveFilesCacheManager {
+class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
   private cache = writable<Map<string, DriveFileMetadata[]>>(new Map());
   private isFetchingStore = writable<boolean>(false);
   private cacheLoadedStore = writable<boolean>(false);
-  private isFetching = false;
+  private fetchingFlag = false;
   private lastFetchTime: number | null = null;
 
   get store() {
+    // Return Map grouped by series for efficient series-based operations
     return this.cache;
   }
 
@@ -61,12 +65,12 @@ class DriveFilesCacheManager {
    * and cache them in memory for the session
    */
   async fetchAllFiles(): Promise<void> {
-    if (this.isFetching) {
+    if (this.fetchingFlag) {
       console.log('Drive files cache fetch already in progress');
       return;
     }
 
-    this.isFetching = true;
+    this.fetchingFlag = true;
     this.isFetchingStore.set(true);
     try {
       console.log('Fetching all Drive file metadata...');
@@ -110,10 +114,10 @@ class DriveFilesCacheManager {
       console.log('Folder names:', foundFolderNames);
 
       // Build cache from files using the folder map
-      // All entries are arrays to support Drive's duplicate file names
+      // Group by series title (folder name) for efficient series-based operations
       const cacheMap = new Map<string, DriveFileMetadata[]>();
 
-      // Add .cbz files (group by path in case of duplicates)
+      // Add .cbz files (group by series title)
       for (const file of cbzFiles) {
         const parentId = file.parents?.[0];
         const parentName = parentId ? folderNames.get(parentId) : null;
@@ -130,11 +134,12 @@ class DriveFilesCacheManager {
             parentId: parentId
           };
 
-          const existing = cacheMap.get(path);
+          // Group by series title (parentName) instead of full path
+          const existing = cacheMap.get(parentName);
           if (existing) {
             existing.push(metadata);
           } else {
-            cacheMap.set(path, [metadata]);
+            cacheMap.set(parentName, [metadata]);
           }
         }
       }
@@ -170,7 +175,7 @@ class DriveFilesCacheManager {
       }
       // Don't clear cache on error, keep stale data
     } finally {
-      this.isFetching = false;
+      this.fetchingFlag = false;
       this.isFetchingStore.set(false);
 
       // Check if sync was requested after login (do this in finally to ensure fetch is complete)
@@ -237,8 +242,8 @@ class DriveFilesCacheManager {
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    const files = currentCache.get(path);
-    return files !== undefined && files.length > 0;
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.some(f => f.path === path) || false;
   }
 
   /**
@@ -252,8 +257,8 @@ class DriveFilesCacheManager {
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    const files = currentCache.get(path);
-    return files && files.length > 0 ? files[0] : undefined;
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.find(f => f.path === path);
   }
 
   /**
@@ -267,7 +272,8 @@ class DriveFilesCacheManager {
     })();
 
     const path = `${seriesTitle}/${volumeTitle}.cbz`;
-    return currentCache.get(path) || [];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.filter(f => f.path === path) || [];
   }
 
   /**
@@ -297,11 +303,8 @@ class DriveFilesCacheManager {
       currentCache = value;
     })();
 
-    const result: DriveFileMetadata[] = [];
-    for (const files of currentCache.values()) {
-      result.push(...files.filter((file) => file.path.startsWith(`${seriesTitle}/`)));
-    }
-    return result;
+    // With series-grouped cache, just get the series directly (O(1) lookup)
+    return currentCache.get(seriesTitle) || [];
   }
 
   /**
@@ -309,9 +312,9 @@ class DriveFilesCacheManager {
    */
   addDriveFile(seriesTitle: string, volumeTitle: string, metadata: DriveFileMetadata): void {
     this.cache.update((cache) => {
-      const path = `${seriesTitle}/${volumeTitle}.cbz`;
       const newCache = new Map(cache);
-      const existing = newCache.get(path);
+      // Group by series title instead of full path
+      const existing = newCache.get(seriesTitle);
 
       if (existing) {
         // Check if this file ID already exists, replace it
@@ -322,7 +325,7 @@ class DriveFilesCacheManager {
           existing.push(metadata);
         }
       } else {
-        newCache.set(path, [metadata]);
+        newCache.set(seriesTitle, [metadata]);
       }
 
       return newCache;
@@ -356,7 +359,17 @@ class DriveFilesCacheManager {
     this.cache.update((cache) => {
       const path = `${seriesTitle}/${volumeTitle}.cbz`;
       const newCache = new Map(cache);
-      newCache.delete(path);
+      const seriesFiles = newCache.get(seriesTitle);
+
+      if (seriesFiles) {
+        const filtered = seriesFiles.filter(f => f.path !== path);
+        if (filtered.length === 0) {
+          newCache.delete(seriesTitle);
+        } else {
+          newCache.set(seriesTitle, filtered);
+        }
+      }
+
       return newCache;
     });
   }
@@ -401,7 +414,158 @@ class DriveFilesCacheManager {
    * Check if cache is currently being fetched
    */
   isFetchingCache(): boolean {
-    return this.isFetching;
+    return this.fetchingFlag;
+  }
+
+  // ========================================
+  // CloudCache Interface Implementation
+  // ========================================
+
+  /**
+   * Check if a file exists at the given path
+   * @param path Full path like "SeriesTitle/VolumeTitle.cbz"
+   */
+  has(path: string): boolean {
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
+    this.cache.subscribe((value) => {
+      currentCache = value;
+    })();
+
+    // Extract series title from path and find within that series
+    const seriesTitle = path.split('/')[0];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.some(f => f.path === path) || false;
+  }
+
+  /**
+   * Get first file at the given path (for providers that support duplicates)
+   * @param path Full path like "SeriesTitle/VolumeTitle.cbz"
+   */
+  get(path: string): DriveFileMetadata | null {
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
+    this.cache.subscribe((value) => {
+      currentCache = value;
+    })();
+
+    // Extract series title from path and find within that series
+    const seriesTitle = path.split('/')[0];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.find(f => f.path === path) || null;
+  }
+
+  /**
+   * Get all files at the given path (for duplicate detection)
+   * @param path Full path like "SeriesTitle/VolumeTitle.cbz"
+   */
+  getAll(path: string): DriveFileMetadata[] {
+    let currentCache: Map<string, DriveFileMetadata[]> = new Map();
+    this.cache.subscribe((value) => {
+      currentCache = value;
+    })();
+
+    // Extract series title from path and find all matches within that series
+    const seriesTitle = path.split('/')[0];
+    const seriesFiles = currentCache.get(seriesTitle);
+    return seriesFiles?.filter(f => f.path === path) || [];
+  }
+
+  /**
+   * Get all files for a specific series
+   * @param seriesTitle Series title to filter by
+   */
+  getBySeries(seriesTitle: string): DriveFileMetadata[] {
+    return this.getDriveFilesBySeries(seriesTitle);
+  }
+
+  /**
+   * Get all cached files
+   */
+  getAllFiles(): DriveFileMetadata[] {
+    return this.getAllDriveFiles();
+  }
+
+  /**
+   * Fetch fresh data from Google Drive and populate cache
+   */
+  async fetch(): Promise<void> {
+    await this.fetchAllFiles();
+  }
+
+  /**
+   * Clear all cached data
+   */
+  clear(): void {
+    this.clearCache();
+  }
+
+  /**
+   * Check if cache is currently being fetched
+   */
+  isFetching(): boolean {
+    return this.isFetchingCache();
+  }
+
+  /**
+   * Check if cache has been loaded at least once
+   */
+  isLoaded(): boolean {
+    let loaded = false;
+    this.cacheLoadedStore.subscribe((value) => {
+      loaded = value;
+    })();
+    return loaded;
+  }
+
+  /**
+   * Add a file to the cache (e.g., after upload)
+   * @param path File path
+   * @param metadata File metadata
+   */
+  add(path: string, metadata: DriveFileMetadata): void {
+    // Parse path to get series and volume title
+    const parts = path.split('/');
+    if (parts.length === 2) {
+      const seriesTitle = parts[0];
+      const volumeTitle = parts[1].replace('.cbz', '');
+      this.addDriveFile(seriesTitle, volumeTitle, metadata);
+    }
+  }
+
+  /**
+   * Remove a file from the cache by file ID
+   * @param fileId Provider-specific file ID
+   */
+  removeById(fileId: string): void {
+    this.removeDriveFileById(fileId);
+  }
+
+  /**
+   * Update file metadata in the cache
+   * @param fileId Provider-specific file ID
+   * @param updates Partial metadata to update
+   */
+  update(fileId: string, updates: Partial<DriveFileMetadata>): void {
+    // For now, only description updates are common
+    // Can be extended for other fields if needed
+    if (updates.description !== undefined) {
+      this.updateFileDescription(fileId, updates.description);
+    }
+
+    // For other fields, update the cache directly
+    this.cache.update((cache) => {
+      const newCache = new Map(cache);
+
+      for (const [path, files] of newCache.entries()) {
+        const updated = files.map(file =>
+          file.fileId === fileId
+            ? { ...file, ...updates }
+            : file
+        );
+        newCache.set(path, updated);
+      }
+
+      return newCache;
+    });
   }
 }
 

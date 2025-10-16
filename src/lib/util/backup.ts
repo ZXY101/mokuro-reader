@@ -1,7 +1,8 @@
 import type { VolumeMetadata } from '$lib/types';
 import { driveApiClient, escapeNameForDriveQuery } from './google-drive/api-client';
-import { driveFilesCache } from './google-drive/drive-files-cache';
 import { createArchiveBlob } from './zip';
+import { unifiedCloudManager } from './sync/unified-cloud-manager';
+import type { ProviderType } from './sync/provider-interface';
 
 /**
  * Uploads a CBZ blob to Google Drive
@@ -109,93 +110,4 @@ export async function findFile(
   const files = await driveApiClient.listFiles(query, 'files(id, name)');
 
   return files.length > 0 ? files[0].id : null;
-}
-
-/**
- * Backs up a volume to Google Drive
- * @param volume The volume to backup
- * @param onProgress Optional progress callback (current, total)
- * @returns Promise resolving to the uploaded file ID
- */
-export async function backupVolumeToDrive(
-  volume: VolumeMetadata,
-  onProgress?: (step: string) => void
-): Promise<string> {
-  let cbzBlob: Blob | null = null;
-
-  try {
-    // Create the series folder
-    onProgress?.('Creating folder...');
-    const rootFolderId = await getOrCreateFolder('mokuro-reader');
-    const seriesFolderId = await getOrCreateFolder(volume.series_title, rootFolderId);
-
-    // Create CBZ using the shared function
-    onProgress?.('Creating archive...');
-    cbzBlob = await createArchiveBlob([volume]);
-
-    // Upload
-    const fileName = `${volume.volume_title}.cbz`;
-    onProgress?.('Uploading to Google Drive...');
-    const fileId = await uploadCbzToDrive(cbzBlob, fileName, seriesFolderId);
-
-    // Update the cache with the newly uploaded file
-    driveFilesCache.addDriveFile(volume.series_title, volume.volume_title, {
-      fileId,
-      name: fileName,
-      modifiedTime: new Date().toISOString(),
-      size: cbzBlob.size,
-      path: `${volume.series_title}/${fileName}`
-    });
-
-    return fileId;
-  } finally {
-    // Explicit memory cleanup
-    cbzBlob = null;
-
-    // Hint to garbage collector (non-standard but helps in V8/Chrome)
-    if (typeof (globalThis as any).gc === 'function') {
-      (globalThis as any).gc();
-    }
-  }
-}
-
-/**
- * Backs up multiple volumes to Google Drive with batching and memory management
- * @param volumes Array of volumes to backup
- * @param onProgress Optional progress callback (completed, total, currentVolume)
- * @returns Promise resolving to success/failure counts
- */
-export async function backupMultipleVolumesToDrive(
-  volumes: VolumeMetadata[],
-  onProgress?: (completed: number, total: number, currentVolume: string) => void
-): Promise<{ succeeded: number; failed: number }> {
-  const BATCH_SIZE = 5; // Process 5 volumes at a time
-  const BATCH_DELAY_MS = 2000; // 2 second delay between batches for GC
-
-  let successCount = 0;
-  let failCount = 0;
-
-  // Process in batches
-  for (let batchStart = 0; batchStart < volumes.length; batchStart += BATCH_SIZE) {
-    const batch = volumes.slice(batchStart, batchStart + BATCH_SIZE);
-
-    // Process each volume in the batch
-    for (const volume of batch) {
-      try {
-        onProgress?.(successCount + failCount, volumes.length, volume.volume_title);
-        await backupVolumeToDrive(volume);
-        successCount++;
-      } catch (error) {
-        console.error(`Failed to backup ${volume.volume_title}:`, error);
-        failCount++;
-      }
-    }
-
-    // Delay between batches to allow garbage collection
-    if (batchStart + BATCH_SIZE < volumes.length) {
-      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-    }
-  }
-
-  return { succeeded: successCount, failed: failCount };
 }

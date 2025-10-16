@@ -3,16 +3,21 @@
   import { ListgroupItem, Spinner } from 'flowbite-svelte';
   import { progress } from '$lib/settings';
   import { DownloadSolid } from 'flowbite-svelte-icons';
-  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
-  import { driveState } from '$lib/util/google-drive';
   import { showSnackbar } from '$lib/util';
-  import { downloadQueue } from '$lib/util/download-queue';
+  import { downloadQueue, queueSeriesVolumes } from '$lib/util/download-queue';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
 
   interface Props {
     series_uuid: string;
   }
 
   let { series_uuid }: Props = $props();
+
+  // Get active provider's display name
+  let providerDisplayName = $derived.by(() => {
+    const provider = unifiedCloudManager.getActiveProvider();
+    return provider?.name || 'Cloud';
+  });
 
   let firstUnreadVolume = $derived(
     Object.values($volumesWithPlaceholders)
@@ -65,17 +70,15 @@
         return;
       }
 
-      let authenticated = false;
-      driveState.subscribe(state => {
-        authenticated = state.isAuthenticated;
-      })();
-
-      if (!authenticated) {
-        showSnackbar('Please sign in to Google Drive first', 'error');
+      // Check if any cloud provider is authenticated
+      const hasProvider = unifiedCloudManager.getActiveProvider() !== null;
+      if (!hasProvider) {
+        showSnackbar('Please sign in to a cloud storage provider first', 'error');
         return;
       }
 
-      await downloadSeriesFromDrive(allSeriesVolumes);
+      // Queue all series volumes for download
+      queueSeriesVolumes(allSeriesVolumes);
     }
   }
 </script>
@@ -88,7 +91,7 @@
           <div class="flex items-center gap-2">
             <p class:text-green-400={isComplete} class="font-semibold">{volume.series_title}</p>
             {#if isPlaceholderOnly}
-              <span class="text-xs text-blue-400">In Drive</span>
+              <span class="text-xs text-blue-400">In {providerDisplayName}</span>
             {/if}
           </div>
           {#if isPlaceholderOnly}

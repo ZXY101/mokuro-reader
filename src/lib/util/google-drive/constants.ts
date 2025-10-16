@@ -47,10 +47,18 @@ export const GOOGLE_DRIVE_CONFIG = {
     HAS_AUTHENTICATED: 'gdrive_has_authenticated' // Track if user has ever authenticated
   },
 
-  // Token refresh settings
-  TOKEN_REFRESH_BUFFER_MS: 5 * 60 * 1000, // Refresh 5 minutes before expiry
-  TOKEN_WARNING_BUFFER_MS: 10 * 60 * 1000, // Warn 10 minutes before expiry
-  TOKEN_REFRESH_CHECK_INTERVAL_MS: 2 * 60 * 1000, // Check every 2 minutes
+  // Token refresh settings - Layer 1: Smart multi-attempt refresh
+  TOKEN_REFRESH_BUFFER_MS: 15 * 60 * 1000, // Start refresh attempts 15 minutes before expiry (at 45 min mark)
+  TOKEN_WARNING_BUFFER_MS: 10 * 60 * 1000, // Warn 10 minutes before expiry if refresh attempts failing
+  TOKEN_REFRESH_CHECK_INTERVAL_MS: 60 * 1000, // Check every minute for more responsive refresh
+
+  // Multi-attempt refresh schedule (time before expiry -> retry if needed)
+  REFRESH_SCHEDULE: [
+    { at: 15 * 60 * 1000, maxRetries: 2 },  // 45 min mark: try twice
+    { at: 10 * 60 * 1000, maxRetries: 2 },  // 50 min mark: try twice
+    { at: 5 * 60 * 1000, maxRetries: 2 },   // 55 min mark: try twice
+    { at: 2 * 60 * 1000, maxRetries: 1 }    // 58 min mark: last attempt
+  ],
 
   // Debug mode: Set to true to use short-lived tokens for testing (30 seconds)
   DEBUG_SHORT_TOKEN_EXPIRY: false

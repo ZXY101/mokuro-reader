@@ -62,6 +62,8 @@ export async function updateDriveFileDescriptionForEntries(
     console.log(`Updating description for ${fileName}: "${newDescription}"`);
 
     await driveApiClient.updateFileDescription(fileId, newDescription);
+
+    // Also update the cache
     driveFilesCache.updateFileDescription(fileId, newDescription);
 
     console.log(`Successfully updated description for ${fileName}`);

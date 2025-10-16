@@ -280,11 +280,11 @@ async function processZipFile(
 
     // Process file entries
     if (entry.readable) {
-      // Convert readable stream to blob
-      const blob = await new Response(entry.readable).blob();
+      // Convert readable stream to ArrayBuffer to avoid intermediate Blob disk writes
+      const arrayBuffer = await new Response(entry.readable).arrayBuffer();
 
-      // Create a File object
-      const fileBlob = new File([blob], entry.filename, {
+      // Create a File object directly from ArrayBuffer
+      const fileBlob = new File([arrayBuffer], entry.filename, {
         lastModified: entry.lastModified?.getTime() || Date.now()
       });
       const path = zipFile.path === '' ? entry.filename : `${zipFile.path}/${entry.filename}`;

@@ -6,16 +6,16 @@
   import BackupButton from '$lib/components/BackupButton.svelte';
   import { Button, Listgroup, Spinner } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
-  import { promptConfirmation, zipManga, showSnackbar, backupVolumeToDrive } from '$lib/util';
+  import { promptConfirmation, zipManga, showSnackbar } from '$lib/util';
   import { promptExtraction } from '$lib/util/modals';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats } from '$lib/settings';
-  import { driveState, driveFilesCache, driveApiClient } from '$lib/util/google-drive';
-  import type { DriveState } from '$lib/util/google-drive';
   import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
-  import { downloadSeriesFromDrive } from '$lib/util/download-from-drive';
+  import { backupQueue } from '$lib/util/backup-queue';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { providerManager } from '$lib/util/sync';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -34,56 +34,98 @@
 
   let loading = $state(false);
 
-  // Track backup state from progress tracker
-  let progressState = $state($progressTrackerStore);
+  // Subscribe to unified cloud cache updates
+  let cloudFiles = $state<Map<string, any[]>>(new Map());
+  let cacheHasLoaded = $state(false);
+  let wasFetching = $state(false);
+
   $effect(() => {
-    return progressTrackerStore.subscribe(value => {
-      progressState = value;
+    return unifiedCloudManager.cloudFiles.subscribe(value => {
+      console.log('[Series Page] Cloud files updated:', value.size, 'series');
+      cloudFiles = value;
+      // If we get files and weren't fetching, cache must already be loaded
+      if (value.size > 0 && !wasFetching) {
+        cacheHasLoaded = true;
+        console.log('[Series Page] Cache already loaded (has files)');
+      }
     });
   });
 
-  let seriesTitle = $derived(manga?.[0]?.series_title || '');
-  let processId = $derived(`backup-series-${seriesTitle}`);
-
-  let backupProcess = $derived.by(() => {
-    return progressState.processes.find(p => p.id === processId);
-  });
-
-  let backingUpSeries = $derived(!!backupProcess);
-  let backupProgress = $derived(backupProcess?.status?.match(/(\d+\/\d+)/)?.[1] || '');
-
-  let state = $state<DriveState>({
-    isAuthenticated: false,
-    isCacheLoading: false,
-    isCacheLoaded: false,
-    isFullyConnected: false,
-    needsAttention: false
-  });
+  // Track when fetching completes to know when cache is loaded
   $effect(() => {
-    return driveState.subscribe(value => {
-      state = value;
+    return unifiedCloudManager.isFetching.subscribe(isFetching => {
+      console.log('[Series Page] isFetching:', isFetching, 'wasFetching:', wasFetching);
+      // Mark cache as loaded when fetching transitions from true to false
+      if (wasFetching && !isFetching) {
+        cacheHasLoaded = true;
+        console.log('[Series Page] Cache has loaded (fetch complete)');
+      }
+      wasFetching = isFetching;
+      // Also mark as loaded if not fetching and we have files
+      if (!isFetching && cloudFiles.size > 0) {
+        cacheHasLoaded = true;
+        console.log('[Series Page] Cache already loaded (not fetching + has files)');
+      }
     });
   });
 
-  // Check if all volumes in series are backed up
-  let driveCache = $state(new Map());
+  // Subscribe to provider manager status for reactive authentication state
+  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
   $effect(() => {
-    return driveFilesCache.store.subscribe(value => {
-      driveCache = value;
+    return providerManager.status.subscribe(value => {
+      console.log('[Series Page] Provider status updated:', value.hasAnyAuthenticated, value);
+      providerStatus = value;
+      // Reset cache loaded state when provider changes
+      if (!value.hasAnyAuthenticated) {
+        cacheHasLoaded = false;
+        wasFetching = false;
+      }
     });
   });
+  let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
+  let isCloudReady = $derived(hasAnyProvider && cacheHasLoaded);
 
-  let allBackedUp = $derived.by(() => {
-    if (!manga || manga.length === 0) return false;
-    return manga.every(vol => driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`));
+  // Get active provider's display name
+  let providerDisplayName = $derived.by(() => {
+    const provider = unifiedCloudManager.getActiveProvider();
+    return provider?.name || 'cloud';
   });
 
-  let anyBackedUp = $derived.by(() => {
-    if (!manga || manga.length === 0) return false;
-    return manga.some(vol => driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`));
+  // Debug logging for reactive values
+  $effect(() => {
+    console.log('[Series Page] Reactive values - hasAnyProvider:', hasAnyProvider, 'allBackedUp:', allBackedUp, 'anyBackedUp:', anyBackedUp);
   });
 
-  async function confirmDelete(deleteStats = false, deleteDrive = false) {
+  // Use $effect to manually compute these values when cloudFiles changes
+  let allBackedUp = $state(false);
+  let anyBackedUp = $state(false);
+
+  $effect(() => {
+    // This effect runs whenever cloudFiles changes
+    if (!manga || manga.length === 0) {
+      allBackedUp = false;
+      anyBackedUp = false;
+      return;
+    }
+
+    // Efficient O(1) lookup: Get series files from Map by series title
+    const seriesTitle = manga[0].series_title;
+    const seriesFiles = cloudFiles.get(seriesTitle) || [];
+
+    allBackedUp = manga.every(vol => {
+      const path = `${vol.series_title}/${vol.volume_title}.cbz`;
+      return seriesFiles.some(f => f.path === path);
+    });
+
+    anyBackedUp = manga.some(vol => {
+      const path = `${vol.series_title}/${vol.volume_title}.cbz`;
+      return seriesFiles.some(f => f.path === path);
+    });
+
+    console.log('[Series Page] Backup status computed - allBackedUp:', allBackedUp, 'anyBackedUp:', anyBackedUp, 'seriesFiles:', seriesFiles.length);
+  });
+
+  async function confirmDelete(deleteStats = false, deleteCloud = false) {
     const seriesUuid = manga?.[0].series_uuid;
     if (seriesUuid) {
       manga?.forEach((vol) => {
@@ -97,64 +139,71 @@
         }
       });
 
-      // Delete from Drive if checkbox checked
-      if (deleteDrive && isAuthenticated && manga) {
-        await deleteSeriesFromDrive(manga);
+      // Delete from cloud if checkbox checked
+      if (deleteCloud && hasAnyProvider && manga) {
+        await deleteSeriesFromCloud(manga);
       }
 
       goto('/');
     }
   }
 
-  async function deleteSeriesFromDrive(volumes: VolumeMetadata[]) {
+  async function deleteSeriesFromCloud(volumes: VolumeMetadata[]) {
     if (!volumes || volumes.length === 0) return;
 
-    // Get any file from the series to find the parent folder ID
-    const sampleFile = driveFilesCache.getDriveFile(volumes[0].series_title, volumes[0].volume_title);
-    if (!sampleFile || !sampleFile.parentId) {
-      showSnackbar('Series folder not found in Drive', 'error');
+    const seriesTitle = volumes[0].series_title;
+
+    // Check if any volumes are backed up (efficient O(1) Map lookup)
+    const backedUpVolumes = cloudFiles.get(seriesTitle) || [];
+
+    if (backedUpVolumes.length === 0) {
+      showSnackbar(`No volumes found in ${providerDisplayName}`, 'info');
       return;
     }
 
     try {
-      // Trash the folder using the ID from cache (no query needed, works with all characters)
-      await driveApiClient.trashFile(sampleFile.parentId);
+      // Use the new deleteSeriesFolder method which deletes the entire folder
+      // The unified manager automatically updates its cache, so no need to fetch again
+      const result = await unifiedCloudManager.deleteSeriesFolder(seriesTitle);
 
-      // Remove all volumes from cache
-      for (const vol of volumes) {
-        driveFilesCache.removeDriveFile(vol.series_title, vol.volume_title);
+      if (result.failed === 0) {
+        showSnackbar(`Deleted ${result.succeeded} volume(s) from ${providerDisplayName}`, 'success');
+      } else {
+        showSnackbar(`Deleted ${result.succeeded} volume(s), ${result.failed} failed`, 'error');
       }
-
-      showSnackbar(`Moved series folder to Drive trash`, 'success');
     } catch (error) {
-      console.error('Failed to delete series from Drive:', error);
-      showSnackbar('Failed to delete from Drive', 'error');
+      console.error(`Failed to delete series from ${providerDisplayName}:`, error);
+      showSnackbar(`Failed to delete from ${providerDisplayName}`, 'error');
+      // Refresh cache to restore correct state on error
+      await unifiedCloudManager.fetchAllCloudVolumes();
     }
   }
 
-  async function onDeleteFromDrive() {
+  async function onDeleteFromCloud() {
     if (!manga || manga.length === 0) return;
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+
+    // Check if any provider is authenticated
+    if (!hasAnyProvider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
 
     if (!anyBackedUp) {
-      showSnackbar('No backups found in Drive', 'info');
+      showSnackbar(`No backups found in ${providerDisplayName}`, 'info');
       return;
     }
 
     promptConfirmation(
-      `Delete ${manga[0].series_title} from Google Drive?`,
+      `Delete ${manga[0].series_title} from ${providerDisplayName}?`,
       async () => {
-        await deleteSeriesFromDrive(manga);
+        await deleteSeriesFromCloud(manga);
       }
     );
   }
 
   function onDelete() {
-    const hasDriveBackups = manga?.some(vol =>
-      driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`)
+    const hasCloudBackups = manga?.some(vol =>
+      unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title)
     );
 
     promptConfirmation(
@@ -166,9 +215,9 @@
         storageKey: "deleteStatsPreference",
         defaultValue: false
       },
-      hasDriveBackups ? {
-        label: "Also delete from Google Drive?",
-        storageKey: "deleteDrivePreference",
+      hasCloudBackups ? {
+        label: `Also delete from ${providerDisplayName}?`,
+        storageKey: "deleteCloudPreference",
         defaultValue: false
       } : undefined
     );
@@ -190,22 +239,17 @@
 
   async function backupSeries() {
     if (!manga || manga.length === 0) return;
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+
+    // Check if any provider is authenticated
+    const provider = unifiedCloudManager.getDefaultProvider();
+    if (!provider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
 
-    // If already backing up, don't start again
-    if (backingUpSeries) {
-      return;
-    }
-
-    const currentSeriesTitle = manga[0].series_title;
-    const currentProcessId = `backup-series-${currentSeriesTitle}`;
-
-    // Filter out already backed up volumes
+    // Filter out already backed up volumes using unified cloud manager
     const volumesToBackup = manga.filter(vol =>
-      !driveCache.has(`${vol.series_title}/${vol.volume_title}.cbz`)
+      !unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title)
     );
 
     if (volumesToBackup.length === 0) {
@@ -213,81 +257,52 @@
       return;
     }
 
-    progressTrackerStore.addProcess({
-      id: currentProcessId,
-      description: `Backing up ${currentSeriesTitle}`,
-      progress: 0,
-      status: `0/${volumesToBackup.length} volumes`
-    });
+    // Add volumes to backup queue
+    backupQueue.queueSeriesVolumesForBackup(volumesToBackup, provider.type);
 
-    let successCount = 0;
-    let failCount = 0;
-
-    try {
-      for (let i = 0; i < volumesToBackup.length; i++) {
-        const volume = volumesToBackup[i];
-        const progress = Math.round(((i + 1) / volumesToBackup.length) * 100);
-
-        progressTrackerStore.updateProcess(currentProcessId, {
-          progress,
-          status: `${i + 1}/${volumesToBackup.length}: ${volume.volume_title}`
-        });
-
-        try {
-          await backupVolumeToDrive(volume);
-          successCount++;
-        } catch (error) {
-          console.error(`Failed to backup ${volume.volume_title}:`, error);
-          failCount++;
-        }
-      }
-    } finally {
-      progressTrackerStore.removeProcess(currentProcessId);
-    }
-
-    if (failCount === 0) {
-      showSnackbar(`Successfully backed up ${successCount} volumes`, 'success');
-    } else {
-      showSnackbar(`Backed up ${successCount} volumes, ${failCount} failed`, 'error');
-    }
+    showSnackbar(`Added ${volumesToBackup.length} volume(s) to backup queue`, 'success');
   }
 
   async function downloadAllPlaceholders() {
     if (!placeholders || placeholders.length === 0) return;
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+
+    // Check if any cloud provider is authenticated
+    if (!hasAnyProvider) {
+      showSnackbar('Please sign in to a cloud storage provider first', 'error');
       return;
     }
 
     try {
-      await downloadSeriesFromDrive(placeholders);
+      // Use the download queue to handle placeholders
+      const { queueSeriesVolumes } = await import('$lib/util/download-queue');
+      queueSeriesVolumes(placeholders);
     } catch (error) {
       console.error('Failed to download placeholders:', error);
     }
   }
 
-  // Detect duplicate Drive files - multiple Drive files with same path
-  // Looks directly at Drive cache, independent of local download status
-  let duplicateDriveFiles = $derived.by(() => {
+  // Detect duplicate cloud files - multiple files with same path
+  // Uses unified cloud manager, works with any provider
+  let duplicateCloudFiles = $derived.by(() => {
     if (!manga || manga.length === 0) return [];
 
-    // Get all Drive files for this series from cache (regardless of local state)
+    // Get all cloud files for this series from unified cache
     const seriesTitle = manga[0].series_title;
-    const driveFilesForSeries = driveFilesCache.getDriveFilesBySeries(seriesTitle);
+    const cloudFilesForSeries = unifiedCloudManager.getCloudVolumesBySeries(seriesTitle);
 
-    // Group Drive files by path
-    const pathGroups = new Map<string, typeof driveFilesForSeries>();
-    for (const driveFile of driveFilesForSeries) {
-      const existing = pathGroups.get(driveFile.path);
+    // Group cloud files by path
+    const pathGroups = new Map<string, typeof cloudFilesForSeries>();
+    for (const cloudFile of cloudFilesForSeries) {
+      const existing = pathGroups.get(cloudFile.path);
       if (existing) {
-        existing.push(driveFile);
+        existing.push(cloudFile);
       } else {
-        pathGroups.set(driveFile.path, [driveFile]);
+        pathGroups.set(cloudFile.path, [cloudFile]);
       }
     }
 
     // Collect all duplicate files (keep most recent, mark others for deletion)
-    const duplicates: typeof driveFilesForSeries = [];
+    const duplicates: typeof cloudFilesForSeries = [];
     for (const files of pathGroups.values()) {
       if (files.length > 1) {
         // Sort by modified time, keep most recent
@@ -307,32 +322,31 @@
     return duplicates;
   });
 
-  let hasDuplicates = $derived(duplicateDriveFiles.length > 0);
+  let hasDuplicates = $derived(duplicateCloudFiles.length > 0);
 
-  async function cleanDriveDuplicates() {
-    if (!state.isAuthenticated) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+  async function cleanCloudDuplicates() {
+    if (!hasAnyProvider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
 
-    if (duplicateDriveFiles.length === 0) {
-      showSnackbar('No duplicate Drive files found', 'info');
+    if (duplicateCloudFiles.length === 0) {
+      showSnackbar(`No duplicate ${providerDisplayName} files found`, 'info');
       return;
     }
 
     promptConfirmation(
-      `Remove ${duplicateDriveFiles.length} duplicates from Drive?\n\nWe'll keep one copy of each volume and remove the duplicates.`,
+      `Remove ${duplicateCloudFiles.length} duplicates from ${providerDisplayName}?\n\nWe'll keep one copy of each volume and remove the duplicates.`,
       async () => {
         let successCount = 0;
         let failCount = 0;
 
-        for (const duplicate of duplicateDriveFiles) {
+        for (const duplicate of duplicateCloudFiles) {
           try {
-            await driveApiClient.trashFile(duplicate.fileId);
-            driveFilesCache.removeDriveFileById(duplicate.fileId);
+            await unifiedCloudManager.deleteVolumeCbz(duplicate.fileId);
             successCount++;
           } catch (error) {
-            console.error(`Failed to delete ${duplicate.name}:`, error);
+            console.error(`Failed to delete ${duplicate.path}:`, error);
             failCount++;
           }
         }
@@ -366,37 +380,25 @@
         </div>
       </div>
       <div class="flex flex-row gap-2 items-start">
-        {#if state.isAuthenticated}
-          {#if state.isCacheLoading && !state.isCacheLoaded}
-            <Button color="light" disabled={true}>
-              <Spinner size="4" class="me-2" />
-              Loading Drive status...
+        <!-- Debug: hasAnyProvider={hasAnyProvider}, cacheHasLoaded={cacheHasLoaded}, isCloudReady={isCloudReady}, allBackedUp={allBackedUp}, anyBackedUp={anyBackedUp} -->
+        {#if isCloudReady}
+          {#if !allBackedUp}
+            <Button
+              color="light"
+              on:click={backupSeries}
+            >
+              <CloudArrowUpOutline class="w-4 h-4 me-2" />
+              {anyBackedUp ? 'Backup remaining volumes' : `Backup series to ${providerDisplayName}`}
             </Button>
-          {:else}
-            {#if !allBackedUp}
-              <Button
-                color="light"
-                on:click={backupSeries}
-                disabled={backingUpSeries}
-              >
-                {#if backingUpSeries}
-                  <Spinner size="4" class="me-2" />
-                  Backing up {backupProgress}
-                {:else}
-                  <CloudArrowUpOutline class="w-4 h-4 me-2" />
-                  {anyBackedUp ? 'Backup remaining volumes' : 'Backup series to Drive'}
-                {/if}
-              </Button>
-            {/if}
-            {#if anyBackedUp}
-              <Button
-                color="red"
-                on:click={onDeleteFromDrive}
-              >
-                <TrashBinSolid class="w-4 h-4 me-2" />
-                Delete series from Drive
-              </Button>
-            {/if}
+          {/if}
+          {#if anyBackedUp}
+            <Button
+              color="red"
+              on:click={onDeleteFromCloud}
+            >
+              <TrashBinSolid class="w-4 h-4 me-2" />
+              Delete series from {providerDisplayName}
+            </Button>
           {/if}
         {/if}
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
@@ -406,10 +408,10 @@
       </div>
     </div>
     <Listgroup active class="flex-1 h-full w-full">
-      {#if hasDuplicates && state.isAuthenticated}
+      {#if hasDuplicates && hasAnyProvider}
         <div class="mb-4 flex items-center justify-between px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded">
-          <h4 class="text-sm font-semibold text-red-600 dark:text-red-400">Duplicates found in Drive ({duplicateDriveFiles.length})</h4>
-          <Button size="xs" color="red" on:click={cleanDriveDuplicates}>
+          <h4 class="text-sm font-semibold text-red-600 dark:text-red-400">Duplicates found in {providerDisplayName} ({duplicateCloudFiles.length})</h4>
+          <Button size="xs" color="red" on:click={cleanCloudDuplicates}>
             <TrashBinSolid class="w-3 h-3 me-1" />
             Clean Duplicates
           </Button>
@@ -422,8 +424,8 @@
 
       {#if placeholders && placeholders.length > 0}
         <div class="mt-4 mb-2 flex items-center justify-between px-4">
-          <h4 class="text-sm font-semibold text-gray-400">Available in Drive ({placeholders.length})</h4>
-          {#if state.isAuthenticated}
+          <h4 class="text-sm font-semibold text-gray-400">Available in {providerDisplayName} ({placeholders.length})</h4>
+          {#if hasAnyProvider}
             <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
               <DownloadSolid class="w-3 h-3 me-1" />
               Download all

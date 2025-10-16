@@ -34,11 +34,12 @@ export async function generateThumbnail(
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, width, height);
 
-  // Convert canvas to blob using the same type as the input file
-  const blob = await new Promise<Blob>((resolve) =>
-    canvas.toBlob((b) => resolve(b!), file.type, 0.8)
-  );
-
-  // Create and return a new File with the same type
-  return new File([blob], `thumbnail_${file.name}`, { type: file.type });
+  // Convert canvas directly to File to avoid intermediate Blob
+  // Use toBlob callback to immediately create File without storing Blob separately
+  return new Promise<File>((resolve) => {
+    canvas.toBlob((blob) => {
+      if (!blob) throw new Error('Failed to create thumbnail blob');
+      resolve(new File([blob], `thumbnail_${file.name}`, { type: file.type }));
+    }, file.type, 0.8);
+  });
 }

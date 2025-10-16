@@ -23,8 +23,17 @@ export interface VolumeMetadata {
   character_count: number;
   thumbnail?: File;
 
-  // Placeholder fields for Drive-only volumes (not yet downloaded locally)
+  // Placeholder fields for cloud-only volumes (not yet downloaded locally)
   isPlaceholder?: boolean;
+
+  // Generic cloud storage fields (new multi-provider format)
+  cloudProvider?: 'google-drive' | 'mega' | 'webdav';
+  cloudFileId?: string;
+  cloudModifiedTime?: string;
+  cloudSize?: number;
+
+  // Legacy Drive-specific fields (kept for backward compatibility)
+  // When present without cloudProvider, assumed to be google-drive
   driveFileId?: string;
   driveModifiedTime?: string;
   driveSize?: number;

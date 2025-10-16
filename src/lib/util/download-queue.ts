@@ -10,10 +10,15 @@ import { generateThumbnail } from '$lib/catalog/thumbnails';
 import { driveApiClient } from './google-drive/api-client';
 import { driveFilesCache } from './google-drive/drive-files-cache';
 import { miscSettings } from '$lib/settings/misc';
+import { unifiedCloudManager } from './sync/unified-cloud-manager';
+import { getCloudFileId, getCloudProvider, getCloudSize, getCloudModifiedTime } from './cloud-fields';
+import type { ProviderType } from './sync/provider-interface';
+import { BlobReader, ZipReader, Uint8ArrayWriter } from '@zip.js/zip.js';
 
 export interface QueueItem {
 	volumeUuid: string;
-	driveFileId: string;
+	cloudFileId: string;
+	cloudProvider: ProviderType;
 	seriesTitle: string;
 	volumeTitle: string;
 	volumeMetadata: VolumeMetadata;
@@ -49,6 +54,13 @@ const queueStore = writable<QueueItem[]>([]);
 let workerPool: WorkerPool | null = null;
 let processingStarted = false;
 
+// Track MEGA share links that need cleanup after download
+const megaShareLinksToCleanup = new Map<string, string>(); // fileId -> fileId (for cleanup)
+
+// Rate limiting for MEGA share link creation using a promise chain as mutex
+let megaShareLinkMutex = Promise.resolve();
+const MEGA_SHARE_LINK_THROTTLE_MS = 200; // 200ms between share link creations
+
 // Subscribe to queue changes and update progress tracker
 queueStore.subscribe(queue => {
 	const totalCount = queue.length;
@@ -69,16 +81,28 @@ queueStore.subscribe(queue => {
  * Add a single volume to the download queue
  */
 export function queueVolume(volume: VolumeMetadata): void {
-	if (!volume.isPlaceholder || !volume.driveFileId) {
-		console.warn('Can only queue placeholder volumes with Drive file IDs');
+	const cloudFileId = getCloudFileId(volume);
+	const cloudProvider = getCloudProvider(volume);
+
+	console.log('[Download Queue] queueVolume called:', {
+		isPlaceholder: volume.isPlaceholder,
+		volumeTitle: volume.volume_title,
+		cloudFileId,
+		cloudProvider,
+		volumeCloudProvider: volume.cloudProvider,
+		volumeDriveFileId: volume.driveFileId
+	});
+
+	if (!volume.isPlaceholder || !cloudFileId || !cloudProvider) {
+		console.warn('Can only queue placeholder volumes with cloud file IDs');
 		return;
 	}
 
 	const queue = get(queueStore);
 
-	// Check for duplicates by volumeUuid or driveFileId
+	// Check for duplicates by volumeUuid or cloudFileId
 	const isDuplicate = queue.some(
-		item => item.volumeUuid === volume.volume_uuid || item.driveFileId === volume.driveFileId
+		item => item.volumeUuid === volume.volume_uuid || item.cloudFileId === cloudFileId
 	);
 
 	if (isDuplicate) {
@@ -88,7 +112,8 @@ export function queueVolume(volume: VolumeMetadata): void {
 
 	const queueItem: QueueItem = {
 		volumeUuid: volume.volume_uuid,
-		driveFileId: volume.driveFileId,
+		cloudFileId,
+		cloudProvider,
 		seriesTitle: volume.series_title,
 		volumeTitle: volume.volume_title,
 		volumeMetadata: volume,
@@ -106,7 +131,10 @@ export function queueVolume(volume: VolumeMetadata): void {
  * Add multiple volumes from a series to the queue
  */
 export function queueSeriesVolumes(volumes: VolumeMetadata[]): void {
-	const placeholders = volumes.filter(v => v.isPlaceholder && v.driveFileId);
+	const placeholders = volumes.filter(v => {
+		const cloudFileId = getCloudFileId(v);
+		return v.isPlaceholder && cloudFileId;
+	});
 
 	if (placeholders.length === 0) {
 		console.warn('No placeholder volumes to queue');
@@ -156,7 +184,7 @@ export function getSeriesQueueStatus(seriesTitle: string): SeriesQueueStatus {
 }
 
 /**
- * Initialize worker pool with settings from miscSettings
+ * Initialize worker pool based on user-configured RAM setting
  */
 function initializeWorkerPool(): WorkerPool {
 	if (workerPool) {
@@ -166,26 +194,88 @@ function initializeWorkerPool(): WorkerPool {
 	let maxWorkers: number;
 	let memoryLimitMB: number;
 
-	// Get throttle setting
-	let throttleSetting = false;
+	// Get user's RAM configuration
+	let deviceRamGB = 4; // Default
 	miscSettings.subscribe(value => {
-		throttleSetting = value.throttleDownloads;
+		deviceRamGB = value.deviceRamGB ?? 4;
 	})();
 
-	if (throttleSetting) {
-		// Throttled mode with reasonable limits
-		maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
-		memoryLimitMB = 500; // 500 MB memory threshold
-		console.log(`Download queue: Throttled mode - ${maxWorkers} workers, ${memoryLimitMB}MB limit`);
-	} else {
-		// Unthrottled mode, use more workers and disable memory limits
-		maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
-		memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
-		console.log(`Download queue: Unthrottled mode - ${maxWorkers} workers, no memory limit`);
-	}
+	// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
+	memoryLimitMB = (deviceRamGB * 1024) / 8;
+
+	// Worker count: scale with RAM, minimum 2, cap at 8
+	// Use 1.5x RAM in GB as base (e.g., 4GB = 6 workers, 16GB = 24 workers → capped at 8)
+	// Cap at 8 to avoid overwhelming cloud services and saturating network bandwidth
+	const calculatedWorkers = Math.max(2, Math.floor(deviceRamGB * 1.5));
+	maxWorkers = Math.min(8, calculatedWorkers);
+
+	console.log(`Download queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
 
 	workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
 	return workerPool;
+}
+
+/**
+ * Decompress a CBZ file blob into entries
+ */
+async function decompressCbz(blob: Blob): Promise<DecompressedEntry[]> {
+	const reader = new BlobReader(blob);
+	const zipReader = new ZipReader(reader);
+	const entries = await zipReader.getEntries();
+
+	const decompressed: DecompressedEntry[] = [];
+	for (const entry of entries) {
+		if (entry.directory || !entry.getData) continue;
+
+		const uint8Array = await entry.getData(new Uint8ArrayWriter());
+		decompressed.push({
+			filename: entry.filename,
+			data: uint8Array.buffer as ArrayBuffer
+		});
+	}
+
+	await zipReader.close();
+	return decompressed;
+}
+
+/**
+ * Get provider credentials for worker downloads
+ * For MEGA, creates a temporary share link instead of passing credentials
+ * Implements rate limiting to prevent API congestion
+ */
+async function getProviderCredentials(provider: ProviderType, fileId: string): Promise<any> {
+	if (provider === 'google-drive') {
+		let token = '';
+		tokenManager.token.subscribe(value => {
+			token = value;
+		})();
+		return { accessToken: token };
+	} else if (provider === 'webdav') {
+		// Get WebDAV credentials from localStorage
+		const serverUrl = localStorage.getItem('webdav_server_url');
+		const username = localStorage.getItem('webdav_username');
+		const password = localStorage.getItem('webdav_password');
+		return { webdavUrl: serverUrl, webdavUsername: username, webdavPassword: password };
+	} else if (provider === 'mega') {
+		// Serialize MEGA share link creation using a promise chain as mutex
+		// This prevents concurrent API calls that could trigger rate limiting
+		const result = await (megaShareLinkMutex = megaShareLinkMutex.then(async () => {
+			// Add throttle delay between each share link creation
+			await new Promise(resolve => setTimeout(resolve, MEGA_SHARE_LINK_THROTTLE_MS));
+
+			// Create a temporary share link for this file (with built-in retry logic)
+			const { megaProvider } = await import('./sync/providers/mega/mega-provider');
+			const shareUrl = await megaProvider.createShareLink(fileId);
+
+			// Track this share link for cleanup after download
+			megaShareLinksToCleanup.set(fileId, fileId);
+
+			return { megaShareUrl: shareUrl };
+		}));
+
+		return result;
+	}
+	return {};
 }
 
 /**
@@ -217,11 +307,24 @@ async function processVolumeData(
 	};
 
 	// Convert image entries to File objects
+	// Create File objects directly from ArrayBuffers with proper MIME types
 	const files: Record<string, File> = {};
 	for (const entry of entries) {
 		if (!entry.filename.endsWith('.mokuro') && !entry.filename.includes('__MACOSX')) {
-			const blob = new Blob([entry.data]);
-			files[entry.filename] = new File([blob], entry.filename);
+			// Determine MIME type from file extension
+			const extension = entry.filename.toLowerCase().split('.').pop() || '';
+			const mimeTypes: Record<string, string> = {
+				'jpg': 'image/jpeg',
+				'jpeg': 'image/jpeg',
+				'png': 'image/png',
+				'gif': 'image/gif',
+				'webp': 'image/webp',
+				'bmp': 'image/bmp'
+			};
+			const mimeType = mimeTypes[extension] || 'application/octet-stream';
+
+			// Create File directly from ArrayBuffer with proper MIME type
+			files[entry.filename] = new File([entry.data], entry.filename, { type: mimeType });
 		}
 	}
 
@@ -250,15 +353,19 @@ async function processVolumeData(
 		});
 	}
 
-	// Update Drive file description if folder name doesn't match series title
-	if (placeholder.driveFileId) {
+	// Update cloud file description if folder name doesn't match series title
+	const cloudFileId = getCloudFileId(placeholder);
+	const cloudProvider = getCloudProvider(placeholder);
+
+	if (cloudFileId && cloudProvider) {
 		try {
 			const folderName = placeholder.series_title;
 			const actualSeriesTitle = mokuroData.title;
 
-			if (folderName !== actualSeriesTitle) {
+			if (folderName !== actualSeriesTitle && cloudProvider === 'google-drive') {
+				// Only Drive supports description updates currently
 				const fileMetadata = await driveApiClient.getFileMetadata(
-					placeholder.driveFileId,
+					cloudFileId,
 					'capabilities/canEdit,description'
 				);
 				const canEdit = fileMetadata.capabilities?.canEdit ?? false;
@@ -273,104 +380,137 @@ async function processVolumeData(
 							? `${seriesTag}\n${currentDescription}`
 							: seriesTag;
 
-						await driveApiClient.updateFileDescription(placeholder.driveFileId, newDescription);
-						driveFilesCache.updateFileDescription(placeholder.driveFileId, newDescription);
+						await driveApiClient.updateFileDescription(cloudFileId, newDescription);
+
+
+					// Also update driveFilesCache
+					driveFilesCache.updateFileDescription(cloudFileId, newDescription);
+						// Update unified cloud manager cache
+						unifiedCloudManager.updateCacheEntry(cloudFileId, {
+							description: newDescription
+						});
 					}
 				}
 			}
 		} catch (error) {
-			console.warn('Failed to update Drive file description:', error);
+			console.warn('Failed to update cloud file description:', error);
 		}
 	}
 }
 
 /**
- * Process the queue in parallel using worker pool
+ * Handle download errors consistently
  */
-async function processQueue(): Promise<void> {
-	// Always allow processing to check for new queued items
-	// The worker pool handles concurrency limits
+function handleDownloadError(item: QueueItem, processId: string, errorMessage: string): void {
+	progressTrackerStore.updateProcess(processId, {
+		progress: 0,
+		status: `Error: ${errorMessage}`
+	});
+	showSnackbar(`Failed to download ${item.volumeTitle}: ${errorMessage}`);
+	queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
+	setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+}
 
-	// Initialize worker pool if needed
-	const pool = initializeWorkerPool();
+/**
+ * Check if queue is empty and terminate worker pool if so
+ */
+function checkAndTerminatePool(): void {
+	const currentQueue = get(queueStore);
+	if (currentQueue.length === 0 && workerPool) {
+		workerPool.terminate();
+		workerPool = null;
+		processingStarted = false;
+	}
+}
 
-	// Get access token
-	let token = '';
-	tokenManager.token.subscribe(value => {
-		token = value;
-	})();
+/**
+ * Cleanup MEGA share link after download completes or fails
+ *
+ * NOTE: Cleanup failures are not critical. MEGA likely reuses existing share links,
+ * so if cleanup fails (due to disconnect, crash, etc.), the next download attempt
+ * will automatically reuse the existing link. This provides a self-healing behavior
+ * where orphaned links are eventually reused and cleaned up on successful downloads.
+ */
+async function cleanupMegaShareLink(fileId: string): Promise<void> {
+	if (megaShareLinksToCleanup.has(fileId)) {
+		try {
+			const { megaProvider } = await import('./sync/providers/mega/mega-provider');
+			await megaProvider.deleteShareLink(fileId);
+			megaShareLinksToCleanup.delete(fileId);
+		} catch (error) {
+			console.warn(`Failed to cleanup MEGA share link for ${fileId}:`, error);
+			// Still remove from tracking to prevent memory leak
+			megaShareLinksToCleanup.delete(fileId);
+		}
+	}
+}
 
-	if (!token) {
-		console.error('Download queue: No access token available');
+/**
+ * Process download using workers for all providers
+ * - Google Drive: Workers download with OAuth token and decompress
+ * - WebDAV: Workers download with Basic Auth and decompress
+ * - MEGA: Workers download from share link via MEGA API and decompress
+ */
+async function processDownload(item: QueueItem, processId: string): Promise<void> {
+	const provider = unifiedCloudManager.getActiveProvider();
+
+	if (!provider) {
+		handleDownloadError(item, processId, 'No cloud provider authenticated');
 		return;
 	}
 
-	const queue = get(queueStore);
+	const pool = initializeWorkerPool();
+	const fileSize = getCloudSize(item.volumeMetadata) || 0;
 
-	// Process all queued items (not already downloading)
-	for (const item of queue) {
-		if (item.status !== 'queued') {
-			continue;
-		}
+	// Check if provider supports worker downloads
+	if (provider.supportsWorkerDownload) {
+		// Strategy 1: Worker handles download + decompress (Drive, WebDAV, MEGA)
+		console.log(`[Download Queue] Using worker download for ${provider.name}`);
 
-		// Mark processing as started once we actually start processing
-		processingStarted = true;
+		// Get provider credentials (for MEGA, this creates a temporary share link)
+		const credentials = await getProviderCredentials(provider.type, item.cloudFileId);
 
-		// Mark as downloading
-		queueStore.update(q =>
-			q.map(i => (i.volumeUuid === item.volumeUuid ? { ...i, status: 'downloading' as const } : i))
-		);
-
-		const processId = `download-${item.driveFileId}`;
-
-		// Add process tracker
-		progressTrackerStore.addProcess({
-			id: processId,
-			description: `Downloading ${item.volumeTitle}`,
-			progress: 0,
-			status: 'Starting download...'
-		});
-
-		// Estimate memory requirement based on file size
-		const fileSize = item.volumeMetadata.driveSize || 0;
-		const memoryRequirement = Math.max(fileSize * 3, 50 * 1024 * 1024);
+		// Estimate memory requirement (download + decompress + processing overhead)
+		// More accurate multiplier: compressed file + decompressed data + working memory
+		const memoryRequirement = Math.max(fileSize * 2.8, 50 * 1024 * 1024);
 
 		// Create worker metadata
 		const workerMetadata: WorkerVolumeMetadata = {
 			volumeUuid: item.volumeUuid,
-			driveFileId: item.driveFileId,
+			driveFileId: item.cloudFileId,
 			seriesTitle: item.seriesTitle,
 			volumeTitle: item.volumeTitle,
-			driveModifiedTime: item.volumeMetadata.driveModifiedTime,
-			driveSize: item.volumeMetadata.driveSize
+			driveModifiedTime: getCloudModifiedTime(item.volumeMetadata) ?? undefined,
+			driveSize: getCloudSize(item.volumeMetadata) ?? undefined
 		};
 
-		// Create worker task
+		// Create worker task for download+decompress
 		const task: WorkerTask = {
-			id: item.driveFileId,
+			id: item.cloudFileId,
 			memoryRequirement,
 			metadata: workerMetadata,
 			data: {
-				fileId: item.driveFileId,
+				mode: 'download-and-decompress',
+				provider: provider.type,
+				fileId: item.cloudFileId,
 				fileName: item.volumeTitle + '.cbz',
-				accessToken: token,
+				credentials,
 				metadata: workerMetadata
 			},
 			onProgress: data => {
 				const percent = Math.round((data.loaded / data.total) * 100);
 				progressTrackerStore.updateProcess(processId, {
-					progress: percent,
+					progress: percent * 0.9, // 0-90% for download
 					status: `Downloading... ${percent}%`
 				});
 			},
 			onComplete: async (data, releaseMemory) => {
 				try {
 					progressTrackerStore.updateProcess(processId, {
-						progress: 90,
+						progress: 95,
 						status: 'Processing files...'
 					});
 
-					// Process volume data and save to DB
 					await processVolumeData(data.entries, item.volumeMetadata);
 
 					progressTrackerStore.updateProcess(processId, {
@@ -379,64 +519,70 @@ async function processQueue(): Promise<void> {
 					});
 
 					showSnackbar(`Downloaded ${item.volumeTitle} successfully`);
-
-					// Remove from queue
 					queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
-
-					// Clean up progress tracker after delay
 					setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
 				} catch (error) {
 					console.error(`Failed to process ${item.volumeTitle}:`, error);
-					progressTrackerStore.updateProcess(processId, {
-						progress: 0,
-						status: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-					});
-					showSnackbar(
-						`Failed to process: ${error instanceof Error ? error.message : 'Unknown error'}`
-					);
-
-					// Remove from queue even on error
-					queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
-
-					setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
+					handleDownloadError(item, processId, error instanceof Error ? error.message : 'Unknown error');
 				} finally {
+					// Cleanup MEGA share link if this was a MEGA download
+					await cleanupMegaShareLink(item.cloudFileId);
 					releaseMemory();
-
-					// Check if queue is empty and terminate pool
-					const currentQueue = get(queueStore);
-					if (currentQueue.length === 0 && workerPool) {
-						workerPool.terminate();
-						workerPool = null;
-						processingStarted = false;
-					}
+					checkAndTerminatePool();
 				}
 			},
-			onError: data => {
+			onError: async data => {
 				console.error(`Error downloading ${item.volumeTitle}:`, data.error);
-				progressTrackerStore.updateProcess(processId, {
-					progress: 0,
-					status: `Error: ${data.error}`
-				});
-				showSnackbar(`Failed to download ${item.volumeTitle}`);
-
-				// Remove from queue
-				queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
-
-				setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-				// Check if queue is empty and terminate pool
-				const currentQueue = get(queueStore);
-				if (currentQueue.length === 0 && workerPool) {
-					workerPool.terminate();
-					workerPool = null;
-					processingStarted = false;
-				}
+				// Cleanup MEGA share link if this was a MEGA download
+				await cleanupMegaShareLink(item.cloudFileId);
+				handleDownloadError(item, processId, data.error);
+				checkAndTerminatePool();
 			}
 		};
 
-		// Add task to worker pool
 		pool.addTask(task);
 	}
+}
+
+/**
+ * Process the queue - unified download handling for all providers
+ * Processes all queued items concurrently (respecting worker pool limits)
+ */
+function processQueue(): void {
+	const queue = get(queueStore);
+	const queuedItems = queue.filter(item => item.status === 'queued');
+
+	// Mark processing as started if we have queued items
+	if (queuedItems.length > 0) {
+		processingStarted = true;
+	}
+
+	// Process each queued item (worker pool will handle concurrency limits)
+	queuedItems.forEach(item => {
+		// Mark as downloading
+		queueStore.update(q =>
+			q.map(i => (i.volumeUuid === item.volumeUuid ? { ...i, status: 'downloading' as const } : i))
+		);
+
+		const processId = `download-${item.cloudFileId}`;
+
+		// Add progress tracker
+		progressTrackerStore.addProcess({
+			id: processId,
+			description: `Downloading ${item.volumeTitle}`,
+			progress: 0,
+			status: 'Starting download...'
+		});
+
+		console.log('[Download Queue] Processing download:', {
+			volumeTitle: item.volumeTitle,
+			cloudProvider: item.cloudProvider
+		});
+
+		// Start download (worker pool handles concurrency)
+		// Don't await - let multiple downloads run concurrently
+		processDownload(item, processId);
+	});
 }
 
 // Export the store for reactive subscriptions

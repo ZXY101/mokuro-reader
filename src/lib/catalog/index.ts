@@ -4,7 +4,7 @@ import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { liveQuery } from 'dexie';
 import { derived, readable, type Readable } from 'svelte/store';
 import { deriveSeriesFromVolumes } from '$lib/catalog/catalog';
-import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
+import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
 import { generatePlaceholders } from '$lib/catalog/placeholders';
 
 function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
@@ -36,14 +36,12 @@ export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
   return () => subscription.unsubscribe();
 });
 
-// Merge local volumes with Drive placeholders
+// Merge local volumes with cloud placeholders
 export const volumesWithPlaceholders = derived(
-  [volumes, driveFilesCache.store],
-  ([$volumes, $driveCache], set) => {
-    // Generate placeholders from Drive files
-    const driveFiles = Array.from($driveCache.values()).flat();
-
-    generatePlaceholders(driveFiles).then(placeholders => {
+  [volumes, unifiedCloudManager.cloudFiles],
+  ([$volumes, $cloudFiles], set) => {
+    // Generate placeholders from cloud files
+    generatePlaceholders($cloudFiles).then(placeholders => {
       // Combine local volumes with placeholders
       const combined = { ...$volumes };
 
@@ -79,27 +77,16 @@ export const currentVolume = derived([page, volumes], ([$page, $volumes]) => {
   return undefined;
 });
 
-// Track the last volume UUID outside the derived store to maintain state across updates
-let lastVolumeUuid: string | undefined;
-
 export const currentVolumeData: Readable<VolumeData | undefined> = derived(
   [currentVolume],
-  ([$currentVolume], set: (value: VolumeData | undefined) => void) => {
-    const newVolumeUuid = $currentVolume?.volume_uuid;
-
-    // Only clear data if we're actually navigating to a different volume
-    // This prevents flashing when unrelated volumes are added to the catalog
-    if (newVolumeUuid !== lastVolumeUuid) {
-      // Navigation detected - clear old data to prevent state leaks
-      set(undefined);
-      lastVolumeUuid = newVolumeUuid;
-    }
+  ([$currentVolume], set) => {
+    // CRITICAL: Immediately clear old data synchronously to prevent state leaks
+    // This ensures old volume data doesn't persist during the async gap
+    set(undefined);
 
     if ($currentVolume) {
       db.volumes_data.get($currentVolume.volume_uuid).then((data) => {
-        // Verify this is still the current volume before setting
-        // (user might have navigated away during the async gap)
-        if (data && $currentVolume.volume_uuid === lastVolumeUuid) {
+        if (data) {
           set(data);
         }
       });

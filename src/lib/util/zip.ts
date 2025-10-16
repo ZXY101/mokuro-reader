@@ -1,6 +1,6 @@
 import type { VolumeMetadata } from '$lib/types';
 import { db } from '$lib/catalog/db';
-import { BlobReader, BlobWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
+import { BlobReader, Uint8ArrayWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
 
 export async function zipManga(
   manga: VolumeMetadata[],
@@ -39,7 +39,7 @@ export async function zipManga(
  * @param volume The volume metadata
  * @returns Promise resolving to an array of promises for adding files
  */
-async function addVolumeToArchive(zipWriter: ZipWriter<Blob>, volume: VolumeMetadata) {
+async function addVolumeToArchive(zipWriter: ZipWriter<Uint8Array>, volume: VolumeMetadata) {
   // Get volume data from the database
   const volumeData = await db.volumes_data.get(volume.volume_uuid);
   if (!volumeData) {
@@ -77,11 +77,13 @@ async function addVolumeToArchive(zipWriter: ZipWriter<Blob>, volume: VolumeMeta
 
 /**
  * Creates an archive blob containing the specified volumes
+ * Uses Uint8Array throughout to avoid intermediate Blob disk writes under memory pressure
  * @param volumes Array of volumes to include in the archive
  * @returns Promise resolving to the archive blob
  */
 export async function createArchiveBlob(volumes: VolumeMetadata[]): Promise<Blob> {
-  const zipWriter = new ZipWriter(new BlobWriter('application/zip'));
+  // Use Uint8ArrayWriter to keep everything in memory until final conversion
+  const zipWriter = new ZipWriter(new Uint8ArrayWriter());
 
   // Add each volume to the archive
   const volumePromises = volumes.map((volume) => addVolumeToArchive(zipWriter, volume));
@@ -89,8 +91,11 @@ export async function createArchiveBlob(volumes: VolumeMetadata[]): Promise<Blob
   // Wait for all volumes to be added
   await Promise.all((await Promise.all(volumePromises)).flat());
 
-  // Close the archive and get the blob
-  return await zipWriter.close();
+  // Close the archive and get the Uint8Array
+  const uint8Array = await zipWriter.close();
+
+  // Convert to Blob only at the very end for download/upload
+  return new Blob([uint8Array], { type: 'application/zip' });
 }
 
 /**

@@ -4,6 +4,7 @@
   import { processFiles } from '$lib/upload';
   import { profiles } from '$lib/settings';
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
+  import { volumes } from '$lib/settings/volume-data';
 
   import {
     promptConfirmation,
@@ -20,19 +21,23 @@
     syncService,
     READER_FOLDER,
     CLIENT_ID,
-    API_KEY,
-    backupVolumeToDrive
+    API_KEY
   } from '$lib/util';
+  import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import { backupQueue } from '$lib/util/backup-queue';
   import { driveState } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
-  import { Badge, Button, Toggle } from 'flowbite-svelte';
+  import { Badge, Button, Radio } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { catalog } from '$lib/catalog';
   import type { VolumeMetadata } from '$lib/types';
   import { updateDriveFileDescriptionForEntries } from '$lib/util/update-drive-descriptions';
+
+  // Import multi-provider sync
+  import { providerManager, megaProvider, webdavProvider } from '$lib/util/sync';
 
   // Subscribe to stores
   let accessToken = $state('');
@@ -60,6 +65,31 @@
     ];
     return () => unsubscribers.forEach(unsub => unsub());
   });
+
+  // Subscribe to provider manager status for reactive authentication state
+  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
+  $effect(() => {
+    return providerManager.status.subscribe(value => {
+      providerStatus = value;
+    });
+  });
+
+  // Reactive provider authentication checks - now using provider manager for all providers
+  let googleDriveAuth = $derived(providerStatus.providers['google-drive']?.isAuthenticated || false);
+  let megaAuth = $derived(providerStatus.providers['mega']?.isAuthenticated || false);
+  let webdavAuth = $derived(providerStatus.providers['webdav']?.isAuthenticated || false);
+  let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
+
+  // MEGA login state
+  let megaEmail = $state('');
+  let megaPassword = $state('');
+  let megaLoading = $state(false);
+
+  // WebDAV login state
+  let webdavUrl = $state('');
+  let webdavUsername = $state('');
+  let webdavPassword = $state('');
+  let webdavLoading = $state(false);
 
   // Use constants from the google-drive utility
   const type = 'application/json';
@@ -167,11 +197,6 @@
       }
     }
   }
-
-  onMount(() => {
-    // Clear service worker cache for Google Drive downloads
-    clearServiceWorkerCache();
-  });
 
   async function createPicker() {
     // Ensure reader folder exists first
@@ -328,29 +353,8 @@
     });
 
     // Create a worker pool for parallel downloads
-    // Use navigator.hardwareConcurrency to determine optimal number of workers
-    // but limit to a reasonable number to avoid overwhelming the browser
-    let maxWorkers;
-    let memoryLimitMB;
-    
-    if ($miscSettings.throttleDownloads) {
-      // Throttled mode with reasonable limits
-      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 6);
-      // Set memory threshold to 500MB to prevent excessive memory usage on mobile devices
-      // This is not a hard limit - tasks that individually need more than 500MB can still run
-      // It just prevents starting new tasks when the current pool already exceeds 500MB
-      memoryLimitMB = 500; // 500 MB memory threshold
-      console.log(
-        `Throttled downloads: Using ${maxWorkers} workers and ${memoryLimitMB}MB memory threshold`
-      );
-    } else {
-      // Unthrottled mode, use more workers and disable memory limits
-      maxWorkers = Math.min(navigator.hardwareConcurrency || 4, 12);
-      memoryLimitMB = 100000; // Very high memory limit (100GB) effectively disables the constraint
-      console.log(`Unthrottled downloads: Using ${maxWorkers} workers with no memory limit`);
-    }
-    
-    const workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
+    // Worker pool will use settings from miscSettings.deviceRamGB
+    const workerPool = new WorkerPool();
 
     // Track download progress
     const fileProgress: { [fileId: string]: number } = {};
@@ -680,8 +684,9 @@
     await syncReadProgress();
   }
   
-  onMount(async () => {
+  onMount(() => {
     // Clear service worker cache for Google Drive downloads
+    // This is cloud-page-specific and not part of global init
     clearServiceWorkerCache();
   });
 
@@ -732,14 +737,170 @@
     }
   }
 
+  // Google Drive handlers
+  async function handleGoogleDriveLogin() {
+    try {
+      // Trigger OAuth flow
+      signIn();
+
+      // Wait for authentication to complete by watching the accessToken store
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Login timeout'));
+        }, 90000); // 90 second timeout for OAuth popup
+
+        const unsubscribe = accessTokenStore.subscribe(token => {
+          if (token) {
+            clearTimeout(timeout);
+            unsubscribe();
+            resolve();
+          }
+        });
+      });
+
+      // Set as current provider (auto-logs out any other provider)
+      const provider = providerManager.getProviderInstance('google-drive');
+      if (provider) {
+        await providerManager.setCurrentProvider(provider);
+      }
+
+      // After successful login, populate unified cache for placeholders
+      showSnackbar('Connected to Google Drive - loading cloud data...');
+      await unifiedCloudManager.fetchAllCloudVolumes();
+      showSnackbar('Google Drive connected');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Login failed';
+      showSnackbar(message);
+    }
+  }
+
+  // MEGA handlers
+  async function handleMegaLogin() {
+    megaLoading = true;
+    try {
+      await megaProvider.login({ email: megaEmail, password: megaPassword });
+
+      // Set as current provider (auto-logs out any other provider)
+      await providerManager.setCurrentProvider(megaProvider);
+
+      // Populate unified cache for rest of app to use
+      showSnackbar('Connected to MEGA - loading cloud data...');
+      await unifiedCloudManager.fetchAllCloudVolumes();
+      showSnackbar('MEGA connected');
+
+      // Clear form and trigger reactivity
+      megaEmail = '';
+      megaPassword = '';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(message);
+    } finally {
+      megaLoading = false;
+    }
+  }
+
+  async function handleMegaLogout() {
+    await megaProvider.logout();
+    megaEmail = '';
+    megaPassword = '';
+    unifiedCloudManager.clearCache();
+    providerManager.updateStatus();
+    showSnackbar('Logged out of MEGA');
+  }
+
+  async function handleMegaSync() {
+    try {
+      // Download from MEGA
+      const volumeData = await megaProvider.downloadVolumeData();
+
+      // Update local store if we got data
+      if (volumeData && Object.keys(volumeData).length > 0) {
+        volumes.update(() => volumeData);
+        showSnackbar('Downloaded read progress from MEGA');
+      }
+
+      // Upload current local data to MEGA
+      let currentVolumes;
+      volumes.subscribe(v => { currentVolumes = v; })();
+      await megaProvider.uploadVolumeData(currentVolumes);
+
+      showSnackbar('Synced read progress with MEGA');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Sync failed: ${message}`);
+    }
+  }
+
+  // WebDAV handlers
+  async function handleWebDAVLogin() {
+    webdavLoading = true;
+    try {
+      await webdavProvider.login({
+        serverUrl: webdavUrl,
+        username: webdavUsername,
+        password: webdavPassword
+      });
+
+      // Set as current provider (auto-logs out any other provider)
+      await providerManager.setCurrentProvider(webdavProvider);
+
+      // Populate unified cache for rest of app to use
+      showSnackbar('Connected to WebDAV - loading cloud data...');
+      await unifiedCloudManager.fetchAllCloudVolumes();
+      showSnackbar('WebDAV connected');
+
+      // Clear form and trigger reactivity
+      webdavUrl = '';
+      webdavUsername = '';
+      webdavPassword = '';
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(message);
+    } finally {
+      webdavLoading = false;
+    }
+  }
+
+  async function handleWebDAVLogout() {
+    await webdavProvider.logout();
+    webdavUrl = '';
+    webdavUsername = '';
+    webdavPassword = '';
+    unifiedCloudManager.clearCache();
+    providerManager.updateStatus();
+    showSnackbar('Logged out of WebDAV');
+  }
+
+  async function handleWebDAVSync() {
+    try {
+      // Download from WebDAV
+      const volumeData = await webdavProvider.downloadVolumeData();
+
+      // Update local store if we got data
+      if (volumeData && Object.keys(volumeData).length > 0) {
+        volumes.update(() => volumeData);
+        showSnackbar('Downloaded read progress from WebDAV');
+      }
+
+      // Upload current local data to WebDAV
+      let currentVolumes;
+      volumes.subscribe(v => { currentVolumes = v; })();
+      await webdavProvider.uploadVolumeData(currentVolumes);
+
+      showSnackbar('Synced read progress with WebDAV');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Sync failed: ${message}`);
+    }
+  }
+
   async function backupAllSeries() {
-    if (!accessToken) {
-      showSnackbar('Please sign in to Google Drive first', 'error');
+    // Get default provider
+    const provider = unifiedCloudManager.getDefaultProvider();
+    if (!provider) {
+      showSnackbar('Please connect to a cloud storage provider first', 'error');
       return;
     }
-
-    // Import driveFilesCache
-    const { driveFilesCache } = await import('$lib/util/google-drive');
 
     // Get all volumes from catalog
     const allVolumes: VolumeMetadata[] = [];
@@ -754,7 +915,7 @@
 
     // Filter out already backed up volumes
     const volumesToBackup = allVolumes.filter(vol =>
-      !driveFilesCache.existsInDrive(vol.series_title, vol.volume_title)
+      !unifiedCloudManager.existsInCloud(vol.series_title, vol.volume_title)
     );
 
     const skippedCount = allVolumes.length - volumesToBackup.length;
@@ -764,56 +925,14 @@
       return;
     }
 
-    const processId = 'backup-all';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: `Backing up ${volumesToBackup.length} volumes`,
-      progress: 0,
-      status: skippedCount > 0 ? `Skipping ${skippedCount} already backed up` : 'Starting backup...'
-    });
+    // Add all volumes to the backup queue
+    backupQueue.queueSeriesVolumesForBackup(volumesToBackup, provider.type);
 
-    let completedCount = 0;
-    let failedCount = 0;
-
-    volumesToBackup.sort((a, b) => {
-      if (a.series_title === b.series_title) {
-        return a.volume_title.localeCompare(b.volume_title);
-      }
-      return a.series_title.localeCompare(b.series_title);
-    });
-
-    for (let i = 0; i < volumesToBackup.length; i++) {
-      const volume = volumesToBackup[i];
-
-      try {
-        progressTrackerStore.updateProcess(processId, {
-          progress: (i / volumesToBackup.length) * 100,
-          status: `Backing up ${volume.series_title} - ${volume.volume_title}...`
-        });
-
-        await backupVolumeToDrive(volume);
-        completedCount++;
-      } catch (error) {
-        console.error(`Failed to backup ${volume.volume_title}:`, error);
-        failedCount++;
-      }
-    }
-
-    progressTrackerStore.updateProcess(processId, {
-      progress: 100,
-      status: `Backup complete (${completedCount} succeeded, ${failedCount} failed${skippedCount > 0 ? `, ${skippedCount} skipped` : ''})`
-    });
-
-    setTimeout(() => progressTrackerStore.removeProcess(processId), 5000);
-
-    if (failedCount === 0) {
-      const message = skippedCount > 0
-        ? `${completedCount} volumes backed up, ${skippedCount} already backed up`
-        : 'All volumes backed up successfully';
-      showSnackbar(message, 'success');
-    } else {
-      showSnackbar(`Backup completed with ${failedCount} failures`, 'error');
-    }
+    // Show notification
+    const message = skippedCount > 0
+      ? `Added ${volumesToBackup.length} volumes to backup queue (${skippedCount} already backed up)`
+      : `Added ${volumesToBackup.length} volumes to backup queue`;
+    showSnackbar(message, 'success');
   }
 </script>
 
@@ -822,19 +941,143 @@
 </svelte:head>
 
 <div class="p-2 h-[90svh]">
-  {#if accessToken}
-    <div class="flex justify-between items-center gap-6 flex-col">
-      <div class="flex justify-between items-center w-full max-w-3xl">
-        <div class="flex items-center gap-3">
-          <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
-          {#if state.isCacheLoading && !state.isCacheLoaded}
-            <Badge color="yellow">Loading Drive data...</Badge>
-          {:else if state.isCacheLoaded}
-            <Badge color="green">Connected</Badge>
-          {/if}
+  {#if !hasAnyProvider}
+    <!-- Provider Selection Screen (like sign-in options) -->
+    <div class="flex justify-center pt-0 sm:pt-20">
+      <div class="w-full max-w-md">
+        <h2 class="text-2xl font-semibold text-center mb-8">Choose a Cloud Storage Provider</h2>
+
+        <div class="flex flex-col gap-3">
+          <!-- Google Drive Option -->
+          <button
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
+            onclick={handleGoogleDriveLogin}
+          >
+            <div class="flex items-center gap-4">
+              <GoogleSolid size="xl" />
+              <div class="text-left flex-1">
+                <div class="font-semibold text-lg">Google Drive</div>
+                <div class="text-sm text-gray-400">15GB free • Requires re-auth every hour</div>
+              </div>
+            </div>
+          </button>
+
+          <!-- MEGA Option -->
+          <button
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
+            onclick={() => {
+              // Show MEGA login form
+              const megaForm = document.getElementById('mega-login-form');
+              if (megaForm) megaForm.classList.toggle('hidden');
+            }}
+          >
+            <div class="flex items-center gap-4">
+              <div class="w-8 h-8 flex items-center justify-center text-2xl">M</div>
+              <div class="text-left flex-1">
+                <div class="font-semibold text-lg">MEGA</div>
+                <div class="text-sm text-gray-400">20GB free • Persistent login</div>
+              </div>
+            </div>
+          </button>
+
+          <div id="mega-login-form" class="hidden pl-12 pr-4 pb-4">
+            <form
+              onsubmit={(e) => {
+                e.preventDefault();
+                handleMegaLogin();
+              }}
+              class="flex flex-col gap-3"
+            >
+              <input
+                type="email"
+                bind:value={megaEmail}
+                placeholder="Email"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <input
+                type="password"
+                bind:value={megaPassword}
+                placeholder="Password"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <Button type="submit" disabled={megaLoading} color="blue" size="sm">
+                {megaLoading ? 'Connecting...' : 'Connect to MEGA'}
+              </Button>
+            </form>
+          </div>
+
+          <!-- WebDAV Option -->
+          <button
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 opacity-50 cursor-not-allowed"
+            disabled
+          >
+            <div class="flex items-center gap-4">
+              <div class="w-8 h-8 flex items-center justify-center text-2xl">W</div>
+              <div class="text-left flex-1">
+                <div class="flex items-center gap-2">
+                  <div class="font-semibold text-lg">WebDAV</div>
+                  <Badge color="yellow">Under Development</Badge>
+                </div>
+                <div class="text-sm text-gray-400">Nextcloud, ownCloud, NAS • Persistent login</div>
+              </div>
+            </div>
+          </button>
+
+          <div id="webdav-login-form" class="hidden pl-12 pr-4 pb-4">
+            <form
+              onsubmit={(e) => {
+                e.preventDefault();
+                handleWebDAVLogin();
+              }}
+              class="flex flex-col gap-3"
+            >
+              <input
+                type="url"
+                bind:value={webdavUrl}
+                placeholder="Server URL (e.g., https://cloud.example.com/remote.php/dav)"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <input
+                type="text"
+                bind:value={webdavUsername}
+                placeholder="Username"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <input
+                type="password"
+                bind:value={webdavPassword}
+                placeholder="Password or App Token"
+                required
+                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+              />
+              <Button type="submit" disabled={webdavLoading} color="blue" size="sm">
+                {webdavLoading ? 'Connecting...' : 'Connect to WebDAV'}
+              </Button>
+            </form>
+          </div>
         </div>
-        <Button color="red" on:click={logout}>Log out</Button>
       </div>
+    </div>
+  {:else}
+    <!-- Connected Provider Interface -->
+    {#if googleDriveAuth}
+      <!-- Google Drive Connected -->
+      <div class="flex justify-between items-center gap-6 flex-col">
+        <div class="flex justify-between items-center w-full max-w-3xl">
+          <div class="flex items-center gap-3">
+            <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
+            {#if state.isCacheLoading && !state.isCacheLoaded}
+              <Badge color="yellow">Loading Drive data...</Badge>
+            {:else if state.isCacheLoaded}
+              <Badge color="green">Connected</Badge>
+            {/if}
+          </div>
+          <Button color="red" on:click={logout}>Log out</Button>
+        </div>
       <p class="text-center">
         Add your zipped manga files (ZIP or CBZ) to the <span class="text-primary-700"
           >{READER_FOLDER}</span
@@ -847,19 +1090,15 @@
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
 
         <div class="flex flex-col gap-2">
-          <div class="flex items-center gap-2">
-            <Toggle
-              size="small"
-              checked={$miscSettings.throttleDownloads}
-              on:change={() => updateMiscSetting('throttleDownloads', !$miscSettings.throttleDownloads)}
-            >
-              <span class="flex items-center gap-2">
-                Throttle downloads for stability
-              </span>
-            </Toggle>
+          <label class="text-sm font-medium">Device RAM Configuration</label>
+          <div class="flex gap-4">
+            <Radio name="ram-config" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
+            <Radio name="ram-config" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
+            <Radio name="ram-config" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
+            <Radio name="ram-config" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
           </div>
-          <p class="text-xs text-gray-500 ml-1">
-            Helps prevent crashes on low memory devices or for extremely large downloads.
+          <p class="text-xs text-gray-500">
+            Configure your device's RAM to optimize download performance and prevent memory issues.
           </p>
         </div>
 
@@ -875,9 +1114,9 @@
         <div class="flex-col gap-2 flex">
           <Button
             color="purple"
-            on:click={() => promptConfirmation('Backup all series to Google Drive?', backupAllSeries)}
+            on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
           >
-            Backup all series to Drive
+            Backup all series to cloud
           </Button>
         </div>
         <div class="flex-col gap-2 flex">
@@ -899,17 +1138,110 @@
         </div>
       </div>
     </div>
-  {:else}
-    <div class="flex justify-center pt-0 sm:pt-32">
-      <button
-        class="w-full border rounded-lg border-slate-600 p-10 border-opacity-50 hover:bg-slate-800 max-w-3xl"
-        onclick={signIn}
-      >
-        <div class="flex sm:flex-row flex-col gap-2 items-center justify-center">
-          <GoogleSolid size="lg" />
-          <h2 class="text-lg">Connect to Google Drive</h2>
+    {:else if megaAuth}
+      <!-- MEGA Connected -->
+      <div class="flex justify-center items-center flex-col gap-6">
+        <div class="w-full max-w-3xl">
+          <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+              <h2 class="text-3xl font-semibold">MEGA Cloud Storage</h2>
+              <Badge color="green">Connected</Badge>
+            </div>
+            <Button color="red" on:click={handleMegaLogout}>Log out</Button>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <p class="text-center text-gray-300 mb-2">
+              Your read progress is synced with MEGA cloud storage.
+            </p>
+
+            <div class="flex flex-col gap-2">
+              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="flex gap-4">
+                <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
+                <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
+                <Radio name="ram-config-mega" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
+                <Radio name="ram-config-mega" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
+              </div>
+              <p class="text-xs text-gray-500">
+                Configure your device's RAM to optimize download performance and prevent memory issues.
+              </p>
+            </div>
+
+            <Button color="blue" on:click={handleMegaSync}>
+              Sync read progress
+            </Button>
+
+            <Button
+              color="purple"
+              on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
+            >
+              Backup all series to cloud
+            </Button>
+
+            <div class="mt-4 p-4 bg-gray-800 rounded-lg">
+              <h3 class="font-semibold mb-2">About MEGA</h3>
+              <ul class="text-sm text-gray-300 space-y-1">
+                <li>20GB free storage</li>
+                <li>End-to-end encryption</li>
+                <li>Persistent login (no re-authentication needed)</li>
+              </ul>
+            </div>
+          </div>
         </div>
-      </button>
-    </div>
+      </div>
+    {:else if webdavAuth}
+      <!-- WebDAV Connected -->
+      <div class="flex justify-center items-center flex-col gap-6">
+        <div class="w-full max-w-3xl">
+          <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+              <h2 class="text-3xl font-semibold">WebDAV Server</h2>
+              <Badge color="green">Connected</Badge>
+            </div>
+            <Button color="red" on:click={handleWebDAVLogout}>Log out</Button>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <p class="text-center text-gray-300 mb-2">
+              Your read progress is synced with your WebDAV server.
+            </p>
+
+            <div class="flex flex-col gap-2">
+              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="flex gap-4">
+                <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
+                <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
+                <Radio name="ram-config-mega" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
+                <Radio name="ram-config-mega" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
+              </div>
+              <p class="text-xs text-gray-500">
+                Configure your device's RAM to optimize download performance and prevent memory issues.
+              </p>
+            </div>
+
+            <Button color="blue" on:click={handleWebDAVSync}>
+              Sync read progress
+            </Button>
+
+            <Button
+              color="purple"
+              on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
+            >
+              Backup all series to cloud
+            </Button>
+
+            <div class="mt-4 p-4 bg-gray-800 rounded-lg">
+              <h3 class="font-semibold mb-2">WebDAV Server</h3>
+              <ul class="text-sm text-gray-300 space-y-1">
+                <li>Compatible with Nextcloud, ownCloud, and NAS devices</li>
+                <li>Persistent login (no re-authentication needed)</li>
+                <li>Self-hosted and private</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    {/if}
   {/if}
 </div>

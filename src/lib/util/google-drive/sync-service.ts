@@ -4,7 +4,6 @@ import { parseVolumesFromJson, volumes } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import { driveApiClient, DriveApiError, escapeNameForDriveQuery } from './api-client';
 import { tokenManager } from './token-manager';
-import { driveFilesCache } from './drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG, type SyncProgress } from './constants';
 
 class SyncService {
@@ -53,6 +52,36 @@ class SyncService {
     return files.length > 0 ? files[0].id : '';
   }
 
+  // Layer 1: Ensure token is valid and won't expire during sync
+  private async ensureTokenValid(): Promise<boolean> {
+    if (!tokenManager.isAuthenticated()) {
+      return false;
+    }
+
+    const timeLeft = tokenManager.getTimeUntilExpiry();
+
+    // If token expires in less than 2 minutes, try to refresh it silently
+    if (timeLeft !== null && timeLeft < 2 * 60 * 1000) {
+      console.log('⚡ Token expiring soon, pre-validating before sync...');
+
+      try {
+        // Attempt silent refresh (will use existing SSO session)
+        tokenManager.reAuthenticate();
+
+        // Give it a moment to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Check if still authenticated after refresh attempt
+        return tokenManager.isAuthenticated();
+      } catch (error) {
+        console.error('Failed to pre-validate token:', error);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   async syncReadProgress(): Promise<void> {
     if (!tokenManager.isAuthenticated()) {
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN, 'true');
@@ -61,8 +90,17 @@ class SyncService {
       return;
     }
 
+    // Layer 1: Pre-validate token before sync
+    const tokenValid = await this.ensureTokenValid();
+    if (!tokenValid) {
+      showSnackbar('Session expired. Please sign in again to sync.');
+      localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN, 'true');
+      tokenManager.requestNewToken(false, false);
+      return;
+    }
+
     const processId = 'sync-read-progress';
-    
+
     try {
       progressTrackerStore.addProcess({
         id: processId,
@@ -78,8 +116,13 @@ class SyncService {
       });
 
       const readerFolderId = await this.ensureReaderFolderExists();
-      const volumeDataFiles = driveFilesCache.getVolumeDataFiles();
-      console.log('Volume data files from cache:', volumeDataFiles);
+
+      // Query Drive API directly for volume-data.json files
+      const volumeDataQuery = `'${readerFolderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA}' and trashed=false`;
+      const volumeDataFilesRaw = await driveApiClient.listFiles(volumeDataQuery, 'files(id,name)');
+      const volumeDataFiles = volumeDataFilesRaw.map(file => ({ fileId: file.id, name: file.name }));
+
+      console.log('Volume data files from Drive API:', volumeDataFiles);
 
       // Step 2: Download and merge cloud data from all volume-data.json files
       let cloudVolumes: any = {};
@@ -154,17 +197,11 @@ class SyncService {
           for (let i = 1; i < volumeDataFiles.length; i++) {
             try {
               await driveApiClient.deleteFile(volumeDataFiles[i].fileId);
-              driveFilesCache.removeDriveFileById(volumeDataFiles[i].fileId);
               console.log(`Deleted duplicate volume-data.json file: ${volumeDataFiles[i].fileId}`);
             } catch (error) {
               console.warn(`Failed to delete duplicate file ${volumeDataFiles[i].fileId}:`, error);
             }
           }
-
-          // Refresh cache after deleting duplicates to ensure consistency
-          driveFilesCache.fetchAllFiles().catch(err =>
-            console.error('Failed to refresh cache after deleting duplicates:', err)
-          );
         }
       } else {
         progressTrackerStore.updateProcess(processId, {

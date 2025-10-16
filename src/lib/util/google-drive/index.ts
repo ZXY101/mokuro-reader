@@ -2,14 +2,15 @@ import { writable } from 'svelte/store';
 import { tokenManager } from './token-manager';
 import { driveApiClient, DriveApiError } from './api-client';
 import { syncService } from './sync-service';
-import { driveFilesCache } from './drive-files-cache';
 import { driveState } from './drive-state';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
+import { providerManager } from '../sync/provider-manager';
+import { unifiedCloudManager } from '../sync/unified-cloud-manager';
+import { driveFilesCache } from './drive-files-cache';
 
 // Re-export the main modules
-export { tokenManager, driveApiClient, DriveApiError, syncService, driveFilesCache, driveState, GOOGLE_DRIVE_CONFIG };
-export type { TokenInfo, DriveFile, SyncProgress } from './types';
-export type { DriveFileMetadata } from './drive-files-cache';
+export { tokenManager, driveApiClient, DriveApiError, syncService, driveState, GOOGLE_DRIVE_CONFIG, driveFilesCache };
+export type { TokenInfo, DriveFile, SyncProgress, DriveFileMetadata } from './types';
 export type { DriveState } from './drive-state';
 
 // Backward compatibility exports for old API
@@ -31,13 +32,10 @@ export async function initGoogleDriveApi(): Promise<void> {
     await driveApiClient.initialize();
 
     if (tokenManager.isAuthenticated()) {
-      // Set flag to sync after cache loads
+      // Set flag to sync after login
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN, 'true');
 
-      // Fetch Drive files cache - will auto-trigger sync when complete
-      driveFilesCache.fetchAllFiles().catch(err =>
-        console.error('Failed to fetch Drive files cache:', err)
-      );
+      console.log('Google Drive API initialized with authenticated token');
     }
   } catch (error) {
     console.error('Failed to initialize Google Drive API:', error);
@@ -50,13 +48,15 @@ export function signInToGoogleDrive(): void {
   if (!tokenManager.isAuthenticated()) {
     // Will auto-detect if first-time (consent) or re-auth (minimal)
     // Cache fetch happens automatically in token manager callback
+    // Provider status will be updated automatically in token manager callback
     tokenManager.requestNewToken(false, false);
   }
 }
 
 export async function signOutFromGoogleDrive(): Promise<void> {
   await tokenManager.logout();
-  driveFilesCache.clearCache();
+  unifiedCloudManager.clearCache();
+  providerManager.updateStatus();
 }
 
 export function isSignedIn(): boolean {

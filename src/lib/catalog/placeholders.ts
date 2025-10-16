@@ -1,5 +1,5 @@
 import type { VolumeMetadata } from '$lib/types';
-import type { DriveFileMetadata } from '$lib/util/google-drive/drive-files-cache';
+import type { CloudVolumeWithProvider } from '$lib/util/sync/unified-cloud-manager';
 import { db } from './db';
 import { browser } from '$app/environment';
 
@@ -42,11 +42,11 @@ function extractSeriesTitleFromDescription(description: string | undefined): str
 }
 
 /**
- * Parse series and volume title from Drive file path and description
+ * Parse series and volume title from cloud file path and description
  * Expected format: "SeriesTitle/VolumeTitle.cbz"
  * Description overrides folder name if present
  */
-function parseDrivePath(
+function parseCloudPath(
   path: string,
   description?: string
 ): { seriesTitle: string; volumeTitle: string } | null {
@@ -66,16 +66,16 @@ function parseDrivePath(
 }
 
 /**
- * Generate placeholder VolumeMetadata for a Drive-only file
+ * Generate placeholder VolumeMetadata for a cloud-only file
  */
-function createPlaceholder(driveFile: DriveFileMetadata, seriesUuid: string): VolumeMetadata | null {
-  const parsed = parseDrivePath(driveFile.path, driveFile.description);
+function createPlaceholder(cloudFile: CloudVolumeWithProvider, seriesUuid: string): VolumeMetadata | null {
+  const parsed = parseCloudPath(cloudFile.path, cloudFile.description);
   if (!parsed) return null;
 
   const { seriesTitle, volumeTitle } = parsed;
 
   // Use fileId for volume UUID to ensure uniqueness
-  const volumeUuid = generateUuidFromString(driveFile.fileId);
+  const volumeUuid = generateUuidFromString(cloudFile.fileId);
 
   return {
     mokuro_version: 'unknown', // Will be filled in after download
@@ -88,18 +88,19 @@ function createPlaceholder(driveFile: DriveFileMetadata, seriesUuid: string): Vo
 
     // Placeholder-specific fields
     isPlaceholder: true,
-    driveFileId: driveFile.fileId,
-    driveModifiedTime: driveFile.modifiedTime,
-    driveSize: driveFile.size
+    cloudProvider: cloudFile.provider,
+    cloudFileId: cloudFile.fileId,
+    cloudModifiedTime: cloudFile.modifiedTime,
+    cloudSize: cloudFile.size
   };
 }
 
 /**
- * Identify Drive-only files by comparing Drive cache with local DB
- * Returns placeholder VolumeMetadata for files that exist in Drive but not locally
+ * Identify cloud-only files by comparing cloud files with local DB
+ * Returns placeholder VolumeMetadata for files that exist in cloud but not locally
  */
 export async function generatePlaceholders(
-  driveFiles: DriveFileMetadata[]
+  cloudFilesMap: Map<string, CloudVolumeWithProvider[]>
 ): Promise<VolumeMetadata[]> {
   // Skip during SSR/build - IndexedDB is not available
   if (!browser) {
@@ -122,13 +123,19 @@ export async function generatePlaceholders(
     }
   }
 
-  // Find Drive-only files
-  const driveOnlyFiles = driveFiles.filter(file => !localPaths.has(file.path));
+  // Flatten Map values into a single array
+  const cloudFiles: CloudVolumeWithProvider[] = [];
+  for (const files of cloudFilesMap.values()) {
+    cloudFiles.push(...files);
+  }
+
+  // Find cloud-only files
+  const cloudOnlyFiles = cloudFiles.filter(file => !localPaths.has(file.path));
 
   // Generate placeholders
   const placeholders: VolumeMetadata[] = [];
-  for (const driveFile of driveOnlyFiles) {
-    const parsed = parseDrivePath(driveFile.path, driveFile.description);
+  for (const cloudFile of cloudOnlyFiles) {
+    const parsed = parseCloudPath(cloudFile.path, cloudFile.description);
     if (!parsed) continue;
 
     // Use existing series UUID if we have local volumes with this series title
@@ -136,7 +143,7 @@ export async function generatePlaceholders(
     const seriesUuid = seriesTitleToUuid.get(parsed.seriesTitle)
       || generateUuidFromString(parsed.seriesTitle);
 
-    const placeholder = createPlaceholder(driveFile, seriesUuid);
+    const placeholder = createPlaceholder(cloudFile, seriesUuid);
     if (placeholder) {
       placeholders.push(placeholder);
     }
