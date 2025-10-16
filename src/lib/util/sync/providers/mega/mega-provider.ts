@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import type { SyncProvider, ProviderCredentials, ProviderStatus } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import { Storage } from 'megajs';
+import { unifiedCloudManager } from '../../unified-cloud-manager';
 
 interface MegaCredentials {
 	email: string;
@@ -63,6 +64,48 @@ async function retryWithBackoff<T>(
 	}
 
 	throw lastError;
+}
+
+/**
+ * Smart retry wrapper for MEGA operations that may fail due to stale cache
+ * When two devices sync back and forth, file IDs change but local cache is stale
+ * This wrapper detects ENOENT errors, refreshes the cache, and retries once
+ */
+async function retryWithCacheRefresh<T>(
+	operation: () => Promise<T>,
+	operationName: string = 'operation'
+): Promise<T> {
+	try {
+		return await operation();
+	} catch (error) {
+		const errorMessage = error instanceof Error ? error.message : String(error);
+
+		// Check if error is ENOENT (file/object not found)
+		const isStaleCache =
+			errorMessage.includes('ENOENT') ||
+			errorMessage.includes('not found') ||
+			errorMessage.includes('Object');
+
+		if (isStaleCache) {
+			console.warn(
+				`${operationName} failed with ENOENT - cache may be stale. Refreshing cache and retrying...`
+			);
+
+			// Refresh the cloud cache to get latest file IDs from MEGA
+			await unifiedCloudManager.fetchAllCloudVolumes();
+
+			// Retry the operation once with fresh cache
+			try {
+				return await operation();
+			} catch (retryError) {
+				console.error(`${operationName} failed again after cache refresh:`, retryError);
+				throw retryError;
+			}
+		}
+
+		// Non-stale-cache error, throw immediately
+		throw error;
+	}
 }
 
 export class MegaProvider implements SyncProvider {
@@ -362,72 +405,78 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	private async uploadFile(filename: string, content: string): Promise<void> {
-		const mokuroFolder = await this.ensureMokuroFolder();
+		// Wrap JSON file uploads with smart cache refresh retry
+		return retryWithCacheRefresh(async () => {
+			const mokuroFolder = await this.ensureMokuroFolder();
 
-		return new Promise(async (resolve, reject) => {
-			try {
-				// Check if file already exists using storage.files
-				const children = await this.listFolder(mokuroFolder);
-				const existingFile = children.find((f: any) => f.name === filename && !f.directory);
+			return new Promise<void>(async (resolve, reject) => {
+				try {
+					// Check if file already exists using storage.files
+					const children = await this.listFolder(mokuroFolder);
+					const existingFile = children.find((f: any) => f.name === filename && !f.directory);
 
-				const uploadNew = () => {
-					// Convert string to Uint8Array (browser-compatible)
-					const encoder = new TextEncoder();
-					const contentBuffer = encoder.encode(content);
+					const uploadNew = () => {
+						// Convert string to Uint8Array (browser-compatible)
+						const encoder = new TextEncoder();
+						const contentBuffer = encoder.encode(content);
 
-					mokuroFolder.upload(
-						{
-							name: filename,
-							size: contentBuffer.length
-						},
-						contentBuffer,
-						(error: Error | null) => {
-							if (error) reject(error);
-							else resolve();
-						}
-					);
-				};
+						mokuroFolder.upload(
+							{
+								name: filename,
+								size: contentBuffer.length
+							},
+							contentBuffer,
+							(error: Error | null) => {
+								if (error) reject(error);
+								else resolve();
+							}
+						);
+					};
 
-				if (existingFile) {
-					// Delete existing file first
-					existingFile.delete(true, (deleteError: Error | null) => {
-						if (deleteError) {
-							reject(deleteError);
-						} else {
-							uploadNew();
-						}
-					});
-				} else {
-					uploadNew();
+					if (existingFile) {
+						// Delete existing file first
+						existingFile.delete(true, (deleteError: Error | null) => {
+							if (deleteError) {
+								reject(deleteError);
+							} else {
+								uploadNew();
+							}
+						});
+					} else {
+						uploadNew();
+					}
+				} catch (error) {
+					reject(error);
 				}
-			} catch (error) {
-				reject(error);
-			}
-		});
+			});
+		}, `Upload ${filename}`);
 	}
 
 	private async downloadFile(filename: string): Promise<string | null> {
-		const mokuroFolder = await this.ensureMokuroFolder();
+		// Wrap JSON file downloads with smart cache refresh retry
+		return retryWithCacheRefresh(async () => {
+			const mokuroFolder = await this.ensureMokuroFolder();
 
-		const children = await this.listFolder(mokuroFolder);
-		const file = children.find((f: any) => f.name === filename && !f.directory);
+			const children = await this.listFolder(mokuroFolder);
+			const file = children.find((f: any) => f.name === filename && !f.directory);
 
-		if (!file) {
-			return null;
-		}
+			if (!file) {
+				return null;
+			}
 
-		return new Promise((resolve, reject) => {
-			file.download((error: Error | null, data: Uint8Array) => {
-				if (error) {
-					reject(error);
-				} else {
-					// Convert Uint8Array to string (browser-compatible)
-					const decoder = new TextDecoder('utf-8');
-					const text = decoder.decode(data);
-					resolve(text);
-				}
+			return new Promise<string>((resolve, reject) => {
+				file.download((error: Error | null, data: Uint8Array) => {
+					if (error) {
+						reject(error);
+					} else {
+						// Convert Uint8Array to string (browser-compatible)
+						const decoder = new TextDecoder('utf-8');
+						const text = decoder.decode(data);
+						resolve(text);
+					}
+				});
 			});
-		});
+		}, `Download ${filename}`);
 	}
 
 	// VOLUME STORAGE METHODS
