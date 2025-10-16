@@ -360,34 +360,35 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	/**
-	 * Force MEGA to reload its file structure
-	 * This is needed when files change on other devices
+	 * Reinitialize the MEGA connection to get a fresh storage cache
+	 * This is needed when files change on other devices and the cache becomes stale
 	 */
-	private async reloadStorage(): Promise<void> {
-		// MEGA.js updates storage.files automatically, but server changes need time
-		// We'll wait for an 'update' event or a short timeout
-		return new Promise(resolve => {
-			let resolved = false;
+	private async reinitialize(): Promise<void> {
+		if (!browser) return;
 
-			const onUpdate = () => {
-				if (!resolved) {
-					resolved = true;
-					resolve();
-				}
-			};
+		// Save current credentials
+		const email = localStorage.getItem(STORAGE_KEYS.EMAIL);
+		const password = localStorage.getItem(STORAGE_KEYS.PASSWORD);
 
-			// Listen for update events
-			this.storage.once('update', onUpdate);
+		if (!email || !password) {
+			console.warn('Cannot reinitialize MEGA: no stored credentials');
+			return;
+		}
 
-			// Also resolve after a timeout if no update comes
-			setTimeout(() => {
-				this.storage.removeListener('update', onUpdate);
-				if (!resolved) {
-					resolved = true;
-					resolve();
-				}
-			}, 3000); // 3 second timeout
-		});
+		console.log('🔄 Reinitializing MEGA connection to refresh cache...');
+
+		// Clear current storage
+		this.storage = null;
+		this.mokuroFolder = null;
+
+		// Reconnect with fresh credentials
+		try {
+			await this.login({ email, password });
+			console.log('✅ MEGA connection reinitialized successfully');
+		} catch (error) {
+			console.error('Failed to reinitialize MEGA:', error);
+			throw error;
+		}
 	}
 
 	private async ensureMokuroFolder(): Promise<any> {
@@ -490,7 +491,7 @@ export class MegaProvider implements SyncProvider {
 					reject(error);
 				}
 			});
-		}, `Upload ${filename}`, this.reloadStorage.bind(this));
+		}, `Upload ${filename}`, this.reinitialize.bind(this));
 	}
 
 	private async downloadFile(filename: string): Promise<string | null> {
@@ -517,7 +518,7 @@ export class MegaProvider implements SyncProvider {
 					}
 				});
 			});
-		}, `Download ${filename}`, this.reloadStorage.bind(this));
+		}, `Download ${filename}`, this.reinitialize.bind(this));
 	}
 
 	// VOLUME STORAGE METHODS
