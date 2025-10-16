@@ -165,7 +165,7 @@ function initializeWorkerPool(): WorkerPool {
 	// Get user's RAM configuration
 	let deviceRamGB = 4; // Default
 	miscSettings.subscribe(value => {
-		deviceRamGB = value.deviceRamGB;
+		deviceRamGB = value.deviceRamGB ?? 4;
 	})();
 
 	// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
