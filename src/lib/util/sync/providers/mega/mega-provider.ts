@@ -73,7 +73,8 @@ async function retryWithBackoff<T>(
  */
 async function retryWithCacheRefresh<T>(
 	operation: () => Promise<T>,
-	operationName: string = 'operation'
+	operationName: string = 'operation',
+	forceReload?: () => Promise<void>
 ): Promise<T> {
 	try {
 		return await operation();
@@ -88,10 +89,19 @@ async function retryWithCacheRefresh<T>(
 
 		if (isStaleCache) {
 			console.warn(
-				`${operationName} failed with ENOENT - cache may be stale. Refreshing cache and retrying...`
+				`${operationName} failed with ENOENT - cache may be stale. Waiting for MEGA to sync and retrying...`
 			);
 
-			// Refresh the cloud cache to get latest file IDs from MEGA
+			// Give MEGA time to propagate server changes to storage.files
+			// MEGA.js updates storage.files via events, but server changes take time
+			await new Promise(resolve => setTimeout(resolve, 2000));
+
+			// Force reload of MEGA's storage.files if provided
+			if (forceReload) {
+				await forceReload();
+			}
+
+			// Refresh our app's cloud cache
 			await unifiedCloudManager.fetchAllCloudVolumes();
 
 			// Retry the operation once with fresh cache
@@ -349,6 +359,37 @@ export class MegaProvider implements SyncProvider {
 		});
 	}
 
+	/**
+	 * Force MEGA to reload its file structure
+	 * This is needed when files change on other devices
+	 */
+	private async reloadStorage(): Promise<void> {
+		// MEGA.js updates storage.files automatically, but server changes need time
+		// We'll wait for an 'update' event or a short timeout
+		return new Promise(resolve => {
+			let resolved = false;
+
+			const onUpdate = () => {
+				if (!resolved) {
+					resolved = true;
+					resolve();
+				}
+			};
+
+			// Listen for update events
+			this.storage.once('update', onUpdate);
+
+			// Also resolve after a timeout if no update comes
+			setTimeout(() => {
+				this.storage.removeListener('update', onUpdate);
+				if (!resolved) {
+					resolved = true;
+					resolve();
+				}
+			}, 3000); // 3 second timeout
+		});
+	}
+
 	private async ensureMokuroFolder(): Promise<any> {
 		try {
 			// Always get fresh reference from storage.files to avoid stale references
@@ -449,7 +490,7 @@ export class MegaProvider implements SyncProvider {
 					reject(error);
 				}
 			});
-		}, `Upload ${filename}`);
+		}, `Upload ${filename}`, this.reloadStorage.bind(this));
 	}
 
 	private async downloadFile(filename: string): Promise<string | null> {
@@ -476,7 +517,7 @@ export class MegaProvider implements SyncProvider {
 					}
 				});
 			});
-		}, `Download ${filename}`);
+		}, `Download ${filename}`, this.reloadStorage.bind(this));
 	}
 
 	// VOLUME STORAGE METHODS
