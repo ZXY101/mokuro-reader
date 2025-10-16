@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { progressTrackerStore } from '../progress-tracker';
-import { volumes, profiles } from '$lib/settings';
+import { volumes, profiles, parseVolumesFromJson } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import type { SyncProvider, ProviderType } from './provider-interface';
 
@@ -272,6 +272,7 @@ class UnifiedSyncService {
 
 	/**
 	 * Merge volume data using newest-wins strategy
+	 * IMPORTANT: Always returns VolumeData class instances to ensure toJSON() is available
 	 */
 	private mergeVolumeData(local: any, cloud: any): any {
 		const merged: any = {};
@@ -285,16 +286,25 @@ class UnifiedSyncService {
 			const cloudVol = cloud[volumeId];
 
 			if (!localVol) {
-				// Only in cloud
-				merged[volumeId] = cloudVol;
+				// Only in cloud - parse plain object to VolumeData instance
+				// Use parseVolumesFromJson to ensure proper VolumeData instances
+				const parsed = parseVolumesFromJson(JSON.stringify({ [volumeId]: cloudVol }));
+				merged[volumeId] = parsed[volumeId];
 			} else if (!cloudVol) {
-				// Only in local
+				// Only in local - already a VolumeData instance
 				merged[volumeId] = localVol;
 			} else {
 				// In both - keep newer based on lastProgressUpdate
 				const localDate = new Date(localVol.lastProgressUpdate || 0).getTime();
 				const cloudDate = new Date(cloudVol.lastProgressUpdate || 0).getTime();
-				merged[volumeId] = localDate >= cloudDate ? localVol : cloudVol;
+
+				// Ensure cloud version is converted to VolumeData instance if selected
+				if (localDate >= cloudDate) {
+					merged[volumeId] = localVol;
+				} else {
+					const parsed = parseVolumesFromJson(JSON.stringify({ [volumeId]: cloudVol }));
+					merged[volumeId] = parsed[volumeId];
+				}
 			}
 		});
 
