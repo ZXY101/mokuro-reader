@@ -28,29 +28,24 @@ export interface UnifiedProviderState {
  * Create a reactive store that combines provider status and cache state
  */
 function createUnifiedProviderState(): Readable<UnifiedProviderState> {
-	// Track cache loaded state per session
-	const cacheLoadedStore = writable(false);
-
-	// Reset cache loaded state when cache starts fetching
-	cacheManager.isFetchingState.subscribe((isFetching) => {
-		if (isFetching) {
-			// Cache is loading
-		} else {
-			// Cache finished loading
-			cacheLoadedStore.set(true);
-		}
-	});
+	// Track whether cache has ever finished loading (stays true once set)
+	let hasLoadedOnce = false;
 
 	return derived(
-		[cacheManager.isFetchingState, cacheLoadedStore],
-		([$isCacheLoading, $cacheLoaded]) => {
+		[cacheManager.isFetchingState],
+		([$isCacheLoading]) => {
 			const provider = providerManager.getActiveProvider();
+
+			// Track if cache has loaded at least once
+			if (!$isCacheLoading && !hasLoadedOnce) {
+				hasLoadedOnce = true;
+			}
 
 			if (!provider) {
 				return {
 					isAuthenticated: false,
 					isCacheLoading: false,
-					isCacheLoaded: false,
+					isCacheLoaded: hasLoadedOnce,
 					isFullyConnected: false,
 					needsAttention: false,
 					statusMessage: 'No provider connected'
@@ -58,12 +53,12 @@ function createUnifiedProviderState(): Readable<UnifiedProviderState> {
 			}
 
 			const status = provider.getStatus();
-			const isFullyConnected = status.isAuthenticated && $cacheLoaded && !$isCacheLoading;
+			const isFullyConnected = status.isAuthenticated && hasLoadedOnce && !$isCacheLoading;
 
 			return {
 				isAuthenticated: status.isAuthenticated,
 				isCacheLoading: $isCacheLoading,
-				isCacheLoaded: $cacheLoaded,
+				isCacheLoaded: hasLoadedOnce,
 				isFullyConnected,
 				needsAttention: status.needsAttention,
 				statusMessage: status.statusMessage
