@@ -22,9 +22,7 @@ export default defineConfig({
         }
         warn(warning);
       }
-    },
-    // Increase chunk size warning limit (we have large chunks for manga reader)
-    chunkSizeWarningLimit: 1000
+    }
   },
   test: {
     include: ['src/**/*.{test,spec}.{js,ts,svelte}'],
