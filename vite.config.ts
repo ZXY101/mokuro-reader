@@ -27,6 +27,16 @@ export default defineConfig({
   test: {
     include: ['src/**/*.{test,spec}.{js,ts,svelte}'],
     globals: true,
-    environment: 'jsdom'
+    environment: 'jsdom',
+    setupFiles: ['./src/test-setup.ts'],
+    // Resolve Svelte 5 for browser/client context in tests
+    server: {
+      deps: {
+        inline: ['svelte']
+      }
+    }
+  },
+  resolve: {
+    conditions: ['browser']
   }
 });

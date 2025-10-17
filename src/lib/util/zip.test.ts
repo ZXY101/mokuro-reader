@@ -55,7 +55,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, false, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga.zip');
   });
 
@@ -63,7 +65,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, true, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga - Volume 1.zip');
   });
 
@@ -71,7 +75,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], true, false, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga.cbz');
   });
 
@@ -79,7 +85,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, true, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga - Volume 1.zip');
   });
 
@@ -87,7 +95,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, true, false);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Volume 1.zip');
   });
 
