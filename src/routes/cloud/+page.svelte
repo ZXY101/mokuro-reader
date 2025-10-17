@@ -39,46 +39,23 @@
   // Import multi-provider sync
   import { providerManager, megaProvider, webdavProvider } from '$lib/util/sync';
 
-  // Subscribe to stores
-  let accessToken = $state('');
-  let readerFolderId = $state('');
-  let volumeDataId = $state('');
-  let profilesId = $state('');
-  let tokenClient = $state(null);
+  // Get store references for auto-subscription
+  const providerStatusStore = providerManager.status;
 
-  let state = $state<DriveState>({
-    isAuthenticated: false,
-    isCacheLoading: false,
-    isCacheLoaded: false,
-    isFullyConnected: false,
-    needsAttention: false
-  });
-
-  $effect(() => {
-    const unsubscribers = [
-      accessTokenStore.subscribe(value => { accessToken = value; }),
-      readerFolderIdStore.subscribe(value => { readerFolderId = value.reader; }),
-      volumeDataIdStore.subscribe(value => { volumeDataId = value; }),
-      profilesIdStore.subscribe(value => { profilesId = value; }),
-      tokenClientStore.subscribe(value => { tokenClient = value; }),
-      driveState.subscribe(value => { state = value; })
-    ];
-    return () => unsubscribers.forEach(unsub => unsub());
-  });
-
-  // Subscribe to provider manager status for reactive authentication state
-  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
-  $effect(() => {
-    return providerManager.status.subscribe(value => {
-      providerStatus = value;
-    });
-  });
+  // Use Svelte's derived runes for automatic store subscriptions
+  let accessToken = $derived($accessTokenStore);
+  let readerFolderId = $derived($readerFolderIdStore.reader);
+  let volumeDataId = $derived($volumeDataIdStore);
+  let profilesId = $derived($profilesIdStore);
+  let tokenClient = $derived($tokenClientStore);
+  let state = $derived($driveState);
 
   // Reactive provider authentication checks - now using provider manager for all providers
-  let googleDriveAuth = $derived(providerStatus.providers['google-drive']?.isAuthenticated || false);
-  let megaAuth = $derived(providerStatus.providers['mega']?.isAuthenticated || false);
-  let webdavAuth = $derived(providerStatus.providers['webdav']?.isAuthenticated || false);
-  let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
+  // Use derived to reactively compute auth states from the status store
+  let googleDriveAuth = $derived($providerStatusStore.providers['google-drive']?.isAuthenticated || false);
+  let megaAuth = $derived($providerStatusStore.providers['mega']?.isAuthenticated || false);
+  let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
+  let hasAnyProvider = $derived($providerStatusStore.hasAnyAuthenticated);
 
   // MEGA login state
   let megaEmail = $state('');
@@ -93,6 +70,13 @@
 
   // Use constants from the google-drive utility
   const type = 'application/json';
+
+  // Error handler for Google Drive operations
+  function handleDriveError(error: unknown, context: string): void {
+    console.error(`Google Drive error (${context}):`, error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    showSnackbar(`Failed ${context}: ${message}`);
+  }
 
   async function getFileSize(fileId: string): Promise<number> {
     try {
@@ -249,7 +233,7 @@
     picker.setVisible(true);
   }
 
-  async function listFilesInFolder(folderId) {
+  async function listFilesInFolder(folderId: string): Promise<any[]> {
     try {
       const { result } = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and (mimeType='application/zip' or mimeType='application/x-zip-compressed' or mimeType='application/vnd.comicbook+zip' or mimeType='application/x-cbz' or mimeType='application/vnd.google-apps.folder')`,
@@ -265,7 +249,7 @@
   }
 
   // Pass the scanProcessId as a parameter
-  async function processFolder(folderId, folderName, scanProcessId) {
+  async function processFolder(folderId: string, folderName: string, scanProcessId: string): Promise<any[]> {
     const files = await listFilesInFolder(folderId);
     const allFiles = [];
 
@@ -631,7 +615,7 @@
   async function onUploadProfiles() {
     const metadata = {
       mimeType: type,
-      name: PROFILES_FILE,
+      name: 'profiles.json',
       parents: [profilesId ? null : readerFolderId]
     };
 
@@ -898,7 +882,7 @@
     // Get default provider
     const provider = unifiedCloudManager.getDefaultProvider();
     if (!provider) {
-      showSnackbar('Please connect to a cloud storage provider first', 'error');
+      showSnackbar('Please connect to a cloud storage provider first');
       return;
     }
 
@@ -909,7 +893,7 @@
     }
 
     if (allVolumes.length === 0) {
-      showSnackbar('No volumes to backup', 'error');
+      showSnackbar('No volumes to backup');
       return;
     }
 
@@ -921,7 +905,7 @@
     const skippedCount = allVolumes.length - volumesToBackup.length;
 
     if (volumesToBackup.length === 0) {
-      showSnackbar('All volumes already backed up', 'info');
+      showSnackbar('All volumes already backed up');
       return;
     }
 
@@ -932,7 +916,7 @@
     const message = skippedCount > 0
       ? `Added ${volumesToBackup.length} volumes to backup queue (${skippedCount} already backed up)`
       : `Added ${volumesToBackup.length} volumes to backup queue`;
-    showSnackbar(message, 'success');
+    showSnackbar(message);
   }
 </script>
 
@@ -1090,7 +1074,7 @@
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
 
         <div class="flex flex-col gap-2">
-          <label class="text-sm font-medium">Device RAM Configuration</label>
+          <div class="text-sm font-medium">Device RAM Configuration</div>
           <div class="flex gap-4">
             <Radio name="ram-config" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
             <Radio name="ram-config" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
@@ -1156,7 +1140,7 @@
             </p>
 
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="text-sm font-medium">Device RAM Configuration</div>
               <div class="flex gap-4">
                 <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
                 <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
@@ -1208,7 +1192,7 @@
             </p>
 
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="text-sm font-medium">Device RAM Configuration</div>
               <div class="flex gap-4">
                 <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
                 <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>

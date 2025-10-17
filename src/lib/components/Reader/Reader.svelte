@@ -79,7 +79,7 @@
 
     // Check if the target page should be shown in single mode
     const targetShouldBeSingle = shouldShowSinglePage(
-      volumeSettings.singlePageView,
+      volumeSettings.singlePageView ?? 'auto',
       targetPage,
       targetNextPage,
       targetPreviousPage,
@@ -192,7 +192,9 @@
         toggleFullScreen();
         return;
       case 'Escape':
-        goto(`/${volume.series_uuid}`);
+        if (volume) {
+          goto(`/${volume.series_uuid}`);
+        }
         return;
       default:
         break;
@@ -356,7 +358,7 @@
 
     // Use auto-detection function with width consistency checking
     return shouldShowSinglePage(
-      volumeSettings.singlePageView,
+      volumeSettings.singlePageView ?? 'auto',
       currentPage,
       nextPage,
       previousPage,
@@ -430,8 +432,8 @@
   <QuickActions
     {left}
     {right}
-    src1={Object.values(volumeData.files)[index]}
-    src2={!useSinglePage ? Object.values(volumeData.files)[index + 1] : undefined}
+    src1={volumeData.files ? Object.values(volumeData.files)[index] : undefined}
+    src2={!useSinglePage && volumeData.files ? Object.values(volumeData.files)[index + 1] : undefined}
   />
   <SettingsButton />
   <Cropper />
@@ -453,7 +455,9 @@
           on:keydown={(e) => {
             if (e.key === 'Enter') {
               onManualPageChange();
-              e.currentTarget.blur();
+              if (e.currentTarget && 'blur' in e.currentTarget) {
+                (e.currentTarget as HTMLElement).blur();
+              }
             }
           }}
           on:blur={onManualPageChange}
@@ -513,7 +517,7 @@
         id="manga-panel"
       >
         {#key page}
-          {#if volumeData}
+          {#if volumeData && volumeData.files}
             {#if showSecondPage()}
               <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} volumeUuid={volume.volume_uuid} />
             {/if}

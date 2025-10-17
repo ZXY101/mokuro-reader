@@ -1,3 +1,18 @@
+// Type augmentations for non-standard browser APIs
+interface NavigatorDeviceMemory extends Navigator {
+  deviceMemory?: number;
+}
+
+interface PerformanceMemory {
+  jsHeapSizeLimit: number;
+  totalJSHeapSize: number;
+  usedJSHeapSize: number;
+}
+
+interface PerformanceWithMemory extends Performance {
+  memory?: PerformanceMemory;
+}
+
 /**
  * Checks if code is running in a browser environment
  * @returns {boolean} True if in browser, false if in Node.js/SSR
@@ -23,14 +38,16 @@ export function getAvailableMemory() {
 
   try {
     // Method 1: navigator.deviceMemory API (Chrome, Edge, Opera)
-    if (typeof navigator !== 'undefined' && typeof navigator.deviceMemory === 'number') {
+    const nav = navigator as NavigatorDeviceMemory;
+    if (typeof nav !== 'undefined' && typeof nav.deviceMemory === 'number') {
       // deviceMemory is in GB, convert to bytes and assume browser can use ~60%
-      return Math.floor(navigator.deviceMemory * GB * 0.6);
+      return Math.floor(nav.deviceMemory * GB * 0.6);
     }
 
     // Method 2: performance.memory API (Chrome, Edge, Opera)
-    if (typeof performance !== 'undefined' && performance?.memory?.jsHeapSizeLimit) {
-      return performance.memory.jsHeapSizeLimit;
+    const perf = performance as PerformanceWithMemory;
+    if (typeof perf !== 'undefined' && perf?.memory?.jsHeapSizeLimit) {
+      return perf.memory.jsHeapSizeLimit;
     }
 
     // Method 3: Estimate based on hardware concurrency (logical CPU cores)
@@ -70,7 +87,7 @@ export function getAvailableMemory() {
  * @param {number} bytes - Memory size in bytes
  * @returns {string} Formatted memory size with units
  */
-function formatMemory(bytes) {
+function formatMemory(bytes: number): string {
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];
   let size = bytes;
   let unitIndex = 0;

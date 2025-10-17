@@ -73,7 +73,7 @@
       // Check if any cloud provider is authenticated
       const hasProvider = unifiedCloudManager.getActiveProvider() !== null;
       if (!hasProvider) {
-        showSnackbar('Please sign in to a cloud storage provider first', 'error');
+        showSnackbar('Please sign in to a cloud storage provider first');
         return;
       }
 

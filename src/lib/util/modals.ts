@@ -10,21 +10,24 @@ type ConfirmationPopup = {
   open: boolean;
   message: string;
   checkboxOption?: CheckboxOption;
-  onConfirm?: (checkboxValue?: boolean) => void;
+  checkboxOption2?: CheckboxOption;
+  onConfirm?: (checkboxValue?: boolean, checkboxValue2?: boolean) => void;
   onCancel?: () => void;
 };
 export const confirmationPopupStore = writable<ConfirmationPopup | undefined>(undefined);
 
 export function promptConfirmation(
-  message: string, 
-  onConfirm?: (checkboxValue?: boolean) => void, 
+  message: string,
+  onConfirm?: (checkboxValue?: boolean, checkboxValue2?: boolean) => void,
   onCancel?: () => void,
-  checkboxOption?: CheckboxOption
+  checkboxOption?: CheckboxOption,
+  checkboxOption2?: CheckboxOption
 ) {
   confirmationPopupStore.set({
     open: true,
     message,
     checkboxOption,
+    checkboxOption2,
     onConfirm,
     onCancel
   });

@@ -7,18 +7,28 @@
 
   let open = $state(false);
   let checkboxValue = $state(false);
+  let checkboxValue2 = $state(false);
 
   onMount(() => {
     confirmationPopupStore.subscribe((value) => {
       if (value) {
         open = value.open;
-        
+
         // Load the user's previous selection from localStorage if checkbox option is provided
         if (browser && value.checkboxOption) {
           const { storageKey, defaultValue } = value.checkboxOption;
           const savedPreference = localStorage.getItem(storageKey);
-          checkboxValue = savedPreference !== null 
-            ? savedPreference === 'true' 
+          checkboxValue = savedPreference !== null
+            ? savedPreference === 'true'
+            : defaultValue;
+        }
+
+        // Load the second checkbox value if provided
+        if (browser && value.checkboxOption2) {
+          const { storageKey, defaultValue } = value.checkboxOption2;
+          const savedPreference = localStorage.getItem(storageKey);
+          checkboxValue2 = savedPreference !== null
+            ? savedPreference === 'true'
             : defaultValue;
         }
       }
@@ -31,11 +41,17 @@
       const { storageKey } = $confirmationPopupStore.checkboxOption;
       localStorage.setItem(storageKey, checkboxValue.toString());
     }
-    
-    if ($confirmationPopupStore?.onConfirm) {
-      $confirmationPopupStore.onConfirm(checkboxValue);
+
+    // Save the second checkbox preference if provided
+    if (browser && $confirmationPopupStore?.checkboxOption2) {
+      const { storageKey } = $confirmationPopupStore.checkboxOption2;
+      localStorage.setItem(storageKey, checkboxValue2.toString());
     }
-    
+
+    if ($confirmationPopupStore?.onConfirm) {
+      $confirmationPopupStore.onConfirm(checkboxValue, checkboxValue2);
+    }
+
     // Always close the modal after confirmation
     open = false;
   }
@@ -61,6 +77,14 @@
         <Checkbox bind:checked={checkboxValue} id="confirmation-checkbox" />
         <label for="confirmation-checkbox" class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">
           {$confirmationPopupStore.checkboxOption.label}
+        </label>
+      </div>
+    {/if}
+    {#if $confirmationPopupStore?.checkboxOption2}
+      <div class="flex items-center justify-center mb-4">
+        <Checkbox bind:checked={checkboxValue2} id="confirmation-checkbox-2" />
+        <label for="confirmation-checkbox-2" class="ml-2 text-sm font-medium text-gray-500 dark:text-gray-400">
+          {$confirmationPopupStore.checkboxOption2.label}
         </label>
       </div>
     {/if}

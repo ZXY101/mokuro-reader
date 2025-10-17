@@ -20,6 +20,7 @@ interface CompressAndUploadMessage {
 interface ProviderCredentials {
 	// Google Drive
 	accessToken?: string;
+	seriesFolderId?: string; // Pre-created folder ID (avoids race conditions)
 
 	// WebDAV
 	webdavUrl?: string;
@@ -93,16 +94,13 @@ async function compressVolume(
 async function uploadToGoogleDrive(
 	cbzData: Uint8Array,
 	filename: string,
-	seriesTitle: string,
+	seriesFolderId: string,
 	accessToken: string,
 	onProgress: (loaded: number, total: number) => void
 ): Promise<string> {
 	console.log(`Worker: Uploading ${filename} to Google Drive...`);
 
-	// First, ensure the folder structure exists
-	const rootFolderId = await getOrCreateFolder('mokuro-reader', accessToken);
-	const seriesFolderId = await getOrCreateFolder(seriesTitle, accessToken, rootFolderId);
-
+	// Use pre-created folder ID (created in backup-queue to avoid race conditions)
 	const metadata = {
 		name: filename,
 		mimeType: 'application/x-cbz',
@@ -420,13 +418,13 @@ ctx.addEventListener('message', async (event) => {
 		const filename = `${volumeTitle}.cbz`;
 
 		if (provider === 'google-drive') {
-			if (!credentials.accessToken) {
-				throw new Error('Missing Google Drive access token');
+			if (!credentials.accessToken || !credentials.seriesFolderId) {
+				throw new Error('Missing Google Drive access token or series folder ID');
 			}
 			fileId = await uploadToGoogleDrive(
 				cbzData,
 				filename,
-				seriesTitle,
+				credentials.seriesFolderId,
 				credentials.accessToken,
 				(loaded, total) => {
 					const uploadProgress = 30 + (loaded / total) * 70;

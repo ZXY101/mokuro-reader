@@ -3,7 +3,10 @@
     "allow": [
       "WebFetch(domain:mega.js.org)",
       "WebFetch(domain:github.com)",
-      "Bash(gh pr ready:*)"
+      "Bash(gh pr ready:*)",
+      "Bash(npm outdated:*)",
+      "Bash(npm update:*)",
+      "Bash(npm test:*)"
     ],
     "deny": [],
     "ask": []

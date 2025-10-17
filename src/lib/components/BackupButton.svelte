@@ -87,39 +87,39 @@
 
     const provider = unifiedCloudManager.getDefaultProvider();
     if (!provider) {
-      showSnackbar('Please connect to a cloud storage provider first', 'error');
+      showSnackbar('Please connect to a cloud storage provider first');
       return;
     }
 
     if (isBackedUp) {
-      showSnackbar('Volume already backed up', 'info');
+      showSnackbar('Volume already backed up');
       return;
     }
 
     if (isQueued || isBackingUp) {
-      showSnackbar('Volume already in backup queue', 'info');
+      showSnackbar('Volume already in backup queue');
       return;
     }
 
     // Add to backup queue
     backupQueue.queueVolumeForBackup(volume);
-    showSnackbar(`Added ${volume.volume_title} to backup queue`, 'info');
+    showSnackbar(`Added ${volume.volume_title} to backup queue`);
   }
 
   async function handleDelete(e: MouseEvent) {
     e.stopPropagation();
 
     if (!cloudFile) {
-      showSnackbar('Volume not backed up', 'info');
+      showSnackbar('Volume not backed up');
       return;
     }
 
     try {
       await unifiedCloudManager.deleteVolumeCbz(cloudFile.fileId);
-      showSnackbar(`Deleted from ${cloudFile.provider}`, 'success');
+      showSnackbar(`Deleted from ${cloudFile.provider}`);
     } catch (error) {
       console.error('Delete failed:', error);
-      showSnackbar(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      showSnackbar(`Delete failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

@@ -15,7 +15,7 @@
   interface Props {
     left: (_e: any, ingoreTimeOut?: boolean) => void;
     right: (_e: any, ingoreTimeOut?: boolean) => void;
-    src1: File;
+    src1: File | undefined;
     src2: File | undefined;
   }
 

@@ -1,7 +1,7 @@
 import { browser } from '$app/environment';
 import type { SyncProvider, ProviderCredentials, ProviderStatus } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
-import { createClient, type WebDAVClient } from 'webdav';
+import type { WebDAVClient } from 'webdav';
 
 interface WebDAVCredentials {
 	serverUrl: string;
@@ -75,6 +75,9 @@ export class WebDAVProvider implements SyncProvider {
 		const normalizedUrl = serverUrl.replace(/\/$/, '');
 
 		try {
+			// Dynamically import webdav to reduce initial bundle size
+			const { createClient } = await import('webdav');
+
 			// Create WebDAV client
 			this.client = createClient(normalizedUrl, {
 				username,

@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store';
 import type { VolumeMetadata } from '$lib/types';
 import { progressTrackerStore } from './progress-tracker';
-import { WorkerPool, type WorkerTask } from './worker-pool';
+import type { WorkerPool, WorkerTask } from './worker-pool';
 import { tokenManager } from './google-drive/token-manager';
 import { showSnackbar } from './snackbar';
 import { db } from '$lib/catalog/db';
@@ -31,7 +31,13 @@ const queueStore = writable<BackupQueueItem[]>([]);
 
 // Shared worker pool for all backups
 let workerPool: WorkerPool | null = null;
+let poolInitPromise: Promise<WorkerPool> | null = null;
 let processingStarted = false;
+
+// Series folder initialization lock (provider-agnostic)
+// Prevents multiple concurrent workers from racing to create the same series folder
+// Maps "provider:seriesTitle" -> Promise that resolves when folder is guaranteed to exist
+const seriesFolderLocks = new Map<string, Promise<void>>();
 
 // Subscribe to queue changes and update progress tracker
 queueStore.subscribe(queue => {
@@ -62,7 +68,7 @@ export function queueVolumeForBackup(volume: VolumeMetadata, provider?: Provider
 	const targetProvider = provider || unifiedCloudManager.getDefaultProvider()?.type;
 	if (!targetProvider) {
 		console.warn('No cloud provider available for backup');
-		showSnackbar('Please connect to a cloud storage provider first', 'error');
+		showSnackbar('Please connect to a cloud storage provider first');
 		return;
 	}
 
@@ -99,7 +105,7 @@ export function queueSeriesVolumesForBackup(volumes: VolumeMetadata[], provider?
 	const targetProvider = provider || unifiedCloudManager.getDefaultProvider()?.type;
 	if (!targetProvider) {
 		console.warn('No cloud provider available for backup');
-		showSnackbar('Please connect to a cloud storage provider first', 'error');
+		showSnackbar('Please connect to a cloud storage provider first');
 		return;
 	}
 
@@ -152,29 +158,185 @@ export function getSeriesBackupQueueStatus(seriesTitle: string): SeriesQueueStat
 
 /**
  * Initialize worker pool based on user-configured RAM setting
+ * Uses promise-based mutex to prevent race conditions with concurrent calls
  */
-function initializeWorkerPool(): WorkerPool {
+async function initializeWorkerPool(): Promise<WorkerPool> {
+	// Return existing pool if already created
 	if (workerPool) {
 		return workerPool;
 	}
 
-	// Fixed worker count - cloud upload speeds are the bottleneck, not CPU
-	const maxWorkers = 4;
-	let memoryLimitMB: number;
+	// If already initializing, wait for that to complete
+	if (poolInitPromise) {
+		return poolInitPromise;
+	}
 
-	// Get user's RAM configuration
-	let deviceRamGB = 4; // Default
-	miscSettings.subscribe(value => {
-		deviceRamGB = value.deviceRamGB ?? 4;
+	// Start initialization and store the promise
+	poolInitPromise = (async () => {
+		// Dynamically import WorkerPool to reduce initial bundle size
+		const { WorkerPool: WorkerPoolClass } = await import('./worker-pool');
+
+		// Fixed worker count - cloud upload speeds are the bottleneck, not CPU
+		const maxWorkers = 4;
+		let memoryLimitMB: number;
+
+		// Get user's RAM configuration
+		let deviceRamGB = 4; // Default
+		miscSettings.subscribe(value => {
+			deviceRamGB = value.deviceRamGB ?? 4;
+		})();
+
+		// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
+		memoryLimitMB = (deviceRamGB * 1024) / 8;
+
+		console.log(`Backup queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
+
+		workerPool = new WorkerPoolClass(UploadWorker, maxWorkers, memoryLimitMB);
+		return workerPool;
 	})();
 
-	// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
-	memoryLimitMB = (deviceRamGB * 1024) / 8;
+	try {
+		return await poolInitPromise;
+	} finally {
+		// Clear the promise after completion (success or failure)
+		poolInitPromise = null;
+	}
+}
 
-	console.log(`Backup queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
+/**
+ * Ensure series folder exists for any provider (with race condition protection)
+ * Provider-agnostic mutex prevents concurrent folder creation for the same series
+ */
+async function ensureSeriesFolder(provider: ProviderType, seriesTitle: string, credentials: any): Promise<any> {
+	const lockKey = `${provider}:${seriesTitle}`;
 
-	workerPool = new WorkerPool(UploadWorker, maxWorkers, memoryLimitMB);
-	return workerPool;
+	// Check if folder initialization is already in progress or complete
+	const existingLock = seriesFolderLocks.get(lockKey);
+	if (existingLock) {
+		await existingLock;
+		// Return provider-specific data after lock resolves
+		if (provider === 'google-drive') {
+			return await ensureGoogleDriveFolder(seriesTitle, credentials.accessToken);
+		}
+		return; // MEGA and WebDAV don't need to return folder references
+	}
+
+	// Start folder creation and store the promise
+	const lockPromise = (async () => {
+		try {
+			if (provider === 'google-drive') {
+				await ensureGoogleDriveFolder(seriesTitle, credentials.accessToken);
+			} else if (provider === 'mega') {
+				await ensureMEGAFolder(seriesTitle, credentials.megaEmail, credentials.megaPassword);
+			} else if (provider === 'webdav') {
+				await ensureWebDAVFolder(seriesTitle, credentials.webdavUrl, credentials.webdavUsername, credentials.webdavPassword);
+			}
+		} catch (error) {
+			// On error, remove lock so it can be retried
+			seriesFolderLocks.delete(lockKey);
+			throw error;
+		}
+	})();
+
+	seriesFolderLocks.set(lockKey, lockPromise);
+	await lockPromise;
+
+	// Return provider-specific data
+	if (provider === 'google-drive') {
+		return await ensureGoogleDriveFolder(seriesTitle, credentials.accessToken);
+	}
+}
+
+/**
+ * Google Drive: Ensure series folder exists and return folder ID
+ */
+async function ensureGoogleDriveFolder(seriesTitle: string, accessToken: string): Promise<string> {
+	const escapedSeriesTitle = seriesTitle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+	// Ensure mokuro-reader root folder exists
+	const rootQuery = `name='mokuro-reader' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+	const rootSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(rootQuery)}&fields=files(id,name)`;
+	const rootResponse = await fetch(rootSearchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+	const rootData = await rootResponse.json();
+
+	let rootFolderId: string;
+	if (rootData.files?.length > 0) {
+		rootFolderId = rootData.files[0].id;
+	} else {
+		const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+			method: 'POST',
+			headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name: 'mokuro-reader', mimeType: 'application/vnd.google-apps.folder' })
+		});
+		rootFolderId = (await createResponse.json()).id;
+	}
+
+	// Ensure series folder exists
+	const seriesQuery = `name='${escapedSeriesTitle}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+	const seriesSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(seriesQuery)}&fields=files(id,name)`;
+	const seriesResponse = await fetch(seriesSearchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+	const seriesData = await seriesResponse.json();
+
+	if (seriesData.files?.length > 0) {
+		return seriesData.files[0].id;
+	}
+
+	const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+		method: 'POST',
+		headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+		body: JSON.stringify({ name: seriesTitle, mimeType: 'application/vnd.google-apps.folder', parents: [rootFolderId] })
+	});
+	return (await createResponse.json()).id;
+}
+
+/**
+ * MEGA: Ensure series folder exists in main thread
+ * Workers will create their own Storage instances, but folders will already exist
+ */
+async function ensureMEGAFolder(seriesTitle: string, email: string, password: string): Promise<void> {
+	const { Storage } = await import('megajs');
+	const storage = new Storage({ email, password });
+	await storage.ready;
+
+	// Ensure mokuro-reader folder exists
+	let mokuroFolder = storage.root.children?.find((c: any) => c.name === 'mokuro-reader' && c.directory);
+	if (!mokuroFolder) {
+		mokuroFolder = await storage.root.mkdir('mokuro-reader');
+	}
+
+	// Ensure series folder exists
+	let seriesFolder = mokuroFolder.children?.find((c: any) => c.name === seriesTitle && c.directory);
+	if (!seriesFolder) {
+		await mokuroFolder.mkdir(seriesTitle);
+	}
+}
+
+/**
+ * WebDAV: Ensure series folder path exists
+ */
+async function ensureWebDAVFolder(seriesTitle: string, serverUrl: string, username: string, password: string): Promise<void> {
+	const authHeader = 'Basic ' + btoa(`${username}:${password}`);
+	const path = `mokuro-reader/${seriesTitle}`;
+	const parts = path.split('/').filter(p => p);
+
+	let currentPath = '';
+	for (const part of parts) {
+		currentPath += `/${part}`;
+		const folderUrl = `${serverUrl}${currentPath}`;
+
+		try {
+			const response = await fetch(folderUrl, {
+				method: 'MKCOL',
+				headers: { 'Authorization': authHeader }
+			});
+			// 201 = created, 405 = already exists (both OK)
+			if (!response.ok && response.status !== 405) {
+				console.warn(`Failed to create folder ${currentPath}: ${response.status}`);
+			}
+		} catch (error) {
+			console.warn(`Error creating folder ${currentPath}:`, error);
+		}
+	}
 }
 
 /**
@@ -292,7 +454,7 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 		return;
 	}
 
-	const pool = initializeWorkerPool();
+	const pool = await initializeWorkerPool();
 
 	// Estimate volume size (rough estimate: page count * 0.5MB average per page)
 	const estimatedSize = (item.volumeMetadata.page_count || 10) * 0.5 * 1024 * 1024;
@@ -314,6 +476,15 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 
 				const { metadata, filesData } = await prepareVolumeDataForWorker(item.volumeUuid);
 				const credentials = await getProviderCredentials(provider.type);
+
+				// Ensure series folder exists BEFORE worker starts (prevents race conditions)
+				// This is provider-agnostic and works for Google Drive, MEGA, and WebDAV
+				const folderData = await ensureSeriesFolder(provider.type, item.seriesTitle, credentials);
+
+				// For Google Drive, pass folder ID to worker to avoid redundant folder lookups
+				if (provider.type === 'google-drive' && folderData) {
+					credentials.seriesFolderId = folderData;
+				}
 
 				return {
 					mode: 'compress-and-upload',

@@ -71,7 +71,7 @@ export const currentSeries = derived([page, catalog], ([$page, $catalog]) =>
 );
 
 export const currentVolume = derived([page, volumes], ([$page, $volumes]) => {
-  if ($page && $volumes) {
+  if ($page && $volumes && $page.params.volume) {
     return $volumes[$page.params.volume]; // Direct lookup instead of find()
   }
   return undefined;
@@ -79,7 +79,7 @@ export const currentVolume = derived([page, volumes], ([$page, $volumes]) => {
 
 export const currentVolumeData: Readable<VolumeData | undefined> = derived(
   [currentVolume],
-  ([$currentVolume], set) => {
+  ([$currentVolume], set: (value: VolumeData | undefined) => void) => {
     // CRITICAL: Immediately clear old data synchronously to prevent state leaks
     // This ensures old volume data doesn't persist during the async gap
     set(undefined);

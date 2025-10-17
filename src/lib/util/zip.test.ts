@@ -12,8 +12,8 @@ vi.mock('$lib/catalog/db', () => ({
 }));
 
 // Mock the DOM APIs
-global.URL.createObjectURL = vi.fn(() => 'blob:test');
-global.URL.revokeObjectURL = vi.fn();
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:test');
+globalThis.URL.revokeObjectURL = vi.fn();
 
 // Mock document.createElement
 document.createElement = vi.fn().mockImplementation((tag) => {
@@ -34,7 +34,8 @@ describe('zipManga', () => {
     series_title: 'Test Manga',
     volume_title: 'Volume 1',
     mokuro_version: '1.0',
-    character_count: 100
+    character_count: 100,
+    page_count: 1
   };
 
   const mockVolumeData = {
@@ -54,7 +55,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, false, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga.zip');
   });
 
@@ -62,7 +65,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, true, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga - Volume 1.zip');
   });
 
@@ -70,7 +75,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], true, false, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga.cbz');
   });
 
@@ -78,7 +85,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, true, true);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Test Manga - Volume 1.zip');
   });
 
@@ -86,7 +95,9 @@ describe('zipManga', () => {
     const result = await zipManga([mockVolume], false, true, false);
     expect(result).toBe(false);
     expect(document.createElement).toHaveBeenCalledWith('a');
-    const link = document.createElement('a');
+    // Get the actual mock element that was created and used
+    const mockCalls = vi.mocked(document.createElement).mock.results;
+    const link = mockCalls[mockCalls.length - 1].value;
     expect(link.download).toBe('Volume 1.zip');
   });
 
@@ -95,7 +106,8 @@ describe('zipManga', () => {
     const mockVolume2 = {
       ...mockVolume,
       volume_uuid: 'test-uuid-2',
-      volume_title: 'Volume 2'
+      volume_title: 'Volume 2',
+      page_count: 1
     };
 
     // Mock the document.createElement to track calls
