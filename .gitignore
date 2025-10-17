@@ -8,3 +8,10 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# IDE directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
