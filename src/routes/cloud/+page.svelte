@@ -71,6 +71,13 @@
   // Use constants from the google-drive utility
   const type = 'application/json';
 
+  // Error handler for Google Drive operations
+  function handleDriveError(error: unknown, context: string): void {
+    console.error(`Google Drive error (${context}):`, error);
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    showSnackbar(`Failed ${context}: ${message}`);
+  }
+
   async function getFileSize(fileId: string): Promise<number> {
     try {
       const { result } = await gapi.client.drive.files.get({
@@ -226,7 +233,7 @@
     picker.setVisible(true);
   }
 
-  async function listFilesInFolder(folderId) {
+  async function listFilesInFolder(folderId: string): Promise<any[]> {
     try {
       const { result } = await gapi.client.drive.files.list({
         q: `'${folderId}' in parents and (mimeType='application/zip' or mimeType='application/x-zip-compressed' or mimeType='application/vnd.comicbook+zip' or mimeType='application/x-cbz' or mimeType='application/vnd.google-apps.folder')`,
@@ -242,7 +249,7 @@
   }
 
   // Pass the scanProcessId as a parameter
-  async function processFolder(folderId, folderName, scanProcessId) {
+  async function processFolder(folderId: string, folderName: string, scanProcessId: string): Promise<any[]> {
     const files = await listFilesInFolder(folderId);
     const allFiles = [];
 

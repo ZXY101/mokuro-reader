@@ -87,6 +87,11 @@ class BackupCacheManager {
     if (!response) return files;
 
     for (const item of response) {
+      // Skip items without required fields
+      if (!item.name || !item.id || !item.mimeType || !item.modifiedTime) {
+        continue;
+      }
+
       const currentPath = parentPath ? `${parentPath}/${item.name}` : item.name;
 
       if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
