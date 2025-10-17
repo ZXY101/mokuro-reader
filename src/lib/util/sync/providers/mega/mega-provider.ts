@@ -1,7 +1,6 @@
 import { browser } from '$app/environment';
 import type { SyncProvider, ProviderCredentials, ProviderStatus } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
-import { Storage } from 'megajs';
 import { unifiedCloudManager } from '../../unified-cloud-manager';
 
 interface MegaCredentials {
@@ -163,6 +162,9 @@ export class MegaProvider implements SyncProvider {
 		const { email, password } = credentials as MegaCredentials;
 
 		try {
+			// Dynamically import megajs to reduce initial bundle size
+			const { Storage } = await import('megajs');
+
 			// Initialize MEGA storage
 			this.storage = await new Promise((resolve, reject) => {
 				const storage = new Storage(

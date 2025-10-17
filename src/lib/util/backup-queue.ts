@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store';
 import type { VolumeMetadata } from '$lib/types';
 import { progressTrackerStore } from './progress-tracker';
-import { WorkerPool, type WorkerTask } from './worker-pool';
+import type { WorkerPool, WorkerTask } from './worker-pool';
 import { tokenManager } from './google-drive/token-manager';
 import { showSnackbar } from './snackbar';
 import { db } from '$lib/catalog/db';
@@ -153,10 +153,13 @@ export function getSeriesBackupQueueStatus(seriesTitle: string): SeriesQueueStat
 /**
  * Initialize worker pool based on user-configured RAM setting
  */
-function initializeWorkerPool(): WorkerPool {
+async function initializeWorkerPool(): Promise<WorkerPool> {
 	if (workerPool) {
 		return workerPool;
 	}
+
+	// Dynamically import WorkerPool to reduce initial bundle size
+	const { WorkerPool: WorkerPoolClass } = await import('./worker-pool');
 
 	// Fixed worker count - cloud upload speeds are the bottleneck, not CPU
 	const maxWorkers = 4;
@@ -173,7 +176,7 @@ function initializeWorkerPool(): WorkerPool {
 
 	console.log(`Backup queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
 
-	workerPool = new WorkerPool(UploadWorker, maxWorkers, memoryLimitMB);
+	workerPool = new WorkerPoolClass(UploadWorker, maxWorkers, memoryLimitMB);
 	return workerPool;
 }
 
@@ -292,7 +295,7 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 		return;
 	}
 
-	const pool = initializeWorkerPool();
+	const pool = await initializeWorkerPool();
 
 	// Estimate volume size (rough estimate: page count * 0.5MB average per page)
 	const estimatedSize = (item.volumeMetadata.page_count || 10) * 0.5 * 1024 * 1024;

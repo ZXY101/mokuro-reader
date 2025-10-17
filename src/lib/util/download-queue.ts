@@ -1,7 +1,7 @@
 import { writable, get } from 'svelte/store';
 import type { VolumeMetadata, VolumeData } from '$lib/types';
 import { progressTrackerStore } from './progress-tracker';
-import { WorkerPool, type WorkerTask } from './worker-pool';
+import type { WorkerPool, WorkerTask } from './worker-pool';
 import type { VolumeMetadata as WorkerVolumeMetadata } from './worker-pool';
 import { tokenManager } from './google-drive/token-manager';
 import { showSnackbar } from './snackbar';
@@ -186,10 +186,13 @@ export function getSeriesQueueStatus(seriesTitle: string): SeriesQueueStatus {
 /**
  * Initialize worker pool based on user-configured RAM setting
  */
-function initializeWorkerPool(): WorkerPool {
+async function initializeWorkerPool(): Promise<WorkerPool> {
 	if (workerPool) {
 		return workerPool;
 	}
+
+	// Dynamically import WorkerPool to reduce initial bundle size
+	const { WorkerPool: WorkerPoolClass } = await import('./worker-pool');
 
 	let maxWorkers: number;
 	let memoryLimitMB: number;
@@ -211,7 +214,7 @@ function initializeWorkerPool(): WorkerPool {
 
 	console.log(`Download queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
 
-	workerPool = new WorkerPool(undefined, maxWorkers, memoryLimitMB);
+	workerPool = new WorkerPoolClass(undefined, maxWorkers, memoryLimitMB);
 	return workerPool;
 }
 
@@ -459,7 +462,7 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
 		return;
 	}
 
-	const pool = initializeWorkerPool();
+	const pool = await initializeWorkerPool();
 	const fileSize = getCloudSize(item.volumeMetadata) || 0;
 
 	// Check if provider supports worker downloads
