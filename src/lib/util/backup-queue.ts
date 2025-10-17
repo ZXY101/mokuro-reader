@@ -31,6 +31,7 @@ const queueStore = writable<BackupQueueItem[]>([]);
 
 // Shared worker pool for all backups
 let workerPool: WorkerPool | null = null;
+let poolInitPromise: Promise<WorkerPool> | null = null;
 let processingStarted = false;
 
 // Subscribe to queue changes and update progress tracker
@@ -152,32 +153,49 @@ export function getSeriesBackupQueueStatus(seriesTitle: string): SeriesQueueStat
 
 /**
  * Initialize worker pool based on user-configured RAM setting
+ * Uses promise-based mutex to prevent race conditions with concurrent calls
  */
 async function initializeWorkerPool(): Promise<WorkerPool> {
+	// Return existing pool if already created
 	if (workerPool) {
 		return workerPool;
 	}
 
-	// Dynamically import WorkerPool to reduce initial bundle size
-	const { WorkerPool: WorkerPoolClass } = await import('./worker-pool');
+	// If already initializing, wait for that to complete
+	if (poolInitPromise) {
+		return poolInitPromise;
+	}
 
-	// Fixed worker count - cloud upload speeds are the bottleneck, not CPU
-	const maxWorkers = 4;
-	let memoryLimitMB: number;
+	// Start initialization and store the promise
+	poolInitPromise = (async () => {
+		// Dynamically import WorkerPool to reduce initial bundle size
+		const { WorkerPool: WorkerPoolClass } = await import('./worker-pool');
 
-	// Get user's RAM configuration
-	let deviceRamGB = 4; // Default
-	miscSettings.subscribe(value => {
-		deviceRamGB = value.deviceRamGB ?? 4;
+		// Fixed worker count - cloud upload speeds are the bottleneck, not CPU
+		const maxWorkers = 4;
+		let memoryLimitMB: number;
+
+		// Get user's RAM configuration
+		let deviceRamGB = 4; // Default
+		miscSettings.subscribe(value => {
+			deviceRamGB = value.deviceRamGB ?? 4;
+		})();
+
+		// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
+		memoryLimitMB = (deviceRamGB * 1024) / 8;
+
+		console.log(`Backup queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
+
+		workerPool = new WorkerPoolClass(UploadWorker, maxWorkers, memoryLimitMB);
+		return workerPool;
 	})();
 
-	// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
-	memoryLimitMB = (deviceRamGB * 1024) / 8;
-
-	console.log(`Backup queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
-
-	workerPool = new WorkerPoolClass(UploadWorker, maxWorkers, memoryLimitMB);
-	return workerPool;
+	try {
+		return await poolInitPromise;
+	} finally {
+		// Clear the promise after completion (success or failure)
+		poolInitPromise = null;
+	}
 }
 
 /**

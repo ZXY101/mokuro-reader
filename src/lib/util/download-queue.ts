@@ -52,6 +52,7 @@ const queueStore = writable<QueueItem[]>([]);
 
 // Shared worker pool for all downloads
 let workerPool: WorkerPool | null = null;
+let poolInitPromise: Promise<WorkerPool> | null = null;
 let processingStarted = false;
 
 // Track MEGA share links that need cleanup after download
@@ -185,37 +186,54 @@ export function getSeriesQueueStatus(seriesTitle: string): SeriesQueueStatus {
 
 /**
  * Initialize worker pool based on user-configured RAM setting
+ * Uses promise-based mutex to prevent race conditions with concurrent calls
  */
 async function initializeWorkerPool(): Promise<WorkerPool> {
+	// Return existing pool if already created
 	if (workerPool) {
 		return workerPool;
 	}
 
-	// Dynamically import WorkerPool to reduce initial bundle size
-	const { WorkerPool: WorkerPoolClass } = await import('./worker-pool');
+	// If already initializing, wait for that to complete
+	if (poolInitPromise) {
+		return poolInitPromise;
+	}
 
-	let maxWorkers: number;
-	let memoryLimitMB: number;
+	// Start initialization and store the promise
+	poolInitPromise = (async () => {
+		// Dynamically import WorkerPool to reduce initial bundle size
+		const { WorkerPool: WorkerPoolClass } = await import('./worker-pool');
 
-	// Get user's RAM configuration
-	let deviceRamGB = 4; // Default
-	miscSettings.subscribe(value => {
-		deviceRamGB = value.deviceRamGB ?? 4;
+		let maxWorkers: number;
+		let memoryLimitMB: number;
+
+		// Get user's RAM configuration
+		let deviceRamGB = 4; // Default
+		miscSettings.subscribe(value => {
+			deviceRamGB = value.deviceRamGB ?? 4;
+		})();
+
+		// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
+		memoryLimitMB = (deviceRamGB * 1024) / 8;
+
+		// Worker count: scale with RAM, minimum 2, cap at 8
+		// Use 1.5x RAM in GB as base (e.g., 4GB = 6 workers, 16GB = 24 workers → capped at 8)
+		// Cap at 8 to avoid overwhelming cloud services and saturating network bandwidth
+		const calculatedWorkers = Math.max(2, Math.floor(deviceRamGB * 1.5));
+		maxWorkers = Math.min(8, calculatedWorkers);
+
+		console.log(`Download queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
+
+		workerPool = new WorkerPoolClass(undefined, maxWorkers, memoryLimitMB);
+		return workerPool;
 	})();
 
-	// Memory limit: 1/8th of configured RAM (e.g., 16GB = 2048MB limit)
-	memoryLimitMB = (deviceRamGB * 1024) / 8;
-
-	// Worker count: scale with RAM, minimum 2, cap at 8
-	// Use 1.5x RAM in GB as base (e.g., 4GB = 6 workers, 16GB = 24 workers → capped at 8)
-	// Cap at 8 to avoid overwhelming cloud services and saturating network bandwidth
-	const calculatedWorkers = Math.max(2, Math.floor(deviceRamGB * 1.5));
-	maxWorkers = Math.min(8, calculatedWorkers);
-
-	console.log(`Download queue: ${maxWorkers} workers, ${memoryLimitMB}MB limit (${deviceRamGB}GB configured)`);
-
-	workerPool = new WorkerPoolClass(undefined, maxWorkers, memoryLimitMB);
-	return workerPool;
+	try {
+		return await poolInitPromise;
+	} finally {
+		// Clear the promise after completion (success or failure)
+		poolInitPromise = null;
+	}
 }
 
 /**
