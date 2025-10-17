@@ -62,7 +62,7 @@ export function queueVolumeForBackup(volume: VolumeMetadata, provider?: Provider
 	const targetProvider = provider || unifiedCloudManager.getDefaultProvider()?.type;
 	if (!targetProvider) {
 		console.warn('No cloud provider available for backup');
-		showSnackbar('Please connect to a cloud storage provider first', 'error');
+		showSnackbar('Please connect to a cloud storage provider first');
 		return;
 	}
 
@@ -99,7 +99,7 @@ export function queueSeriesVolumesForBackup(volumes: VolumeMetadata[], provider?
 	const targetProvider = provider || unifiedCloudManager.getDefaultProvider()?.type;
 	if (!targetProvider) {
 		console.warn('No cloud provider available for backup');
-		showSnackbar('Please connect to a cloud storage provider first', 'error');
+		showSnackbar('Please connect to a cloud storage provider first');
 		return;
 	}
 

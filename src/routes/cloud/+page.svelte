@@ -898,7 +898,7 @@
     // Get default provider
     const provider = unifiedCloudManager.getDefaultProvider();
     if (!provider) {
-      showSnackbar('Please connect to a cloud storage provider first', 'error');
+      showSnackbar('Please connect to a cloud storage provider first');
       return;
     }
 
@@ -909,7 +909,7 @@
     }
 
     if (allVolumes.length === 0) {
-      showSnackbar('No volumes to backup', 'error');
+      showSnackbar('No volumes to backup');
       return;
     }
 
@@ -921,7 +921,7 @@
     const skippedCount = allVolumes.length - volumesToBackup.length;
 
     if (volumesToBackup.length === 0) {
-      showSnackbar('All volumes already backed up', 'info');
+      showSnackbar('All volumes already backed up');
       return;
     }
 
@@ -932,7 +932,7 @@
     const message = skippedCount > 0
       ? `Added ${volumesToBackup.length} volumes to backup queue (${skippedCount} already backed up)`
       : `Added ${volumesToBackup.length} volumes to backup queue`;
-    showSnackbar(message, 'success');
+    showSnackbar(message);
   }
 </script>
 

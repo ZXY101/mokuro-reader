@@ -58,7 +58,7 @@ let processingStarted = false;
 const megaShareLinksToCleanup = new Map<string, string>(); // fileId -> fileId (for cleanup)
 
 // Rate limiting for MEGA share link creation using a promise chain as mutex
-let megaShareLinkMutex = Promise.resolve();
+let megaShareLinkMutex: Promise<void | { megaShareUrl: string }> = Promise.resolve();
 const MEGA_SHARE_LINK_THROTTLE_MS = 200; // 200ms between share link creations
 
 // Subscribe to queue changes and update progress tracker

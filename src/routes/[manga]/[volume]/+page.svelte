@@ -13,18 +13,20 @@
   import { activityTracker } from '$lib/util/activity-tracker';
   import { Spinner } from 'flowbite-svelte';
 
-  let volumeId = $derived($page.params.volume);
+  let volumeId = $derived($page.params.volume || '');
   let count: undefined | number = $state(undefined);
 
   // Initialize volume when volumeId changes (reactive to navigation)
   $effect(() => {
-    if (!$volumes?.[volumeId]) {
+    if (volumeId && !$volumes?.[volumeId]) {
       initializeVolume(volumeId);
     }
   });
 
   // Start/restart timer when volumeId changes
   $effect(() => {
+    if (!volumeId) return;
+
     // Record activity when volume changes
     activityTracker.recordActivity();
 

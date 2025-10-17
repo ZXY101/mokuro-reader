@@ -10,6 +10,9 @@ export interface DriveFile {
   name: string;
   mimeType: string;
   size?: string;
+  modifiedTime?: string;
+  parents?: string[];
+  description?: string;
 }
 
 export interface SyncProgress {

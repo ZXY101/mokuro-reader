@@ -129,7 +129,7 @@ class UnifiedSyncService {
 				if (failed === 0) {
 					showSnackbar(`Synced with ${succeeded} provider(s) successfully`);
 				} else {
-					showSnackbar(`Synced with ${succeeded} provider(s), ${failed} failed`, 'warning');
+					showSnackbar(`Synced with ${succeeded} provider(s), ${failed} failed`);
 				}
 			}
 
@@ -255,15 +255,15 @@ class UnifiedSyncService {
 		// Step 2: Get local profiles
 		const localProfiles = get(profiles);
 
-		// Step 3: Merge profiles (newest wins based on id/name matching)
-		const mergedProfiles = this.mergeProfiles(localProfiles, cloudProfiles || []);
+		// Step 3: Merge profiles (newest wins based on profile name)
+		const mergedProfiles = this.mergeProfiles(localProfiles, cloudProfiles || {});
 
 		// Step 4: Update local storage
 		profiles.set(mergedProfiles);
 
 		// Step 5: Upload merged profiles if changed
 		const mergedJson = JSON.stringify(mergedProfiles);
-		const cloudJson = JSON.stringify(cloudProfiles || []);
+		const cloudJson = JSON.stringify(cloudProfiles || {});
 
 		if (mergedJson !== cloudJson) {
 			await provider.uploadProfiles(mergedProfiles);
@@ -312,24 +312,15 @@ class UnifiedSyncService {
 	}
 
 	/**
-	 * Merge profiles (simple array merge, keeping all unique profiles)
+	 * Merge profiles (Record<string, Settings>) keeping all unique profile names
 	 */
-	private mergeProfiles(local: any[], cloud: any[]): any[] {
-		// For profiles, we'll just combine them and deduplicate by ID
-		// This is a simple strategy - could be enhanced with timestamps if needed
-		const profileMap = new Map();
-
-		// Add local profiles
-		local.forEach(profile => {
-			profileMap.set(profile.id, profile);
-		});
-
-		// Add/update with cloud profiles
-		cloud.forEach(profile => {
-			profileMap.set(profile.id, profile);
-		});
-
-		return Array.from(profileMap.values());
+	private mergeProfiles(local: any, cloud: any): any {
+		// For profiles, we'll combine them with cloud profiles taking precedence
+		// Profiles are Record<string, Settings> where key is profile name
+		return {
+			...local,
+			...cloud
+		};
 	}
 }
 

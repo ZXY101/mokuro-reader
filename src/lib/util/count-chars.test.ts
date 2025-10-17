@@ -26,26 +26,38 @@ describe('countChars', () => {
 describe('getCharCount', () => {
   const samplePages: Page[] = [
     {
+      version: '1.0',
+      img_width: 100,
+      img_height: 100,
+      img_path: 'test.jpg',
       blocks: [
         {
           lines: ['こんにちは', 'Hello世界'],
-          box: [0, 0, 0, 0]
+          box: [0, 0, 0, 0],
+          vertical: false,
+          font_size: 12
         },
         {
           lines: ['私は日本語を勉強します'],
-          box: [0, 0, 0, 0]
+          box: [0, 0, 0, 0],
+          vertical: false,
+          font_size: 12
         }
-      ],
-      dimensions: [0, 0]
+      ]
     },
     {
+      version: '1.0',
+      img_width: 100,
+      img_height: 100,
+      img_path: 'test2.jpg',
       blocks: [
         {
           lines: ['漢字 and かな'],
-          box: [0, 0, 0, 0]
+          box: [0, 0, 0, 0],
+          vertical: false,
+          font_size: 12
         }
-      ],
-      dimensions: [0, 0]
+      ]
     }
   ];
 

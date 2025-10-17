@@ -134,9 +134,11 @@ async function uploadVolumeData(
         );
       }
 
-      uploadMetadata.thumbnail = await generateThumbnail(
-        uploadData.files?.[Object.keys(uploadData.files)[0]]
-      );
+      const firstFileKey = uploadData.files ? Object.keys(uploadData.files)[0] : undefined;
+      const firstFile = firstFileKey ? uploadData.files?.[firstFileKey] : undefined;
+      if (firstFile) {
+        uploadMetadata.thumbnail = await generateThumbnail(firstFile);
+      }
       await db.transaction('rw', db.volumes, async () => {
         await db.volumes.add(uploadMetadata as VolumeMetadata, uploadMetadata.volume_uuid);
       });
@@ -274,7 +276,9 @@ async function processZipFile(
   volumesByPath: Record<string, Partial<VolumeMetadata>>,
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
-  for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream())) {
+  // Cast to any to workaround TypeScript type definition limitation
+  // ZipReaderStream does support async iteration at runtime
+  for await (const entry of zipFile.file.stream().pipeThrough(new ZipReaderStream()) as any) {
     // Skip directories as we're only creating File objects
     if (entry.directory) continue;
 

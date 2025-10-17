@@ -762,7 +762,9 @@ export class MegaProvider implements SyncProvider {
 						if (error) {
 							reject(error);
 						} else {
-							const blob = new Blob([data], { type: 'application/zip' });
+							// Convert to standard Uint8Array to satisfy TypeScript
+							const standardArray = new Uint8Array(Array.from(data));
+							const blob = new Blob([standardArray], { type: 'application/zip' });
 							console.log(`✅ Downloaded ${fileObj.name} from MEGA`);
 							resolve(blob);
 						}

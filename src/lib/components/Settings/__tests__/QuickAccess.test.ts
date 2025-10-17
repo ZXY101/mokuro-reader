@@ -12,13 +12,17 @@ describe('QuickAccess', () => {
     // Mock isReader to return true
     vi.mocked(isReader).mockReturnValue(true);
 
-    // Mock window.location
+    // Mock window.location using Object.defineProperty
     const originalLocation = window.location;
-    delete window.location;
-    window.location = {
-      href: '/series-uuid/volume-uuid',
-      pathname: '/series-uuid/volume-uuid'
-    } as any;
+    delete (window as any).location;
+    Object.defineProperty(window, 'location', {
+      value: {
+        href: '/series-uuid/volume-uuid',
+        pathname: '/series-uuid/volume-uuid'
+      },
+      writable: true,
+      configurable: true
+    });
 
     const { getByText } = render(QuickAccess);
     const closeButton = getByText('Close reader');
@@ -29,6 +33,10 @@ describe('QuickAccess', () => {
     expect(window.location.href).toBe('/series-uuid');
 
     // Restore window.location
-    window.location = originalLocation;
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true
+    });
   });
 });

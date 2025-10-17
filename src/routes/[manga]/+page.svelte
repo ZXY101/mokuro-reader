@@ -157,7 +157,7 @@
     const backedUpVolumes = cloudFiles.get(seriesTitle) || [];
 
     if (backedUpVolumes.length === 0) {
-      showSnackbar(`No volumes found in ${providerDisplayName}`, 'info');
+      showSnackbar(`No volumes found in ${providerDisplayName}`);
       return;
     }
 
@@ -167,13 +167,13 @@
       const result = await unifiedCloudManager.deleteSeriesFolder(seriesTitle);
 
       if (result.failed === 0) {
-        showSnackbar(`Deleted ${result.succeeded} volume(s) from ${providerDisplayName}`, 'success');
+        showSnackbar(`Deleted ${result.succeeded} volume(s) from ${providerDisplayName}`);
       } else {
-        showSnackbar(`Deleted ${result.succeeded} volume(s), ${result.failed} failed`, 'error');
+        showSnackbar(`Deleted ${result.succeeded} volume(s), ${result.failed} failed`);
       }
     } catch (error) {
       console.error(`Failed to delete series from ${providerDisplayName}:`, error);
-      showSnackbar(`Failed to delete from ${providerDisplayName}`, 'error');
+      showSnackbar(`Failed to delete from ${providerDisplayName}`);
       // Refresh cache to restore correct state on error
       await unifiedCloudManager.fetchAllCloudVolumes();
     }
@@ -184,12 +184,12 @@
 
     // Check if any provider is authenticated
     if (!hasAnyProvider) {
-      showSnackbar('Please connect to a cloud storage provider first', 'error');
+      showSnackbar('Please connect to a cloud storage provider first');
       return;
     }
 
     if (!anyBackedUp) {
-      showSnackbar(`No backups found in ${providerDisplayName}`, 'info');
+      showSnackbar(`No backups found in ${providerDisplayName}`);
       return;
     }
 
@@ -243,7 +243,7 @@
     // Check if any provider is authenticated
     const provider = unifiedCloudManager.getDefaultProvider();
     if (!provider) {
-      showSnackbar('Please connect to a cloud storage provider first', 'error');
+      showSnackbar('Please connect to a cloud storage provider first');
       return;
     }
 
@@ -253,14 +253,14 @@
     );
 
     if (volumesToBackup.length === 0) {
-      showSnackbar('All volumes already backed up', 'info');
+      showSnackbar('All volumes already backed up');
       return;
     }
 
     // Add volumes to backup queue
     backupQueue.queueSeriesVolumesForBackup(volumesToBackup, provider.type);
 
-    showSnackbar(`Added ${volumesToBackup.length} volume(s) to backup queue`, 'success');
+    showSnackbar(`Added ${volumesToBackup.length} volume(s) to backup queue`);
   }
 
   async function downloadAllPlaceholders() {
@@ -268,7 +268,7 @@
 
     // Check if any cloud provider is authenticated
     if (!hasAnyProvider) {
-      showSnackbar('Please sign in to a cloud storage provider first', 'error');
+      showSnackbar('Please sign in to a cloud storage provider first');
       return;
     }
 
@@ -326,12 +326,12 @@
 
   async function cleanCloudDuplicates() {
     if (!hasAnyProvider) {
-      showSnackbar('Please connect to a cloud storage provider first', 'error');
+      showSnackbar('Please connect to a cloud storage provider first');
       return;
     }
 
     if (duplicateCloudFiles.length === 0) {
-      showSnackbar(`No duplicate ${providerDisplayName} files found`, 'info');
+      showSnackbar(`No duplicate ${providerDisplayName} files found`);
       return;
     }
 
@@ -352,9 +352,9 @@
         }
 
         if (failCount === 0) {
-          showSnackbar(`Cleaned up ${successCount} duplicate(s)`, 'success');
+          showSnackbar(`Cleaned up ${successCount} duplicate(s)`);
         } else {
-          showSnackbar(`Cleaned up ${successCount}, ${failCount} failed`, 'error');
+          showSnackbar(`Cleaned up ${successCount}, ${failCount} failed`);
         }
       }
     );

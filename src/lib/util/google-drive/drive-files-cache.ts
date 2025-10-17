@@ -221,7 +221,7 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         files.push({
           fileId: item.id,
           name: item.name,
-          modifiedTime: item.modifiedTime,
+          modifiedTime: item.modifiedTime || new Date().toISOString(),
           size: item.size ? parseInt(item.size) : undefined,
           path: currentPath
         });

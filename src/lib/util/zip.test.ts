@@ -12,8 +12,8 @@ vi.mock('$lib/catalog/db', () => ({
 }));
 
 // Mock the DOM APIs
-global.URL.createObjectURL = vi.fn(() => 'blob:test');
-global.URL.revokeObjectURL = vi.fn();
+globalThis.URL.createObjectURL = vi.fn(() => 'blob:test');
+globalThis.URL.revokeObjectURL = vi.fn();
 
 // Mock document.createElement
 document.createElement = vi.fn().mockImplementation((tag) => {
@@ -34,7 +34,8 @@ describe('zipManga', () => {
     series_title: 'Test Manga',
     volume_title: 'Volume 1',
     mokuro_version: '1.0',
-    character_count: 100
+    character_count: 100,
+    page_count: 1
   };
 
   const mockVolumeData = {
@@ -95,7 +96,8 @@ describe('zipManga', () => {
     const mockVolume2 = {
       ...mockVolume,
       volume_uuid: 'test-uuid-2',
-      volume_title: 'Volume 2'
+      volume_title: 'Volume 2',
+      page_count: 1
     };
 
     // Mock the document.createElement to track calls

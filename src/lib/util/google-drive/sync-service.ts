@@ -227,7 +227,7 @@ class SyncService {
   private async mergeVolumeData(cloudVolumes: any): Promise<any> {
     return new Promise((resolve) => {
       volumes.subscribe(localVolumes => {
-        const merged = {};
+        const merged: Record<string, any> = {};
         const allVolumeIds = new Set([
           ...Object.keys(localVolumes),
           ...Object.keys(cloudVolumes)
