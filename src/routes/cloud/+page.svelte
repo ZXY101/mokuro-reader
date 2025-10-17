@@ -1090,7 +1090,7 @@
         <Button color="blue" on:click={createPicker}>Download Manga</Button>
 
         <div class="flex flex-col gap-2">
-          <label class="text-sm font-medium">Device RAM Configuration</label>
+          <div class="text-sm font-medium">Device RAM Configuration</div>
           <div class="flex gap-4">
             <Radio name="ram-config" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
             <Radio name="ram-config" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
@@ -1156,7 +1156,7 @@
             </p>
 
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="text-sm font-medium">Device RAM Configuration</div>
               <div class="flex gap-4">
                 <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
                 <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
@@ -1208,7 +1208,7 @@
             </p>
 
             <div class="flex flex-col gap-2">
-              <label class="text-sm font-medium">Device RAM Configuration</label>
+              <div class="text-sm font-medium">Device RAM Configuration</div>
               <div class="flex gap-4">
                 <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
                 <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
