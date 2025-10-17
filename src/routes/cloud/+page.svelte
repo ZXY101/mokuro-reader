@@ -39,46 +39,23 @@
   // Import multi-provider sync
   import { providerManager, megaProvider, webdavProvider } from '$lib/util/sync';
 
-  // Subscribe to stores
-  let accessToken = $state('');
-  let readerFolderId = $state('');
-  let volumeDataId = $state('');
-  let profilesId = $state('');
-  let tokenClient = $state(null);
+  // Get store references for auto-subscription
+  const providerStatusStore = providerManager.status;
 
-  let state = $state<DriveState>({
-    isAuthenticated: false,
-    isCacheLoading: false,
-    isCacheLoaded: false,
-    isFullyConnected: false,
-    needsAttention: false
-  });
-
-  $effect(() => {
-    const unsubscribers = [
-      accessTokenStore.subscribe(value => { accessToken = value; }),
-      readerFolderIdStore.subscribe(value => { readerFolderId = value.reader; }),
-      volumeDataIdStore.subscribe(value => { volumeDataId = value; }),
-      profilesIdStore.subscribe(value => { profilesId = value; }),
-      tokenClientStore.subscribe(value => { tokenClient = value; }),
-      driveState.subscribe(value => { state = value; })
-    ];
-    return () => unsubscribers.forEach(unsub => unsub());
-  });
-
-  // Subscribe to provider manager status for reactive authentication state
-  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
-  $effect(() => {
-    return providerManager.status.subscribe(value => {
-      providerStatus = value;
-    });
-  });
+  // Use Svelte's derived runes for automatic store subscriptions
+  let accessToken = $derived($accessTokenStore);
+  let readerFolderId = $derived($readerFolderIdStore.reader);
+  let volumeDataId = $derived($volumeDataIdStore);
+  let profilesId = $derived($profilesIdStore);
+  let tokenClient = $derived($tokenClientStore);
+  let state = $derived($driveState);
 
   // Reactive provider authentication checks - now using provider manager for all providers
-  let googleDriveAuth = $derived(providerStatus.providers['google-drive']?.isAuthenticated || false);
-  let megaAuth = $derived(providerStatus.providers['mega']?.isAuthenticated || false);
-  let webdavAuth = $derived(providerStatus.providers['webdav']?.isAuthenticated || false);
-  let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
+  // Use derived to reactively compute auth states from the status store
+  let googleDriveAuth = $derived($providerStatusStore.providers['google-drive']?.isAuthenticated || false);
+  let megaAuth = $derived($providerStatusStore.providers['mega']?.isAuthenticated || false);
+  let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
+  let hasAnyProvider = $derived($providerStatusStore.hasAnyAuthenticated);
 
   // MEGA login state
   let megaEmail = $state('');
@@ -631,7 +608,7 @@
   async function onUploadProfiles() {
     const metadata = {
       mimeType: type,
-      name: PROFILES_FILE,
+      name: 'profiles.json',
       parents: [profilesId ? null : readerFolderId]
     };
 

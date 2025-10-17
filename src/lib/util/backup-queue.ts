@@ -34,6 +34,10 @@ let workerPool: WorkerPool | null = null;
 let poolInitPromise: Promise<WorkerPool> | null = null;
 let processingStarted = false;
 
+// Folder cache for Google Drive to prevent race conditions
+// Maps "seriesTitle" -> folder ID or Promise resolving to folder ID
+const gdriveFolderCache = new Map<string, string | Promise<string>>();
+
 // Subscribe to queue changes and update progress tracker
 queueStore.subscribe(queue => {
 	const totalCount = queue.length;
@@ -199,6 +203,99 @@ async function initializeWorkerPool(): Promise<WorkerPool> {
 }
 
 /**
+ * Ensure Google Drive series folder exists (with race condition protection)
+ * Uses promise-based mutex to prevent multiple workers from creating duplicate folders
+ */
+async function ensureGDriveSeriesFolder(seriesTitle: string, accessToken: string): Promise<string> {
+	// Check if we already have the folder ID
+	const cached = gdriveFolderCache.get(seriesTitle);
+	if (cached) {
+		// If it's a promise, wait for it; if it's a string, return it
+		return typeof cached === 'string' ? cached : await cached;
+	}
+
+	// Start folder creation and store the promise
+	const folderPromise = (async () => {
+		// Escape special characters for Drive API query
+		const escapedSeriesTitle = seriesTitle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+		// First, ensure mokuro-reader root folder exists
+		const rootQuery = `name='mokuro-reader' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+		const rootSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(rootQuery)}&fields=files(id,name)`;
+
+		const rootResponse = await fetch(rootSearchUrl, {
+			headers: { 'Authorization': `Bearer ${accessToken}` }
+		});
+		const rootData = await rootResponse.json();
+
+		let rootFolderId: string;
+		if (rootData.files && rootData.files.length > 0) {
+			rootFolderId = rootData.files[0].id;
+		} else {
+			// Create root folder
+			const createRootResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${accessToken}`,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					name: 'mokuro-reader',
+					mimeType: 'application/vnd.google-apps.folder'
+				})
+			});
+			const rootFolder = await createRootResponse.json();
+			rootFolderId = rootFolder.id;
+		}
+
+		// Now ensure series folder exists under root folder
+		const seriesQuery = `name='${escapedSeriesTitle}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+		const seriesSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(seriesQuery)}&fields=files(id,name)`;
+
+		const seriesResponse = await fetch(seriesSearchUrl, {
+			headers: { 'Authorization': `Bearer ${accessToken}` }
+		});
+		const seriesData = await seriesResponse.json();
+
+		let seriesFolderId: string;
+		if (seriesData.files && seriesData.files.length > 0) {
+			seriesFolderId = seriesData.files[0].id;
+		} else {
+			// Create series folder
+			const createSeriesResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${accessToken}`,
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					name: seriesTitle,
+					mimeType: 'application/vnd.google-apps.folder',
+					parents: [rootFolderId]
+				})
+			});
+			const seriesFolder = await createSeriesResponse.json();
+			seriesFolderId = seriesFolder.id;
+		}
+
+		// Cache the folder ID (replace the promise with the actual ID)
+		gdriveFolderCache.set(seriesTitle, seriesFolderId);
+		return seriesFolderId;
+	})();
+
+	// Store the promise in the cache
+	gdriveFolderCache.set(seriesTitle, folderPromise);
+
+	try {
+		return await folderPromise;
+	} catch (error) {
+		// On error, remove from cache so it can be retried
+		gdriveFolderCache.delete(seriesTitle);
+		throw error;
+	}
+}
+
+/**
  * Get provider credentials for worker uploads
  */
 async function getProviderCredentials(provider: ProviderType): Promise<any> {
@@ -335,6 +432,13 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 
 				const { metadata, filesData } = await prepareVolumeDataForWorker(item.volumeUuid);
 				const credentials = await getProviderCredentials(provider.type);
+
+				// For Google Drive, ensure folder exists BEFORE worker starts (prevents race conditions)
+				if (provider.type === 'google-drive' && credentials.accessToken) {
+					const seriesFolderId = await ensureGDriveSeriesFolder(item.seriesTitle, credentials.accessToken);
+					// Pass folder ID to worker so it doesn't need to create folders
+					credentials.seriesFolderId = seriesFolderId;
+				}
 
 				return {
 					mode: 'compress-and-upload',
