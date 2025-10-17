@@ -34,9 +34,10 @@ let workerPool: WorkerPool | null = null;
 let poolInitPromise: Promise<WorkerPool> | null = null;
 let processingStarted = false;
 
-// Folder cache for Google Drive to prevent race conditions
-// Maps "seriesTitle" -> folder ID or Promise resolving to folder ID
-const gdriveFolderCache = new Map<string, string | Promise<string>>();
+// Series folder initialization lock (provider-agnostic)
+// Prevents multiple concurrent workers from racing to create the same series folder
+// Maps "provider:seriesTitle" -> Promise that resolves when folder is guaranteed to exist
+const seriesFolderLocks = new Map<string, Promise<void>>();
 
 // Subscribe to queue changes and update progress tracker
 queueStore.subscribe(queue => {
@@ -203,95 +204,138 @@ async function initializeWorkerPool(): Promise<WorkerPool> {
 }
 
 /**
- * Ensure Google Drive series folder exists (with race condition protection)
- * Uses promise-based mutex to prevent multiple workers from creating duplicate folders
+ * Ensure series folder exists for any provider (with race condition protection)
+ * Provider-agnostic mutex prevents concurrent folder creation for the same series
  */
-async function ensureGDriveSeriesFolder(seriesTitle: string, accessToken: string): Promise<string> {
-	// Check if we already have the folder ID
-	const cached = gdriveFolderCache.get(seriesTitle);
-	if (cached) {
-		// If it's a promise, wait for it; if it's a string, return it
-		return typeof cached === 'string' ? cached : await cached;
+async function ensureSeriesFolder(provider: ProviderType, seriesTitle: string, credentials: any): Promise<any> {
+	const lockKey = `${provider}:${seriesTitle}`;
+
+	// Check if folder initialization is already in progress or complete
+	const existingLock = seriesFolderLocks.get(lockKey);
+	if (existingLock) {
+		await existingLock;
+		// Return provider-specific data after lock resolves
+		if (provider === 'google-drive') {
+			return await ensureGoogleDriveFolder(seriesTitle, credentials.accessToken);
+		}
+		return; // MEGA and WebDAV don't need to return folder references
 	}
 
 	// Start folder creation and store the promise
-	const folderPromise = (async () => {
-		// Escape special characters for Drive API query
-		const escapedSeriesTitle = seriesTitle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-
-		// First, ensure mokuro-reader root folder exists
-		const rootQuery = `name='mokuro-reader' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-		const rootSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(rootQuery)}&fields=files(id,name)`;
-
-		const rootResponse = await fetch(rootSearchUrl, {
-			headers: { 'Authorization': `Bearer ${accessToken}` }
-		});
-		const rootData = await rootResponse.json();
-
-		let rootFolderId: string;
-		if (rootData.files && rootData.files.length > 0) {
-			rootFolderId = rootData.files[0].id;
-		} else {
-			// Create root folder
-			const createRootResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${accessToken}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					name: 'mokuro-reader',
-					mimeType: 'application/vnd.google-apps.folder'
-				})
-			});
-			const rootFolder = await createRootResponse.json();
-			rootFolderId = rootFolder.id;
+	const lockPromise = (async () => {
+		try {
+			if (provider === 'google-drive') {
+				await ensureGoogleDriveFolder(seriesTitle, credentials.accessToken);
+			} else if (provider === 'mega') {
+				await ensureMEGAFolder(seriesTitle, credentials.megaEmail, credentials.megaPassword);
+			} else if (provider === 'webdav') {
+				await ensureWebDAVFolder(seriesTitle, credentials.webdavUrl, credentials.webdavUsername, credentials.webdavPassword);
+			}
+		} catch (error) {
+			// On error, remove lock so it can be retried
+			seriesFolderLocks.delete(lockKey);
+			throw error;
 		}
-
-		// Now ensure series folder exists under root folder
-		const seriesQuery = `name='${escapedSeriesTitle}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-		const seriesSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(seriesQuery)}&fields=files(id,name)`;
-
-		const seriesResponse = await fetch(seriesSearchUrl, {
-			headers: { 'Authorization': `Bearer ${accessToken}` }
-		});
-		const seriesData = await seriesResponse.json();
-
-		let seriesFolderId: string;
-		if (seriesData.files && seriesData.files.length > 0) {
-			seriesFolderId = seriesData.files[0].id;
-		} else {
-			// Create series folder
-			const createSeriesResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${accessToken}`,
-					'Content-Type': 'application/json'
-				},
-				body: JSON.stringify({
-					name: seriesTitle,
-					mimeType: 'application/vnd.google-apps.folder',
-					parents: [rootFolderId]
-				})
-			});
-			const seriesFolder = await createSeriesResponse.json();
-			seriesFolderId = seriesFolder.id;
-		}
-
-		// Cache the folder ID (replace the promise with the actual ID)
-		gdriveFolderCache.set(seriesTitle, seriesFolderId);
-		return seriesFolderId;
 	})();
 
-	// Store the promise in the cache
-	gdriveFolderCache.set(seriesTitle, folderPromise);
+	seriesFolderLocks.set(lockKey, lockPromise);
+	await lockPromise;
 
-	try {
-		return await folderPromise;
-	} catch (error) {
-		// On error, remove from cache so it can be retried
-		gdriveFolderCache.delete(seriesTitle);
-		throw error;
+	// Return provider-specific data
+	if (provider === 'google-drive') {
+		return await ensureGoogleDriveFolder(seriesTitle, credentials.accessToken);
+	}
+}
+
+/**
+ * Google Drive: Ensure series folder exists and return folder ID
+ */
+async function ensureGoogleDriveFolder(seriesTitle: string, accessToken: string): Promise<string> {
+	const escapedSeriesTitle = seriesTitle.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+
+	// Ensure mokuro-reader root folder exists
+	const rootQuery = `name='mokuro-reader' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+	const rootSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(rootQuery)}&fields=files(id,name)`;
+	const rootResponse = await fetch(rootSearchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+	const rootData = await rootResponse.json();
+
+	let rootFolderId: string;
+	if (rootData.files?.length > 0) {
+		rootFolderId = rootData.files[0].id;
+	} else {
+		const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+			method: 'POST',
+			headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name: 'mokuro-reader', mimeType: 'application/vnd.google-apps.folder' })
+		});
+		rootFolderId = (await createResponse.json()).id;
+	}
+
+	// Ensure series folder exists
+	const seriesQuery = `name='${escapedSeriesTitle}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+	const seriesSearchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(seriesQuery)}&fields=files(id,name)`;
+	const seriesResponse = await fetch(seriesSearchUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+	const seriesData = await seriesResponse.json();
+
+	if (seriesData.files?.length > 0) {
+		return seriesData.files[0].id;
+	}
+
+	const createResponse = await fetch('https://www.googleapis.com/drive/v3/files', {
+		method: 'POST',
+		headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+		body: JSON.stringify({ name: seriesTitle, mimeType: 'application/vnd.google-apps.folder', parents: [rootFolderId] })
+	});
+	return (await createResponse.json()).id;
+}
+
+/**
+ * MEGA: Ensure series folder exists in main thread
+ * Workers will create their own Storage instances, but folders will already exist
+ */
+async function ensureMEGAFolder(seriesTitle: string, email: string, password: string): Promise<void> {
+	const { Storage } = await import('megajs');
+	const storage = new Storage({ email, password });
+	await storage.ready;
+
+	// Ensure mokuro-reader folder exists
+	let mokuroFolder = storage.root.children?.find((c: any) => c.name === 'mokuro-reader' && c.directory);
+	if (!mokuroFolder) {
+		mokuroFolder = await storage.root.mkdir('mokuro-reader');
+	}
+
+	// Ensure series folder exists
+	let seriesFolder = mokuroFolder.children?.find((c: any) => c.name === seriesTitle && c.directory);
+	if (!seriesFolder) {
+		await mokuroFolder.mkdir(seriesTitle);
+	}
+}
+
+/**
+ * WebDAV: Ensure series folder path exists
+ */
+async function ensureWebDAVFolder(seriesTitle: string, serverUrl: string, username: string, password: string): Promise<void> {
+	const authHeader = 'Basic ' + btoa(`${username}:${password}`);
+	const path = `mokuro-reader/${seriesTitle}`;
+	const parts = path.split('/').filter(p => p);
+
+	let currentPath = '';
+	for (const part of parts) {
+		currentPath += `/${part}`;
+		const folderUrl = `${serverUrl}${currentPath}`;
+
+		try {
+			const response = await fetch(folderUrl, {
+				method: 'MKCOL',
+				headers: { 'Authorization': authHeader }
+			});
+			// 201 = created, 405 = already exists (both OK)
+			if (!response.ok && response.status !== 405) {
+				console.warn(`Failed to create folder ${currentPath}: ${response.status}`);
+			}
+		} catch (error) {
+			console.warn(`Error creating folder ${currentPath}:`, error);
+		}
 	}
 }
 
@@ -433,11 +477,13 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 				const { metadata, filesData } = await prepareVolumeDataForWorker(item.volumeUuid);
 				const credentials = await getProviderCredentials(provider.type);
 
-				// For Google Drive, ensure folder exists BEFORE worker starts (prevents race conditions)
-				if (provider.type === 'google-drive' && credentials.accessToken) {
-					const seriesFolderId = await ensureGDriveSeriesFolder(item.seriesTitle, credentials.accessToken);
-					// Pass folder ID to worker so it doesn't need to create folders
-					credentials.seriesFolderId = seriesFolderId;
+				// Ensure series folder exists BEFORE worker starts (prevents race conditions)
+				// This is provider-agnostic and works for Google Drive, MEGA, and WebDAV
+				const folderData = await ensureSeriesFolder(provider.type, item.seriesTitle, credentials);
+
+				// For Google Drive, pass folder ID to worker to avoid redundant folder lookups
+				if (provider.type === 'google-drive' && folderData) {
+					credentials.seriesFolderId = folderData;
 				}
 
 				return {
