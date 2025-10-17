@@ -39,9 +39,6 @@ netstat -ano | findstr :4174 | awk '{print $5}' | head -1 | xargs -I {} taskkill
 
 **Why this matters**: Vite's preview server auto-increments the port if 4173 is occupied. Google OAuth is configured for localhost:4173 specifically, so any other port will break authentication.
 
-### Node.js Version Requirement
-**IMPORTANT**: This project requires Node.js 18.x. It is not compatible with Node.js 19+ or earlier versions. Use `nvm use` (an `.nvmrc` file is present) or manually switch to Node 18.
-
 ## Architecture
 
 ### Core Data Flow
