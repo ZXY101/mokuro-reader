@@ -514,19 +514,24 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 					showSnackbar(`Backed up ${item.volumeTitle} successfully`);
 					queueStore.update(q => q.filter(i => i.volumeUuid !== item.volumeUuid));
 
-					// For MEGA, manually add the uploaded file to cache for immediate UI update
-					// (Worker uses separate MEGA instance, so main thread needs to be notified)
-					if (provider.type === 'mega' && data?.fileId) {
-						const { megaCache } = await import('./sync/providers/mega/mega-cache');
+					// Add the uploaded file to cache immediately for ALL providers
+					// This ensures the UI updates right away, showing the file as backed up
+					if (data?.fileId) {
+						const { cacheManager } = await import('./sync/cache-manager');
+						const cache = cacheManager.getCache(provider.type);
 						const path = `${item.seriesTitle}/${item.volumeTitle}.cbz`;
-						// Cache is keyed by series title, not full path
-						megaCache.add(item.seriesTitle, {
-							fileId: data.fileId,
-							path,
-							modifiedTime: new Date().toISOString(),
-							size: 0 // Size unknown at this point, will be updated on next full fetch
-						});
-						console.log(`✅ Added ${path} to MEGA cache (series: ${item.seriesTitle})`);
+
+						if (cache && cache.add) {
+							// All providers now use the same interface: full path as first parameter
+							// The cache implementations internally extract the series title for Map grouping
+							cache.add(path, {
+								fileId: data.fileId,
+								path,
+								modifiedTime: new Date().toISOString(),
+								size: 0 // Size unknown at this point, will be updated on next full fetch
+							});
+							console.log(`✅ Added ${path} to ${provider.type} cache`);
+						}
 					}
 
 					// Note: Full cache refresh is deferred until all uploads complete (see checkAndTerminatePool)
