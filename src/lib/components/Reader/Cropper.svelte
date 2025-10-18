@@ -37,7 +37,7 @@
   async function onCrop() {
     if ($cropperStore?.image && pixels) {
       loading = true;
-      const imageData = await getCroppedImg($cropperStore.image, pixels);
+      const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
       updateLastCard(imageData, $cropperStore.sentence);
       close();
     }

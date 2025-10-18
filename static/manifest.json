@@ -53,7 +53,7 @@
   ],
   "start_url": "/",
   "background_color": "#030712",
-  "display": "standalone",
+  "display": "fullscreen",
   "scope": "/",
   "theme_color": "#030712",
   "description": "Reader for Mokuro processed manga"

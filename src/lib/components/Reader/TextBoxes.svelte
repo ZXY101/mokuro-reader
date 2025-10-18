@@ -61,7 +61,7 @@
         showCropper(URL.createObjectURL(src), sentence);
       } else {
         promptConfirmation('Add image to last created anki card?', async () => {
-          const imageData = await imageToWebp(src);
+          const imageData = await imageToWebp(src, $settings);
           updateLastCard(imageData, sentence);
         });
       }
