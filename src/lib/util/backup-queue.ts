@@ -37,6 +37,9 @@ const queueStore = writable<BackupQueueItem[]>([]);
 // Track if this queue is currently using the shared pool
 let processingStarted = false;
 
+// Mutex: Prevents multiple concurrent processQueue() executions
+let isProcessingQueue = false;
+
 // Series folder initialization lock (provider-agnostic)
 // Prevents multiple concurrent workers from racing to create the same series folder
 // Maps "provider:seriesTitle" -> Promise that resolves when folder is guaranteed to exist
@@ -617,51 +620,68 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 /**
  * Process the queue - unified backup handling for all providers
  * Processes all queued items concurrently (respecting worker pool limits)
+ *
+ * MUTEX: Only one execution of this function at a time to prevent duplicate task submission
  */
 async function processQueue(): Promise<void> {
-	// CRITICAL: Take queue snapshot BEFORE any await points
-	// This prevents race conditions where multiple processQueue() calls interleave
-	const queue = get(queueStore);
-	const queuedItems = queue.filter(item => item.status === 'queued');
-
-	// Mark processing as started and register as pool user if we have queued items
-	if (queuedItems.length > 0 && !processingStarted) {
-		processingStarted = true;
-		incrementPoolUsers();
-
-		// Pre-initialize the pool BEFORE processing any items
-		// This prevents the race condition where multiple backups wait for pool initialization
-		// and then resume in scrambled order
-		await getFileProcessingPool();
+	// Mutex check: If already processing, return immediately
+	// This prevents concurrent processQueue() calls from interfering with each other
+	if (isProcessingQueue) {
+		return;
 	}
 
-	// Process each queued item - worker pool will handle provider concurrency limits
-	queuedItems.forEach(item => {
+	try {
+		// Acquire mutex
+		isProcessingQueue = true;
 
-		// Mark as backing-up (must check BOTH volumeUuid AND provider to support multi-provider queuing)
-		queueStore.update(q =>
-			q.map(i => (i.volumeUuid === item.volumeUuid && i.provider === item.provider ? { ...i, status: 'backing-up' as const } : i))
-		);
+		// Read current queue state atomically (single source of truth)
+		const queue = get(queueStore);
+		const queuedItems = queue.filter(item => item.status === 'queued');
 
-		const processId = `backup-${item.volumeUuid}`;
+		// Nothing to do if no queued items
+		if (queuedItems.length === 0) {
+			return;
+		}
 
-		// Add progress tracker
-		const isExport = isPseudoProvider(item.provider);
-		progressTrackerStore.addProcess({
-			id: processId,
-			description: isExport ? `Exporting ${item.volumeTitle}` : `Backing up ${item.volumeTitle}`,
-			progress: 0,
-			status: 'Queued...'
+		// Mark processing as started and register as pool user
+		if (!processingStarted) {
+			processingStarted = true;
+			incrementPoolUsers();
+
+			// Pre-initialize the pool BEFORE processing any items
+			await getFileProcessingPool();
+		}
+
+		// Process each queued item - worker pool will handle provider concurrency limits
+		queuedItems.forEach(item => {
+			// Mark as backing-up (must check BOTH volumeUuid AND provider to support multi-provider queuing)
+			queueStore.update(q =>
+				q.map(i => (i.volumeUuid === item.volumeUuid && i.provider === item.provider ? { ...i, status: 'backing-up' as const } : i))
+			);
+
+			const processId = `backup-${item.volumeUuid}`;
+
+			// Add progress tracker
+			const isExport = isPseudoProvider(item.provider);
+			progressTrackerStore.addProcess({
+				id: processId,
+				description: isExport ? `Exporting ${item.volumeTitle}` : `Backing up ${item.volumeTitle}`,
+				progress: 0,
+				status: 'Queued...'
+			});
+
+			console.log(`[Backup Queue] Processing ${isExport ? 'export' : 'backup'}:`, {
+				volumeTitle: item.volumeTitle,
+				provider: item.provider
+			});
+
+			// Start backup/export (worker pool handles global concurrency)
+			processBackup(item, processId);
 		});
-
-		console.log(`[Backup Queue] Processing ${isExport ? 'export' : 'backup'}:`, {
-			volumeTitle: item.volumeTitle,
-			provider: item.provider
-		});
-
-		// Start backup/export (worker pool handles global concurrency)
-		processBackup(item, processId);
-	});
+	} finally {
+		// Release mutex
+		isProcessingQueue = false;
+	}
 }
 
 // Export the store for reactive subscriptions
