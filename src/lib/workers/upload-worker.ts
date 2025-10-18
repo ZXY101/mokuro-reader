@@ -1,8 +1,8 @@
 // Universal worker for compressing and uploading volume backups
 // Worker handles compression and upload for all cloud providers (Google Drive, WebDAV, MEGA)
 
-import { Uint8ArrayReader, Uint8ArrayWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
 import { Storage } from 'megajs';
+import { compressVolume, type MokuroMetadata } from '$lib/util/compress-volume';
 
 // Define the worker context
 const ctx: Worker = self as any;
@@ -12,7 +12,7 @@ interface CompressAndUploadMessage {
 	provider: 'google-drive' | 'webdav' | 'mega';
 	volumeTitle: string;
 	seriesTitle: string;
-	metadata: any; // Mokuro metadata
+	metadata: MokuroMetadata;
 	filesData: { filename: string; data: ArrayBuffer }[]; // Volume image files
 	credentials: ProviderCredentials;
 }
@@ -48,44 +48,6 @@ interface ErrorMessage {
 	error: string;
 }
 
-/**
- * Compress volume data into a CBZ file (Uint8Array)
- * Progress: 0-30% of overall process
- */
-async function compressVolume(
-	volumeTitle: string,
-	metadata: any,
-	filesData: { filename: string; data: ArrayBuffer }[],
-	onProgress: (loaded: number, total: number) => void
-): Promise<Uint8Array> {
-	console.log(`Worker: Compressing ${volumeTitle}...`);
-
-	// Create zip writer with Uint8Array output
-	const zipWriter = new ZipWriter(new Uint8ArrayWriter());
-
-	// Total items to add: all files + mokuro file
-	const totalItems = filesData.length + 1;
-	let completedItems = 0;
-
-	// Add image files inside a folder
-	const folderName = volumeTitle;
-	for (const { filename, data } of filesData) {
-		await zipWriter.add(`${folderName}/${filename}`, new Uint8ArrayReader(new Uint8Array(data)));
-		completedItems++;
-		onProgress(completedItems, totalItems);
-	}
-
-	// Add mokuro metadata file
-	await zipWriter.add(`${volumeTitle}.mokuro`, new TextReader(JSON.stringify(metadata)));
-	completedItems++;
-	onProgress(completedItems, totalItems);
-
-	// Close and get the compressed data
-	const uint8Array = await zipWriter.close();
-
-	console.log(`Worker: Compressed ${volumeTitle} (${uint8Array.length} bytes)`);
-	return uint8Array;
-}
 
 /**
  * Upload to Google Drive using resumable upload
@@ -402,8 +364,17 @@ ctx.addEventListener('message', async (event) => {
 		const { volumeTitle, seriesTitle, metadata, filesData, provider, credentials } = message;
 
 		// Phase 1: Compression (0-30%)
+		// Convert ArrayBuffers to Uint8Arrays for the shared compression function
+		const filesDataUint8: { filename: string; data: Uint8Array }[] = filesData.map(
+			({ filename, data }) => ({
+				filename,
+				data: new Uint8Array(data)
+			})
+		);
+
+		console.log(`Worker: Compressing ${volumeTitle}...`);
 		let compressionProgress = 0;
-		const cbzData = await compressVolume(volumeTitle, metadata, filesData, (completed, total) => {
+		const cbzData = await compressVolume(volumeTitle, metadata, filesDataUint8, (completed, total) => {
 			compressionProgress = (completed / total) * 30;
 			const progressMessage: ProgressMessage = {
 				type: 'progress',
@@ -412,6 +383,8 @@ ctx.addEventListener('message', async (event) => {
 			};
 			ctx.postMessage(progressMessage);
 		});
+
+		console.log(`Worker: Compressed ${volumeTitle} (${cbzData.length} bytes)`);
 
 		// Phase 2: Upload (30-100%)
 		let fileId: string;
