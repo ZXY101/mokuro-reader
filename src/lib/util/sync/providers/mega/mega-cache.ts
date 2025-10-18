@@ -149,24 +149,28 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 	add(path: string, metadata: CloudVolumeMetadata): void {
 		this.cache.update((cache) => {
 			const newCache = new Map(cache);
-			const existing = newCache.get(path);
+
+			// Extract series title from path (e.g., "SeriesTitle/VolumeTitle.cbz" -> "SeriesTitle")
+			// This matches how fetch() groups files by series title
+			const seriesTitle = path.split('/')[0];
+			const existing = newCache.get(seriesTitle);
 
 			if (existing) {
 				// Check if this file ID already exists, replace it
 				const index = existing.findIndex(f => f.fileId === metadata.fileId);
 				if (index >= 0) {
 					// Create new array with replacement (immutable)
-					newCache.set(path, [
+					newCache.set(seriesTitle, [
 						...existing.slice(0, index),
 						metadata,
 						...existing.slice(index + 1)
 					]);
 				} else {
 					// Create new array with addition (immutable)
-					newCache.set(path, [...existing, metadata]);
+					newCache.set(seriesTitle, [...existing, metadata]);
 				}
 			} else {
-				newCache.set(path, [metadata]);
+				newCache.set(seriesTitle, [metadata]);
 			}
 
 			return newCache;
