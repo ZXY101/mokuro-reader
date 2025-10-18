@@ -517,6 +517,8 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
  * When a download completes, processQueue() is called again to start the next item
  */
 async function processQueue(): Promise<void> {
+	// CRITICAL: Take queue snapshot BEFORE any await points
+	// This prevents race conditions where multiple processQueue() calls interleave
 	const queue = get(queueStore);
 	const queuedItems = queue.filter(item => item.status === 'queued');
 

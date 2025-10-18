@@ -619,6 +619,8 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
  * Processes all queued items concurrently (respecting worker pool limits)
  */
 async function processQueue(): Promise<void> {
+	// CRITICAL: Take queue snapshot BEFORE any await points
+	// This prevents race conditions where multiple processQueue() calls interleave
 	const queue = get(queueStore);
 	const queuedItems = queue.filter(item => item.status === 'queued');
 
@@ -636,9 +638,9 @@ async function processQueue(): Promise<void> {
 	// Process each queued item - worker pool will handle provider concurrency limits
 	queuedItems.forEach(item => {
 
-		// Mark as backing-up
+		// Mark as backing-up (must check BOTH volumeUuid AND provider to support multi-provider queuing)
 		queueStore.update(q =>
-			q.map(i => (i.volumeUuid === item.volumeUuid ? { ...i, status: 'backing-up' as const } : i))
+			q.map(i => (i.volumeUuid === item.volumeUuid && i.provider === item.provider ? { ...i, status: 'backing-up' as const } : i))
 		);
 
 		const processId = `backup-${item.volumeUuid}`;
