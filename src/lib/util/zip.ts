@@ -2,6 +2,7 @@ import type { VolumeMetadata } from '$lib/types';
 import { db } from '$lib/catalog/db';
 import { BlobReader, Uint8ArrayWriter, TextReader, ZipWriter } from '@zip.js/zip.js';
 import { compressVolume, type MokuroMetadata } from './compress-volume';
+import { backupQueue } from './backup-queue';
 
 export async function zipManga(
   manga: VolumeMetadata[],
@@ -12,21 +13,17 @@ export async function zipManga(
   const extension = asCbz ? 'cbz' : 'zip';
 
   if (individualVolumes) {
-    // Extract each volume individually
+    // Queue each volume for export (non-blocking with progress tracking)
     for (const volume of manga) {
       // Generate the filename for this specific volume
       const filename = includeSeriesTitle
         ? `${volume.series_title} - ${volume.volume_title}.${extension}`
         : `${volume.volume_title}.${extension}`;
 
-      await createAndDownloadArchive(
-        [volume], // Pass as array for consistency with the shared function
-        asCbz,
-        filename // Pass the pre-generated filename directly
-      );
+      backupQueue.queueVolumeForExport(volume, filename, extension);
     }
   } else {
-    // Extract all volumes as a single file
+    // Multi-volume export: Keep blocking approach for now (edge case, less common)
     const filename = `${manga[0].series_title}.${extension}`;
     await createAndDownloadArchive(manga, asCbz, filename);
   }
