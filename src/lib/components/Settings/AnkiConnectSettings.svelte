@@ -13,6 +13,10 @@
   let pictureField = $state($settings.ankiConnectSettings.pictureField);
   let sentenceField = $state($settings.ankiConnectSettings.sentenceField);
 
+  let heightField = $state($settings.ankiConnectSettings.heightField);
+  let widthField = $state($settings.ankiConnectSettings.widthField);
+  let qualityField = $state($settings.ankiConnectSettings.qualityField);
+
   let triggerMethod = $state($settings.ankiConnectSettings.triggerMethod);
 
   const triggerOptions = [
@@ -91,6 +95,41 @@
           bind:value={triggerMethod}
         />
       </Label>
+    </div>
+    <hr>
+    <h4>Quality Settings</h4>
+    <Helper>Allows you to customize the file size stored on your devices</Helper>
+    <div>
+      <Label>Max Height (0 = Ignore; 200 Recommended):</Label>
+      <Input
+        {disabled}
+        type="number"
+        bind:value={heightField}
+        on:change={() => {updateAnkiSetting('heightField', heightField); if (heightField < 0) heightField = 0;}}
+        min={0}
+      />
+    </div>
+    <div>
+      <Label>Max Width (0 = Ignore; 200 Recommended):</Label>
+      <Input
+        {disabled}
+        type="number"
+        bind:value={widthField}
+        on:change={() => {updateAnkiSetting('widthField', widthField); if (widthField < 0) widthField = 0;}}
+        min={0}
+      />
+    </div>
+    <div>
+      <Label>Quality (Between 0 and 1; 0.5 Recommended):</Label>
+      <Input
+        {disabled}
+        type="number"
+        bind:value={qualityField}
+        on:change={() => updateAnkiSetting('qualityField', qualityField)}
+        min={0}
+        max={1} 
+        step="0.1"
+      />
     </div>
   </div>
 </AccordionItem>
