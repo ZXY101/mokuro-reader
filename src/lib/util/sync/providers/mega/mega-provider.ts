@@ -121,8 +121,8 @@ export class MegaProvider implements SyncProvider {
 	readonly type = 'mega' as const;
 	readonly name = 'MEGA';
 	readonly supportsWorkerDownload = true; // Workers can download via MEGA API from share links
-	readonly uploadConcurrencyLimit = 2; // More conservative for MEGA API
-	readonly downloadConcurrencyLimit = 2;
+	readonly uploadConcurrencyLimit = 6; // Higher limit - MEGA benefits from more concurrent connections
+	readonly downloadConcurrencyLimit = 6;
 
 	private storage: any = null;
 	private mokuroFolder: any = null;
