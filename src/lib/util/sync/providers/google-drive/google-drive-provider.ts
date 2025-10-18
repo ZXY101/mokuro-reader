@@ -17,8 +17,8 @@ export class GoogleDriveProvider implements SyncProvider {
 	readonly type = 'google-drive' as const;
 	readonly name = 'Google Drive';
 	readonly supportsWorkerDownload = true; // Workers can download directly with access token
-	readonly uploadConcurrencyLimit = 3;
-	readonly downloadConcurrencyLimit = 3;
+	readonly uploadConcurrencyLimit = 4;
+	readonly downloadConcurrencyLimit = 4;
 
 	private readerFolderId: string | null = null;
 
