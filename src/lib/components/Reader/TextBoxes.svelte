@@ -111,8 +111,9 @@
     color: black;
     padding: 0;
     position: absolute;
-    line-height: 1.1em;
+    line-height: 1.7;
     font-size: 16pt;
+    font-family: 'Noto Sans JP', sans-serif;
     white-space: nowrap;
     border: 1px solid rgba(0, 0, 0, 0);
     z-index: 11;
@@ -120,6 +121,8 @@
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   .textBox:focus,
@@ -132,15 +135,18 @@
     display: none;
     white-space: nowrap;
     letter-spacing: 0.1em;
-    line-height: 1.1em;
+    line-height: 1.7;
     margin: 0;
     background-color: rgb(255, 255, 255);
     font-weight: var(--bold);
+    font-family: 'Noto Sans JP', sans-serif;
     z-index: 11;
     user-select: text;
     -webkit-user-select: text;
     -moz-user-select: text;
     -ms-user-select: text;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   .textBox:focus p,
