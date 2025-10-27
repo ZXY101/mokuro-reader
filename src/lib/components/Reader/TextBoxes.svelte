@@ -12,6 +12,17 @@
 
   let { page, src, volumeUuid }: Props = $props();
 
+  interface TextBoxData {
+    left: string;
+    top: string;
+    width: string;
+    height: string;
+    fontSize: string;
+    writingMode: string;
+    lines: string[];
+    area: number;
+  }
+
   let textBoxes = $derived(
     page.blocks
       .map((block) => {
@@ -20,23 +31,35 @@
 
         let [_xmin, _ymin, _xmax, _ymax] = box;
 
-        const xmin = clamp(_xmin, 0, img_width);
-        const ymin = clamp(_ymin, 0, img_height);
-        const xmax = clamp(_xmax, 0, img_width);
-        const ymax = clamp(_ymax, 0, img_height);
+        // Expand bounding box by 10% (5% on each side) to give text more room
+        const originalWidth = _xmax - _xmin;
+        const originalHeight = _ymax - _ymin;
+        const expansionX = originalWidth * 0.05;
+        const expansionY = originalHeight * 0.05;
+
+        const xmin = clamp(_xmin - expansionX, 0, img_width);
+        const ymin = clamp(_ymin - expansionY, 0, img_height);
+        const xmax = clamp(_xmax + expansionX, 0, img_width);
+        const ymax = clamp(_ymax + expansionY, 0, img_height);
 
         const width = xmax - xmin;
         const height = ymax - ymin;
         const area = width * height;
 
-        const textBox = {
+        // Replace manual ellipsis with proper ellipsis character (…)
+        // Handle both ASCII periods (...) and full-width periods (．．．)
+        const processedLines = lines.map(line =>
+          line.replace(/\.\.\./g, '…').replace(/．．．/g, '…')
+        );
+
+        const textBox: TextBoxData = {
           left: `${xmin}px`,
           top: `${ymin}px`,
           width: `${width}px`,
           height: `${height}px`,
           fontSize: $settings.fontSize === 'auto' ? `${font_size}px` : `${$settings.fontSize}pt`,
           writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
-          lines,
+          lines: processedLines,
           area
         };
 
@@ -53,6 +76,100 @@
   let contenteditable = $derived($settings.textEditable);
 
   let triggerMethod = $derived($settings.ankiConnectSettings.triggerMethod || 'both');
+
+  // Track adjusted font sizes for each textbox
+  let adjustedFontSizes = $state<Map<number, string>>(new Map());
+  // Track which textboxes need word wrapping enabled
+  let needsWrapping = $state<Set<number>>(new Set());
+
+  // Svelte action to adjust font size when element is mounted
+  function handleTextBoxMount(element: HTMLDivElement, params: [number, string]) {
+    const [index, initialFontSize] = params;
+
+    if (display !== 'block') return;
+
+    // Use requestAnimationFrame to ensure the DOM is fully rendered
+    requestAnimationFrame(() => {
+      // Parse the initial font size to get numeric value
+      const match = initialFontSize.match(/(\d+(?:\.\d+)?)(px|pt)/);
+      if (!match) return;
+
+      const originalSize = parseFloat(match[1]);
+      const unit = match[2];
+      const minFontSize = 8; // Minimum font size in px
+
+      // Convert to px for consistent handling
+      let originalInPx = unit === 'pt' ? originalSize * 1.333 : originalSize;
+
+      // Check if content overflows
+      const isOverflowing = () => {
+        return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
+      };
+
+      // Test nowrap mode: reduce font size until it fits
+      element.style.whiteSpace = 'nowrap';
+      element.style.wordWrap = 'normal';
+      element.style.overflowWrap = 'normal';
+      element.style.fontSize = `${originalInPx}px`;
+
+      let noWrapSize = originalInPx;
+      while (isOverflowing() && noWrapSize > minFontSize) {
+        noWrapSize -= 1;
+        element.style.fontSize = `${noWrapSize}px`;
+      }
+
+      // Test wrap mode: reduce font size until it fits
+      element.style.whiteSpace = 'normal';
+      element.style.wordWrap = 'break-word';
+      element.style.overflowWrap = 'break-word';
+      element.style.fontSize = `${originalInPx}px`;
+
+      let wrapSize = originalInPx;
+      while (isOverflowing() && wrapSize > minFontSize) {
+        wrapSize -= 1;
+        element.style.fontSize = `${wrapSize}px`;
+      }
+
+      // Choose the mode that allows larger font size (prefer wrapping if 2x better)
+      let finalSize: number;
+      let useWrapping: boolean;
+
+      if (wrapSize >= noWrapSize * 1.2) {
+        // Wrapping allows significantly larger font (2x or more)
+        finalSize = wrapSize;
+        useWrapping = true;
+      } else {
+        // Nowrap is better or wrapping doesn't help enough
+        finalSize = noWrapSize;
+        useWrapping = false;
+      }
+
+      // Apply final settings
+      if (useWrapping) {
+        needsWrapping.add(index);
+        element.style.whiteSpace = 'normal';
+        element.style.wordWrap = 'break-word';
+        element.style.overflowWrap = 'break-word';
+      } else {
+        element.style.whiteSpace = 'nowrap';
+        element.style.wordWrap = 'normal';
+        element.style.overflowWrap = 'normal';
+      }
+
+      element.style.fontSize = `${finalSize}px`;
+
+      // Store adjusted size if it changed
+      if (finalSize < originalInPx) {
+        adjustedFontSizes.set(index, `${finalSize}px`);
+      }
+    });
+
+    return {
+      destroy() {
+        // Cleanup if needed
+      }
+    };
+  }
 
   async function onUpdateCard(lines: string[]) {
     if ($settings.ankiConnectSettings.enabled) {
@@ -85,12 +202,13 @@
 
 {#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`${volumeUuid}-textBox-${index}`)}
   <div
+    use:handleTextBoxMount={[index, fontSize]}
     class="textBox"
     style:width
     style:height
     style:left
     style:top
-    style:font-size={fontSize}
+    style:font-size={adjustedFontSizes.get(index) || fontSize}
     style:font-weight={fontWeight}
     style:display
     style:border
@@ -114,7 +232,7 @@
     line-height: 1.1em;
     font-size: 16pt;
     font-family: 'Noto Sans JP', sans-serif;
-    white-space: nowrap;
+    /* Word wrapping controlled dynamically by JavaScript */
     border: 1px solid rgba(0, 0, 0, 0);
     z-index: 11;
     user-select: text;
@@ -123,6 +241,7 @@
     -ms-user-select: text;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
+    box-sizing: border-box;
   }
 
   .textBox:focus,
@@ -132,8 +251,8 @@
   }
 
   .textBox p {
-    display: none;
-    white-space: nowrap;
+    visibility: hidden;
+    /* Word wrapping controlled dynamically by JavaScript */
     letter-spacing: 0.1em;
     line-height: 1.1em;
     margin: 0;
@@ -151,6 +270,6 @@
 
   .textBox:focus p,
   .textBox:hover p {
-    display: table;
+    visibility: visible;
   }
 </style>
