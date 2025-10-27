@@ -121,6 +121,8 @@ export class MegaProvider implements SyncProvider {
 	readonly type = 'mega' as const;
 	readonly name = 'MEGA';
 	readonly supportsWorkerDownload = true; // Workers can download via MEGA API from share links
+	readonly uploadConcurrencyLimit = 6;
+	readonly downloadConcurrencyLimit = 6;
 
 	private storage: any = null;
 	private mokuroFolder: any = null;
@@ -531,31 +533,21 @@ export class MegaProvider implements SyncProvider {
 		}
 
 		try {
+			await this.reinitialize();
 			await this.ensureMokuroFolder();
 
 			// Get all files from storage
 			const files = Object.values(this.storage.files || {});
 
-			// DEBUG: Log what we're seeing in MEGA
-			console.log(`🔍 MEGA Debug: Total files/folders in storage: ${files.length}`);
 			const rootItems = files.filter((f: any) => !f.parent);
-			console.log(`🔍 MEGA Debug: Root items: ${rootItems.length}`);
-			rootItems.forEach((item: any) => {
-				console.log(`  - ${item.directory ? '[DIR]' : '[FILE]'} ${item.name}`);
-			});
 
 			const allCbzFiles = files.filter((f: any) => !f.directory && (f.name || '').toLowerCase().endsWith('.cbz'));
-			console.log(`🔍 MEGA Debug: Total CBZ files anywhere: ${allCbzFiles.length}`);
-			allCbzFiles.slice(0, 5).forEach((f: any) => {
-				console.log(`  - ${f.name} (parent: ${f.parent?.name || 'root'})`);
-			});
 
 			// Find ALL mokuro-reader folders (there may be multiple from different sessions)
 			// Note: We don't check parent because MEGA's root folder location varies by account/locale
 			const mokuroFolders = files.filter(
 				(f: any) => f.name === MOKURO_FOLDER && f.directory
 			);
-			console.log(`🔍 MEGA Debug: Found ${mokuroFolders.length} mokuro-reader folder(s)`);
 
 			// Filter CBZ files that are in ANY mokuro-reader folder or its subfolders
 			const cbzFiles: import('../../provider-interface').CloudVolumeMetadata[] = [];
