@@ -31,10 +31,16 @@
 
         let [_xmin, _ymin, _xmax, _ymax] = box;
 
-        const xmin = clamp(_xmin, 0, img_width);
-        const ymin = clamp(_ymin, 0, img_height);
-        const xmax = clamp(_xmax, 0, img_width);
-        const ymax = clamp(_ymax, 0, img_height);
+        // Expand bounding box by 10% (5% on each side) to give text more room
+        const originalWidth = _xmax - _xmin;
+        const originalHeight = _ymax - _ymin;
+        const expansionX = originalWidth * 0.05;
+        const expansionY = originalHeight * 0.05;
+
+        const xmin = clamp(_xmin - expansionX, 0, img_width);
+        const ymin = clamp(_ymin - expansionY, 0, img_height);
+        const xmax = clamp(_xmax + expansionX, 0, img_width);
+        const ymax = clamp(_ymax + expansionY, 0, img_height);
 
         const width = xmax - xmin;
         const height = ymax - ymin;
