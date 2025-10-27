@@ -111,7 +111,7 @@
     color: black;
     padding: 0;
     position: absolute;
-    line-height: 1.7;
+    line-height: 1.2;
     font-size: 16pt;
     font-family: 'Noto Sans JP', sans-serif;
     white-space: nowrap;
@@ -135,7 +135,7 @@
     display: none;
     white-space: nowrap;
     letter-spacing: 0.1em;
-    line-height: 1.7;
+    line-height: 1.2;
     margin: 0;
     background-color: rgb(255, 255, 255);
     font-weight: var(--bold);
