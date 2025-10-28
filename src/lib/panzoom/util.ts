@@ -231,9 +231,9 @@ export function scrollImage(direction: 'up' | 'down') {
   const scrollAmount = window.innerHeight * 0.5; // 50% of visible page height
 
   if (direction === 'up') {
-    pz.moveTo(x, y + scrollAmount);
+    pz.smoothMoveTo(x, y + scrollAmount);
   } else {
-    pz.moveTo(x, y - scrollAmount);
+    pz.smoothMoveTo(x, y - scrollAmount);
   }
 
   keepInBounds();
