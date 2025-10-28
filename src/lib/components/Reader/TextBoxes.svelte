@@ -81,92 +81,116 @@
   let adjustedFontSizes = $state<Map<number, string>>(new Map());
   // Track which textboxes need word wrapping enabled
   let needsWrapping = $state<Set<number>>(new Set());
+  // Track which textboxes have been processed
+  let processedTextBoxes = $state<Set<number>>(new Set());
 
-  // Svelte action to adjust font size when element is mounted
-  function handleTextBoxMount(element: HTMLDivElement, params: [number, string]) {
+  // Calculate optimal font size for a textbox
+  function calculateOptimalFontSize(element: HTMLDivElement, initialFontSize: string) {
+    // Parse the initial font size to get numeric value
+    const match = initialFontSize.match(/(\d+(?:\.\d+)?)(px|pt)/);
+    if (!match) return null;
+
+    const originalSize = parseFloat(match[1]);
+    const unit = match[2];
+    const minFontSize = 8; // Minimum font size in px
+
+    // Convert to px for consistent handling
+    let originalInPx = unit === 'pt' ? originalSize * 1.333 : originalSize;
+
+    // Check if content overflows
+    const isOverflowing = () => {
+      return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
+    };
+
+    // Test nowrap mode: reduce font size until it fits
+    element.style.whiteSpace = 'nowrap';
+    element.style.wordWrap = 'normal';
+    element.style.overflowWrap = 'normal';
+    element.style.fontSize = `${originalInPx}px`;
+
+    let noWrapSize = originalInPx;
+    while (isOverflowing() && noWrapSize > minFontSize) {
+      noWrapSize -= 1;
+      element.style.fontSize = `${noWrapSize}px`;
+    }
+
+    // Test wrap mode: reduce font size until it fits
+    element.style.whiteSpace = 'normal';
+    element.style.wordWrap = 'break-word';
+    element.style.overflowWrap = 'break-word';
+    element.style.fontSize = `${originalInPx}px`;
+
+    let wrapSize = originalInPx;
+    while (isOverflowing() && wrapSize > minFontSize) {
+      wrapSize -= 1;
+      element.style.fontSize = `${wrapSize}px`;
+    }
+
+    // Choose the mode that allows larger font size (prefer wrapping if 1.2x better)
+    let finalSize: number;
+    let useWrapping: boolean;
+
+    if (wrapSize >= noWrapSize * 1.2) {
+      // Wrapping allows significantly larger font
+      finalSize = wrapSize;
+      useWrapping = true;
+    } else {
+      // Nowrap is better or wrapping doesn't help enough
+      finalSize = noWrapSize;
+      useWrapping = false;
+    }
+
+    return {
+      finalSize,
+      useWrapping,
+      originalInPx
+    };
+  }
+
+  // Handle hover event to calculate resize on demand
+  function handleTextBoxHover(element: HTMLDivElement, params: [number, string]) {
     const [index, initialFontSize] = params;
 
-    if (display !== 'block') return;
+    const onMouseEnter = () => {
+      // Skip if already processed or OCR is hidden
+      if (processedTextBoxes.has(index) || display !== 'block') return;
 
-    // Use requestAnimationFrame to ensure the DOM is fully rendered
-    requestAnimationFrame(() => {
-      // Parse the initial font size to get numeric value
-      const match = initialFontSize.match(/(\d+(?:\.\d+)?)(px|pt)/);
-      if (!match) return;
+      // Mark as processed immediately to prevent duplicate calculations
+      processedTextBoxes.add(index);
 
-      const originalSize = parseFloat(match[1]);
-      const unit = match[2];
-      const minFontSize = 8; // Minimum font size in px
+      // Use requestAnimationFrame to ensure the DOM is fully rendered
+      requestAnimationFrame(() => {
+        const result = calculateOptimalFontSize(element, initialFontSize);
+        if (!result) return;
 
-      // Convert to px for consistent handling
-      let originalInPx = unit === 'pt' ? originalSize * 1.333 : originalSize;
+        const { finalSize, useWrapping, originalInPx } = result;
 
-      // Check if content overflows
-      const isOverflowing = () => {
-        return element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth;
-      };
+        // Apply final settings
+        if (useWrapping) {
+          needsWrapping.add(index);
+          element.style.whiteSpace = 'normal';
+          element.style.wordWrap = 'break-word';
+          element.style.overflowWrap = 'break-word';
+        } else {
+          element.style.whiteSpace = 'nowrap';
+          element.style.wordWrap = 'normal';
+          element.style.overflowWrap = 'normal';
+        }
 
-      // Test nowrap mode: reduce font size until it fits
-      element.style.whiteSpace = 'nowrap';
-      element.style.wordWrap = 'normal';
-      element.style.overflowWrap = 'normal';
-      element.style.fontSize = `${originalInPx}px`;
+        element.style.fontSize = `${finalSize}px`;
 
-      let noWrapSize = originalInPx;
-      while (isOverflowing() && noWrapSize > minFontSize) {
-        noWrapSize -= 1;
-        element.style.fontSize = `${noWrapSize}px`;
-      }
+        // Store adjusted size if it changed
+        if (finalSize < originalInPx) {
+          adjustedFontSizes.set(index, `${finalSize}px`);
+        }
+      });
+    };
 
-      // Test wrap mode: reduce font size until it fits
-      element.style.whiteSpace = 'normal';
-      element.style.wordWrap = 'break-word';
-      element.style.overflowWrap = 'break-word';
-      element.style.fontSize = `${originalInPx}px`;
-
-      let wrapSize = originalInPx;
-      while (isOverflowing() && wrapSize > minFontSize) {
-        wrapSize -= 1;
-        element.style.fontSize = `${wrapSize}px`;
-      }
-
-      // Choose the mode that allows larger font size (prefer wrapping if 2x better)
-      let finalSize: number;
-      let useWrapping: boolean;
-
-      if (wrapSize >= noWrapSize * 1.2) {
-        // Wrapping allows significantly larger font (2x or more)
-        finalSize = wrapSize;
-        useWrapping = true;
-      } else {
-        // Nowrap is better or wrapping doesn't help enough
-        finalSize = noWrapSize;
-        useWrapping = false;
-      }
-
-      // Apply final settings
-      if (useWrapping) {
-        needsWrapping.add(index);
-        element.style.whiteSpace = 'normal';
-        element.style.wordWrap = 'break-word';
-        element.style.overflowWrap = 'break-word';
-      } else {
-        element.style.whiteSpace = 'nowrap';
-        element.style.wordWrap = 'normal';
-        element.style.overflowWrap = 'normal';
-      }
-
-      element.style.fontSize = `${finalSize}px`;
-
-      // Store adjusted size if it changed
-      if (finalSize < originalInPx) {
-        adjustedFontSizes.set(index, `${finalSize}px`);
-      }
-    });
+    element.addEventListener('mouseenter', onMouseEnter);
 
     return {
       destroy() {
-        // Cleanup if needed
+        element.removeEventListener('mouseenter', onMouseEnter);
       }
     };
   }
@@ -202,7 +226,7 @@
 
 {#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`${volumeUuid}-textBox-${index}`)}
   <div
-    use:handleTextBoxMount={[index, fontSize]}
+    use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
     style:width
     style:height
