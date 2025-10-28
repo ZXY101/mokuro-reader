@@ -2,6 +2,7 @@
   import { startCount, volumeStats } from '$lib/settings';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
 
   interface Props {
     count: number | undefined;
@@ -48,6 +49,13 @@
       }
     });
 
+    // If user is already active when Timer mounts (e.g., from volume navigation),
+    // start the timer immediately to avoid the race condition where recordActivity()
+    // was called before callbacks were initialized
+    if (get(activityTracker.active)) {
+      startTimer();
+    }
+
     return () => {
       stopTimer();
     };
@@ -59,7 +67,9 @@
   class="mix-blend-difference z-10 fixed opacity-50 right-20 top-5 p-10 m-[-2.5rem]"
   onclick={onClick}
 >
-  <p>
-    {active ? 'Active' : 'Paused'} | Minutes read: {$volumeStats?.timeReadInMinutes}
-  </p>
+  {#key $volumeStats?.timeReadInMinutes}
+    <p>
+      {active ? 'Active' : 'Paused'} | Minutes read: {$volumeStats?.timeReadInMinutes}
+    </p>
+  {/key}
 </button>

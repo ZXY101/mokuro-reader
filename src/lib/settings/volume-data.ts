@@ -1,11 +1,35 @@
 import { browser } from '$app/environment';
-import { derived, writable } from 'svelte/store';
+import { derived, writable, readable } from 'svelte/store';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
 import { currentSeries, currentVolume } from '$lib/catalog';
 import { settings as globalSettings } from './settings';
 
 import type { PageViewMode } from './settings';
+
+// Deep equality check for settings objects
+function settingsEqual(
+  a: Record<string, { rightToLeft: boolean; singlePageView: PageViewMode; hasCover: boolean }>,
+  b: Record<string, { rightToLeft: boolean; singlePageView: PageViewMode; hasCover: boolean }>
+): boolean {
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+
+  if (aKeys.length !== bKeys.length) return false;
+
+  for (const key of aKeys) {
+    if (!b[key]) return false;
+    if (
+      a[key].rightToLeft !== b[key].rightToLeft ||
+      a[key].singlePageView !== b[key].singlePageView ||
+      a[key].hasCover !== b[key].hasCover
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
 
 export type VolumeSettings = {
   rightToLeft?: boolean;
@@ -203,27 +227,44 @@ export const volumeSettings = derived(volumes, ($volumes) => {
 });
 
 // Effective settings that merge volume-specific overrides with current global defaults
-export const effectiveVolumeSettings = derived(
-  [volumes, globalSettings],
-  ([$volumes, $globalSettings]) => {
-    const effective: Record<
+// Uses custom readable with deep equality check to prevent re-renders when timer updates
+// (which modifies volumes but not settings)
+export const effectiveVolumeSettings = readable(
+  {} as Record<string, { rightToLeft: boolean; singlePageView: PageViewMode; hasCover: boolean }>,
+  (set) => {
+    let previousEffective: Record<
       string,
       { rightToLeft: boolean; singlePageView: PageViewMode; hasCover: boolean }
     > = {};
 
-    if ($volumes) {
-      Object.keys($volumes).forEach((key) => {
-        const volumeSettings = $volumes[key].settings;
-        effective[key] = {
-          rightToLeft: volumeSettings.rightToLeft ?? $globalSettings.volumeDefaults.rightToLeft,
-          singlePageView:
-            volumeSettings.singlePageView ?? $globalSettings.volumeDefaults.singlePageView,
-          hasCover: volumeSettings.hasCover ?? $globalSettings.volumeDefaults.hasCover
-        };
-      });
-    }
+    const unsubscribe = derived([volumes, globalSettings], ([$volumes, $globalSettings]) => {
+      const effective: Record<
+        string,
+        { rightToLeft: boolean; singlePageView: PageViewMode; hasCover: boolean }
+      > = {};
 
-    return effective;
+      if ($volumes) {
+        Object.keys($volumes).forEach((key) => {
+          const volumeSettings = $volumes[key].settings;
+          effective[key] = {
+            rightToLeft: volumeSettings.rightToLeft ?? $globalSettings.volumeDefaults.rightToLeft,
+            singlePageView:
+              volumeSettings.singlePageView ?? $globalSettings.volumeDefaults.singlePageView,
+            hasCover: volumeSettings.hasCover ?? $globalSettings.volumeDefaults.hasCover
+          };
+        });
+      }
+
+      return effective;
+    }).subscribe((effective) => {
+      // Only emit if settings actually changed
+      if (!settingsEqual(previousEffective, effective)) {
+        previousEffective = effective;
+        set(effective);
+      }
+    });
+
+    return unsubscribe;
   }
 );
 
