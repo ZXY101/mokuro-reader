@@ -18,13 +18,18 @@
     { key: 'mobile', text: 'Mobile', value: $settings.mobile },
     { key: 'showTimer', text: 'Show timer', value: $settings.showTimer },
     { key: 'quickActions', text: 'Show quick actions', value: $settings.quickActions },
-    { key: 'invertColors', text: 'Invert colors of the images', value: $settings.invertColors },
-    { key: 'nightMode', text: 'Night mode (strong red filter)', value: $settings.nightMode }
-  ] as { key: SettingsKey; text: string; value: any }[]);
+    { key: 'invertColors', text: 'Invert colors of the images', value: $settings.invertColors, shortcut: 'I' },
+    { key: 'nightMode', text: 'Night mode (strong red filter)', value: $settings.nightMode, shortcut: 'N' }
+  ] as { key: SettingsKey; text: string; value: any; shortcut?: string }[]);
 </script>
 
-{#each toggles as { key, text, value }}
-  <Toggle size="small" checked={value} on:change={() => updateSetting(key, !value)}>{text}</Toggle>
+{#each toggles as { key, text, value, shortcut }}
+  <Toggle size="small" checked={value} on:change={() => updateSetting(key, !value)}>
+    {text}
+    {#if shortcut}
+      <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">({shortcut})</span>
+    {/if}
+  </Toggle>
 {/each}
 
 <div class="mt-4">
