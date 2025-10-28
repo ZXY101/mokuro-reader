@@ -421,7 +421,7 @@
   onresize={() => {
     windowWidth = window.innerWidth;
     windowHeight = window.innerHeight;
-    zoomDefault();
+    zoomDefaultWithLayoutWait();
   }}
   onkeyup={handleShortcuts}
   ontouchstart={handleTouchStart}
