@@ -228,7 +228,7 @@ export function scrollImage(direction: 'up' | 'down') {
   if (!pz) return;
 
   const { x, y } = pz.getTransform();
-  const scrollAmount = window.innerHeight * 0.5; // 50% of visible page height
+  const scrollAmount = window.innerHeight * 0.75; // 75% of visible page height
 
   if (direction === 'up') {
     pz.smoothMoveTo(x, y + scrollAmount);
