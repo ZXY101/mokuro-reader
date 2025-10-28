@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { zoomDefault } from '$lib/panzoom';
   import {
     effectiveVolumeSettings,
     updateProgress,
@@ -9,6 +8,7 @@
     type VolumeSettingsKey,
     type PageViewMode
   } from '$lib/settings';
+  import { zoomDefault } from '$lib/panzoom';
   import { AccordionItem, Helper, Toggle, Label, Select } from 'flowbite-svelte';
 
   const volumeId = $page.params.volume;
@@ -17,8 +17,8 @@
 
   let toggles = $derived([
     { key: 'rightToLeft', text: 'Right to left', value: settings.rightToLeft },
-    { key: 'hasCover', text: 'First page is cover', value: settings.hasCover }
-  ] as { key: VolumeSettingsKey; text: string; value: any }[]);
+    { key: 'hasCover', text: 'First page is cover', value: settings.hasCover, shortcut: 'C' }
+  ] as { key: VolumeSettingsKey; text: string; value: any; shortcut?: string }[]);
 
   const pageViewModes: { value: PageViewMode; name: string }[] = [
     { value: 'single', name: 'Single page' },
@@ -27,11 +27,13 @@
   ];
 
   function onChange(key: VolumeSettingsKey, value: any) {
-    updateVolumeSetting(volumeId, key, !value);
     if (key === 'hasCover') {
+      updateVolumeSetting(volumeId, key, !value);
       const pageClamped = Math.max($volumes[volumeId].progress - 1, 1);
       updateProgress(volumeId, pageClamped);
       zoomDefault();
+    } else {
+      updateVolumeSetting(volumeId, key, !value);
     }
   }
 
@@ -58,8 +60,13 @@
         on:change={onPageViewModeChange}
       />
     </div>
-    {#each toggles as { key, text, value }}
-      <Toggle size="small" checked={value} on:change={() => onChange(key, value)}>{text}</Toggle>
+    {#each toggles as { key, text, value, shortcut }}
+      <Toggle size="small" checked={value} on:change={() => onChange(key, value)}>
+        {text}
+        {#if shortcut}
+          <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">({shortcut})</span>
+        {/if}
+      </Toggle>
     {/each}
   </div>
 </AccordionItem>

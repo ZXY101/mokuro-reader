@@ -5,12 +5,13 @@
   import {
     Panzoom,
     panzoomStore,
+    scrollImage,
     toggleFullScreen,
     zoomDefault,
     zoomDefaultWithLayoutWait,
     zoomFitToScreen
   } from '$lib/panzoom';
-  import { progress, settings, updateProgress, type VolumeSettings } from '$lib/settings';
+  import { effectiveVolumeSettings, progress, settings, updateProgress, updateSetting, updateVolumeSetting, volumes, type VolumeSettings } from '$lib/settings';
   import { clamp, debounce, fireExstaticEvent } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
@@ -34,12 +35,25 @@
     volumeSettings: VolumeSettings;
   }
 
-  let { volumeSettings }: Props = $props();
+  let { volumeSettings: _volumeSettingsProp }: Props = $props();
+
+  let volume = $derived($currentVolume);
+  let volumeData = $derived($currentVolumeData);
+
+  // Use store directly for reactivity instead of prop
+  let volumeSettings = $derived($effectiveVolumeSettings[volume?.volume_uuid || ''] || _volumeSettingsProp);
 
   let start: Date;
 
   function mouseDown() {
     start = new Date();
+  }
+
+  export function toggleHasCover(volumeId: string) {
+    updateVolumeSetting(volumeId, 'hasCover', !volumeSettings.hasCover);
+    const pageClamped = Math.max($volumes[volumeId].progress - 1, 1);
+    updateProgress(volumeId, pageClamped);
+    zoomDefault();
   }
 
   function left(_e: any, ingoreTimeOut?: boolean) {
@@ -170,6 +184,8 @@
         left(event, true);
         return;
       case 'ArrowUp':
+        scrollImage('up');
+        return;
       case 'PageUp':
         changePage(page - navAmount, true);
         return;
@@ -177,6 +193,8 @@
         right(event, true);
         return;
       case 'ArrowDown':
+        scrollImage('down');
+        return;
       case 'PageDown':
       case 'Space':
         changePage(page + navAmount, true);
@@ -191,6 +209,17 @@
         return;
       case 'KeyF':
         toggleFullScreen();
+        return;
+      case 'KeyI':
+        updateSetting('invertColors', !$settings.invertColors);
+        return;
+      case 'KeyN':
+        updateSetting('nightMode', !$settings.nightMode);
+        return;
+      case 'KeyC':
+        if (volume) {
+          toggleHasCover(volume.volume_uuid);
+        }
         return;
       case 'Escape':
         if (volume) {
@@ -324,8 +353,7 @@
       });
     }
   });
-  let volume = $derived($currentVolume);
-  let volumeData = $derived($currentVolumeData);
+
   let pages = $derived(volumeData?.pages || []);
   let page = $derived($progress?.[volume?.volume_uuid || 0] || 1);
   let index = $derived(page - 1);

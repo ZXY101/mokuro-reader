@@ -84,7 +84,7 @@ const defaultSettings: Settings = {
   pageNum: true,
   charCount: false,
   mobile: false,
-  bounds: false,
+  bounds: true,
   backgroundColor: '#030712',
   swipeThreshold: 50,
   edgeButtonWidth: 40,
