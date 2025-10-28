@@ -16,6 +16,7 @@
   import { backupQueue } from '$lib/util/backup-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
+  import { onMount } from 'svelte';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -359,6 +360,20 @@
       }
     );
   }
+
+  onMount(() => {
+    function handleKeydown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        goto('/');
+      }
+    }
+
+    window.addEventListener('keydown', handleKeydown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeydown);
+    };
+  });
 </script>
 
 <svelte:head>
