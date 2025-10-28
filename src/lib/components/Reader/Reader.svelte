@@ -5,6 +5,7 @@
   import {
     Panzoom,
     panzoomStore,
+    scrollImage,
     toggleFullScreen,
     zoomDefault,
     zoomDefaultWithLayoutWait,
@@ -183,6 +184,8 @@
         left(event, true);
         return;
       case 'ArrowUp':
+        scrollImage('up');
+        return;
       case 'PageUp':
         changePage(page - navAmount, true);
         return;
@@ -190,6 +193,8 @@
         right(event, true);
         return;
       case 'ArrowDown':
+        scrollImage('down');
+        return;
       case 'PageDown':
       case 'Space':
         changePage(page + navAmount, true);

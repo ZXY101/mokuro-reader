@@ -37,9 +37,7 @@ export function initPanzoom(node: HTMLElement) {
     filterKey: (e: any) => {
       if (
         e.key === 'ArrowLeft' ||
-        e.key === 'ArrowRight' ||
-        e.key === 'ArrowUp' ||
-        e.key === 'ArrowDown'
+        e.key === 'ArrowRight'
       ) {
         return true;
       }
@@ -224,6 +222,21 @@ export function keepInBounds() {
       transform.y = maxY;
     }
   }
+}
+
+export function scrollImage(direction: 'up' | 'down') {
+  if (!pz) return;
+
+  const { x, y } = pz.getTransform();
+  const scrollAmount = 100; // pixels to scroll
+
+  if (direction === 'up') {
+    pz.moveTo(x, y + scrollAmount);
+  } else {
+    pz.moveTo(x, y - scrollAmount);
+  }
+
+  keepInBounds();
 }
 
 export function toggleFullScreen() {
