@@ -23,13 +23,13 @@ export function initPanzoom(node: HTMLElement) {
     beforeMouseDown: (e) => {
       const target = e.target as HTMLElement;
       // Check if the target is a text box or a child of a text box
-      const isTextBox = target.classList.contains('textBox') || 
+      const isTextBox = target.classList.contains('textBox') ||
                         target.closest('.textBox') !== null;
       // Return true to prevent panning when clicking on text boxes
       // This allows text selection within text boxes
       return isTextBox;
     },
-    beforeWheel: (e) => e.altKey,
+    beforeWheel: (e) => !e.ctrlKey,
     onTouch: (e) => e.touches.length > 1,
     // Panzoom typing is wrong here
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -48,6 +48,27 @@ export function initPanzoom(node: HTMLElement) {
 
   pz.on('pan', () => keepInBounds());
   pz.on('zoom', () => keepInBounds());
+
+  // Add custom wheel handler for panning when Ctrl is not pressed
+  const wheelHandler = (e: WheelEvent) => {
+    if (!e.ctrlKey && pz) {
+      e.preventDefault();
+      const { x, y } = pz.getTransform();
+      // Pan vertically based on wheel deltaY
+      pz.moveTo(x, y - e.deltaY);
+      keepInBounds();
+    }
+  };
+
+  node.addEventListener('wheel', wheelHandler, { passive: false });
+
+  // Return cleanup function
+  return {
+    destroy() {
+      node.removeEventListener('wheel', wheelHandler);
+      pz?.dispose();
+    }
+  };
 }
 
 type PanX = 'left' | 'center' | 'right';
