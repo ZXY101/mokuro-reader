@@ -221,6 +221,12 @@
           toggleHasCover(volume.volume_uuid);
         }
         return;
+      case 'KeyP':
+        rotatePageMode();
+        return;
+      case 'KeyZ':
+        rotateZoomMode();
+        return;
       case 'Escape':
         if (volume) {
           goto(`/${volume.series_uuid}`);
@@ -443,6 +449,79 @@
       });
     }
   });
+
+  // Generic notification system for setting changes
+  let notificationMessage = $state<string>('');
+  let notificationKey = $state<string>('');
+  let notificationTimeout: number | undefined = undefined;
+
+  function showNotification(message: string, key: string) {
+    notificationMessage = message;
+    notificationKey = key;
+
+    // Clear existing timeout
+    if (notificationTimeout !== undefined) {
+      clearTimeout(notificationTimeout);
+    }
+
+    // Hide notification after 2 seconds
+    notificationTimeout = window.setTimeout(() => {
+      notificationMessage = '';
+      notificationKey = '';
+    }, 2000);
+  }
+
+  function rotatePageMode() {
+    if (!volume) return;
+
+    const currentMode = volumeSettings.singlePageView ?? 'auto';
+    let nextMode: 'single' | 'dual' | 'auto';
+
+    // Rotate through: single -> dual -> auto -> single
+    if (currentMode === 'single') {
+      nextMode = 'dual';
+    } else if (currentMode === 'dual') {
+      nextMode = 'auto';
+    } else {
+      nextMode = 'single';
+    }
+
+    updateVolumeSetting(volume.volume_uuid, 'singlePageView', nextMode);
+
+    // Show notification with the new mode
+    const labels = { single: 'Single Page', dual: 'Dual Page', auto: 'Auto Page' };
+    showNotification(labels[nextMode], `pagemode-${nextMode}`);
+  }
+
+  function rotateZoomMode() {
+    const currentMode = $settings.zoomDefault;
+    let nextMode: typeof currentMode;
+
+    // Rotate through: fitToScreen -> fitToWidth -> original -> keepZoom -> keepZoomStart -> fitToScreen
+    if (currentMode === 'zoomFitToScreen') {
+      nextMode = 'zoomFitToWidth';
+    } else if (currentMode === 'zoomFitToWidth') {
+      nextMode = 'zoomOriginal';
+    } else if (currentMode === 'zoomOriginal') {
+      nextMode = 'keepZoom';
+    } else if (currentMode === 'keepZoom') {
+      nextMode = 'keepZoomStart';
+    } else {
+      nextMode = 'zoomFitToScreen';
+    }
+
+    updateSetting('zoomDefault', nextMode);
+
+    // Show notification with the new mode
+    const labels = {
+      zoomFitToScreen: 'Fit to Screen',
+      zoomFitToWidth: 'Fit to Width',
+      zoomOriginal: 'Original Size',
+      keepZoom: 'Keep Zoom',
+      keepZoomStart: 'Keep Zoom, Pan to Top'
+    };
+    showNotification(labels[nextMode], `zoommode-${nextMode}`);
+  }
 </script>
 
 <svelte:window
@@ -510,6 +589,16 @@
       <p class="text-left" class:hidden={!$settings.pageNum}>{pageDisplay}</p>
     {/key}
   </button>
+  {#if notificationMessage}
+    {#key notificationKey}
+      <div
+        class="absolute left-1/2 top-5 z-20 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg transition-opacity"
+        style="backdrop-filter: blur(8px); background-color: rgba(17, 24, 39, 0.9);"
+      >
+        <p class="text-sm font-medium whitespace-nowrap">{notificationMessage}</p>
+      </div>
+    {/key}
+  {/if}
   <div class="flex" style:background-color={$settings.backgroundColor}>
     <Panzoom>
       <button

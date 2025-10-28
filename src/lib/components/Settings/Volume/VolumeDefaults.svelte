@@ -33,7 +33,10 @@
   <div class="flex flex-col gap-5">
     <Helper>The default settings that are applied when you start a new volume</Helper>
     <div>
-      <Label for="default-page-view-mode" class="mb-2">Page view mode</Label>
+      <Label for="default-page-view-mode" class="mb-2">
+        Page view mode
+        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(P)</span>
+      </Label>
       <Select
         id="default-page-view-mode"
         size="sm"

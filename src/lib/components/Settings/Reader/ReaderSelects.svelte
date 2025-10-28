@@ -41,7 +41,10 @@
 </script>
 
 <div>
-  <Label>On page zoom:</Label>
+  <Label>
+    On page zoom:
+    <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(Z)</span>
+  </Label>
   <Select
     items={zoomModes}
     value={zoomModeValue}
