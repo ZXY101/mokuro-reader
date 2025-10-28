@@ -150,6 +150,17 @@ export function zoomDefault() {
   }
 }
 
+export function zoomDefaultWithLayoutWait() {
+  // Double RAF ensures browser has completed layout reflow
+  // First RAF: waits for current layout calculations to finish
+  // Second RAF: ensures next paint frame has correct dimensions
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      zoomDefault();
+    });
+  });
+}
+
 export function keepInBounds() {
   if (!pz || !container) {
     return;

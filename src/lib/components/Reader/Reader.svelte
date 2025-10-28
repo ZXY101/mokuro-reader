@@ -7,6 +7,7 @@
     panzoomStore,
     toggleFullScreen,
     zoomDefault,
+    zoomDefaultWithLayoutWait,
     zoomFitToScreen
   } from '$lib/panzoom';
   import { progress, settings, updateProgress, type VolumeSettings } from '$lib/settings';
@@ -299,9 +300,10 @@
 
     // Wait for all required data and panzoom instance to be ready
     if (pg && pgs && pgs.length > 0 && pz) {
-      // Wait for next tick to ensure DOM has completed layout calculations for the new page/settings
+      // Wait for Svelte DOM updates, then wait for browser layout reflow
+      // This is critical for auto page mode switching to have correct dimensions
       tick().then(() => {
-        zoomDefault();
+        zoomDefaultWithLayoutWait();
       });
     }
   });
