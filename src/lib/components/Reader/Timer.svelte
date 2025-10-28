@@ -28,8 +28,12 @@
   function onClick() {
     if (count) {
       stopTimer();
+      // Reset activity tracker so next activity can restart timer
+      activityTracker.stop();
     } else {
       startTimer();
+      // Record activity to start the inactivity timeout
+      activityTracker.recordActivity();
     }
   }
 
