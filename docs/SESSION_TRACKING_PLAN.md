@@ -34,29 +34,12 @@ What we need:
 
 ## Data Structure
 
-### Page-Level Event (Active Session Only)
+### Page Turn Entry (Minimal Format)
 
 ```typescript
-type PageReadEvent = {
-  page: number;
-  timestamp: number;        // Unix timestamp (4 bytes vs 24 for ISO string)
-  durationSeconds: number;  // Time spent on this page
-  charCount: number;        // Characters on this page (for CPM calc)
-};
-```
-
-### Session Summary (Compacted Historical Data)
-
-```typescript
-type SessionSummary = {
-  pagesRead: number;
-  charsRead: number;
-  totalSeconds: number;
-  avgSecondsPerPage: number;
-  charsPerMinute: number;   // Pre-calculated for quick access
-  pageRange: [number, number]; // [first, last]
-  completedVolume: boolean;
-};
+// Super compact: just [timestamp, page]
+// Char count looked up from volume data when needed
+type PageTurn = [number, number];  // [timestamp_ms, page_number]
 ```
 
 ### Reading Session
@@ -65,17 +48,19 @@ type SessionSummary = {
 type ReadingSession = {
   id: string;               // UUID for uniqueness
   volumeId: string;         // Which volume this session is for
-  startTime: number;        // Unix timestamp
-  endTime?: number;         // Undefined if active, set when ended
-  sessionNumber: number;    // 1st read, 2nd read, etc. (for reread detection)
 
-  // Detailed events (only kept while active)
-  events: PageReadEvent[];
-
-  // Compacted summary (filled when session ends, events deleted)
-  summary?: SessionSummary;
+  // Compact page turn log: [[timestamp, page], [timestamp, page], ...]
+  // Duration calculated as difference between consecutive timestamps
+  // Char count looked up from volume page data when calculating stats
+  turns: PageTurn[];
 };
 ```
+
+**Benefits:**
+- 2 numbers per page turn instead of 4 fields
+- No redundant data (duration calculated on-demand, chars looked up)
+- Smaller JSON serialization
+- Simple to work with
 
 ### Enhanced Volume Data
 
@@ -91,19 +76,22 @@ type VolumeData = {
 
   // === NEW: Session-based tracking ===
   activeSession?: ReadingSession;     // Current session (with detailed events)
-  sessions: ReadingSession[];         // Historical sessions (compacted summaries)
+  sessions: ReadingSession[];         // Historical sessions (with full events)
   totalSessions: number;              // Counter for sessionNumber
 };
 ```
 
 ### Storage Impact
 
-- **Active session:** 200 pages × 24 bytes = ~4.8 KB (temporary)
-- **Historical session:** 100 bytes (summary only, events removed)
-- **10 historical sessions:** 1 KB
-- **100 historical sessions:** 10 KB
-- **Total per volume:** 1.5-10.5 KB
-- **For 100 volumes:** 150 KB - 1 MB ✅ Very reasonable!
+Using compact `[timestamp, page]` tuples:
+
+- **Per page turn:** 2 integers = ~16 bytes in JSON
+- **200-page session:** ~3.2 KB
+- **10 sessions:** ~32 KB
+- **100 sessions:** ~320 KB
+- **For 100 volumes (avg 20 sessions each):** ~6.4 MB
+
+**Much better than original design!** Still room for future compression if needed, but this format is simple and efficient.
 
 ---
 
@@ -115,21 +103,14 @@ type VolumeData = {
 - No `activeSession` exists
 - Last activity was > 30 minutes ago (configurable)
 - User navigates to volume from catalog (intentional start)
-- User explicitly clicks "Start new reading session" (optional)
 
 ```typescript
 function startNewSession(volumeId: string, initialPage: number) {
+  const now = Date.now();
   const session: ReadingSession = {
     id: generateUUID(),
     volumeId,
-    startTime: Date.now(),
-    sessionNumber: volumes[volumeId].totalSessions + 1,
-    events: [{
-      page: initialPage,
-      timestamp: Date.now(),
-      durationSeconds: 0,
-      charCount: getCharCountForPage(volumeId, initialPage)
-    }]
+    turns: [[now, initialPage]]  // First page turn
   };
 
   volumes[volumeId].activeSession = session;
@@ -137,12 +118,12 @@ function startNewSession(volumeId: string, initialPage: number) {
 }
 ```
 
-### 2. During Session (Event Tracking)
+### 2. During Session (Page Turn Tracking)
 
 **On every page turn:**
 
 ```typescript
-function onPageChange(volumeId: string, newPage: number, oldPage: number) {
+function onPageChange(volumeId: string, newPage: number) {
   const session = volumes[volumeId].activeSession;
   if (!session) {
     startNewSession(volumeId, newPage);
@@ -150,19 +131,9 @@ function onPageChange(volumeId: string, newPage: number, oldPage: number) {
   }
 
   const now = Date.now();
-  const lastEvent = session.events[session.events.length - 1];
-  const durationSeconds = (now - lastEvent.timestamp) / 1000;
 
-  // Update last event's duration
-  lastEvent.durationSeconds = durationSeconds;
-
-  // Add new event
-  session.events.push({
-    page: newPage,
-    timestamp: now,
-    durationSeconds: 0,
-    charCount: getCharCountForPage(volumeId, newPage)
-  });
+  // Just append [timestamp, page] - super simple!
+  session.turns.push([now, newPage]);
 
   // Update legacy fields for backward compat
   volumes[volumeId].progress = newPage;
@@ -170,56 +141,77 @@ function onPageChange(volumeId: string, newPage: number, oldPage: number) {
 }
 ```
 
-### 3. Session End (Compaction)
+### 3. Session End
 
 **Session ends when:**
 - Inactivity timeout (30+ min)
 - User navigates away from volume
 - User closes tab (beforeunload, best effort)
-- User completes volume
 - Manual trigger
 
 ```typescript
-function endSession(volumeId: string) {
+function endSession(volumeId: string, volumeData: VolumePageData) {
   const session = volumes[volumeId].activeSession;
   if (!session) return;
-
-  session.endTime = Date.now();
-
-  // Calculate summary stats
-  const totalSeconds = session.events.reduce((sum, e) => sum + e.durationSeconds, 0);
-  const totalChars = session.events.reduce((sum, e) => sum + e.charCount, 0);
-  const pages = new Set(session.events.map(e => e.page)).size;
-
-  session.summary = {
-    pagesRead: pages,
-    charsRead: totalChars,
-    totalSeconds,
-    avgSecondsPerPage: totalSeconds / pages,
-    charsPerMinute: (totalChars / totalSeconds) * 60,
-    pageRange: [
-      Math.min(...session.events.map(e => e.page)),
-      Math.max(...session.events.map(e => e.page))
-    ],
-    completedVolume: session.events.some(e => e.page === getLastPage(volumeId))
-  };
-
-  // COMPACTION: Remove detailed events
-  delete session.events;
 
   // Move to historical sessions
   volumes[volumeId].sessions.push(session);
   delete volumes[volumeId].activeSession;
 
-  // Update legacy aggregate fields
-  volumes[volumeId].timeReadInMinutes += Math.ceil(totalSeconds / 60);
-  volumes[volumeId].chars += totalChars;
+  // Update legacy aggregate fields for backward compatibility
+  const stats = calculateSessionStats(session, volumeData);
+  volumes[volumeId].timeReadInMinutes += Math.ceil(stats.totalSeconds / 60);
+  volumes[volumeId].chars += stats.totalChars;
+}
+
+// Helper: Calculate stats from turns (with break filtering)
+function calculateSessionStats(session: ReadingSession, volumeData: VolumePageData) {
+  const MAX_BREAK_MS = 5 * 60 * 1000; // 5 min = reading break
+  let totalSeconds = 0;
+  let totalChars = 0;
+
+  for (let i = 1; i < session.turns.length; i++) {
+    const [prevTime, prevPage] = session.turns[i - 1];
+    const [currTime, currPage] = session.turns[i];
+
+    const duration = (currTime - prevTime) / 1000;
+
+    // Skip if break was too long (user walked away)
+    if (duration > MAX_BREAK_MS / 1000) continue;
+
+    totalSeconds += duration;
+    totalChars += getCharCountForPage(volumeData, prevPage);
+  }
+
+  return { totalSeconds, totalChars };
 }
 ```
 
 ---
 
 ## Reading Speed Calculation
+
+### Handling Real Reading Behavior
+
+The `[timestamp, page]` format captures actual behavior, including:
+
+**Skimming/Preview:** User jumps ahead to preview, then returns to read properly
+```
+[[1000, 10], [1030, 15], [1040, 16], [1070, 10], [1100, 11], ...]
+         └─ jumped to 15-16 ─┘  └─ returned to read from 10 ─┘
+```
+
+**Strategy for time attribution:**
+1. Group turns by page number: `{10: [1000, 1070], 11: [1100], 15: [1030], 16: [1040]}`
+2. For pages visited multiple times, sum all durations leading to that page
+3. This accurately captures "time actually spent reading page 10" even if interrupted
+
+**Example calculation for page 10:**
+- First visit: `1030 - 1000 = 30s` (then jumped to preview)
+- Second visit: `1100 - 1070 = 30s` (actually reading)
+- Total time on page 10: `60s`
+
+This naturally handles rereading, backtracking, and preview behaviors without special cases!
 
 ### Smart Session Filtering Algorithm
 
@@ -229,33 +221,79 @@ interface ReadingSpeedResult {
   isPersonalized: boolean;
   confidence: 'high' | 'medium' | 'low' | 'none';
   sessionsUsed: number;
-  recentSessions?: SessionSummary[];
+  recentSessions?: ReadingSession[];
 }
 
-function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
+function calculateReadingSpeed(volumes: Volumes, volumesData: VolumePageData[]): ReadingSpeedResult {
+  const MAX_BREAK_MS = 5 * 60 * 1000; // 5 min
+
   // Gather all historical sessions across all volumes
-  const allSessions = Object.values(volumes)
-    .flatMap(v => v.sessions)
-    .filter(s => s.summary);
+  const allSessions = Object.entries(volumes)
+    .flatMap(([volumeId, volumeData]) =>
+      volumeData.sessions.map(s => ({
+        session: s,
+        pageData: volumesData.find(v => v.volume_uuid === volumeId)
+      }))
+    )
+    .filter(item => item.session.turns.length >= 2 && item.pageData);
 
-  // Filter out invalid sessions
-  const validSessions = allSessions.filter(s => {
-    const summary = s.summary!;
+  // Calculate stats and filter invalid sessions
+  const validSessions = allSessions
+    .map(({ session, pageData }) => {
+      // Group time spent by page (handles rereading/backtracking)
+      const timePerPage = new Map<number, number>();
 
-    // Must have read enough to be meaningful
-    if (summary.pagesRead < 10) return false;
+      // Process each turn pair
+      for (let i = 1; i < session.turns.length; i++) {
+        const [prevTime, prevPage] = session.turns[i - 1];
+        const [currTime, currPage] = session.turns[i];
+        const duration = (currTime - prevTime) / 1000;
 
-    // Must be reasonable speed (not "mark all as read")
-    if (summary.avgSecondsPerPage < 5) return false;  // < 5 sec/page is suspicious
+        // Skip breaks
+        if (duration > MAX_BREAK_MS / 1000) continue;
 
-    // Must have actual reading time
-    if (summary.totalSeconds < 60) return false;  // At least 1 minute
+        // Accumulate time for this page (even if visited multiple times)
+        const current = timePerPage.get(prevPage) || 0;
+        timePerPage.set(prevPage, current + duration);
+      }
 
-    // Reasonable CPM range (100-2000)
-    if (summary.charsPerMinute < 100 || summary.charsPerMinute > 2000) return false;
+      // Calculate totals
+      let totalSeconds = 0;
+      let totalChars = 0;
 
-    return true;
-  });
+      for (const [page, duration] of timePerPage.entries()) {
+        totalSeconds += duration;
+        totalChars += getCharCountForPage(pageData!, page);
+      }
+
+      const pagesRead = timePerPage.size;
+      const avgSecondsPerPage = pagesRead > 0 ? totalSeconds / pagesRead : 0;
+      const charsPerMinute = totalSeconds > 0 ? (totalChars / totalSeconds) * 60 : 0;
+
+      return {
+        session,
+        totalSeconds,
+        totalChars,
+        pagesRead,
+        avgSecondsPerPage,
+        charsPerMinute
+      };
+    })
+    .filter(stats => {
+      // Must have read enough to be meaningful
+      if (stats.pagesRead < 10) return false;
+
+      // Must be reasonable speed (not "mark all as read")
+      if (stats.avgSecondsPerPage < 5) return false;
+
+      // Must have actual reading time
+      if (stats.totalSeconds < 60) return false;
+
+      // Reasonable CPM range (100-2000)
+      if (stats.charsPerMinute < 100 || stats.charsPerMinute > 2000) return false;
+
+      return true;
+    });
 
   if (validSessions.length === 0) {
     return {
@@ -266,8 +304,12 @@ function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
     };
   }
 
-  // Sort by end time (most recent first)
-  validSessions.sort((a, b) => b.endTime! - a.endTime!);
+  // Sort by most recent turn timestamp
+  validSessions.sort((a, b) => {
+    const aLastTurn = a.session.turns[a.session.turns.length - 1][0];
+    const bLastTurn = b.session.turns[b.session.turns.length - 1][0];
+    return bLastTurn - aLastTurn;
+  });
 
   // Take last 5 sessions for averaging
   const recentSessions = validSessions.slice(0, 5);
@@ -276,9 +318,9 @@ function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
   let totalWeightedCPM = 0;
   let totalWeight = 0;
 
-  recentSessions.forEach((session, index) => {
+  recentSessions.forEach((stats, index) => {
     const weight = 1 / (index + 1); // 1.0, 0.5, 0.33, 0.25, 0.2
-    totalWeightedCPM += session.summary!.charsPerMinute * weight;
+    totalWeightedCPM += stats.charsPerMinute * weight;
     totalWeight += weight;
   });
 
@@ -296,7 +338,7 @@ function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
     isPersonalized: true,
     confidence,
     sessionsUsed: recentSessions.length,
-    recentSessions: recentSessions.map(s => s.summary!)
+    recentSessions: recentSessions.map(stats => stats.session)
   };
 }
 ```
@@ -412,9 +454,10 @@ function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
 - [ ] Update `VolumeData` type with session fields
 - [ ] Add session start/end logic to reader
 - [ ] Implement page event tracking
-- [ ] Add automatic compaction on session end
 - [ ] Migration script for existing data
 - [ ] Backward compatibility tests
+
+> **Note:** Automatic compaction deferred to future phase. All sessions retain full event data.
 
 ### Phase 2: Reading Speed & Estimates (Week 2)
 - [ ] Create `reading-speed.ts` utility
@@ -432,6 +475,7 @@ function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
 - [ ] Polish UI and responsive design
 
 ### Phase 4: Advanced Features (Future)
+- [ ] Session data compaction/compression (when needed)
 - [ ] Reading goals & challenges
 - [ ] Export stats as CSV/JSON
 - [ ] Comparison with other readers (anonymized, opt-in)
@@ -443,10 +487,10 @@ function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
 ## Success Metrics
 
 **Technical:**
-- ✅ Session data < 10 KB per volume
 - ✅ No performance degradation in reader
 - ✅ 100% backward compatibility
 - ✅ Reliable session end detection (>95%)
+- ✅ Storage usage acceptable for typical usage patterns (<5 MB for most users)
 
 **User Experience:**
 - ✅ Time estimates within 20% accuracy
@@ -487,9 +531,11 @@ function calculateReadingSpeed(volumes: Volumes): ReadingSpeedResult {
 
 - **Backward compatibility is critical** - users must not lose existing data
 - **Migration strategy:** Add new fields as optional, populate gradually
-- **Performance:** Session compaction happens on end, not during reading
+- **Performance:** No compaction initially; all event data retained
+- **Storage:** For typical usage (~10-20 sessions per volume), storage is negligible
 - **Privacy:** All data stays local, no telemetry unless user opts in
 - **Testing:** Need comprehensive tests for edge cases (very fast, very slow, rereads)
+- **Future optimization:** Consider compaction or compression if storage becomes an issue
 
 ---
 

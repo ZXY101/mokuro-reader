@@ -1,5 +1,8 @@
 <script lang="ts">
-  import { startCount, volumeStats } from '$lib/settings';
+  import { startCount, volumeStats, volumes } from '$lib/settings';
+  import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
+  import { currentVolumeCharacterCount } from '$lib/catalog';
+  import { calculateVolumeTimeToFinish } from '$lib/util/reading-speed';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
@@ -12,6 +15,13 @@
   let { count = $bindable(), volumeId }: Props = $props();
 
   let active = $derived(Boolean(count));
+
+  // Calculate time-to-finish
+  let timeEstimate = $derived.by(() => {
+    const volumeProgress = $volumes[volumeId];
+    const charsRead = volumeProgress?.chars || 0;
+    return calculateVolumeTimeToFinish($currentVolumeCharacterCount, charsRead, $personalizedReadingSpeed);
+  });
 
   function startTimer() {
     if (!count) {
@@ -68,8 +78,15 @@
   onclick={onClick}
 >
   {#key $volumeStats?.timeReadInMinutes}
-    <p>
-      {active ? 'Active' : 'Paused'} | Minutes read: {$volumeStats?.timeReadInMinutes}
-    </p>
+    <div class="text-right">
+      <p>
+        {active ? 'Active' : 'Paused'} | Minutes read: {$volumeStats?.timeReadInMinutes}
+      </p>
+      {#if timeEstimate}
+        <p class="text-sm">
+          {timeEstimate.displayText}
+        </p>
+      {/if}
+    </div>
   {/key}
 </button>
