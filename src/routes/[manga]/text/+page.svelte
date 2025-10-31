@@ -1,59 +1,87 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { currentVolume, currentVolumeData } from '$lib/catalog';
+  import { catalog } from '$lib/catalog';
+  import { db } from '$lib/catalog/db';
   import { getCharCount } from '$lib/util/count-chars';
   import { Button, Alert } from 'flowbite-svelte';
   import { ArrowLeftOutline, ClipboardOutline, CheckOutline } from 'flowbite-svelte-icons';
   import { Spinner } from 'flowbite-svelte';
-  import { onMount } from 'svelte';
   import type { VolumeData, VolumeMetadata } from '$lib/types';
+  import { onMount } from 'svelte';
 
-  let volumeId = $derived($page.params.volume || '');
-  let volume = $derived($currentVolume);
+  let seriesId = $derived($page.params.manga || '');
 
-  // Use state instead of derived to wait for data to fully load
-  let volumeData = $state<VolumeData | undefined>(undefined);
+  // Get series volumes from catalog
+  let seriesData = $derived(
+    $catalog?.find((item) => item.series_uuid === seriesId)
+  );
+  let volumes = $derived(
+    seriesData?.volumes
+      .filter(v => !v.isPlaceholder)
+      .sort((a, b) => a.volume_title.localeCompare(b.volume_title, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })) || []
+  );
+
+  // Use state to track loaded data
+  let volumesData = $state<Array<{ volume: VolumeMetadata; data: VolumeData }>>([]);
   let dataLoaded = $state(false);
 
-  // Load data on mount and wait for it
-  onMount(() => {
-    // Subscribe to currentVolumeData and wait for it to be non-null
-    const unsubscribe = currentVolumeData.subscribe(data => {
-      if (data) {
-        volumeData = data;
-        dataLoaded = true;
-      }
-    });
+  // Load all volume data on mount
+  onMount(async () => {
+    if (volumes.length > 0) {
+      const results = await Promise.all(
+        volumes.map(async (volume) => {
+          try {
+            const data = await db.volumes_data.get(volume.volume_uuid);
+            return data ? { volume, data } : null;
+          } catch (error) {
+            console.error(`Failed to load data for ${volume.volume_title}:`, error);
+            return null;
+          }
+        })
+      );
 
-    return unsubscribe;
+      // Filter out null results
+      volumesData = results.filter((item): item is { volume: VolumeMetadata; data: VolumeData } => item !== null);
+      dataLoaded = true;
+    }
   });
-
-  let pages = $derived(volumeData?.pages || []);
 
   // State for copy feedback
   let copySuccess = $state(false);
   let copyError = $state(false);
 
-  // Extract all text with page markers
+  // Extract all text with volume and page markers
   let formattedText = $derived.by(() => {
-    if (!pages || pages.length === 0) return '';
+    if (volumesData.length === 0) return '';
 
     const textParts: string[] = [];
 
-    pages.forEach((page, pageIndex) => {
-      // Add page marker
-      textParts.push(`━━━━━ Page ${pageIndex + 1} ━━━━━\n`);
+    volumesData.forEach(({ volume, data }) => {
+      const pages = data.pages || [];
 
-      // Extract all text from blocks
-      page.blocks.forEach(block => {
-        block.lines.forEach(line => {
-          textParts.push(line);
+      // Add volume marker
+      textParts.push(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      textParts.push(`Volume: ${volume.volume_title}`);
+      textParts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+
+      pages.forEach((pageData, pageIndex) => {
+        // Add page marker
+        textParts.push(`─── Page ${pageIndex + 1} ───\n`);
+
+        // Extract all text from blocks
+        pageData.blocks.forEach(block => {
+          block.lines.forEach(line => {
+            textParts.push(line);
+          });
         });
-      });
 
-      // Add blank line between pages
-      textParts.push('\n');
+        // Add blank line between pages
+        textParts.push('\n');
+      });
     });
 
     return textParts.join('\n');
@@ -61,8 +89,9 @@
 
   // Calculate stats
   let stats = $derived.by(() => {
-    if (!pages || pages.length === 0) {
+    if (volumesData.length === 0) {
       return {
+        volumeCount: 0,
         pageCount: 0,
         japaneseCharCount: 0,
         totalCharCount: 0,
@@ -72,39 +101,48 @@
       };
     }
 
-    const { charCount: japaneseCharCount, lineCount } = getCharCount(pages);
-    const pageCount = pages.length;
+    let totalPages = 0;
+    let totalJapaneseChars = 0;
+    let totalChars = 0;
+    let totalLines = 0;
+    let allText = '';
 
-    // Count total characters (including non-Japanese)
-    let totalCharCount = 0;
-    pages.forEach(page => {
-      page.blocks.forEach(block => {
-        block.lines.forEach(line => {
-          totalCharCount += line.length;
+    volumesData.forEach(({ data }) => {
+      const pages = data.pages || [];
+      totalPages += pages.length;
+
+      const { charCount, lineCount } = getCharCount(pages);
+      totalJapaneseChars += charCount;
+      totalLines += lineCount;
+
+      // Count total characters (including non-Japanese)
+      pages.forEach(pageData => {
+        pageData.blocks.forEach(block => {
+          block.lines.forEach(line => {
+            totalChars += line.length;
+            allText += line + ' ';
+          });
         });
       });
     });
 
-    // Count words (space-separated for English/romaji, or character count for Japanese)
-    const allText = pages
-      .flatMap(p => p.blocks.flatMap(b => b.lines))
-      .join(' ');
+    // Count words (space-separated)
     const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
 
     // Estimate reading time
     // Japanese: ~500 characters per minute
     // English: ~250 words per minute
-    // Use whichever gives a higher estimate (more conservative)
-    const japaneseMinutes = japaneseCharCount / 500;
+    const japaneseMinutes = totalJapaneseChars / 500;
     const englishMinutes = wordCount / 250;
     const estimatedMinutes = Math.ceil(Math.max(japaneseMinutes, englishMinutes));
 
     return {
-      pageCount,
-      japaneseCharCount,
-      totalCharCount,
+      volumeCount: volumesData.length,
+      pageCount: totalPages,
+      japaneseCharCount: totalJapaneseChars,
+      totalCharCount: totalChars,
       wordCount,
-      lineCount,
+      lineCount: totalLines,
       estimatedMinutes
     };
   });
@@ -128,33 +166,33 @@
     }
   }
 
-  function goBackToReader() {
-    goto(`/${volume?.series_uuid}/${volumeId}`);
+  function goBackToSeries() {
+    goto(`/${seriesId}`);
   }
 
-  function goBackToSeries() {
-    goto(`/${volume?.series_uuid}`);
+  function goBackToCatalog() {
+    goto('/');
   }
 </script>
 
 <svelte:head>
-  <title>{volume?.volume_title || 'Volume'} - Text View</title>
+  <title>{seriesData?.title || 'Series'} - Text View</title>
 </svelte:head>
 
-{#if dataLoaded && volume && volumeData && pages.length > 0}
+{#if dataLoaded && volumesData.length > 0 && seriesData}
   <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
       <!-- Header -->
       <div class="mb-8">
         <!-- Navigation Buttons -->
         <div class="flex flex-wrap gap-2 mb-4">
-          <Button size="sm" color="alternative" on:click={goBackToReader}>
-            <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
-            Back to Reader
-          </Button>
           <Button size="sm" color="alternative" on:click={goBackToSeries}>
             <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
             Back to Series
+          </Button>
+          <Button size="sm" color="alternative" on:click={goBackToCatalog}>
+            <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
+            Back to Catalog
           </Button>
           <Button size="sm" color="primary" on:click={copyText}>
             {#if copySuccess}
@@ -173,20 +211,26 @@
           </Alert>
         {/if}
 
-        <!-- Volume Title -->
+        <!-- Series Title -->
         <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          {volume.volume_title}
+          {seriesData.title}
         </h1>
         <p class="text-lg text-gray-600 dark:text-gray-400 mb-4">
-          {volume.series_title}
+          Complete Series Text
         </p>
 
         <!-- Stats -->
         <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-            Volume Statistics
+            Series Statistics
           </h2>
           <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Volumes</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.volumeCount.toLocaleString()}
+              </dd>
+            </div>
             <div>
               <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Pages</dt>
               <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
@@ -217,10 +261,12 @@
                 {stats.lineCount.toLocaleString()}
               </dd>
             </div>
-            <div>
+            <div class="col-span-2 sm:col-span-1">
               <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Est. Reading Time</dt>
               <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                {stats.estimatedMinutes} min
+                {stats.estimatedMinutes >= 60
+                  ? `${Math.floor(stats.estimatedMinutes / 60)}h ${stats.estimatedMinutes % 60}m`
+                  : `${stats.estimatedMinutes} min`}
               </dd>
             </div>
           </dl>
@@ -234,7 +280,7 @@
       <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div class="p-6">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            Full Text
+            Full Series Text
           </h2>
           <div
             class="bg-gray-50 dark:bg-gray-900 rounded-lg p-6 overflow-auto max-h-[800px] border border-gray-200 dark:border-gray-700"
@@ -250,20 +296,20 @@
       </div>
     </div>
   </div>
-{:else if !volume || !volumeData}
+{:else if !seriesData}
   <div class="flex items-center justify-center w-screen h-screen">
     <div class="text-center">
       <Spinner size="12" />
-      <p class="mt-4 text-gray-600 dark:text-gray-400">Loading volume text...</p>
+      <p class="mt-4 text-gray-600 dark:text-gray-400">Loading series...</p>
     </div>
   </div>
 {:else}
   <div class="flex items-center justify-center w-screen h-screen">
     <div class="text-center">
-      <p class="text-gray-600 dark:text-gray-400">No text data available for this volume.</p>
-      <Button class="mt-4" color="alternative" on:click={goBackToSeries}>
+      <p class="text-gray-600 dark:text-gray-400">No volumes available for this series.</p>
+      <Button class="mt-4" color="alternative" on:click={goBackToCatalog}>
         <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
-        Back to Series
+        Back to Catalog
       </Button>
     </div>
   </div>

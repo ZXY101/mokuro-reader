@@ -9,8 +9,7 @@
     ArrowRightOutline,
     CompressOutline,
     ImageOutline,
-    ZoomOutOutline,
-    FileLinesOutline
+    ZoomOutOutline
   } from 'flowbite-svelte-icons';
   import { imageToWebp, showCropper, updateLastCard } from '$lib/anki-connect';
   import { promptConfirmation } from '$lib/util';
@@ -54,13 +53,6 @@
     }
     open = false;
   }
-
-  function handleViewText() {
-    const manga = $page.params.manga;
-    const volume = $page.params.volume;
-    goto(`/${manga}/${volume}/text`);
-    open = false;
-  }
 </script>
 
 {#if $settings.quickActions}
@@ -81,9 +73,6 @@
         <ImageOutline />
       </SpeedDialButton>
     {/if}
-    <SpeedDialButton name="Text View" on:click={handleViewText}>
-      <FileLinesOutline />
-    </SpeedDialButton>
     <SpeedDialButton on:click={toggleFullScreen}>
       <CompressOutline />
     </SpeedDialButton>
