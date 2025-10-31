@@ -12,7 +12,7 @@
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
   import { deleteVolume, mangaStats } from '$lib/settings';
-  import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid, FileLinesOutline } from 'flowbite-svelte-icons';
   import { backupQueue } from '$lib/util/backup-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
@@ -361,6 +361,10 @@
     );
   }
 
+  function goToSeriesText() {
+    goto(`/${$page.params.manga}/text`);
+  }
+
   onMount(() => {
     function handleKeydown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
@@ -416,6 +420,10 @@
             </Button>
           {/if}
         {/if}
+        <Button color="blue" on:click={goToSeriesText}>
+          <FileLinesOutline class="w-4 h-4 me-2" />
+          View Series Text
+        </Button>
         <Button color="alternative" on:click={onDelete}>Remove manga</Button>
         <Button color="light" on:click={onExtract} disabled={loading}>
           {loading ? 'Extracting...' : 'Extract manga'}

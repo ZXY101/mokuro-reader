@@ -4,7 +4,7 @@
   import type { VolumeMetadata } from '$lib/types';
   import { promptConfirmation } from '$lib/util';
   import { Frame, ListgroupItem } from 'flowbite-svelte';
-  import { CheckCircleSolid, TrashBinSolid } from 'flowbite-svelte-icons';
+  import { CheckCircleSolid, TrashBinSolid, FileLinesOutline } from 'flowbite-svelte-icons';
   import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
   import BackupButton from './BackupButton.svelte';
@@ -32,11 +32,11 @@
     e.stopPropagation();
 
     promptConfirmation(
-      `Delete ${volName}?`, 
+      `Delete ${volName}?`,
       async (deleteStats = false) => {
         await db.volumes.where('volume_uuid').equals(volume.volume_uuid).delete();
         await db.volumes_data.where('volume_uuid').equals(volume.volume_uuid).delete();
-        
+
         // Only delete stats and progress if the checkbox is checked
         if (deleteStats) {
           deleteVolume(volume.volume_uuid);
@@ -53,14 +53,19 @@
         } else {
           goto('/');
         }
-      }, 
-      undefined, 
+      },
+      undefined,
       {
         label: "Also delete stats and progress?",
         storageKey: "deleteStatsPreference",
         defaultValue: false
       }
     );
+  }
+
+  function onViewTextClicked(e: Event) {
+    e.stopPropagation();
+    goto(`/${$page.params.manga}/${volume_uuid}/text`);
   }
 </script>
 
@@ -88,6 +93,13 @@
         </div>
         <div class="flex gap-2 items-center">
           <BackupButton {volume} class="mr-2" />
+          <button
+            onclick={onViewTextClicked}
+            class="flex items-center justify-center"
+            title="View text only"
+          >
+            <FileLinesOutline class="text-blue-400 hover:text-blue-500 z-10" />
+          </button>
           <button onclick={onDeleteClicked} class="flex items-center justify-center">
             <TrashBinSolid class="text-red-400 hover:text-red-500 z-10 poin" />
           </button>

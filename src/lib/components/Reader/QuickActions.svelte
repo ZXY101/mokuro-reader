@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { toggleFullScreen, zoomFitToScreen } from '$lib/panzoom';
   import { SpeedDial, SpeedDialButton } from 'flowbite-svelte';
   import { settings } from '$lib/settings';

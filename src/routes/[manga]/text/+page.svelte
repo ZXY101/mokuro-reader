@@ -1,0 +1,316 @@
+<script lang="ts">
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { catalog } from '$lib/catalog';
+  import { db } from '$lib/catalog/db';
+  import { getCharCount } from '$lib/util/count-chars';
+  import { Button, Alert } from 'flowbite-svelte';
+  import { ArrowLeftOutline, ClipboardOutline, CheckOutline } from 'flowbite-svelte-icons';
+  import { Spinner } from 'flowbite-svelte';
+  import type { VolumeData, VolumeMetadata } from '$lib/types';
+  import { onMount } from 'svelte';
+
+  let seriesId = $derived($page.params.manga || '');
+
+  // Get series volumes from catalog
+  let seriesData = $derived(
+    $catalog?.find((item) => item.series_uuid === seriesId)
+  );
+  let volumes = $derived(
+    seriesData?.volumes
+      .filter(v => !v.isPlaceholder)
+      .sort((a, b) => a.volume_title.localeCompare(b.volume_title, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      })) || []
+  );
+
+  // Use state to track loaded data
+  let volumesData = $state<Array<{ volume: VolumeMetadata; data: VolumeData }>>([]);
+  let dataLoaded = $state(false);
+
+  // Load all volume data on mount
+  onMount(async () => {
+    if (volumes.length > 0) {
+      const results = await Promise.all(
+        volumes.map(async (volume) => {
+          try {
+            const data = await db.volumes_data.get(volume.volume_uuid);
+            return data ? { volume, data } : null;
+          } catch (error) {
+            console.error(`Failed to load data for ${volume.volume_title}:`, error);
+            return null;
+          }
+        })
+      );
+
+      // Filter out null results
+      volumesData = results.filter((item): item is { volume: VolumeMetadata; data: VolumeData } => item !== null);
+      dataLoaded = true;
+    }
+  });
+
+  // State for copy feedback
+  let copySuccess = $state(false);
+  let copyError = $state(false);
+
+  // Extract all text with volume and page markers
+  let formattedText = $derived.by(() => {
+    if (volumesData.length === 0) return '';
+
+    const textParts: string[] = [];
+
+    volumesData.forEach(({ volume, data }) => {
+      const pages = data.pages || [];
+
+      // Add volume marker
+      textParts.push(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+      textParts.push(`Volume: ${volume.volume_title}`);
+      textParts.push(`━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+
+      pages.forEach((pageData, pageIndex) => {
+        // Add page marker
+        textParts.push(`─── Page ${pageIndex + 1} ───\n`);
+
+        // Extract all text from blocks
+        pageData.blocks.forEach(block => {
+          block.lines.forEach(line => {
+            textParts.push(line);
+          });
+        });
+
+        // Add blank line between pages
+        textParts.push('\n');
+      });
+    });
+
+    return textParts.join('\n');
+  });
+
+  // Calculate stats
+  let stats = $derived.by(() => {
+    if (volumesData.length === 0) {
+      return {
+        volumeCount: 0,
+        pageCount: 0,
+        japaneseCharCount: 0,
+        totalCharCount: 0,
+        wordCount: 0,
+        lineCount: 0,
+        estimatedMinutes: 0
+      };
+    }
+
+    let totalPages = 0;
+    let totalJapaneseChars = 0;
+    let totalChars = 0;
+    let totalLines = 0;
+    let allText = '';
+
+    volumesData.forEach(({ data }) => {
+      const pages = data.pages || [];
+      totalPages += pages.length;
+
+      const { charCount, lineCount } = getCharCount(pages);
+      totalJapaneseChars += charCount;
+      totalLines += lineCount;
+
+      // Count total characters (including non-Japanese)
+      pages.forEach(pageData => {
+        pageData.blocks.forEach(block => {
+          block.lines.forEach(line => {
+            totalChars += line.length;
+            allText += line + ' ';
+          });
+        });
+      });
+    });
+
+    // Count words (space-separated)
+    const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
+
+    // Estimate reading time
+    // Japanese: ~500 characters per minute
+    // English: ~250 words per minute
+    const japaneseMinutes = totalJapaneseChars / 500;
+    const englishMinutes = wordCount / 250;
+    const estimatedMinutes = Math.ceil(Math.max(japaneseMinutes, englishMinutes));
+
+    return {
+      volumeCount: volumesData.length,
+      pageCount: totalPages,
+      japaneseCharCount: totalJapaneseChars,
+      totalCharCount: totalChars,
+      wordCount,
+      lineCount: totalLines,
+      estimatedMinutes
+    };
+  });
+
+  // Copy text to clipboard
+  async function copyText() {
+    try {
+      await navigator.clipboard.writeText(formattedText);
+      copySuccess = true;
+      copyError = false;
+      setTimeout(() => {
+        copySuccess = false;
+      }, 3000);
+    } catch (err) {
+      console.error('Failed to copy text:', err);
+      copyError = true;
+      copySuccess = false;
+      setTimeout(() => {
+        copyError = false;
+      }, 3000);
+    }
+  }
+
+  function goBackToSeries() {
+    goto(`/${seriesId}`);
+  }
+
+  function goBackToCatalog() {
+    goto('/');
+  }
+</script>
+
+<svelte:head>
+  <title>{seriesData?.title || 'Series'} - Text View</title>
+</svelte:head>
+
+{#if dataLoaded && volumesData.length > 0 && seriesData}
+  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <!-- Header -->
+      <div class="mb-8">
+        <!-- Navigation Buttons -->
+        <div class="flex flex-wrap gap-2 mb-4">
+          <Button size="sm" color="alternative" on:click={goBackToSeries}>
+            <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
+            Back to Series
+          </Button>
+          <Button size="sm" color="alternative" on:click={goBackToCatalog}>
+            <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
+            Back to Catalog
+          </Button>
+          <Button size="sm" color="primary" on:click={copyText}>
+            {#if copySuccess}
+              <CheckOutline class="w-3.5 h-3.5 mr-2" />
+              Copied!
+            {:else}
+              <ClipboardOutline class="w-3.5 h-3.5 mr-2" />
+              Copy All Text
+            {/if}
+          </Button>
+        </div>
+
+        {#if copyError}
+          <Alert color="red" dismissable class="mb-4">
+            Failed to copy text. Please try again or manually select and copy.
+          </Alert>
+        {/if}
+
+        <!-- Series Title -->
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          {seriesData.title}
+        </h1>
+        <p class="text-lg text-gray-600 dark:text-gray-400 mb-4">
+          Complete Series Text
+        </p>
+
+        <!-- Stats -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+            Series Statistics
+          </h2>
+          <dl class="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Volumes</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.volumeCount.toLocaleString()}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Pages</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.pageCount.toLocaleString()}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Japanese Characters</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.japaneseCharCount.toLocaleString()}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Total Characters</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.totalCharCount.toLocaleString()}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Words</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.wordCount.toLocaleString()}
+              </dd>
+            </div>
+            <div>
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Lines</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.lineCount.toLocaleString()}
+              </dd>
+            </div>
+            <div class="col-span-2 sm:col-span-1">
+              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Est. Reading Time</dt>
+              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                {stats.estimatedMinutes >= 60
+                  ? `${Math.floor(stats.estimatedMinutes / 60)}h ${stats.estimatedMinutes % 60}m`
+                  : `${stats.estimatedMinutes} min`}
+              </dd>
+            </div>
+          </dl>
+          <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+            * Estimated reading time based on ~500 Japanese characters/minute or ~250 words/minute
+          </p>
+        </div>
+      </div>
+
+      <!-- Text Content -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="p-6">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Full Series Text
+          </h2>
+          <div
+            class="bg-gray-50 dark:bg-gray-900 rounded-lg p-6 overflow-auto max-h-[800px] border border-gray-200 dark:border-gray-700"
+          >
+            <pre
+              class="whitespace-pre-wrap font-mono text-sm text-gray-900 dark:text-gray-100 leading-relaxed"
+            >{formattedText}</pre>
+          </div>
+          <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+            Tip: Use Ctrl+F (Cmd+F on Mac) to search within the text, or use browser extensions for language analysis.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+{:else if !seriesData}
+  <div class="flex items-center justify-center w-screen h-screen">
+    <div class="text-center">
+      <Spinner size="12" />
+      <p class="mt-4 text-gray-600 dark:text-gray-400">Loading series...</p>
+    </div>
+  </div>
+{:else}
+  <div class="flex items-center justify-center w-screen h-screen">
+    <div class="text-center">
+      <p class="text-gray-600 dark:text-gray-400">No volumes available for this series.</p>
+      <Button class="mt-4" color="alternative" on:click={goBackToCatalog}>
+        <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
+        Back to Catalog
+      </Button>
+    </div>
+  </div>
+{/if}
