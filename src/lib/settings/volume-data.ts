@@ -207,6 +207,27 @@ export function clearVolumes() {
   volumes.set({});
 }
 
+export function clearVolumeSpeedData(volume: string) {
+  volumes.update((prev) => {
+    const currentVolume = prev[volume];
+    if (!currentVolume) return prev;
+
+    // Parse the existing timestamp and add 1ms to win sync conflicts
+    const currentTimestamp = new Date(currentVolume.lastProgressUpdate).getTime();
+    const newTimestamp = new Date(currentTimestamp + 1).toISOString();
+
+    return {
+      ...prev,
+      [volume]: new VolumeData({
+        ...currentVolume,
+        timeReadInMinutes: 0,
+        lastProgressUpdate: newTimestamp
+        // Keep: progress, chars, completed, settings, recentPageTurns, sessions
+      })
+    };
+  });
+}
+
 export function updateProgress(
   volume: string,
   progress: number,

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Navbar, NavBrand, Tooltip, Spinner } from 'flowbite-svelte';
-  import { CloudArrowUpOutline, UploadSolid, UserSettingsSolid, RefreshOutline } from 'flowbite-svelte-icons';
+  import { CloudArrowUpOutline, UploadSolid, UserSettingsSolid, RefreshOutline, ChartLineUpOutline } from 'flowbite-svelte-icons';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import Settings from './Settings/Settings.svelte';
@@ -91,6 +91,10 @@
   function navigateToCloud() {
     goto('/cloud');
   }
+
+  function navigateToReadingSpeed() {
+    goto('/reading-speed');
+  }
   
   function handleSync() {
     // Sync with all authenticated providers
@@ -128,6 +132,9 @@
       </div>
     </NavBrand>
     <div class="flex md:order-2 gap-5">
+      <button onclick={navigateToReadingSpeed} class="flex items-center justify-center w-6 h-6" title="Reading Speed Stats">
+        <ChartLineUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+      </button>
       <button onclick={openSettings} class="flex items-center justify-center w-6 h-6">
         <UserSettingsSolid class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
       </button>
