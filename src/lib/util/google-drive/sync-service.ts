@@ -1,6 +1,6 @@
 import { writable } from 'svelte/store';
 import { progressTrackerStore } from '../progress-tracker';
-import { parseVolumesFromJson, volumes } from '$lib/settings';
+import { parseVolumesFromJson, volumes, enrichVolumeDataWithMetadata } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import { driveApiClient, DriveApiError, escapeNameForDriveQuery } from './api-client';
 import { tokenManager } from './token-manager';
@@ -167,19 +167,26 @@ class SyncService {
 
       const mergedVolumes = await this.mergeVolumeData(cloudVolumes);
 
-      // Step 4: Update local storage
+      // Step 4: Enrich merged volumes with metadata from IndexedDB
       progressTrackerStore.updateProcess(processId, {
         progress: 80,
-        status: 'Updating local data...'
+        status: 'Enriching with volume metadata...'
       });
 
-      volumes.update(() => mergedVolumes);
+      const enrichedVolumes: Record<string, any> = {};
+      for (const [volumeUuid, volumeData] of Object.entries(mergedVolumes)) {
+        enrichedVolumes[volumeUuid] = await enrichVolumeDataWithMetadata(volumeUuid, volumeData as any);
+      }
+
+      // Step 4.5: Update local storage with enriched data (includes metadata)
+      // This ensures metadata persists in localStorage even if IndexedDB is deleted later
+      volumes.update(() => enrichedVolumes);
 
       // Step 5: Upload merged data (only if changed) and clean up duplicates
-      const mergedJson = JSON.stringify(mergedVolumes);
+      const enrichedJson = JSON.stringify(enrichedVolumes);
       const cloudJson = JSON.stringify(cloudVolumes);
 
-      if (mergedJson !== cloudJson || volumeDataFiles.length > 1) {
+      if (enrichedJson !== cloudJson || volumeDataFiles.length > 1) {
         progressTrackerStore.updateProcess(processId, {
           progress: 90,
           status: volumeDataFiles.length > 1
@@ -190,7 +197,7 @@ class SyncService {
         // Upload to first file (or create new if none exist)
         const primaryFileId = volumeDataFiles.length > 0 ? volumeDataFiles[0].fileId : null;
         console.log('Uploading with primaryFileId:', primaryFileId);
-        const uploadResult = await this.uploadVolumeData(mergedVolumes, primaryFileId, readerFolderId);
+        const uploadResult = await this.uploadVolumeData(enrichedVolumes, primaryFileId, readerFolderId);
 
         // Delete duplicate files (if any)
         if (volumeDataFiles.length > 1) {
