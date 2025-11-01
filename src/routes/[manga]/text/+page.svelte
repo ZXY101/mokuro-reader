@@ -9,6 +9,8 @@
   import { Spinner } from 'flowbite-svelte';
   import type { VolumeData, VolumeMetadata } from '$lib/types';
   import { onMount } from 'svelte';
+  import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
+  import { calculateEstimatedTime } from '$lib/util/reading-speed';
 
   let seriesId = $derived($page.params.manga || '');
 
@@ -97,7 +99,7 @@
         totalCharCount: 0,
         wordCount: 0,
         lineCount: 0,
-        estimatedMinutes: 0
+        estimatedTime: null
       };
     }
 
@@ -129,12 +131,8 @@
     // Count words (space-separated)
     const wordCount = allText.split(/\s+/).filter(w => w.length > 0).length;
 
-    // Estimate reading time
-    // Japanese: ~500 characters per minute
-    // English: ~250 words per minute
-    const japaneseMinutes = totalJapaneseChars / 500;
-    const englishMinutes = wordCount / 250;
-    const estimatedMinutes = Math.ceil(Math.max(japaneseMinutes, englishMinutes));
+    // Calculate estimated reading time using utility function
+    const estimatedTime = calculateEstimatedTime(totalJapaneseChars, $personalizedReadingSpeed);
 
     return {
       volumeCount: volumesData.length,
@@ -143,7 +141,7 @@
       totalCharCount: totalChars,
       wordCount,
       lineCount: totalLines,
-      estimatedMinutes
+      estimatedTime
     };
   });
 
@@ -216,7 +214,7 @@
           {seriesData.title}
         </h1>
         <p class="text-lg text-gray-600 dark:text-gray-400 mb-4">
-          Complete Series Text
+          All volumes combined in a single text view for language analysis and searching
         </p>
 
         <!-- Stats -->
@@ -261,18 +259,24 @@
                 {stats.lineCount.toLocaleString()}
               </dd>
             </div>
-            <div class="col-span-2 sm:col-span-1">
-              <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Est. Reading Time</dt>
-              <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                {stats.estimatedMinutes >= 60
-                  ? `${Math.floor(stats.estimatedMinutes / 60)}h ${stats.estimatedMinutes % 60}m`
-                  : `${stats.estimatedMinutes} min`}
-              </dd>
-            </div>
+            {#if stats.estimatedTime}
+              <div class="col-span-2 sm:col-span-1">
+                <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">Est. Reading Time</dt>
+                <dd class="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {stats.estimatedTime.displayText}{stats.estimatedTime.isPersonalized ? ' ⭐' : ''}
+                </dd>
+              </div>
+            {/if}
           </dl>
-          <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-            * Estimated reading time based on ~500 Japanese characters/minute or ~250 words/minute
-          </p>
+          {#if stats.estimatedTime}
+            <p class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+              {#if stats.estimatedTime.isPersonalized}
+                * Estimated based on your average speed from the last 8 hours of reading (~{$personalizedReadingSpeed.charsPerMinute} chars/min)
+              {:else}
+                * Estimated reading time based on default speed (~100 Japanese characters/minute for manga)
+              {/if}
+            </p>
+          {/if}
         </div>
       </div>
 

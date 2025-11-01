@@ -7,8 +7,10 @@
   import Cropper from 'svelte-easy-crop';
 
   let open = $state(false);
-  let pixels: Pixels;
+  let pixels: Pixels | undefined = undefined;
   let loading = $state(false);
+  let crop = $state({ x: 0, y: 0 });
+  let zoom = $state(1);
 
   afterNavigate(() => {
     close();
@@ -35,22 +37,35 @@
   }
 
   async function onCrop() {
+    console.log('[Cropper] onCrop called');
+    console.log('[Cropper] $cropperStore?.image:', $cropperStore?.image);
+    console.log('[Cropper] pixels:', pixels);
+
     if ($cropperStore?.image && pixels) {
+      console.log('[Cropper] Starting crop operation');
       loading = true;
-      const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
-      updateLastCard(imageData, $cropperStore.sentence);
-      close();
+      try {
+        const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
+        console.log('[Cropper] Got cropped image, updating card');
+        updateLastCard(imageData, $cropperStore.sentence);
+        close();
+      } catch (error) {
+        console.error('[Cropper] Error during crop:', error);
+        loading = false;
+      }
+    } else {
+      console.warn('[Cropper] Cannot crop - missing image or pixels');
     }
   }
 
-  function onCropComplete(e: any) {
-    // In v4, the event detail structure might have changed
-    // Check if e.detail.pixels exists, otherwise use e.detail directly
-    pixels = e.detail.pixels || e.detail;
+  function onCropComplete(detail: any) {
+    // In v4, the callback receives the detail directly (not as e.detail)
+    // This fires continuously as the user adjusts the crop area
+    pixels = detail.pixels;
   }
 </script>
 
-<Modal title="Crop image" bind:open on:{close}>
+<Modal title="Crop image" bind:open on:close={close}>
   {#if $cropperStore?.image && !loading}
     <div class=" flex flex-col gap-2">
       <div class="relative w-full h-[55svh] sm:h-[65svh]">
@@ -58,7 +73,9 @@
           zoomSpeed={0.5}
           maxZoom={10}
           image={$cropperStore?.image}
-          on:cropcomplete={onCropComplete}
+          bind:crop
+          bind:zoom
+          oncropcomplete={onCropComplete}
         />
       </div>
       {#if $settings.ankiConnectSettings.grabSentence && $cropperStore?.sentence}

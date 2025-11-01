@@ -39,14 +39,27 @@ export type VolumeSettings = {
 
 export type VolumeSettingsKey = keyof VolumeSettings;
 
+// Session tracking types
+export type PageTurn = [number, number]; // [timestamp_ms, page_number]
+
+// Aggregate session data (for reading speed calculation)
+export type AggregateSession = {
+  durationMs: number;
+  charsRead: number;
+};
+
 type Progress = Record<string, number> | undefined;
 type VolumeDataJSON = {
-  progress: number;
-  chars: number;
-  completed: boolean;
-  timeReadInMinutes: number;
-  settings: VolumeSettings;
-  lastProgressUpdate: string;
+  progress?: number;
+  chars?: number;
+  completed?: boolean;
+  timeReadInMinutes?: number;
+  settings?: VolumeSettings;
+  lastProgressUpdate?: string;
+  // Recent page turns for active reading session (will be compacted into sessions)
+  recentPageTurns?: PageTurn[];
+  // Aggregate session data for reading speed calculation
+  sessions?: AggregateSession[];
 };
 
 class VolumeData implements VolumeDataJSON {
@@ -56,6 +69,8 @@ class VolumeData implements VolumeDataJSON {
   timeReadInMinutes: number;
   settings: VolumeSettings;
   lastProgressUpdate: string;
+  recentPageTurns: PageTurn[];
+  sessions: AggregateSession[];
 
   constructor(data: Partial<VolumeDataJSON> = {}) {
     this.progress = typeof data.progress === 'number' ? data.progress : 0;
@@ -63,7 +78,11 @@ class VolumeData implements VolumeDataJSON {
     this.completed = !!data.completed;
     this.timeReadInMinutes =
       typeof data.timeReadInMinutes === 'number' ? data.timeReadInMinutes : 0;
-    this.lastProgressUpdate = data.lastProgressUpdate || new Date(this.progress).toISOString();
+    this.lastProgressUpdate = data.lastProgressUpdate || new Date(0).toISOString();
+
+    // Session tracking fields
+    this.recentPageTurns = data.recentPageTurns || [];
+    this.sessions = data.sessions || [];
 
     // Only store explicitly set values, leave others undefined to fall back to global defaults
     this.settings = {};
@@ -100,14 +119,45 @@ class VolumeData implements VolumeDataJSON {
   }
 
   toJSON() {
-    return {
-      progress: this.progress,
-      chars: this.chars,
-      completed: this.completed,
-      timeReadInMinutes: this.timeReadInMinutes,
-      lastProgressUpdate: this.lastProgressUpdate,
-      settings: { ...this.settings }
-    };
+    const result: Partial<VolumeDataJSON> = {};
+
+    // Only include non-default values
+    if (this.progress > 0) result.progress = this.progress;
+    if (this.chars > 0) result.chars = this.chars;
+    if (this.completed) result.completed = this.completed;
+    if (this.timeReadInMinutes > 0) result.timeReadInMinutes = this.timeReadInMinutes;
+
+    // Only include lastProgressUpdate if it's not epoch
+    if (this.lastProgressUpdate !== new Date(0).toISOString()) {
+      result.lastProgressUpdate = this.lastProgressUpdate;
+    }
+
+    // Include volume properties (rightToLeft, hasCover) but exclude device preferences (singlePageView)
+    // rightToLeft and hasCover are facts about the volume itself that should sync
+    // singlePageView is a device-specific viewing preference that should stay local
+    const syncableSettings: Partial<VolumeSettings> = {};
+    if (typeof this.settings.rightToLeft === 'boolean') {
+      syncableSettings.rightToLeft = this.settings.rightToLeft;
+    }
+    if (typeof this.settings.hasCover === 'boolean') {
+      syncableSettings.hasCover = this.settings.hasCover;
+    }
+
+    if (Object.keys(syncableSettings).length > 0) {
+      result.settings = syncableSettings;
+    }
+
+    // Only include recentPageTurns if there are any
+    if (this.recentPageTurns.length > 0) {
+      result.recentPageTurns = this.recentPageTurns;
+    }
+
+    // Only include sessions if there are any
+    if (this.sessions.length > 0) {
+      result.sessions = this.sessions;
+    }
+
+    return result;
   }
 }
 
@@ -165,6 +215,31 @@ export function updateProgress(
 ) {
   volumes.update((prev) => {
     const currentVolume = prev[volume] || new VolumeData();
+    const now = Date.now();
+
+    // Get session timeout from user settings (in minutes, convert to ms)
+    let sessionTimeoutMs = 30 * 60 * 1000; // Default 30 minutes
+    globalSettings.subscribe(s => {
+      sessionTimeoutMs = s.inactivityTimeoutMinutes * 60 * 1000;
+    })();
+
+    // Session tracking logic - just add to recentPageTurns
+    // Compaction into aggregate sessions will happen later
+    let recentPageTurns = currentVolume.recentPageTurns;
+
+    // Check if we need to clear old turns (session timeout)
+    if (recentPageTurns.length > 0) {
+      const lastTurn = recentPageTurns[recentPageTurns.length - 1];
+      if (now - lastTurn[0] > sessionTimeoutMs) {
+        // TODO: Compact recentPageTurns into an aggregate session before clearing
+        // For now, just clear
+        recentPageTurns = [];
+      }
+    }
+
+    // Add new turn
+    recentPageTurns = [...recentPageTurns, [now, progress]];
+
     return {
       ...prev,
       [volume]: new VolumeData({
@@ -172,7 +247,8 @@ export function updateProgress(
         progress,
         chars: chars ?? currentVolume.chars,
         completed,
-        lastProgressUpdate: new Date().toISOString()
+        lastProgressUpdate: new Date().toISOString(),
+        recentPageTurns
       })
     };
   });
