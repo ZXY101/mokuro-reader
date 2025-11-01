@@ -169,9 +169,21 @@ export function processVolumeSpeedData(
  */
 export function calculateReadingSpeedStats(
 	volumeData: VolumeSpeedData[],
-	currentPersonalizedSpeed: number
+	currentPersonalizedSpeed: number,
+	allVolumesData: Record<string, any>
 ): ReadingSpeedStats {
-	if (volumeData.length === 0) {
+	// Count ALL completed volumes (including marked-as-read) for achievements
+	let allCompletedCount = 0;
+	let allCompletedChars = 0;
+
+	for (const [volumeId, data] of Object.entries(allVolumesData)) {
+		if (data.completed && data.chars > 0) {
+			allCompletedCount++;
+			allCompletedChars += data.chars;
+		}
+	}
+
+	if (volumeData.length === 0 && allCompletedCount === 0) {
 		return {
 			totalTimeMinutes: 0,
 			averageSpeed: 0,
@@ -185,8 +197,10 @@ export function calculateReadingSpeedStats(
 	}
 
 	const totalTime = volumeData.reduce((sum, v) => sum + v.durationMinutes, 0);
-	const totalChars = volumeData.reduce((sum, v) => sum + v.charsRead, 0);
-	const avgSpeed = volumeData.reduce((sum, v) => sum + v.charsPerMinute, 0) / volumeData.length;
+	const totalChars = allCompletedChars; // Use total from ALL completed volumes
+	const avgSpeed = volumeData.length > 0
+		? volumeData.reduce((sum, v) => sum + v.charsPerMinute, 0) / volumeData.length
+		: 0;
 
 	// Calculate speed trend (compare recent 10 vs first 10)
 	let speedTrend = 0;
@@ -213,73 +227,88 @@ export function calculateReadingSpeedStats(
 	// Calculate badges/achievements
 	const badges: string[] = [];
 
-	// Speed-based achievements (reading speed in chars/min)
-  if (currentPersonalizedSpeed > 50) {
-    badges.push('⅛ Native');
-  }
-  if (currentPersonalizedSpeed > 100) {
-    badges.push('¼ Native');
-  }
-  if (currentPersonalizedSpeed > 150) {
-    badges.push('⅜ Native');
-  }
-  if (currentPersonalizedSpeed > 200) {
-    badges.push('½ Native');
-  }
-  if (currentPersonalizedSpeed > 250) {
-    badges.push('⅝ Native');
-  }
-  if (currentPersonalizedSpeed > 300) {
-    badges.push('¾ Native');
-  }
-  if (currentPersonalizedSpeed > 350) {
-    badges.push('⅞ Native');
-  }
-  if (currentPersonalizedSpeed > 400) {
-    badges.push('Native');
-  }
-  if (currentPersonalizedSpeed > 600) {
-    badges.push('Speed Reader');
-  }
-  if (currentPersonalizedSpeed > 800) {
-    badges.push('Speed Demon');
-  }
+	// Speed-based achievements (10 levels: Grey -> Bronze -> Silver -> Gold -> Platinum -> Prestige Bronze -> Prestige Silver -> Prestige Gold -> Prestige Platinum -> Prismatic)
+	if (currentPersonalizedSpeed > 10) {
+		badges.push('Beginner');
+	}
+	if (currentPersonalizedSpeed > 25) {
+		badges.push('¹⁄₁₆ Native');
+	}
+	if (currentPersonalizedSpeed > 50) {
+		badges.push('⅛ Native');
+	}
+	if (currentPersonalizedSpeed > 100) {
+		badges.push('¼ Native');
+	}
+	if (currentPersonalizedSpeed > 150) {
+		badges.push('⅜ Native');
+	}
+	if (currentPersonalizedSpeed > 200) {
+		badges.push('½ Native');
+	}
+	if (currentPersonalizedSpeed > 250) {
+		badges.push('⅝ Native');
+	}
+	if (currentPersonalizedSpeed > 300) {
+		badges.push('¾ Native');
+	}
+	if (currentPersonalizedSpeed > 350) {
+		badges.push('⅞ Native');
+	}
+	if (currentPersonalizedSpeed > 450) {
+		badges.push('Native');
+	}
 
-	// Volume count achievements
-	if (volumeData.length >= 5) {
+	// Volume count achievements (10 levels) - Use ALL completed volumes
+	if (allCompletedCount >= 1) {
+		badges.push('First Volume');
+	}
+	if (allCompletedCount >= 3) {
+		badges.push('First Steps');
+	}
+	if (allCompletedCount >= 5) {
 		badges.push('Getting Started');
 	}
-	if (volumeData.length >= 10) {
+	if (allCompletedCount >= 10) {
 		badges.push('Consistent Reader');
 	}
-	if (volumeData.length >= 25) {
+	if (allCompletedCount >= 25) {
 		badges.push('Dedicated Reader');
 	}
-  if (volumeData.length >= 50) {
-    badges.push('Veteran Reader');
-  }
-	if (volumeData.length >= 100) {
+	if (allCompletedCount >= 50) {
+		badges.push('Veteran Reader');
+	}
+	if (allCompletedCount >= 100) {
 		badges.push('Century Club');
 	}
-	if (volumeData.length >= 250) {
+	if (allCompletedCount >= 250) {
 		badges.push('Master Reader');
 	}
-	if (volumeData.length >= 500) {
+	if (allCompletedCount >= 500) {
 		badges.push('Bookworm');
 	}
-	if (volumeData.length >= 1000) {
+	if (allCompletedCount >= 1000) {
 		badges.push('Librarian');
 	}
 
-	// Character count achievements
+	// Character count achievements (10 levels)
+	if (totalChars >= 10000) {
+		badges.push('10K Characters');
+	}
+	if (totalChars >= 50000) {
+		badges.push('50K Characters');
+	}
 	if (totalChars >= 100000) {
 		badges.push('100K Characters');
+	}
+	if (totalChars >= 250000) {
+		badges.push('Quarter Million');
 	}
 	if (totalChars >= 500000) {
 		badges.push('Half Million');
 	}
 	if (totalChars >= 1000000) {
-		badges.push('Million Character Club');
+		badges.push('Million Club');
 	}
 	if (totalChars >= 2500000) {
 		badges.push('2.5 Million Club');
@@ -287,34 +316,49 @@ export function calculateReadingSpeedStats(
 	if (totalChars >= 5000000) {
 		badges.push('5 Million Club');
 	}
+	if (totalChars >= 7500000) {
+		badges.push('7.5 Million Club');
+	}
 	if (totalChars >= 10000000) {
-		badges.push('Ten Million Club');
+		badges.push('10 Million Club');
 	}
 
-	// Time-based achievements
+	// Time-based achievements (10 levels)
 	const totalHours = totalTime / 60;
+	if (totalHours >= 1) {
+		badges.push('1 Hour Reader');
+	}
+	if (totalHours >= 5) {
+		badges.push('5 Hour Reader');
+	}
 	if (totalHours >= 10) {
 		badges.push('10 Hour Reader');
+	}
+	if (totalHours >= 25) {
+		badges.push('25 Hour Reader');
 	}
 	if (totalHours >= 50) {
 		badges.push('50 Hour Reader');
 	}
 	if (totalHours >= 100) {
-		badges.push('Marathon Reader');
+		badges.push('100 Hour Reader');
+	}
+	if (totalHours >= 250) {
+		badges.push('250 Hour Reader');
 	}
 	if (totalHours >= 500) {
-		badges.push('Epic Reader');
+		badges.push('500 Hour Reader');
 	}
 	if (totalHours >= 1000) {
-		badges.push('Legendary Reader');
+		badges.push('1000 Hour Reader');
+	}
+	if (totalHours >= 2000) {
+		badges.push('2000 Hour Reader');
 	}
 
-	// Trend-based achievements
+	// Special achievement (trend-based)
 	if (speedTrend > 20) {
 		badges.push('Improving Fast');
-	}
-	if (speedTrend < -20) {
-		badges.push('Needs Practice');
 	}
 
 	return {

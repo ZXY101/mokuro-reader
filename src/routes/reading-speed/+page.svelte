@@ -23,9 +23,58 @@
     ChartLineUpOutline,
     TrashBinSolid
   } from 'flowbite-svelte-icons';
-
   import type { VolumeMetadata } from '$lib/types';
   import Chart from 'chart.js/auto';
+
+  // All possible achievements for test mode (10 levels per category + 1 special)
+  const ALL_ACHIEVEMENTS = [
+    // Speed-based achievements (10 levels: Grey -> Bronze -> Silver -> Gold -> Platinum -> Prestige Bronze -> Prestige Silver -> Prestige Gold -> Prestige Platinum -> Prismatic)
+    'Beginner',
+    '¹⁄₁₆ Native',
+    '⅛ Native',
+    '¼ Native',
+    '⅜ Native',
+    '½ Native',
+    '⅝ Native',
+    '¾ Native',
+    '⅞ Native',
+    'Native',
+    // Volume count achievements (10 levels)
+    'First Volume',
+    'First Steps',
+    'Getting Started',
+    'Consistent Reader',
+    'Dedicated Reader',
+    'Veteran Reader',
+    'Century Club',
+    'Master Reader',
+    'Bookworm',
+    'Librarian',
+    // Character count achievements (10 levels)
+    '10K Characters',
+    '50K Characters',
+    '100K Characters',
+    'Quarter Million',
+    'Half Million',
+    'Million Club',
+    '2.5 Million Club',
+    '5 Million Club',
+    '7.5 Million Club',
+    '10 Million Club',
+    // Time-based achievements (10 levels)
+    '1 Hour Reader',
+    '5 Hour Reader',
+    '10 Hour Reader',
+    '25 Hour Reader',
+    '50 Hour Reader',
+    '100 Hour Reader',
+    '250 Hour Reader',
+    '500 Hour Reader',
+    '1000 Hour Reader',
+    '2000 Hour Reader',
+    // Special achievement
+    'Improving Fast'
+  ];
 
   // Reactive state
   let chartCanvas: HTMLCanvasElement;
@@ -37,6 +86,9 @@
   let deleteModalOpen = false;
   let volumeToDelete: VolumeSpeedData | null = null;
 
+  // Toggle for showing all achievements
+  let showAllAchievements = $state(false);
+
   // Derived stores
   const volumeSpeedData = derived(
     [volumes, catalogStore],
@@ -47,9 +99,9 @@
   );
 
   const stats = derived(
-    [volumeSpeedData, personalizedReadingSpeed],
-    ([$volumeSpeedData, $personalizedSpeed]) => {
-      return calculateReadingSpeedStats($volumeSpeedData, $personalizedSpeed.charsPerMinute);
+    [volumeSpeedData, personalizedReadingSpeed, volumes],
+    ([$volumeSpeedData, $personalizedSpeed, $volumes]) => {
+      return calculateReadingSpeedStats($volumeSpeedData, $personalizedSpeed.charsPerMinute, $volumes);
     }
   );
 
@@ -245,9 +297,11 @@
   }
 
   // Update chart when data changes
-  $: if (chartCanvas && $volumeSpeedData) {
-    createChart($volumeSpeedData);
-  }
+  $effect(() => {
+    if (chartCanvas && $volumeSpeedData) {
+      createChart($volumeSpeedData);
+    }
+  });
 
   onMount(() => {
     return () => {
@@ -261,48 +315,73 @@
     return new Intl.NumberFormat().format(Math.round(num));
   }
 
-  function getBadgeColor(badge: string): string {
+  // Format numbers with metric notation (K, M, B)
+  function formatMetric(num: number): string {
+    if (num >= 1_000_000_000) {
+      return (num / 1_000_000_000).toFixed(1).replace(/\.0$/, '') + 'B';
+    }
+    if (num >= 1_000_000) {
+      return (num / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M';
+    }
+    if (num >= 1_000) {
+      return (num / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+    }
+    return num.toString();
+  }
+
+  function getBadgeColor(badge: string): 'dark' | 'yellow' | 'blue' | 'green' {
+    // 10-tier system: Grey -> Bronze -> Silver -> Gold -> Platinum -> Prestige Bronze -> Prestige Silver -> Prestige Gold -> Prestige Platinum -> Prismatic
     switch (badge) {
-      // Speed-based badges
-      case '⅛ Native': return 'dark';
-      case '¼ Native': return 'dark';
-      case '⅜ Native': return 'blue';
-      case '½ Native': return 'blue';
-      case '⅝ Native': return 'indigo';
-      case '¾ Native': return 'indigo';
-      case '⅞ Native': return 'purple';
-      case 'Native': return 'purple';
-      case 'Speed Reader': return 'pink';
-      case 'Speed Demon': return 'red';
+      // Speed-based badges (10 levels)
+      case 'Beginner': return 'dark';      // Tier 1: Grey
+      case '¹⁄₁₆ Native': return 'dark';   // Tier 2: Bronze
+      case '⅛ Native': return 'dark';      // Tier 3: Silver
+      case '¼ Native': return 'dark';      // Tier 4: Gold
+      case '⅜ Native': return 'blue';      // Tier 5: Platinum
+      case '½ Native': return 'dark';      // Tier 6: Prestige Bronze
+      case '⅝ Native': return 'dark';      // Tier 7: Prestige Silver
+      case '¾ Native': return 'dark';      // Tier 8: Prestige Gold
+      case '⅞ Native': return 'blue';      // Tier 9: Prestige Platinum
+      case 'Native': return 'dark';        // Tier 10: Prismatic
 
-      // Volume count badges
-      case 'Getting Started': return 'blue';
-      case 'Consistent Reader': return 'indigo';
-      case 'Dedicated Reader': return 'purple';
-      case 'Veteran Reader': return 'yellow';
-      case 'Century Club': return 'red';
-      case 'Master Reader': return 'pink';
-      case 'Bookworm': return 'purple';
-      case 'Librarian': return 'yellow';
+      // Volume count badges (10 levels)
+      case 'First Volume': return 'dark';      // Tier 1: Grey
+      case 'First Steps': return 'dark';       // Tier 2: Bronze
+      case 'Getting Started': return 'dark';   // Tier 3: Silver
+      case 'Consistent Reader': return 'dark';   // Tier 4: Gold
+      case 'Dedicated Reader': return 'blue';    // Tier 5: Platinum
+      case 'Veteran Reader': return 'dark';      // Tier 6: Prestige Bronze
+      case 'Century Club': return 'dark';        // Tier 7: Prestige Silver
+      case 'Master Reader': return 'dark';       // Tier 8: Prestige Gold
+      case 'Bookworm': return 'blue';            // Tier 9: Prestige Platinum
+      case 'Librarian': return 'dark';           // Tier 10: Prismatic
 
-      // Character count badges
-      case '100K Characters': return 'green';
-      case 'Half Million': return 'teal';
-      case 'Million Character Club': return 'pink';
-      case '2.5 Million Club': return 'purple';
-      case '5 Million Club': return 'indigo';
-      case 'Ten Million Club': return 'red';
+      // Character count badges (10 levels)
+      case '10K Characters': return 'dark';      // Tier 1: Grey
+      case '50K Characters': return 'dark';      // Tier 2: Bronze
+      case '100K Characters': return 'dark';     // Tier 3: Silver
+      case 'Quarter Million': return 'dark';     // Tier 4: Gold
+      case 'Half Million': return 'blue';        // Tier 5: Platinum
+      case 'Million Club': return 'dark';        // Tier 6: Prestige Bronze
+      case '2.5 Million Club': return 'dark';    // Tier 7: Prestige Silver
+      case '5 Million Club': return 'dark';      // Tier 8: Prestige Gold
+      case '7.5 Million Club': return 'blue';    // Tier 9: Prestige Platinum
+      case '10 Million Club': return 'dark';     // Tier 10: Prismatic
 
-      // Time-based badges
-      case '10 Hour Reader': return 'blue';
-      case '50 Hour Reader': return 'indigo';
-      case 'Marathon Reader': return 'purple';
-      case 'Epic Reader': return 'red';
-      case 'Legendary Reader': return 'yellow';
+      // Time-based badges (10 levels)
+      case '1 Hour Reader': return 'dark';       // Tier 1: Grey
+      case '5 Hour Reader': return 'dark';       // Tier 2: Bronze
+      case '10 Hour Reader': return 'dark';      // Tier 3: Silver
+      case '25 Hour Reader': return 'dark';      // Tier 4: Gold
+      case '50 Hour Reader': return 'blue';      // Tier 5: Platinum
+      case '100 Hour Reader': return 'dark';     // Tier 6: Prestige Bronze
+      case '250 Hour Reader': return 'dark';     // Tier 7: Prestige Silver
+      case '500 Hour Reader': return 'dark';     // Tier 8: Prestige Gold
+      case '1000 Hour Reader': return 'blue';    // Tier 9: Prestige Platinum
+      case '2000 Hour Reader': return 'dark';    // Tier 10: Prismatic
 
-      // Trend-based badges
+      // Special achievement
       case 'Improving Fast': return 'green';
-      case 'Needs Practice': return 'yellow';
 
       default: return 'dark';
     }
@@ -310,7 +389,9 @@
 
   function getBadgeTooltip(badge: string): string {
     switch (badge) {
-      // Speed-based badges
+      // Speed-based badges (10 levels)
+      case 'Beginner': return 'Unlocked at >10 chars/min reading speed';
+      case '¹⁄₁₆ Native': return 'Unlocked at >25 chars/min reading speed';
       case '⅛ Native': return 'Unlocked at >50 chars/min reading speed';
       case '¼ Native': return 'Unlocked at >100 chars/min reading speed';
       case '⅜ Native': return 'Unlocked at >150 chars/min reading speed';
@@ -318,11 +399,11 @@
       case '⅝ Native': return 'Unlocked at >250 chars/min reading speed';
       case '¾ Native': return 'Unlocked at >300 chars/min reading speed';
       case '⅞ Native': return 'Unlocked at >350 chars/min reading speed';
-      case 'Native': return 'Unlocked at >400 chars/min reading speed';
-      case 'Speed Reader': return 'Unlocked at >600 chars/min reading speed';
-      case 'Speed Demon': return 'Unlocked at >800 chars/min reading speed';
+      case 'Native': return 'Unlocked at >450 chars/min reading speed';
 
-      // Volume count badges
+      // Volume count badges (10 levels)
+      case 'First Volume': return 'Unlocked after completing 1 volume';
+      case 'First Steps': return 'Unlocked after completing 3 volumes';
       case 'Getting Started': return 'Unlocked after completing 5 volumes';
       case 'Consistent Reader': return 'Unlocked after completing 10 volumes';
       case 'Dedicated Reader': return 'Unlocked after completing 25 volumes';
@@ -332,24 +413,32 @@
       case 'Bookworm': return 'Unlocked after completing 500 volumes';
       case 'Librarian': return 'Unlocked after completing 1,000 volumes';
 
-      // Character count badges
+      // Character count badges (10 levels)
+      case '10K Characters': return 'Unlocked after reading 10,000 characters';
+      case '50K Characters': return 'Unlocked after reading 50,000 characters';
       case '100K Characters': return 'Unlocked after reading 100,000 characters';
+      case 'Quarter Million': return 'Unlocked after reading 250,000 characters';
       case 'Half Million': return 'Unlocked after reading 500,000 characters';
-      case 'Million Character Club': return 'Unlocked after reading 1,000,000 characters';
+      case 'Million Club': return 'Unlocked after reading 1,000,000 characters';
       case '2.5 Million Club': return 'Unlocked after reading 2,500,000 characters';
       case '5 Million Club': return 'Unlocked after reading 5,000,000 characters';
-      case 'Ten Million Club': return 'Unlocked after reading 10,000,000 characters';
+      case '7.5 Million Club': return 'Unlocked after reading 7,500,000 characters';
+      case '10 Million Club': return 'Unlocked after reading 10,000,000 characters';
 
-      // Time-based badges
+      // Time-based badges (10 levels)
+      case '1 Hour Reader': return 'Unlocked after 1 hour of reading time';
+      case '5 Hour Reader': return 'Unlocked after 5 hours of reading time';
       case '10 Hour Reader': return 'Unlocked after 10 hours of reading time';
+      case '25 Hour Reader': return 'Unlocked after 25 hours of reading time';
       case '50 Hour Reader': return 'Unlocked after 50 hours of reading time';
-      case 'Marathon Reader': return 'Unlocked after 100 hours of reading time';
-      case 'Epic Reader': return 'Unlocked after 500 hours of reading time';
-      case 'Legendary Reader': return 'Unlocked after 1,000 hours of reading time';
+      case '100 Hour Reader': return 'Unlocked after 100 hours of reading time';
+      case '250 Hour Reader': return 'Unlocked after 250 hours of reading time';
+      case '500 Hour Reader': return 'Unlocked after 500 hours of reading time';
+      case '1000 Hour Reader': return 'Unlocked after 1,000 hours of reading time';
+      case '2000 Hour Reader': return 'Unlocked after 2,000 hours of reading time';
 
-      // Trend-based badges
-      case 'Improving Fast': return 'Unlocked when speed trend is >20% improvement';
-      case 'Needs Practice': return 'Unlocked when speed trend is <-20% decline';
+      // Special achievement
+      case 'Improving Fast': return 'Unlocked when speed trend shows >20% improvement';
 
       default: return '';
     }
@@ -359,6 +448,20 @@
     if (trend > 10) return ArrowUpOutline;
     if (trend < -10) return ArrowDownOutline;
     return null;
+  }
+
+  // Get category for a badge to enable separators
+  function getBadgeCategory(badge: string): 'speed' | 'volume' | 'characters' | 'time' | 'special' {
+    const speedBadges = ['Beginner', '¹⁄₁₆ Native', '⅛ Native', '¼ Native', '⅜ Native', '½ Native', '⅝ Native', '¾ Native', '⅞ Native', 'Native'];
+    const volumeBadges = ['First Volume', 'First Steps', 'Getting Started', 'Consistent Reader', 'Dedicated Reader', 'Veteran Reader', 'Century Club', 'Master Reader', 'Bookworm', 'Librarian'];
+    const charBadges = ['10K Characters', '50K Characters', '100K Characters', 'Quarter Million', 'Half Million', 'Million Club', '2.5 Million Club', '5 Million Club', '7.5 Million Club', '10 Million Club'];
+    const timeBadges = ['1 Hour Reader', '5 Hour Reader', '10 Hour Reader', '25 Hour Reader', '50 Hour Reader', '100 Hour Reader', '250 Hour Reader', '500 Hour Reader', '1000 Hour Reader', '2000 Hour Reader'];
+
+    if (speedBadges.includes(badge)) return 'speed';
+    if (volumeBadges.includes(badge)) return 'volume';
+    if (charBadges.includes(badge)) return 'characters';
+    if (timeBadges.includes(badge)) return 'time';
+    return 'special';
   }
 
   function confirmDelete(volume: VolumeSpeedData) {
@@ -374,13 +477,75 @@
     deleteModalOpen = false;
     volumeToDelete = null;
   }
+
+  // Get animation class for prestige and mythic tier badges
+  function getBadgeAnimation(badge: string): string {
+    // Tier 6 (Prestige Bronze) - Bronze shimmer effect
+    const tier6Badges = ['½ Native', 'Veteran Reader', '100 Hour Reader', 'Million Club'];
+    if (tier6Badges.includes(badge)) return 'badge-bronze-shimmer';
+
+    // Tier 7 (Prestige Silver) - Silver sparkle effect
+    const tier7Badges = ['⅝ Native', 'Century Club', '250 Hour Reader', '2.5 Million Club'];
+    if (tier7Badges.includes(badge)) return 'badge-silver-sparkle';
+
+    // Tier 8 (Prestige Gold) - Gold glow effect
+    const tier8Badges = ['¾ Native', 'Master Reader', '500 Hour Reader', '5 Million Club'];
+    if (tier8Badges.includes(badge)) return 'badge-gold-glow';
+
+    // Tier 9 (Prestige Platinum) - Platinum pulse effect
+    const tier9Badges = ['⅞ Native', 'Bookworm', '1000 Hour Reader', '7.5 Million Club'];
+    if (tier9Badges.includes(badge)) return 'badge-platinum-pulse';
+
+    // Tier 10 (Mythic Prismatic) - Ultimate rainbow prismatic effect
+    const tier10Badges = ['Native', 'Librarian', '2000 Hour Reader', '10 Million Club'];
+    if (tier10Badges.includes(badge)) return 'badge-prismatic';
+
+    return '';
+  }
+
+  // Get tier-specific color class for custom badge colors
+  function getBadgeTierClass(badge: string): string {
+    // Tier 1 (Grey)
+    const tier1Badges = ['Beginner', 'First Volume', '10K Characters', '1 Hour Reader'];
+    if (tier1Badges.includes(badge)) return 'badge-tier-grey';
+
+    // Tier 2 (Bronze)
+    const tier2Badges = ['¹⁄₁₆ Native', 'First Steps', '50K Characters', '5 Hour Reader'];
+    if (tier2Badges.includes(badge)) return 'badge-tier-bronze';
+
+    // Tier 3 (Silver)
+    const tier3Badges = ['⅛ Native', 'Getting Started', '100K Characters', '10 Hour Reader'];
+    if (tier3Badges.includes(badge)) return 'badge-tier-silver';
+
+    // Tier 4 (Gold)
+    const tier4Badges = ['¼ Native', 'Consistent Reader', 'Quarter Million', '25 Hour Reader'];
+    if (tier4Badges.includes(badge)) return 'badge-tier-gold';
+
+    // Tier 6 (Prestige Bronze)
+    const tier6Badges = ['½ Native', 'Veteran Reader', '100 Hour Reader', 'Million Club'];
+    if (tier6Badges.includes(badge)) return 'badge-tier-bronze';
+
+    // Tier 7 (Prestige Silver)
+    const tier7Badges = ['⅝ Native', 'Century Club', '250 Hour Reader', '2.5 Million Club'];
+    if (tier7Badges.includes(badge)) return 'badge-tier-silver';
+
+    // Tier 8 (Prestige Gold)
+    const tier8Badges = ['¾ Native', 'Master Reader', '500 Hour Reader', '5 Million Club'];
+    if (tier8Badges.includes(badge)) return 'badge-tier-gold';
+
+    // Tier 10 (Prismatic)
+    const tier10Badges = ['Native', 'Librarian', '2000 Hour Reader', '10 Million Club'];
+    if (tier10Badges.includes(badge)) return 'badge-tier-prismatic';
+
+    return '';
+  }
 </script>
 
 <svelte:head>
   <title>Reading Speed History</title>
 </svelte:head>
 
-<div class="p-4 min-h-[90svh] w-full mx-auto">
+<div class="p-4 min-h-[90svh] w-full">
   <h1 class="text-3xl font-bold mb-6">Reading Speed History</h1>
 
   {#if $volumeSpeedData.length === 0}
@@ -394,12 +559,12 @@
     </Card>
   {:else}
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 max-w-7xl mx-auto">
-      <!-- Current Speed -->
-      <Card>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 w-full">
+      <!-- Recent Speed -->
+      <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-400 mb-1">Current Speed</p>
+            <p class="text-sm text-gray-400 mb-1">Recent Speed</p>
             <p class="text-2xl font-bold">{Math.round($stats.currentSpeed)}</p>
             <p class="text-xs text-gray-500">chars/min</p>
           </div>
@@ -407,32 +572,32 @@
         </div>
       </Card>
 
-      <!-- Average Speed -->
-      <Card>
+      <!-- Characters Read -->
+      <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-400 mb-1">Average Speed</p>
-            <p class="text-2xl font-bold">{Math.round($stats.averageSpeed)}</p>
-            <p class="text-xs text-gray-500">chars/min</p>
+            <p class="text-sm text-gray-400 mb-1">Characters Read</p>
+            <p class="text-2xl font-bold">{formatMetric($stats.totalCharsRead)}</p>
+            <p class="text-xs text-gray-500">{formatNumber($stats.totalCharsRead)} total</p>
           </div>
           <ChartLineUpOutline size="lg" class="text-blue-500" />
         </div>
       </Card>
 
       <!-- Volumes Completed -->
-      <Card>
+      <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-400 mb-1">Volumes Completed</p>
             <p class="text-2xl font-bold">{$totalCompletedVolumes}</p>
-            <p class="text-xs text-gray-500">({$stats.volumesCompleted} tracked) · {formatNumber($stats.totalCharsRead)} chars</p>
+            <p class="text-xs text-gray-500">({$stats.volumesCompleted} tracked)</p>
           </div>
           <BookSolid size="lg" class="text-green-500" />
         </div>
       </Card>
 
       <!-- Total Time -->
-      <Card>
+      <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-400 mb-1">Total Time</p>
@@ -455,14 +620,37 @@
     </div>
 
     <!-- Achievement Badges -->
-    {#if $stats.badges.length > 0}
-      <Card class="mb-6 max-w-7xl mx-auto">
-        <div class="flex items-center gap-2 flex-wrap">
-          <AwardSolid size="md" class="text-yellow-500" />
-          <span class="font-semibold">Achievements:</span>
-          {#each $stats.badges as badge}
+    {#if showAllAchievements || $stats.badges.length > 0}
+      <Card class="mb-6 w-full max-w-none">
+        <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center gap-2">
+            <AwardSolid size="md" class="text-yellow-500" />
+            <span class="font-semibold">Achievements</span>
+          </div>
+          <Button size="xs" color="alternative" on:click={() => showAllAchievements = !showAllAchievements}>
+            {showAllAchievements ? 'Show My Achievements' : 'Show All Achievements'}
+          </Button>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap w-full">
+          {#each (showAllAchievements ? ALL_ACHIEVEMENTS : $stats.badges) as badge, index}
+            {@const animation = getBadgeAnimation(badge)}
+            {@const tierClass = getBadgeTierClass(badge)}
+            {@const isUnlocked = $stats.badges.includes(badge)}
+            {@const badges = showAllAchievements ? ALL_ACHIEVEMENTS : $stats.badges}
+            {@const currentCategory = getBadgeCategory(badge)}
+            {@const previousCategory = index > 0 ? getBadgeCategory(badges[index - 1]) : null}
+            {@const needsSeparator = index > 0 && currentCategory !== previousCategory}
+
+            {#if needsSeparator}
+              <span class="text-gray-500 text-xl select-none">•</span>
+            {/if}
+
             <span title={getBadgeTooltip(badge)}>
-              <Badge color={getBadgeColor(badge)} large>{badge}</Badge>
+              <Badge
+                color={getBadgeColor(badge)}
+                large
+                class="{showAllAchievements && !isUnlocked ? 'opacity-40' : ''} {animation} {tierClass}"
+              >{badge}</Badge>
             </span>
           {/each}
         </div>
@@ -470,7 +658,7 @@
     {/if}
 
     <!-- Chart -->
-    <Card class="mb-6 max-w-7xl mx-auto">
+    <Card class="mb-6 w-full max-w-none">
       <h2 class="text-xl font-semibold mb-4">Reading Speed Over Time</h2>
       <div class="w-full" style="height: 600px;">
         <canvas bind:this={chartCanvas}></canvas>
@@ -479,7 +667,7 @@
 
     <!-- Series Breakdown -->
     {#if $seriesInfo.length > 0}
-      <Card class="mb-6 max-w-7xl mx-auto">
+      <Card class="mb-6 w-full max-w-none">
         <h2 class="text-xl font-semibold mb-4">Speed by Series</h2>
         <div class="overflow-x-auto">
         <Table>
@@ -519,10 +707,10 @@
     {/if}
 
     <!-- Volume History -->
-    <Card class="max-w-7xl mx-auto">
+    <Card class="w-full max-w-none">
       <h2 class="text-xl font-semibold mb-4">Completed Volumes</h2>
 
-      <div class="overflow-x-auto">
+      <div class="overflow-x-auto w-full">
       <Table hoverable={true}>
         <TableHead>
           <TableHeadCell class="cursor-pointer" on:click={() => toggleSort('date')}>
@@ -621,5 +809,127 @@
 <style>
   :global(.dark) canvas {
     filter: brightness(0.95);
+  }
+
+  /* Custom tier colors for badges */
+  :global(.badge-tier-grey) {
+    background-color: #374151 !important;
+    color: #E5E7EB !important;
+  }
+
+  :global(.badge-tier-bronze) {
+    background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%) !important;
+    color: #FFF !important;
+    border: none !important;
+  }
+
+  :global(.badge-tier-silver) {
+    background: linear-gradient(135deg, #D1D5DB 0%, #9CA3AF 100%) !important;
+    color: #1F2937 !important;
+    border: none !important;
+  }
+
+  :global(.badge-tier-gold) {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
+    color: #1F2937 !important;
+    border: none !important;
+  }
+
+  :global(.badge-tier-prismatic) {
+    background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #3b82f6 100%) !important;
+    color: #FFF !important;
+    border: none !important;
+  }
+
+  /* Tier 6: Prestige Bronze - Bronze shimmer with glow effect */
+  @keyframes bronze-shimmer {
+    0%, 100% {
+      filter: brightness(1) saturate(1);
+    }
+    50% {
+      filter: brightness(1.25) saturate(1.4);
+    }
+  }
+
+  @keyframes bronze-glow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(160, 82, 45, 0.5), 0 0 10px rgba(160, 82, 45, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(160, 82, 45, 0.9), 0 0 30px rgba(160, 82, 45, 0.6);
+    }
+  }
+
+  :global(.badge-bronze-shimmer) {
+    animation: bronze-shimmer 2.5s ease-in-out infinite, bronze-glow 2.5s ease-in-out infinite;
+  }
+
+  /* Tier 7: Prestige Silver - Silver sparkle effect */
+  @keyframes silver-sparkle {
+    0%, 100% {
+      filter: brightness(1) drop-shadow(0 0 2px rgba(255, 255, 255, 0.7));
+    }
+    50% {
+      filter: brightness(1.35) drop-shadow(0 0 8px rgba(255, 255, 255, 1));
+    }
+  }
+
+  :global(.badge-silver-sparkle) {
+    animation: silver-sparkle 2s ease-in-out infinite;
+  }
+
+  /* Tier 8: Prestige Gold - Gold glow pulse effect */
+  @keyframes gold-glow {
+    0%, 100% {
+      box-shadow: 0 0 5px rgba(234, 179, 8, 0.5), 0 0 10px rgba(234, 179, 8, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(234, 179, 8, 0.9), 0 0 30px rgba(234, 179, 8, 0.6);
+    }
+  }
+
+  :global(.badge-gold-glow) {
+    animation: gold-glow 2.5s ease-in-out infinite;
+  }
+
+  /* Tier 9: Prestige Platinum - Platinum pulse effect */
+  @keyframes platinum-pulse {
+    0%, 100% {
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.6), 0 0 15px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.9), 0 0 35px rgba(59, 130, 246, 0.6);
+    }
+  }
+
+  :global(.badge-platinum-pulse) {
+    animation: platinum-pulse 2.5s ease-in-out infinite;
+  }
+
+  /* Tier 10: Mythic Prismatic - Ultimate rainbow effect with multi-layered glow */
+  @keyframes prismatic-rainbow {
+    0% { filter: hue-rotate(0deg) brightness(1.3) saturate(1.8); }
+    100% { filter: hue-rotate(360deg) brightness(1.3) saturate(1.8); }
+  }
+
+  @keyframes prismatic-glow {
+    0%, 100% {
+      box-shadow:
+        0 0 10px rgba(236, 72, 153, 0.7),
+        0 0 20px rgba(139, 92, 246, 0.5),
+        0 0 30px rgba(59, 130, 246, 0.3);
+    }
+    50% {
+      box-shadow:
+        0 0 20px rgba(236, 72, 153, 0.9),
+        0 0 40px rgba(139, 92, 246, 0.7),
+        0 0 60px rgba(59, 130, 246, 0.5);
+    }
+  }
+
+  :global(.badge-prismatic) {
+    animation:
+      prismatic-rainbow 3s linear infinite,
+      prismatic-glow 2s ease-in-out infinite;
   }
 </style>
