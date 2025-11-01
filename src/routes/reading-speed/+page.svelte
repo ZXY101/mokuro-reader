@@ -533,6 +533,10 @@
     const tier8Badges = ['¾ Native', 'Master Reader', '500 Hour Reader', '5 Million Club'];
     if (tier8Badges.includes(badge)) return 'badge-tier-gold';
 
+    // Tier 9 (Prestige Platinum)
+    const tier9Badges = ['⅞ Native', 'Bookworm', '1000 Hour Reader', '7.5 Million Club'];
+    if (tier9Badges.includes(badge)) return 'badge-tier-platinum';
+
     // Tier 10 (Prismatic)
     const tier10Badges = ['Native', 'Librarian', '2000 Hour Reader', '10 Million Club'];
     if (tier10Badges.includes(badge)) return 'badge-tier-prismatic';
@@ -835,75 +839,88 @@
     border: none !important;
   }
 
+  :global(.badge-tier-platinum) {
+    background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+    color: #FFF !important;
+    border: none !important;
+  }
+
   :global(.badge-tier-prismatic) {
     background: linear-gradient(135deg, #ec4899 0%, #8b5cf6 50%, #3b82f6 100%) !important;
     color: #FFF !important;
     border: none !important;
   }
 
-  /* Tier 6: Prestige Bronze - Bronze shimmer with glow effect */
+  /* Tier 6: Prestige Bronze - Bronze shimmer with sweep effect */
   @keyframes bronze-shimmer {
-    0%, 100% {
-      filter: brightness(1) saturate(1);
+    0% {
+      background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%);
     }
     50% {
-      filter: brightness(1.25) saturate(1.4);
+      background: linear-gradient(135deg, #FFB366 0%, #F4A460 30%, #D2691E 50%, #A0522D 70%, #8B4513 100%);
     }
-  }
-
-  @keyframes bronze-glow {
-    0%, 100% {
-      box-shadow: 0 0 5px rgba(160, 82, 45, 0.5), 0 0 10px rgba(160, 82, 45, 0.3);
-    }
-    50% {
-      box-shadow: 0 0 20px rgba(160, 82, 45, 0.9), 0 0 30px rgba(160, 82, 45, 0.6);
+    100% {
+      background: linear-gradient(135deg, #A0522D 0%, #8B4513 100%);
     }
   }
 
   :global(.badge-bronze-shimmer) {
-    animation: bronze-shimmer 2.5s ease-in-out infinite, bronze-glow 2.5s ease-in-out infinite;
+    animation: bronze-shimmer 3s linear infinite;
+    box-shadow: 0 0 12px rgba(160, 82, 45, 0.8), 0 0 20px rgba(160, 82, 45, 0.5);
   }
 
-  /* Tier 7: Prestige Silver - Silver sparkle effect */
+  /* Tier 7: Prestige Silver - Silver sparkle with sweep effect */
   @keyframes silver-sparkle {
-    0%, 100% {
-      filter: brightness(1) drop-shadow(0 0 2px rgba(255, 255, 255, 0.7));
+    0% {
+      background: linear-gradient(135deg, #D1D5DB 0%, #9CA3AF 100%);
     }
     50% {
-      filter: brightness(1.35) drop-shadow(0 0 8px rgba(255, 255, 255, 1));
+      background: linear-gradient(135deg, #FFFFFF 0%, #F9FAFB 30%, #E5E7EB 50%, #D1D5DB 70%, #9CA3AF 100%);
+    }
+    100% {
+      background: linear-gradient(135deg, #D1D5DB 0%, #9CA3AF 100%);
     }
   }
 
   :global(.badge-silver-sparkle) {
-    animation: silver-sparkle 2s ease-in-out infinite;
+    animation: silver-sparkle 2.5s linear infinite;
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
   }
 
-  /* Tier 8: Prestige Gold - Gold glow pulse effect */
+  /* Tier 8: Prestige Gold - Gold glow with sweep effect */
   @keyframes gold-glow {
-    0%, 100% {
-      box-shadow: 0 0 5px rgba(234, 179, 8, 0.5), 0 0 10px rgba(234, 179, 8, 0.3);
+    0% {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
     }
     50% {
-      box-shadow: 0 0 20px rgba(234, 179, 8, 0.9), 0 0 30px rgba(234, 179, 8, 0.6);
+      background: linear-gradient(135deg, #FFFBCC 0%, #FFEC80 30%, #FFE066 50%, #FFD700 70%, #FFA500 100%);
+    }
+    100% {
+      background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
     }
   }
 
   :global(.badge-gold-glow) {
-    animation: gold-glow 2.5s ease-in-out infinite;
+    animation: gold-glow 3s linear infinite;
+    box-shadow: 0 0 15px rgba(234, 179, 8, 0.8), 0 0 25px rgba(234, 179, 8, 0.6);
   }
 
-  /* Tier 9: Prestige Platinum - Platinum pulse effect */
+  /* Tier 9: Prestige Platinum - Platinum with sweep effect */
   @keyframes platinum-pulse {
-    0%, 100% {
-      box-shadow: 0 0 8px rgba(59, 130, 246, 0.6), 0 0 15px rgba(59, 130, 246, 0.3);
+    0% {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     }
     50% {
-      box-shadow: 0 0 20px rgba(59, 130, 246, 0.9), 0 0 35px rgba(59, 130, 246, 0.6);
+      background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 30%, #93c5fd 50%, #3b82f6 70%, #2563eb 100%);
+    }
+    100% {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
     }
   }
 
   :global(.badge-platinum-pulse) {
-    animation: platinum-pulse 2.5s ease-in-out infinite;
+    animation: platinum-pulse 2.5s linear infinite;
+    box-shadow: 0 0 18px rgba(59, 130, 246, 0.8), 0 0 30px rgba(59, 130, 246, 0.5);
   }
 
   /* Tier 10: Mythic Prismatic - Ultimate rainbow effect with multi-layered glow */
