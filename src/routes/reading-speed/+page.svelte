@@ -57,6 +57,11 @@
     return getSeriesSpeedInfo($volumeSpeedData);
   });
 
+  // Count all completed volumes (including those without speed tracking)
+  const totalCompletedVolumes = derived(volumes, ($volumes) => {
+    return Object.values($volumes).filter(vol => vol.completed).length;
+  });
+
   // Sorted volume list
   const sortedVolumes = derived(volumeSpeedData, ($volumeSpeedData) => {
     let sorted = [...$volumeSpeedData];
@@ -258,12 +263,95 @@
 
   function getBadgeColor(badge: string): string {
     switch (badge) {
+      // Speed-based badges
+      case '⅛ Native': return 'dark';
+      case '¼ Native': return 'dark';
+      case '⅜ Native': return 'blue';
+      case '½ Native': return 'blue';
+      case '⅝ Native': return 'indigo';
+      case '¾ Native': return 'indigo';
+      case '⅞ Native': return 'purple';
+      case 'Native': return 'purple';
+      case 'Speed Reader': return 'pink';
       case 'Speed Demon': return 'red';
-      case 'Consistent Reader': return 'blue';
-      case 'Improving Fast': return 'green';
-      case 'Marathon Reader': return 'purple';
+
+      // Volume count badges
+      case 'Getting Started': return 'blue';
+      case 'Consistent Reader': return 'indigo';
+      case 'Dedicated Reader': return 'purple';
       case 'Veteran Reader': return 'yellow';
+      case 'Century Club': return 'red';
+      case 'Master Reader': return 'pink';
+      case 'Bookworm': return 'purple';
+      case 'Librarian': return 'yellow';
+
+      // Character count badges
+      case '100K Characters': return 'green';
+      case 'Half Million': return 'teal';
+      case 'Million Character Club': return 'pink';
+      case '2.5 Million Club': return 'purple';
+      case '5 Million Club': return 'indigo';
+      case 'Ten Million Club': return 'red';
+
+      // Time-based badges
+      case '10 Hour Reader': return 'blue';
+      case '50 Hour Reader': return 'indigo';
+      case 'Marathon Reader': return 'purple';
+      case 'Epic Reader': return 'red';
+      case 'Legendary Reader': return 'yellow';
+
+      // Trend-based badges
+      case 'Improving Fast': return 'green';
+      case 'Needs Practice': return 'yellow';
+
       default: return 'dark';
+    }
+  }
+
+  function getBadgeTooltip(badge: string): string {
+    switch (badge) {
+      // Speed-based badges
+      case '⅛ Native': return 'Unlocked at >50 chars/min reading speed';
+      case '¼ Native': return 'Unlocked at >100 chars/min reading speed';
+      case '⅜ Native': return 'Unlocked at >150 chars/min reading speed';
+      case '½ Native': return 'Unlocked at >200 chars/min reading speed';
+      case '⅝ Native': return 'Unlocked at >250 chars/min reading speed';
+      case '¾ Native': return 'Unlocked at >300 chars/min reading speed';
+      case '⅞ Native': return 'Unlocked at >350 chars/min reading speed';
+      case 'Native': return 'Unlocked at >400 chars/min reading speed';
+      case 'Speed Reader': return 'Unlocked at >600 chars/min reading speed';
+      case 'Speed Demon': return 'Unlocked at >800 chars/min reading speed';
+
+      // Volume count badges
+      case 'Getting Started': return 'Unlocked after completing 5 volumes';
+      case 'Consistent Reader': return 'Unlocked after completing 10 volumes';
+      case 'Dedicated Reader': return 'Unlocked after completing 25 volumes';
+      case 'Veteran Reader': return 'Unlocked after completing 50 volumes';
+      case 'Century Club': return 'Unlocked after completing 100 volumes';
+      case 'Master Reader': return 'Unlocked after completing 250 volumes';
+      case 'Bookworm': return 'Unlocked after completing 500 volumes';
+      case 'Librarian': return 'Unlocked after completing 1,000 volumes';
+
+      // Character count badges
+      case '100K Characters': return 'Unlocked after reading 100,000 characters';
+      case 'Half Million': return 'Unlocked after reading 500,000 characters';
+      case 'Million Character Club': return 'Unlocked after reading 1,000,000 characters';
+      case '2.5 Million Club': return 'Unlocked after reading 2,500,000 characters';
+      case '5 Million Club': return 'Unlocked after reading 5,000,000 characters';
+      case 'Ten Million Club': return 'Unlocked after reading 10,000,000 characters';
+
+      // Time-based badges
+      case '10 Hour Reader': return 'Unlocked after 10 hours of reading time';
+      case '50 Hour Reader': return 'Unlocked after 50 hours of reading time';
+      case 'Marathon Reader': return 'Unlocked after 100 hours of reading time';
+      case 'Epic Reader': return 'Unlocked after 500 hours of reading time';
+      case 'Legendary Reader': return 'Unlocked after 1,000 hours of reading time';
+
+      // Trend-based badges
+      case 'Improving Fast': return 'Unlocked when speed trend is >20% improvement';
+      case 'Needs Practice': return 'Unlocked when speed trend is <-20% decline';
+
+      default: return '';
     }
   }
 
@@ -306,7 +394,7 @@
     </Card>
   {:else}
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 max-w-7xl">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 max-w-7xl mx-auto">
       <!-- Current Speed -->
       <Card>
         <div class="flex items-center justify-between">
@@ -336,8 +424,8 @@
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-400 mb-1">Volumes Completed</p>
-            <p class="text-2xl font-bold">{$stats.volumesCompleted}</p>
-            <p class="text-xs text-gray-500">{formatNumber($stats.totalCharsRead)} chars read</p>
+            <p class="text-2xl font-bold">{$totalCompletedVolumes}</p>
+            <p class="text-xs text-gray-500">({$stats.volumesCompleted} tracked) · {formatNumber($stats.totalCharsRead)} chars</p>
           </div>
           <BookSolid size="lg" class="text-green-500" />
         </div>
@@ -368,19 +456,21 @@
 
     <!-- Achievement Badges -->
     {#if $stats.badges.length > 0}
-      <Card class="mb-6 max-w-7xl">
+      <Card class="mb-6 max-w-7xl mx-auto">
         <div class="flex items-center gap-2 flex-wrap">
           <AwardSolid size="md" class="text-yellow-500" />
           <span class="font-semibold">Achievements:</span>
           {#each $stats.badges as badge}
-            <Badge color={getBadgeColor(badge)} large>{badge}</Badge>
+            <span title={getBadgeTooltip(badge)}>
+              <Badge color={getBadgeColor(badge)} large>{badge}</Badge>
+            </span>
           {/each}
         </div>
       </Card>
     {/if}
 
     <!-- Chart -->
-    <Card class="mb-6 max-w-7xl">
+    <Card class="mb-6 max-w-7xl mx-auto">
       <h2 class="text-xl font-semibold mb-4">Reading Speed Over Time</h2>
       <div class="w-full" style="height: 600px;">
         <canvas bind:this={chartCanvas}></canvas>
@@ -389,7 +479,7 @@
 
     <!-- Series Breakdown -->
     {#if $seriesInfo.length > 0}
-      <Card class="mb-6 max-w-7xl">
+      <Card class="mb-6 max-w-7xl mx-auto">
         <h2 class="text-xl font-semibold mb-4">Speed by Series</h2>
         <div class="overflow-x-auto">
         <Table>
@@ -429,7 +519,7 @@
     {/if}
 
     <!-- Volume History -->
-    <Card class="max-w-7xl">
+    <Card class="max-w-7xl mx-auto">
       <h2 class="text-xl font-semibold mb-4">Completed Volumes</h2>
 
       <div class="overflow-x-auto">
