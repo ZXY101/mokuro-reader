@@ -77,14 +77,14 @@
   ];
 
   // Reactive state
-  let chartCanvas: HTMLCanvasElement;
+  let chartCanvas: HTMLCanvasElement = $state()!;
   let chart: Chart | null = null;
-  let sortBy: 'date' | 'speed' | 'series' = 'date';
-  let sortDirection: 'asc' | 'desc' = 'desc';
+  let sortBy: 'date' | 'speed' | 'series' = $state('date');
+  let sortDirection: 'asc' | 'desc' = $state('desc');
 
   // Delete confirmation modal
-  let deleteModalOpen = false;
-  let volumeToDelete: VolumeSpeedData | null = null;
+  let deleteModalOpen = $state(false);
+  let volumeToDelete: VolumeSpeedData | null = $state(null);
 
   // Toggle for showing all achievements
   let showAllAchievements = $state(false);
