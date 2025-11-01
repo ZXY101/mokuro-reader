@@ -252,7 +252,16 @@ class SyncService {
             // Keep the newer record based on lastProgressUpdate
             const localDate = new Date(local.lastProgressUpdate).getTime();
             const cloudDate = new Date(cloud.lastProgressUpdate).getTime();
-            merged[volumeId] = localDate >= cloudDate ? local : cloud;
+            const newerRecord = localDate >= cloudDate ? local : cloud;
+            const olderRecord = localDate >= cloudDate ? cloud : local;
+
+            // Fill in missing metadata from the other record
+            merged[volumeId] = {
+              ...newerRecord,
+              series_uuid: newerRecord.series_uuid || olderRecord.series_uuid,
+              series_title: newerRecord.series_title || olderRecord.series_title,
+              volume_title: newerRecord.volume_title || olderRecord.volume_title
+            };
           }
         });
 
