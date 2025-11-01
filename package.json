@@ -51,6 +51,7 @@
     "@types/gapi": "^0.0.47",
     "@vercel/analytics": "^1.5.0",
     "@zip.js/zip.js": "^2.7.57",
+    "chart.js": "^4.5.1",
     "dexie": "^4.0.1-alpha.25",
     "megajs": "^1.3.9",
     "panzoom": "^9.4.3",
