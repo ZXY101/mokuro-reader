@@ -213,20 +213,108 @@ export function calculateReadingSpeedStats(
 	// Calculate badges/achievements
 	const badges: string[] = [];
 
-	if (currentPersonalizedSpeed > 150) {
-		badges.push('Speed Demon');
+	// Speed-based achievements (reading speed in chars/min)
+  if (currentPersonalizedSpeed > 50) {
+    badges.push('⅛ Native');
+  }
+  if (currentPersonalizedSpeed > 100) {
+    badges.push('¼ Native');
+  }
+  if (currentPersonalizedSpeed > 150) {
+    badges.push('⅜ Native');
+  }
+  if (currentPersonalizedSpeed > 200) {
+    badges.push('½ Native');
+  }
+  if (currentPersonalizedSpeed > 250) {
+    badges.push('⅝ Native');
+  }
+  if (currentPersonalizedSpeed > 300) {
+    badges.push('¾ Native');
+  }
+  if (currentPersonalizedSpeed > 350) {
+    badges.push('⅞ Native');
+  }
+  if (currentPersonalizedSpeed > 400) {
+    badges.push('Native');
+  }
+  if (currentPersonalizedSpeed > 600) {
+    badges.push('Speed Reader');
+  }
+  if (currentPersonalizedSpeed > 800) {
+    badges.push('Speed Demon');
+  }
+
+	// Volume count achievements
+	if (volumeData.length >= 5) {
+		badges.push('Getting Started');
 	}
 	if (volumeData.length >= 10) {
 		badges.push('Consistent Reader');
 	}
+	if (volumeData.length >= 25) {
+		badges.push('Dedicated Reader');
+	}
+  if (volumeData.length >= 50) {
+    badges.push('Veteran Reader');
+  }
+	if (volumeData.length >= 100) {
+		badges.push('Century Club');
+	}
+	if (volumeData.length >= 250) {
+		badges.push('Master Reader');
+	}
+	if (volumeData.length >= 500) {
+		badges.push('Bookworm');
+	}
+	if (volumeData.length >= 1000) {
+		badges.push('Librarian');
+	}
+
+	// Character count achievements
+	if (totalChars >= 100000) {
+		badges.push('100K Characters');
+	}
+	if (totalChars >= 500000) {
+		badges.push('Half Million');
+	}
+	if (totalChars >= 1000000) {
+		badges.push('Million Character Club');
+	}
+	if (totalChars >= 2500000) {
+		badges.push('2.5 Million Club');
+	}
+	if (totalChars >= 5000000) {
+		badges.push('5 Million Club');
+	}
+	if (totalChars >= 10000000) {
+		badges.push('Ten Million Club');
+	}
+
+	// Time-based achievements
+	const totalHours = totalTime / 60;
+	if (totalHours >= 10) {
+		badges.push('10 Hour Reader');
+	}
+	if (totalHours >= 50) {
+		badges.push('50 Hour Reader');
+	}
+	if (totalHours >= 100) {
+		badges.push('Marathon Reader');
+	}
+	if (totalHours >= 500) {
+		badges.push('Epic Reader');
+	}
+	if (totalHours >= 1000) {
+		badges.push('Legendary Reader');
+	}
+
+	// Trend-based achievements
 	if (speedTrend > 20) {
 		badges.push('Improving Fast');
 	}
-	if (totalTime / 60 >= 100) {
-		badges.push('Marathon Reader');
-	}
-	if (volumeData.length >= 50) {
-		badges.push('Veteran Reader');
+	if (speedTrend < -20) {
+		badges.push('Needs Practice');
 	}
 
 	return {
