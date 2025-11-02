@@ -45,8 +45,11 @@ export async function initGoogleDriveApi(): Promise<void> {
 }
 
 // Convenience functions for external use
-export function signInToGoogleDrive(): void {
+export async function signInToGoogleDrive(): Promise<void> {
   if (!tokenManager.isAuthenticated()) {
+    // Initialize Drive API first (lazy load)
+    await driveApiClient.initialize();
+
     // Will auto-detect if first-time (consent) or re-auth (minimal)
     // Cache fetch happens automatically in token manager callback
     // Provider status will be updated automatically in token manager callback

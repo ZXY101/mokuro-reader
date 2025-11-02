@@ -49,7 +49,7 @@ export class GoogleDriveProvider implements SyncProvider {
 				throw new Error('Google Drive auth only works in browser');
 			}
 
-			// Initialize Drive API if needed
+			// Initialize Drive API if needed (this also initializes the token client)
 			await driveApiClient.initialize();
 
 			// Request OAuth token (will show Google sign-in if needed)

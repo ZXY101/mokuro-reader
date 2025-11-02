@@ -189,10 +189,28 @@ class TokenManager {
     }
   }
 
-  initTokenClient(): void {
-    if (typeof google === 'undefined') {
-      throw new Error('Google API not loaded');
+  /**
+   * Wait for google Identity Services global to be available (loaded from script tag)
+   */
+  private async waitForGoogleIdentity(): Promise<void> {
+    if (typeof google !== 'undefined' && google?.accounts?.oauth2) return;
+
+    console.log('⏳ Waiting for Google Identity Services to load...');
+    const maxWait = 10000; // 10 seconds
+    const start = Date.now();
+
+    while (typeof google === 'undefined' || !google?.accounts?.oauth2) {
+      if (Date.now() - start > maxWait) {
+        throw new Error('Timeout waiting for Google Identity Services to load');
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
     }
+    console.log('✅ Google Identity Services loaded');
+  }
+
+  async initTokenClient(): Promise<void> {
+    // Wait for google Identity Services to be available
+    await this.waitForGoogleIdentity();
 
     const tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: GOOGLE_DRIVE_CONFIG.CLIENT_ID,

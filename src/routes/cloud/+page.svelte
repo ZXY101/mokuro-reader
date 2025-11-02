@@ -29,7 +29,7 @@
   import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
-  import { Badge, Button, Radio, Toggle } from 'flowbite-svelte';
+  import { Badge, Button, Radio, Toggle, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { catalog } from '$lib/catalog';
@@ -56,6 +56,9 @@
   let megaAuth = $derived($providerStatusStore.providers['mega']?.isAuthenticated || false);
   let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
   let hasAnyProvider = $derived($providerStatusStore.hasAnyAuthenticated);
+
+  // Google Drive login state
+  let googleDriveLoading = $state(false);
 
   // MEGA login state
   let megaEmail = $state('');
@@ -723,9 +726,13 @@
 
   // Google Drive handlers
   async function handleGoogleDriveLogin() {
+    googleDriveLoading = true;
     try {
-      // Trigger OAuth flow
-      signIn();
+      // Trigger OAuth flow (initialize and show OAuth popup)
+      await signIn();
+
+      // Hide spinner once popup appears - user is now interacting with Google's dialog
+      googleDriveLoading = false;
 
       // Wait for authentication to complete by watching the accessToken store
       await new Promise<void>((resolve, reject) => {
@@ -755,6 +762,8 @@
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
       showSnackbar(message);
+    } finally {
+      googleDriveLoading = false;
     }
   }
 
@@ -934,11 +943,16 @@
         <div class="flex flex-col gap-3">
           <!-- Google Drive Option -->
           <button
-            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
+            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onclick={handleGoogleDriveLogin}
+            disabled={googleDriveLoading}
           >
             <div class="flex items-center gap-4">
-              <GoogleSolid size="xl" />
+              {#if googleDriveLoading}
+                <Spinner size="8" />
+              {:else}
+                <GoogleSolid size="xl" />
+              {/if}
               <div class="text-left flex-1">
                 <div class="font-semibold text-lg">Google Drive</div>
                 <div class="text-sm text-gray-400">15GB free • Requires re-auth every hour</div>
