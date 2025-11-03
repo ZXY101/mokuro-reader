@@ -6,8 +6,8 @@
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { showSnackbar, promptConfirmation } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
-  import { getCloudFileId, getCloudProvider, getCloudSize } from '$lib/util/cloud-fields';
-  import type { ProviderType } from '$lib/util/sync/provider-interface';
+  import { getCloudFileId, getCloudProvider, getCloudSize, getCloudModifiedTime } from '$lib/util/cloud-fields';
+  import type { ProviderType, CloudFileMetadata } from '$lib/util/sync/provider-interface';
 
   interface Props {
     volume: VolumeMetadata;
@@ -99,11 +99,20 @@
       `Delete ${volName} from ${providerName}?`,
       async () => {
         try {
-          if (!cloudFileId) {
-            throw new Error('No cloud file ID');
+          if (!cloudFileId || !cloudProvider) {
+            throw new Error('No cloud file metadata');
           }
 
-          await unifiedCloudManager.deleteVolumeCbz(cloudFileId);
+          // Construct CloudFileMetadata object from volume fields
+          const cloudFile: CloudFileMetadata = {
+            provider: cloudProvider,
+            fileId: cloudFileId,
+            path: `${volume.series_title}/${volume.volume_title}`,
+            modifiedTime: getCloudModifiedTime(volume) || new Date().toISOString(),
+            size: cloudSize || 0
+          };
+
+          await unifiedCloudManager.deleteVolumeCbz(cloudFile);
           showSnackbar(`Deleted ${volName} from ${providerName}`);
         } catch (error) {
           console.error(`Failed to delete from ${providerName}:`, error);

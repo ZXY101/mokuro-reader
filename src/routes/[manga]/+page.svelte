@@ -344,7 +344,7 @@
 
         for (const duplicate of duplicateCloudFiles) {
           try {
-            await unifiedCloudManager.deleteVolumeCbz(duplicate.fileId);
+            await unifiedCloudManager.deleteVolumeCbz(duplicate);
             successCount++;
           } catch (error) {
             console.error(`Failed to delete ${duplicate.path}:`, error);

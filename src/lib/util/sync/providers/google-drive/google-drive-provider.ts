@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { SyncProvider, ProviderStatus, CloudVolumeMetadata } from '../../provider-interface';
+import type { SyncProvider, ProviderStatus, CloudFileMetadata, DriveFileMetadata } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import { tokenManager } from '$lib/util/google-drive/token-manager';
 import { driveApiClient } from '$lib/util/google-drive/api-client';
@@ -239,7 +239,7 @@ export class GoogleDriveProvider implements SyncProvider {
 
 	// VOLUME STORAGE METHODS
 
-	async listCloudVolumes(): Promise<CloudVolumeMetadata[]> {
+	async listCloudVolumes(): Promise<CloudFileMetadata[]> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
@@ -267,8 +267,8 @@ export class GoogleDriveProvider implements SyncProvider {
 
 			console.log(`Found ${cbzFiles.length} CBZ files and ${folderNames.size} folders`);
 
-			// Transform CBZ files to CloudVolumeMetadata format with paths
-			const cloudVolumes: CloudVolumeMetadata[] = [];
+			// Transform CBZ files to DriveFileMetadata format with paths
+			const cloudVolumes: DriveFileMetadata[] = [];
 
 			for (const file of cbzFiles) {
 				const parentId = file.parents?.[0];
@@ -278,11 +278,14 @@ export class GoogleDriveProvider implements SyncProvider {
 				if (parentName) {
 					const path = `${parentName}/${file.name}`;
 					cloudVolumes.push({
+						provider: 'google-drive',
 						fileId: file.id,
 						path: path,
 						modifiedTime: file.modifiedTime || new Date().toISOString(),
 						size: file.size ? parseInt(file.size) : 0,
-						description: file.description
+						description: file.description,
+						parentId: parentId,
+						name: file.name
 					});
 				}
 			}
@@ -345,12 +348,15 @@ export class GoogleDriveProvider implements SyncProvider {
 	}
 
 	async downloadVolumeCbz(
-		fileId: string,
+		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
+
+		// Extract file ID from metadata
+		const fileId = file.fileId;
 
 		try {
 			// Get current access token
@@ -407,10 +413,13 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 	}
 
-	async deleteVolumeCbz(fileId: string): Promise<void> {
+	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
+
+		// Extract file ID from metadata
+		const fileId = file.fileId;
 
 		try {
 			// Delete from Drive

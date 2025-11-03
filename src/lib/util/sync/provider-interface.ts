@@ -83,7 +83,7 @@ class ExportProvider {
 		throw new Error('Export provider does not support sync operations');
 	}
 
-	async listCloudVolumes(): Promise<CloudVolumeMetadata[]> {
+	async listCloudVolumes(): Promise<CloudFileMetadata[]> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
@@ -91,11 +91,11 @@ class ExportProvider {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async downloadVolumeCbz(): Promise<Blob> {
+	async downloadVolumeCbz(_file: CloudFileMetadata): Promise<Blob> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async deleteVolumeCbz(): Promise<void> {
+	async deleteVolumeCbz(_file: CloudFileMetadata): Promise<void> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 }
@@ -119,10 +119,13 @@ export interface ProviderCredentials {
 }
 
 /**
- * Metadata for a cloud-stored volume (CBZ file)
+ * Base metadata for a cloud-stored file (CBZ file)
+ * This is the common interface - use provider-specific types when possible
  */
-export interface CloudVolumeMetadata {
-	/** Provider-specific file ID */
+export interface CloudFileMetadata {
+	/** Provider type discriminator for type-safe narrowing */
+	provider: ProviderType;
+	/** Provider-specific file ID (opaque - use full metadata object for operations) */
 	fileId: string;
 	/** Path in format "SeriesTitle/VolumeTitle.cbz" */
 	path: string;
@@ -133,6 +136,46 @@ export interface CloudVolumeMetadata {
 	/** Optional description/metadata */
 	description?: string;
 }
+
+/**
+ * Google Drive specific metadata
+ * Extends base with Drive-specific fields
+ */
+export interface DriveFileMetadata extends CloudFileMetadata {
+	provider: 'google-drive';
+	/** Parent folder ID for hierarchical operations */
+	parentId?: string;
+	/** Original file name from Drive */
+	name?: string;
+}
+
+/**
+ * MEGA specific metadata
+ * Extends base with MEGA-specific fields
+ */
+export interface MegaFileMetadata extends CloudFileMetadata {
+	provider: 'mega';
+	/** MEGA node handle (currently unused but reserved for future) */
+	nodeHandle?: string;
+}
+
+/**
+ * WebDAV specific metadata
+ * Extends base with WebDAV-specific fields
+ */
+export interface WebDAVFileMetadata extends CloudFileMetadata {
+	provider: 'webdav';
+	/** Entity tag for cache validation */
+	etag?: string;
+	/** Full WebDAV URL */
+	url?: string;
+}
+
+/**
+ * Discriminated union of all cloud file metadata types
+ * Use this when you need to handle any provider's metadata
+ */
+export type AnyCloudFileMetadata = DriveFileMetadata | MegaFileMetadata | WebDAVFileMetadata;
 
 export interface SyncProvider {
 	/** Provider type identifier */
@@ -204,9 +247,9 @@ export interface SyncProvider {
 	// VOLUME STORAGE METHODS
 	/**
 	 * List all CBZ files in cloud storage
-	 * @returns Array of cloud volume metadata
+	 * @returns Array of cloud file metadata
 	 */
-	listCloudVolumes(): Promise<CloudVolumeMetadata[]>;
+	listCloudVolumes(): Promise<CloudFileMetadata[]>;
 
 	/**
 	 * Upload a CBZ file to cloud storage
@@ -219,20 +262,20 @@ export interface SyncProvider {
 
 	/**
 	 * Download a CBZ file from cloud storage
-	 * @param fileId Cloud file ID
+	 * @param file Cloud file metadata (provider extracts internal ID)
 	 * @param onProgress Optional progress callback (loaded, total)
 	 * @returns CBZ file data
 	 */
 	downloadVolumeCbz(
-		fileId: string,
+		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob>;
 
 	/**
 	 * Delete a CBZ file from cloud storage
-	 * @param fileId Cloud file ID
+	 * @param file Cloud file metadata (provider extracts internal ID)
 	 */
-	deleteVolumeCbz(fileId: string): Promise<void>;
+	deleteVolumeCbz(file: CloudFileMetadata): Promise<void>;
 }
 
 export class ProviderError extends Error {

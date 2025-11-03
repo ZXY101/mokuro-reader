@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { SyncProvider, ProviderCredentials, ProviderStatus } from '../../provider-interface';
+import type { SyncProvider, ProviderCredentials, ProviderStatus, CloudFileMetadata } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import { unifiedCloudManager } from '../../unified-cloud-manager';
 
@@ -527,7 +527,7 @@ export class MegaProvider implements SyncProvider {
 
 	// VOLUME STORAGE METHODS
 
-	async listCloudVolumes(): Promise<import('../../provider-interface').CloudVolumeMetadata[]> {
+	async listCloudVolumes(): Promise<import('../../provider-interface').CloudFileMetadata[]> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
 		}
@@ -550,7 +550,7 @@ export class MegaProvider implements SyncProvider {
 			);
 
 			// Filter CBZ files that are in ANY mokuro-reader folder or its subfolders
-			const cbzFiles: import('../../provider-interface').CloudVolumeMetadata[] = [];
+			const cbzFiles: import('../../provider-interface').CloudFileMetadata[] = [];
 
 			for (const file of files) {
 				// Skip non-files
@@ -603,6 +603,7 @@ export class MegaProvider implements SyncProvider {
 					const size = (file as any).size || 0;
 
 					cbzFiles.push({
+						provider: 'mega',
 						fileId,
 						path,
 						modifiedTime,
@@ -696,26 +697,29 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	async downloadVolumeCbz(
-		fileId: string,
+		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
 		}
 
+		// Extract file ID from metadata
+		const fileId = file.fileId;
+
 		try {
 			// Find the file by ID
 			const files = Object.values(this.storage.files || {});
-			const file = files.find(
+			const megaFile = files.find(
 				(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
 			);
 
-			if (!file) {
+			if (!megaFile) {
 				throw new Error('File not found');
 			}
 
 			return new Promise((resolve, reject) => {
-				const fileObj = file as any;
+				const fileObj = megaFile as any;
 
 				// Use download with progress callback if provided
 				if (onProgress) {
@@ -776,24 +780,27 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	async deleteVolumeCbz(fileId: string): Promise<void> {
+	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
 		}
 
+		// Extract file ID from metadata
+		const fileId = file.fileId;
+
 		try {
 			// Find the file by ID
 			const files = Object.values(this.storage.files || {});
-			const file = files.find(
+			const megaFile = files.find(
 				(f: any) => (f.nodeId === fileId || f.id === fileId) && !f.directory
 			);
 
-			if (!file) {
+			if (!megaFile) {
 				throw new Error('File not found');
 			}
 
 			return new Promise((resolve, reject) => {
-				(file as any).delete(true, (error: Error | null) => {
+				(megaFile as any).delete(true, (error: Error | null) => {
 					if (error) {
 						reject(error);
 					} else {
