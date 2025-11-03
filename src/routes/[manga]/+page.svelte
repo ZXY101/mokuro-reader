@@ -17,6 +17,7 @@
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
 
   function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
     return a.volume_title.localeCompare(b.volume_title, undefined, {
@@ -366,6 +367,16 @@
   }
 
   onMount(() => {
+    // Check if cache is already loaded on mount (for navigation scenarios)
+    const currentCloudFiles = unifiedCloudManager.getAllCloudVolumes();
+    const currentlyFetching = get(unifiedCloudManager.isFetching);
+
+    // If we have files and not fetching, cache is already loaded
+    if (currentCloudFiles.length > 0 && !currentlyFetching) {
+      cacheHasLoaded = true;
+      console.log('[Series Page] Cache already loaded on mount:', currentCloudFiles.length, 'files');
+    }
+
     function handleKeydown(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         goto('/');
