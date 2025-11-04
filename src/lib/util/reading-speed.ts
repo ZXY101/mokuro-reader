@@ -1,5 +1,21 @@
 import type { AggregateSession, PageTurn } from '$lib/settings/volume-data';
 
+/**
+ * Format volume name for logging: "Series/Volume (uuid)" or fallback to uuid
+ */
+function formatVolumeName(
+	volumeData: {
+		series_title?: string;
+		volume_title?: string;
+	},
+	volumeId: string
+): string {
+	if (volumeData.series_title && volumeData.volume_title) {
+		return `${volumeData.series_title}/${volumeData.volume_title} (${volumeId.slice(0, 8)}...)`;
+	}
+	return volumeId.slice(0, 8) + '...';
+}
+
 // Reading speed estimation constants
 export const SESSION_DATA_HOURS = 4; // Hours of page-level session data to keep/use
 export const ESTIMATION_HOURS = 8; // Total hours of reading data to use for speed estimates
@@ -124,6 +140,9 @@ export function calculateReadingSpeed(
 		lastProgressUpdate: string;
 		recentPageTurns?: PageTurn[];
 		sessions?: AggregateSession[];
+		series_title?: string;
+		series_uuid?: string;
+		volume_title?: string;
 	}>,
 	idleTimeoutMinutes: number
 ): ReadingSpeedResult {
@@ -132,7 +151,7 @@ export function calculateReadingSpeed(
 	const idleTimeoutMs = idleTimeoutMinutes * 60 * 1000;
 
 	// Step 1: Try to gather recent page-level data from recentPageTurns
-	const allTurnData: Array<{ turns: PageTurn[]; volumeId: string }> = [];
+	const allTurnData: Array<{ turns: PageTurn[]; volumeId: string; volumeData: typeof volumesData[string] }> = [];
 
 	// Debug: Count volumes with page turn data
 	let volumesWithTurns = 0;
@@ -142,7 +161,8 @@ export function calculateReadingSpeed(
 		if (!volumeData.recentPageTurns || volumeData.recentPageTurns.length < 2) {
 			if (volumeData.recentPageTurns && volumeData.recentPageTurns.length > 0) {
 				volumesWithInsufficientTurns++;
-				console.log(`[Reading Speed] Volume ${volumeId.slice(0, 8)}... has only ${volumeData.recentPageTurns.length} page turn(s) (need 2+)`);
+				const volumeName = formatVolumeName(volumeData, volumeId);
+				console.log(`[Reading Speed] ${volumeName} has only ${volumeData.recentPageTurns.length} page turn(s) (need 2+)`);
 			}
 			continue;
 		}
@@ -150,7 +170,8 @@ export function calculateReadingSpeed(
 		volumesWithTurns++;
 		allTurnData.push({
 			turns: volumeData.recentPageTurns,
-			volumeId
+			volumeId,
+			volumeData
 		});
 	}
 
@@ -159,11 +180,12 @@ export function calculateReadingSpeed(
 
 	// Calculate stats from turn data
 	const validTurnStats = allTurnData
-		.map(({ turns, volumeId }): TurnStatsWithVolume | null => {
+		.map(({ turns, volumeId, volumeData }): TurnStatsWithVolume | null => {
 			const stats = calculateTurnStats(turns, idleTimeoutMs);
+			const volumeName = formatVolumeName(volumeData, volumeId);
 
 			// Debug logging
-			console.log(`[Reading Speed] Volume ${volumeId.slice(0, 8)}... page turns:`, {
+			console.log(`[Reading Speed] ${volumeName} page turns:`, {
 				turnCount: turns.length,
 				pagesRead: stats.pagesRead,
 				totalSeconds: stats.totalSeconds.toFixed(1),

@@ -7,10 +7,21 @@ import type { Page } from '$lib/types';
 import type { PageTurn } from './volume-data';
 
 /**
+ * Format volume name for logging: "Series/Volume (uuid)" or fallback to uuid
+ */
+function formatVolumeName(volumeData: VolumeData, volumeId: string): string {
+  if (volumeData.series_title && volumeData.volume_title) {
+    return `${volumeData.series_title}/${volumeData.volume_title} (${volumeId.slice(0, 8)}...)`;
+  }
+  return volumeId.slice(0, 8) + '...';
+}
+
+/**
  * Migrate 2-tuple page turn data to 3-tuple format by enriching with character counts from IndexedDB
  */
 async function migratePageTurnData(
   volumeId: string,
+  volumeData: VolumeData,
   turns: PageTurn[]
 ): Promise<PageTurn[] | null> {
   // Check if already migrated (all turns are 3-tuple)
@@ -24,17 +35,18 @@ async function migratePageTurnData(
     return null; // No migration needed
   }
 
-  console.log(`[Migration] Attempting to migrate ${volumeId.slice(0, 8)}... (${turns.length} turns)`);
+  const volumeName = formatVolumeName(volumeData, volumeId);
+  console.log(`[Migration] Attempting to migrate ${volumeName} (${turns.length} turns)`);
 
   try {
     // Load pages from IndexedDB
-    const volumeData = await db.volumes_data.get(volumeId);
-    if (!volumeData || !volumeData.pages) {
-      console.log(`[Migration] Failed - no pages in IndexedDB for ${volumeId.slice(0, 8)}...`);
+    const volumePagesData = await db.volumes_data.get(volumeId);
+    if (!volumePagesData || !volumePagesData.pages) {
+      console.log(`[Migration] Failed - no pages in IndexedDB for ${volumeName}`);
       return null;
     }
 
-    const pages = volumeData.pages as Page[];
+    const pages = volumePagesData.pages as Page[];
 
     // Helper to get character count for a page
     const getPageChars = (pageNum: number): number => {
@@ -72,10 +84,10 @@ async function migratePageTurnData(
       return [timestamp, page, cumulativeChars] as PageTurn;
     });
 
-    console.log(`[Migration] Successfully migrated ${volumeId.slice(0, 8)}...`);
+    console.log(`[Migration] Successfully migrated ${volumeName}`);
     return migratedTurns;
   } catch (error) {
-    console.warn(`[Migration] Failed for ${volumeId.slice(0, 8)}...`, error);
+    console.warn(`[Migration] Failed for ${volumeName}`, error);
     return null;
   }
 }
@@ -97,7 +109,7 @@ export const personalizedReadingSpeed = derived(
     const migrationPromises = Object.entries($volumes)
       .filter(([_, data]) => data.recentPageTurns && data.recentPageTurns.length > 0)
       .map(async ([volumeId, data]) => {
-        const migrated = await migratePageTurnData(volumeId, data.recentPageTurns!);
+        const migrated = await migratePageTurnData(volumeId, data, data.recentPageTurns!);
         return migrated ? { volumeId, migrated } : null;
       });
 
