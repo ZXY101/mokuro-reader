@@ -8,6 +8,18 @@ import { parseVolumesFromJson } from '$lib/settings';
 import { getOrCreateFolder, uploadCbzToDrive } from '$lib/util/backup';
 
 /**
+ * Metadata for a file selected from the Google Drive file picker
+ */
+interface PickedFile {
+	/** File ID in Google Drive */
+	id: string;
+	/** File name */
+	name: string | undefined;
+	/** MIME type */
+	mimeType: string | undefined;
+}
+
+/**
  * Google Drive Provider
  *
  * Wraps existing Google Drive integration into the unified SyncProvider interface.
@@ -481,7 +493,7 @@ export class GoogleDriveProvider implements SyncProvider {
 	 * Show Google Drive file picker for selecting CBZ/ZIP files or folders
 	 * Opens the Google Picker UI, expands any selected folders, and returns all files
 	 */
-	async showFilePicker(): Promise<import('../../provider-interface').PickedFile[]> {
+	async showFilePicker(): Promise<PickedFile[]> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
@@ -536,7 +548,7 @@ export class GoogleDriveProvider implements SyncProvider {
 									const docs = data[google.picker.Response.DOCUMENTS];
 
 									// Expand folders and collect all files
-									const allFiles: import('../../provider-interface').PickedFile[] = [];
+									const allFiles: PickedFile[] = [];
 
 									for (const doc of docs) {
 										const pickedFile = {
@@ -597,14 +609,14 @@ export class GoogleDriveProvider implements SyncProvider {
 	 * List all files in a folder recursively
 	 * Expands subfolders and returns all ZIP/CBZ files
 	 */
-	private async listFilesInFolder(folderId: string): Promise<import('../../provider-interface').PickedFile[]> {
+	private async listFilesInFolder(folderId: string): Promise<PickedFile[]> {
 		try {
 			const files = await driveApiClient.listFiles(
 				`'${folderId}' in parents and (mimeType='application/zip' or mimeType='application/x-zip-compressed' or mimeType='application/vnd.comicbook+zip' or mimeType='application/x-cbz' or mimeType='application/vnd.google-apps.folder') and trashed=false`,
 				'files(id, name, mimeType)'
 			);
 
-			const allFiles: import('../../provider-interface').PickedFile[] = [];
+			const allFiles: PickedFile[] = [];
 
 			for (const file of files) {
 				if (file.mimeType === 'application/vnd.google-apps.folder') {
@@ -633,7 +645,7 @@ export class GoogleDriveProvider implements SyncProvider {
 	 * Fetches size and modifiedTime from Drive API for each file
 	 */
 	async getCloudFileMetadata(
-		pickedFiles: import('../../provider-interface').PickedFile[]
+		pickedFiles: PickedFile[]
 	): Promise<import('../../provider-interface').CloudFileMetadata[]> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
