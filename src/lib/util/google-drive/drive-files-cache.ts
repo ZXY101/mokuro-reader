@@ -1,7 +1,7 @@
 import { writable, derived } from 'svelte/store';
 import { driveApiClient } from './api-client';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
-import { syncService } from './sync-service';
+import { unifiedCloudManager } from '../sync/unified-cloud-manager';
 import type { CloudCache } from '../sync/cloud-cache-interface';
 import type { DriveFileMetadata } from '../sync/provider-interface';
 
@@ -183,7 +183,7 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         console.log('Cache loaded, triggering requested sync...');
         localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
 
-        syncService.syncReadProgress().catch(err =>
+        unifiedCloudManager.syncProgress({ silent: false }).catch((err: Error) =>
           console.error('Sync after login failed:', err)
         );
       }

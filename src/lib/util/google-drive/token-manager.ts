@@ -2,7 +2,6 @@ import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { GOOGLE_DRIVE_CONFIG, type TokenInfo } from './constants';
 import { showSnackbar } from '../snackbar';
-import { syncService } from './sync-service';
 import { providerManager } from '../sync/provider-manager';
 
 class TokenManager {

@@ -11,14 +11,12 @@
     showSnackbar,
     uploadFile,
     accessTokenStore,
-    readerFolderIdStore,
     volumeDataIdStore,
     profilesIdStore,
     tokenClientStore,
     signIn,
     logout,
     syncReadProgress,
-    syncService,
     READER_FOLDER,
     CLIENT_ID,
     API_KEY
@@ -44,7 +42,7 @@
 
   // Use Svelte's derived runes for automatic store subscriptions
   let accessToken = $derived($accessTokenStore);
-  let readerFolderId = $derived($readerFolderIdStore.reader);
+  // Note: readerFolderId removed - was part of legacy sync-service (now deleted)
   let volumeDataId = $derived($volumeDataIdStore);
   let profilesId = $derived($profilesIdStore);
   let tokenClient = $derived($tokenClientStore);
