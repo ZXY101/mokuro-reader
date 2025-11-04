@@ -271,7 +271,8 @@ class UnifiedSyncService {
 	}
 
 	/**
-	 * Merge volume data using newest-wins strategy
+	 * Merge volume data using newest-wins strategy for progress data
+	 * But preserves static metadata from both records (favors completeness)
 	 * IMPORTANT: Always returns VolumeData class instances to ensure toJSON() is available
 	 */
 	private mergeVolumeData(local: any, cloud: any): any {
@@ -294,17 +295,31 @@ class UnifiedSyncService {
 				// Only in local - already a VolumeData instance
 				merged[volumeId] = localVol;
 			} else {
-				// In both - keep newer based on lastProgressUpdate
+				// In both - keep newer based on lastProgressUpdate for progress data
+				// But preserve static metadata from both records (favor completeness)
 				const localDate = new Date(localVol.lastProgressUpdate || 0).getTime();
 				const cloudDate = new Date(cloudVol.lastProgressUpdate || 0).getTime();
 
-				// Ensure cloud version is converted to VolumeData instance if selected
+				let newerVol, olderVol;
 				if (localDate >= cloudDate) {
-					merged[volumeId] = localVol;
+					newerVol = localVol;
+					olderVol = cloudVol;
 				} else {
+					// Convert cloud to VolumeData instance
 					const parsed = parseVolumesFromJson(JSON.stringify({ [volumeId]: cloudVol }));
-					merged[volumeId] = parsed[volumeId];
+					newerVol = parsed[volumeId];
+					olderVol = localVol;
 				}
+
+				// Preserve metadata from both records - fill in missing fields
+				merged[volumeId] = parseVolumesFromJson(JSON.stringify({
+					[volumeId]: {
+						...newerVol,
+						series_uuid: newerVol.series_uuid || olderVol.series_uuid,
+						series_title: newerVol.series_title || olderVol.series_title,
+						volume_title: newerVol.volume_title || olderVol.volume_title
+					}
+				}))[volumeId];
 			}
 		});
 
