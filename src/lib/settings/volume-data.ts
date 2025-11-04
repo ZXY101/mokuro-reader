@@ -41,7 +41,7 @@ export type VolumeSettings = {
 export type VolumeSettingsKey = keyof VolumeSettings;
 
 // Session tracking types
-export type PageTurn = [number, number]; // [timestamp_ms, page_number]
+export type PageTurn = [number, number, number]; // [timestamp_ms, page_number, char_count]
 
 // Aggregate session data (for reading speed calculation)
 export type AggregateSession = {
@@ -67,7 +67,7 @@ type VolumeDataJSON = {
   volume_title?: string;
 };
 
-class VolumeData implements VolumeDataJSON {
+export class VolumeData implements VolumeDataJSON {
   progress: number;
   chars: number;
   completed: boolean;
@@ -332,8 +332,10 @@ export function updateProgress(
       }
     }
 
-    // Add new turn
-    recentPageTurns = [...recentPageTurns, [now, progress]];
+    // Add new turn with cumulative character count
+    // Store cumulative chars so we can calculate reading speed even if volume is deleted from IndexedDB
+    const cumulativeChars = chars ?? currentVolume.chars;
+    recentPageTurns = [...recentPageTurns, [now, progress, cumulativeChars]];
 
     // Lazy metadata population: If metadata is missing, fetch it asynchronously
     // This ensures stats pages work even if IndexedDB is later deleted

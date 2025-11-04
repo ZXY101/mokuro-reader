@@ -1,30 +1,17 @@
 import type { AggregateSession, PageTurn } from '$lib/settings/volume-data';
-import type { Page } from '$lib/types';
-
-const MAX_BREAK_MS = 5 * 60 * 1000; // 5 minutes for filtering
 
 // Reading speed estimation constants
 export const SESSION_DATA_HOURS = 4; // Hours of page-level session data to keep/use
 export const ESTIMATION_HOURS = 8; // Total hours of reading data to use for speed estimates
 
 /**
- * Get character count for a specific page
- */
-function getCharCountForPage(pages: Page[], pageNum: number): number {
-	const page = pages[pageNum];
-	if (!page) return 0;
-
-	return page.blocks.reduce((sum, block) => {
-		return sum + block.lines.reduce((lineSum, line) => lineSum + line.length, 0);
-	}, 0);
-}
-
-/**
  * Calculate statistics from page turns
+ * Now uses character counts stored in page turns, no longer needs pages array
+ * NOTE: Only works with 3-tuple format [timestamp, page, chars]
  */
 function calculateTurnStats(
 	turns: PageTurn[],
-	pages: Page[]
+	idleTimeoutMs: number
 ): {
 	totalSeconds: number;
 	totalChars: number;
@@ -33,29 +20,41 @@ function calculateTurnStats(
 	charsPerMinute: number;
 } {
 	// Group time spent by page (handles rereading/backtracking)
-	const timePerPage = new Map<number, number>();
+	const timePerPage = new Map<number, { duration: number; chars: number }>();
 
 	// Process each turn pair
 	for (let i = 1; i < turns.length; i++) {
-		const [prevTime, prevPage] = turns[i - 1];
-		const [currTime] = turns[i];
+		const prevTurn = turns[i - 1];
+		const currTurn = turns[i];
+
+		// Skip 2-tuple format (legacy data without character counts)
+		if (prevTurn.length < 3 || currTurn.length < 3) continue;
+
+		const [prevTime, prevPage, prevChars] = prevTurn;
+		const [currTime, , currChars] = currTurn;
 		const duration = (currTime - prevTime) / 1000;
 
-		// Skip breaks
-		if (duration > MAX_BREAK_MS / 1000) continue;
+		// Skip idle periods (user configured timeout)
+		if (duration > idleTimeoutMs / 1000) continue;
 
-		// Accumulate time for this page
-		const current = timePerPage.get(prevPage) || 0;
-		timePerPage.set(prevPage, current + duration);
+		// Calculate chars read on this page (difference between cumulative counts)
+		const charsOnPage = currChars - prevChars;
+
+		// Accumulate time and chars for this page
+		const current = timePerPage.get(prevPage) || { duration: 0, chars: 0 };
+		timePerPage.set(prevPage, {
+			duration: current.duration + duration,
+			chars: current.chars + charsOnPage
+		});
 	}
 
 	// Calculate totals
 	let totalSeconds = 0;
 	let totalChars = 0;
 
-	for (const [page, duration] of timePerPage.entries()) {
+	for (const { duration, chars } of timePerPage.values()) {
 		totalSeconds += duration;
-		totalChars += getCharCountForPage(pages, page);
+		totalChars += chars;
 	}
 
 	const pagesRead = timePerPage.size;
@@ -78,11 +77,6 @@ export interface ReadingSpeedResult {
 	sessionsUsed: number;
 }
 
-interface VolumeWithPages {
-	volume_uuid: string;
-	pages: Page[];
-}
-
 interface TurnStatsWithVolume {
 	totalSeconds: number;
 	totalChars: number;
@@ -99,7 +93,7 @@ interface TurnStatsWithVolume {
  */
 export function calculateReadingSpeedFromSessions(
 	volumesData: Record<string, { sessions?: AggregateSession[] }>,
-	allVolumesPages: VolumeWithPages[]
+	_idleTimeoutMinutes: number
 ): ReadingSpeedResult {
 	// Since compaction algorithm isn't ready yet, aggregate sessions won't be populated
 	// Fall back to completed volumes calculation
@@ -131,39 +125,59 @@ export function calculateReadingSpeed(
 		recentPageTurns?: PageTurn[];
 		sessions?: AggregateSession[];
 	}>,
-	allVolumesPages: VolumeWithPages[]
+	idleTimeoutMinutes: number
 ): ReadingSpeedResult {
 	const SESSION_DATA_MINUTES = SESSION_DATA_HOURS * 60;
 	const ESTIMATION_MINUTES = ESTIMATION_HOURS * 60;
+	const idleTimeoutMs = idleTimeoutMinutes * 60 * 1000;
 
 	// Step 1: Try to gather recent page-level data from recentPageTurns
-	// (This will be sparse until user starts reading after this update)
-	const allTurnData: Array<{ turns: PageTurn[]; pages: Page[]; volumeId: string }> = [];
+	const allTurnData: Array<{ turns: PageTurn[]; volumeId: string }> = [];
+
+	// Debug: Count volumes with page turn data
+	let volumesWithTurns = 0;
+	let volumesWithInsufficientTurns = 0;
 
 	for (const [volumeId, volumeData] of Object.entries(volumesData)) {
-		if (!volumeData.recentPageTurns || volumeData.recentPageTurns.length < 2) continue;
+		if (!volumeData.recentPageTurns || volumeData.recentPageTurns.length < 2) {
+			if (volumeData.recentPageTurns && volumeData.recentPageTurns.length > 0) {
+				volumesWithInsufficientTurns++;
+				console.log(`[Reading Speed] Volume ${volumeId.slice(0, 8)}... has only ${volumeData.recentPageTurns.length} page turn(s) (need 2+)`);
+			}
+			continue;
+		}
 
-		const volumePages = allVolumesPages.find((v) => v.volume_uuid === volumeId);
-		if (!volumePages) continue;
-
+		volumesWithTurns++;
 		allTurnData.push({
 			turns: volumeData.recentPageTurns,
-			pages: volumePages.pages,
 			volumeId
 		});
 	}
 
+	console.log(`[Reading Speed] Found ${volumesWithTurns} volumes with sufficient turn data (2+ turns)`);
+	console.log(`[Reading Speed] ${volumesWithInsufficientTurns} volumes with < 2 turns`);
+
 	// Calculate stats from turn data
 	const validTurnStats = allTurnData
-		.map(({ turns, pages, volumeId }): TurnStatsWithVolume | null => {
-			const stats = calculateTurnStats(turns, pages);
+		.map(({ turns, volumeId }): TurnStatsWithVolume | null => {
+			const stats = calculateTurnStats(turns, idleTimeoutMs);
 
-			// Must have read enough to be meaningful
-			if (stats.pagesRead < 10) return null;
-			if (stats.avgSecondsPerPage < 5) return null;
-			if (stats.totalSeconds < 60) return null;
-			if (stats.charsPerMinute <= 0 || stats.charsPerMinute > 1000) return null;
+			// Debug logging
+			console.log(`[Reading Speed] Volume ${volumeId.slice(0, 8)}... page turns:`, {
+				turnCount: turns.length,
+				pagesRead: stats.pagesRead,
+				totalSeconds: stats.totalSeconds.toFixed(1),
+				avgSecondsPerPage: stats.avgSecondsPerPage.toFixed(1),
+				charsPerMinute: stats.charsPerMinute.toFixed(1)
+			});
 
+			// Only validate CPM is reasonable (not trying to game the system)
+			if (stats.charsPerMinute <= 0 || stats.charsPerMinute > 1000) {
+				console.log(`[Reading Speed] ❌ Rejected: invalid CPM (${stats.charsPerMinute.toFixed(1)})`);
+				return null;
+			}
+
+			console.log(`[Reading Speed] ✅ Accepted`);
 			return {
 				volumeId,
 				...stats
