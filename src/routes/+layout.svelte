@@ -11,7 +11,6 @@
   import ProgressTracker from '$lib/components/ProgressTracker.svelte';
   import NightModeFilter from '$lib/components/NightModeFilter.svelte';
   import { initializeProviders } from '$lib/util/sync/init-providers';
-  import { enrichAllVolumesWithMetadata } from '$lib/settings/volume-data';
 
   interface Props {
     children?: import('svelte').Snippet;
@@ -21,15 +20,9 @@
 
   inject({ mode: dev ? 'development' : 'production' });
 
-  // Initialize sync providers and enrich metadata on app startup (non-blocking)
+  // Initialize sync providers on app startup (non-blocking)
   onMount(() => {
-    // Enrich volume metadata while volumes still exist in IndexedDB
-    // This ensures stats work even after volumes are deleted
-    enrichAllVolumesWithMetadata().catch((error) => {
-      console.error('Failed to enrich volume metadata:', error);
-    });
-
-    // Initialize sync providers - fire and forget, don't block app initialization
+    // Fire and forget - don't block app initialization
     initializeProviders().catch((error) => {
       console.error('Failed to initialize providers:', error);
     });
