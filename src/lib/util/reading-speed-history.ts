@@ -1,4 +1,5 @@
 import type { VolumeMetadata } from '$lib/types';
+import { updateVolumeMetadata } from '$lib/settings/volume-data';
 
 export interface VolumeSpeedData {
 	volumeId: string;
@@ -104,12 +105,22 @@ export function processVolumeSpeedData(
 		let seriesTitle = data.series_title;
 		let seriesId = data.series_uuid;
 
-		// If metadata is missing from progress data, try catalog
+		// If metadata is missing from progress data, try catalog and save it
 		if (!volumeTitle || !seriesTitle || !seriesId) {
 			const volumeInfo = catalogMap.get(volumeId);
 			volumeTitle = volumeTitle || volumeInfo?.volume_title || `Volume ${volumeId.slice(0, 8)}...`;
 			seriesTitle = seriesTitle || volumeInfo?.series_title || '[Missing Series Info]';
 			seriesId = seriesId || volumeInfo?.series_uuid || 'missing-series-info';
+
+			// Save to progress data for existing users (one-time enrichment)
+			if (volumeInfo) {
+				updateVolumeMetadata(
+					volumeId,
+					volumeInfo.series_uuid,
+					volumeInfo.series_title,
+					volumeInfo.volume_title
+				);
+			}
 		}
 
 		// Get thumbnail from catalog (never stored in progress data to keep JSON small)
