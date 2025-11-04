@@ -1,7 +1,6 @@
 <script lang="ts">
   import { run } from 'svelte/legacy';
 
-  import { processFiles } from '$lib/upload';
   import { profiles } from '$lib/settings';
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
   import { volumes } from '$lib/settings/volume-data';
@@ -32,10 +31,10 @@
   import { GoogleSolid } from 'flowbite-svelte-icons';
   import { catalog } from '$lib/catalog';
   import type { VolumeMetadata } from '$lib/types';
-  import { updateDriveFileDescriptionForEntries } from '$lib/util/update-drive-descriptions';
 
   // Import multi-provider sync
-  import { providerManager, megaProvider, webdavProvider } from '$lib/util/sync';
+  import { providerManager, megaProvider, webdavProvider, googleDriveProvider } from '$lib/util/sync';
+  import { queueVolumesFromCloudFiles } from '$lib/util/download-queue';
 
   // Get store references for auto-subscription
   const providerStatusStore = providerManager.status;
@@ -79,71 +78,6 @@
     showSnackbar(`Failed ${context}: ${message}`);
   }
 
-  async function getFileSize(fileId: string): Promise<number> {
-    try {
-      const { result } = await gapi.client.drive.files.get({
-        fileId: fileId,
-        fields: 'size'
-      });
-      return parseInt(result.size || '0', 10);
-    } catch (error) {
-      console.error('Error getting file size:', error);
-      return 0;
-    }
-  }
-
-  function xhrDownloadFileIdWithTracking(
-    fileId: string,
-    fileName: string,
-    progressCallback: (loaded: number) => void
-  ) {
-    return new Promise<Blob>(async (resolve, reject) => {
-      const { access_token } = gapi.auth.getToken();
-      const xhr = new XMLHttpRequest();
-
-      // Get file size before starting download
-      const size = await getFileSize(fileId);
-
-      xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
-      xhr.setRequestHeader('Authorization', `Bearer ${access_token}`);
-      xhr.responseType = 'blob';
-
-      xhr.onprogress = ({ loaded }) => {
-        // Call the progress callback with the loaded bytes
-        progressCallback(loaded);
-      };
-
-      xhr.onabort = (event) => {
-        console.warn(`xhr ${fileId}: download aborted at ${event.loaded} of ${size}`);
-        showSnackbar('Download failed');
-        reject(new Error('Download aborted'));
-      };
-
-      xhr.onerror = (event) => {
-        console.error(`xhr ${fileId}: download error at ${event.loaded} of ${size}`);
-        showSnackbar('Download failed');
-        reject(new Error('Error downloading file'));
-      };
-
-      xhr.onload = () => {
-        resolve(xhr.response);
-      };
-
-      xhr.ontimeout = (event) => {
-        console.warn(`xhr ${fileId}: download timeout after ${event.loaded} of ${size}`);
-        showSnackbar('Download timed out');
-        reject(new Error('Timeout downloading file'));
-      };
-
-      xhr.send();
-    });
-  }
-
-  // Keep this function for backward compatibility with other parts of the code
-  function xhrDownloadFileId(fileId: string, fileName: string) {
-    return xhrDownloadFileIdWithTracking(fileId, fileName, () => {});
-  }
-
   // Function to clear service worker cache for Google Drive downloads
   async function clearServiceWorkerCache() {
     if ('caches' in window) {
@@ -184,440 +118,32 @@
   }
 
   async function createPicker() {
-    // Ensure reader folder exists first
-    if (!readerFolderId) {
-      try {
-        await syncService.ensureReaderFolderExists();
-      } catch (error) {
-        console.error('Failed to ensure reader folder exists:', error);
-        showSnackbar('Failed to access Google Drive folder');
-        return;
-      }
-    }
-
-    // Wait a tick to ensure readerFolderId is updated
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    console.log('Creating picker with readerFolderId:', readerFolderId);
-
-    // Create a view for ZIP/CBZ files
-    const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
-      .setMimeTypes(
-        'application/zip,application/x-zip-compressed,application/vnd.comicbook+zip,application/x-cbz'
-      )
-      .setMode(google.picker.DocsViewMode.LIST)
-      .setIncludeFolders(true)
-      .setSelectFolderEnabled(true);
-
-    // Only set parent if we have a folder ID
-    if (readerFolderId) {
-      docsView.setParent(readerFolderId);
-    }
-
-    // Create a view specifically for folders
-    const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
-      .setSelectFolderEnabled(true);
-
-    if (readerFolderId) {
-      folderView.setParent(readerFolderId);
-    }
-
-    const picker = new google.picker.PickerBuilder()
-      .addView(docsView)
-      .addView(folderView)
-      .setOAuthToken(accessToken)
-      .setAppId(CLIENT_ID)
-      .setDeveloperKey(API_KEY)
-      .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
-      .setCallback(pickerCallback)
-      .build();
-    picker.setVisible(true);
-  }
-
-  async function listFilesInFolder(folderId: string): Promise<any[]> {
     try {
-      const { result } = await gapi.client.drive.files.list({
-        q: `'${folderId}' in parents and (mimeType='application/zip' or mimeType='application/x-zip-compressed' or mimeType='application/vnd.comicbook+zip' or mimeType='application/x-cbz' or mimeType='application/vnd.google-apps.folder')`,
-        fields: 'files(id, name, mimeType)',
-        pageSize: 1000
-      });
+      // Use provider's file picker - it handles all the Drive-specific logic
+      const pickedFiles = await googleDriveProvider.showFilePicker();
 
-      return result.files || [];
+      if (pickedFiles.length === 0) {
+        return; // User cancelled or no files selected
+      }
+
+      // Fetch full metadata from Drive API
+      const cloudFiles = await googleDriveProvider.getCloudFileMetadata(pickedFiles);
+
+      // Queue volumes for download via the unified queue system
+      queueVolumesFromCloudFiles(cloudFiles);
+
+      showSnackbar(`Queued ${cloudFiles.length} file${cloudFiles.length === 1 ? '' : 's'} for download`);
     } catch (error) {
-      handleDriveError(error, 'listing files in folder');
-      return [];
+      handleDriveError(error, 'selecting files');
     }
   }
 
-  // Pass the scanProcessId as a parameter
-  async function processFolder(folderId: string, folderName: string, scanProcessId: string): Promise<any[]> {
-    const files = await listFilesInFolder(folderId);
-    const allFiles = [];
-
-    // Process each file in the folder
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-
-      // Update the scan process with subfolder information
-      progressTrackerStore.updateProcess(scanProcessId, {
-        status: `Scanning ${folderName} (${i + 1}/${files.length}): ${file.name}`
-      });
-
-      if (file.mimeType === 'application/vnd.google-apps.folder') {
-        // Recursively process subfolders - pass the same scanProcessId
-        const subfolderFiles = await processFolder(file.id, file.name, scanProcessId);
-        allFiles.push(...subfolderFiles);
-      } else {
-        // Add file to the list
-        allFiles.push(file);
-      }
-    }
-
-    return allFiles;
-  }
-
-  async function downloadAndProcessFiles(
-    fileList: { id: string; name: string; mimeType: string }[],
-    existingProcessId?: string
-  ) {
-    // Import the worker pool dynamically
-    const { WorkerPool } = await import('$lib/util/worker-pool');
-
-    // Use the existing processId if provided, otherwise create a new one
-    const overallProcessId =
-      existingProcessId ||
-      `download-batch-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-    // Sort files by name
-    const sortedFiles = fileList.sort((a, b) => a.name.localeCompare(b.name));
-
-    // First, get the total size of all files to download
-    let totalBytesToDownload = 0;
-    let fileSizes: { [fileId: string]: number } = {};
-
-    // If we're using a new process ID (not continuing from scanning), create a new tracker
-    if (!existingProcessId) {
-      progressTrackerStore.addProcess({
-        id: overallProcessId,
-        description: `Downloading ${sortedFiles.length} files`,
-        status: `Calculating total size...`,
-        progress: 0,
-        bytesLoaded: 0,
-        totalBytes: 1 // Temporary value until we know the real total
-      });
-    } else {
-      // Update the existing tracker
-      progressTrackerStore.updateProcess(overallProcessId, {
-        status: `Calculating total size...`,
-        // Keep the progress at 30% (after scanning phase)
-        progress: 30
-      });
-    }
-
-    try {
-      // Get file sizes in parallel using Promise.all
-      const sizePromises = sortedFiles.map((file) => getFileSize(file.id));
-      const sizes = await Promise.all(sizePromises);
-
-      // Store sizes in the map and calculate total
-      sortedFiles.forEach((file, index) => {
-        const size = sizes[index];
-        fileSizes[file.id] = size;
-        totalBytesToDownload += size;
-      });
-    } catch (error) {
-      console.error('Error calculating total size:', error);
-      // Continue anyway with what we have
-    }
-
-    // Update the progress tracker with the total size
-    progressTrackerStore.updateProcess(overallProcessId, {
-      status: `Preparing to download ${sortedFiles.length} files`,
-      totalBytes: totalBytesToDownload,
-      bytesLoaded: 0
-    });
-
-    // Create a worker pool for parallel downloads
-    // Worker pool will use settings from miscSettings.deviceRamGB
-    const workerPool = new WorkerPool();
-
-    // Track download progress
-    const fileProgress: { [fileId: string]: number } = {};
-    let completedFiles = 0;
-    let failedFiles = 0;
-    const processedFiles: { [fileId: string]: boolean } = {};
-
-    // Function to update overall progress
-    const updateOverallProgress = () => {
-      let totalLoaded = 0;
-
-      // Sum up progress from all files
-      for (const fileId in fileProgress) {
-        totalLoaded += fileProgress[fileId];
-      }
-
-      // Calculate progress percentage
-      let progressPercentage;
-
-      if (existingProcessId) {
-        // If we're using an existing process ID, scale the download progress to 30-100%
-        // Download phase is 30-100% of the total progress
-        progressPercentage = 30 + (totalLoaded / totalBytesToDownload) * 70;
-      } else {
-        // If this is a standalone download, use the full 0-100% range
-        progressPercentage = (totalLoaded / totalBytesToDownload) * 100;
-      }
-
-      // Update the progress tracker
-      progressTrackerStore.updateProcess(overallProcessId, {
-        progress: progressPercentage,
-        bytesLoaded: totalLoaded,
-        status: `Downloaded ${completedFiles} of ${sortedFiles.length} files (${failedFiles} failed)`
-      });
-    };
-
-    // Create a promise that resolves when all downloads are complete
-    return new Promise<void>((resolve) => {
-      // Function to check if all downloads are complete
-      const checkAllComplete = () => {
-        // Log current memory usage
-        const memUsage = workerPool.memoryUsage;
-        console.log(
-          `Memory usage: ${(memUsage.current / (1024 * 1024)).toFixed(2)}MB / ${(memUsage.max / (1024 * 1024)).toFixed(2)}MB (${memUsage.percentUsed.toFixed(2)}%)`
-        );
-
-        if (completedFiles + failedFiles === sortedFiles.length) {
-          // All files have been processed
-          workerPool.terminate();
-
-          // Clear service worker cache to free up storage
-          clearServiceWorkerCache().then(() => {
-            console.log('Service worker cache cleared after downloads');
-          }).catch(error => {
-            console.error('Error clearing service worker cache after downloads:', error);
-          });
-
-          // Update the process to show completion
-          progressTrackerStore.updateProcess(overallProcessId, {
-            status: `All downloads complete (${failedFiles} failed)`,
-            progress: 100,
-            bytesLoaded: totalBytesToDownload
-          });
-
-          // Only auto-remove the tracker if it's not part of a larger process
-          if (!existingProcessId) {
-            setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
-          }
-
-          resolve();
-        }
-      };
-
-      // Add each file to the worker pool
-      for (const fileInfo of sortedFiles) {
-        // Initialize progress for this file
-        fileProgress[fileInfo.id] = 0;
-
-        // Create a task for the worker pool
-        // Estimate memory requirement based on file size
-        // We need memory for:
-        // 1. The downloaded file (fileSizes[fileInfo.id])
-        // 2. Processing overhead (typically 2-3x the file size for decompression)
-        const fileSize = fileSizes[fileInfo.id] || 0;
-        const memoryRequirement = Math.max(
-          // Estimate memory needed: file size + processing overhead
-          // Use at least 50MB as a minimum requirement
-          fileSize * 3, // 3x file size for processing overhead
-          50 * 1024 * 1024 // Minimum 50MB
-        );
-
-        console.log(
-          `Adding task for ${fileInfo.name} with estimated memory requirement: ${(memoryRequirement / (1024 * 1024)).toFixed(2)}MB`
-        );
-
-        workerPool.addTask({
-          id: fileInfo.id,
-          memoryRequirement,
-          data: {
-            fileId: fileInfo.id,
-            fileName: fileInfo.name,
-            accessToken
-          },
-          onProgress: (data) => {
-            // Update progress for this file
-            fileProgress[fileInfo.id] = data.loaded;
-            updateOverallProgress();
-          },
-          onComplete: async (data, releaseMemory) => {
-            try {
-              console.log(`Received complete message for ${data.fileName}`, {
-                entriesCount: data.entries?.length
-              });
-
-              console.log(`Processing ${data.entries.length} decompressed entries from ${data.fileName}`);
-
-              // Create File objects for each entry
-              const files = data.entries.map(entry => {
-                return new File([entry.data], entry.filename);
-              });
-
-              console.log(`Created ${files.length} file objects from decompressed entries`);
-
-              // Process all the files
-              await processFiles(files);
-              console.log(`Successfully processed ${files.length} decompressed files from ${data.fileName}`);
-
-              // Update Drive file description if needed (for sideloaded files)
-              // This runs in the background and won't fail the download if it errors
-              updateDriveFileDescriptionForEntries(fileInfo.id, data.fileName, data.entries)
-                .catch(err => console.warn('Background description update failed:', err));
-
-              // Mark as completed
-              completedFiles++;
-              fileProgress[fileInfo.id] = fileSizes[fileInfo.id] || 0;
-              processedFiles[fileInfo.id] = true;
-
-              updateOverallProgress();
-              checkAllComplete();
-            } catch (error) {
-              console.error(`Error processing ${data.fileName}:`, error);
-              showSnackbar(`Failed to process ${data.fileName}`);
-
-              // Mark as failed
-              failedFiles++;
-              processedFiles[fileInfo.id] = true;
-
-              updateOverallProgress();
-              checkAllComplete();
-            } finally {
-              releaseMemory();
-            }
-          },
-          onError: (data) => {
-            console.error(`Error downloading ${fileInfo.name}:`, data.error);
-            showSnackbar(`Failed to download ${fileInfo.name}`);
-
-            // Mark as failed but count the size as downloaded for progress calculation
-            failedFiles++;
-            fileProgress[fileInfo.id] = fileSizes[fileInfo.id] || 0;
-            processedFiles[fileInfo.id] = true;
-
-            updateOverallProgress();
-            checkAllComplete();
-          }
-        });
-      }
-
-      // If there are no files, resolve immediately
-      if (sortedFiles.length === 0) {
-        progressTrackerStore.updateProcess(overallProcessId, {
-          status: 'No files to download',
-          progress: 100
-        });
-
-        // Only auto-remove the tracker if it's not part of a larger process
-        if (!existingProcessId) {
-          setTimeout(() => progressTrackerStore.removeProcess(overallProcessId), 3000);
-        }
-
-        resolve();
-      }
-    });
-  }
-
-  async function pickerCallback(data: google.picker.ResponseObject) {
-    try {
-      if (data[google.picker.Response.ACTION] == google.picker.Action.PICKED) {
-        const docs = data[google.picker.Response.DOCUMENTS];
-
-        if (docs.length === 0) return;
-
-        // Create a unique ID for this entire process (scanning + downloading)
-        const processId = `download-process-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-
-        // Create a single progress tracker for the entire process
-        progressTrackerStore.addProcess({
-          id: processId,
-          description: `Processing ${docs.length} items`,
-          progress: 0,
-          status: 'Starting scan...'
-        });
-
-        // Collect all files to download
-        let allFiles = [];
-
-        try {
-          // First, identify folders and regular files
-          for (let i = 0; i < docs.length; i++) {
-            const doc = docs[i];
-
-            // Update progress based on how many items we've processed
-            // Scanning phase is 0-30% of the total progress
-            const scanProgress = (i / docs.length) * 30;
-
-            if (doc.mimeType === 'application/vnd.google-apps.folder') {
-              // Process folder to get all files inside
-              progressTrackerStore.updateProcess(processId, {
-                progress: scanProgress,
-                status: `Scanning folder: ${doc.name}`
-              });
-
-              // Pass the processId to processFolder
-              const folderFiles = await processFolder(doc.id, doc.name, processId);
-              allFiles.push(...folderFiles);
-            } else {
-              // Add regular file
-              allFiles.push(doc);
-            }
-          }
-
-          // Filter out any non-zip files that might have been included in folders
-          allFiles = allFiles.filter((file) => {
-            const mimeType = file.mimeType.toLowerCase();
-            return mimeType.includes('zip') || mimeType.includes('cbz');
-          });
-
-          if (allFiles.length === 0) {
-            progressTrackerStore.updateProcess(processId, {
-              progress: 100,
-              status: 'No compatible files found'
-            });
-            setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-            showSnackbar('No compatible files found');
-            return;
-          }
-
-          // Update progress to show we're moving to download phase
-          progressTrackerStore.updateProcess(processId, {
-            progress: 30,
-            status: `Found ${allFiles.length} files to download`
-          });
-
-          // Download and process all files - pass the existing processId
-          await downloadAndProcessFiles(allFiles, processId);
-
-          // After the entire process is complete, set a timeout to remove the progress tracker
-          setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-        } catch (error) {
-          // Update the progress tracker to show the error
-          progressTrackerStore.updateProcess(processId, {
-            progress: 0,
-            status: 'Process failed'
-          });
-          setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-          throw error; // Re-throw to be caught by the outer catch block
-        }
-      }
-    } catch (error) {
-      handleDriveError(error, 'processing files');
-    }
-  }
 
   async function onUploadProfiles() {
     const metadata = {
       mimeType: type,
       name: 'profiles.json',
-      parents: [profilesId ? null : readerFolderId]
+      parents: profilesId ? [] : undefined // Only set parents if creating new file
     };
 
     const processId = 'upload-profiles';

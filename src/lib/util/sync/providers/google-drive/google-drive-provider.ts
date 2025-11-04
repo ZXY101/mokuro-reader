@@ -478,6 +478,197 @@ export class GoogleDriveProvider implements SyncProvider {
 	}
 
 	/**
+	 * Show Google Drive file picker for selecting CBZ/ZIP files or folders
+	 * Opens the Google Picker UI, expands any selected folders, and returns all files
+	 */
+	async showFilePicker(): Promise<import('../../provider-interface').PickedFile[]> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
+		}
+
+		return new Promise((resolve, reject) => {
+			const showPicker = async () => {
+				try {
+					// Ensure reader folder exists first
+					const readerFolderId = await this.ensureReaderFolder();
+
+					// Get access token
+					let token = '';
+					tokenManager.token.subscribe(value => { token = value; })();
+
+					if (!token) {
+						throw new Error('No access token available');
+					}
+
+					// Create a view for ZIP/CBZ files
+					const docsView = new google.picker.DocsView(google.picker.ViewId.DOCS)
+						.setMimeTypes(
+							'application/zip,application/x-zip-compressed,application/vnd.comicbook+zip,application/x-cbz'
+						)
+						.setMode(google.picker.DocsViewMode.LIST)
+						.setIncludeFolders(true)
+						.setSelectFolderEnabled(true);
+
+					// Set parent folder if we have one
+					if (readerFolderId) {
+						docsView.setParent(readerFolderId);
+					}
+
+					// Create a view specifically for folders
+					const folderView = new google.picker.DocsView(google.picker.ViewId.FOLDERS)
+						.setSelectFolderEnabled(true);
+
+					if (readerFolderId) {
+						folderView.setParent(readerFolderId);
+					}
+
+					// Create picker with callback
+					const picker = new google.picker.PickerBuilder()
+						.addView(docsView)
+						.addView(folderView)
+						.setOAuthToken(token)
+						.setAppId(GOOGLE_DRIVE_CONFIG.CLIENT_ID)
+						.setDeveloperKey(GOOGLE_DRIVE_CONFIG.API_KEY)
+						.enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
+						.setCallback(async (data: google.picker.ResponseObject) => {
+							try {
+								if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
+									const docs = data[google.picker.Response.DOCUMENTS];
+
+									// Expand folders and collect all files
+									const allFiles: import('../../provider-interface').PickedFile[] = [];
+
+									for (const doc of docs) {
+										const pickedFile = {
+											id: doc[google.picker.Document.ID],
+											name: doc[google.picker.Document.NAME],
+											mimeType: doc[google.picker.Document.MIME_TYPE]
+										};
+
+										if (pickedFile.mimeType === 'application/vnd.google-apps.folder') {
+											// Recursively process folder
+											const folderFiles = await this.listFilesInFolder(pickedFile.id);
+											allFiles.push(...folderFiles);
+										} else {
+											// Add regular file
+											allFiles.push(pickedFile);
+										}
+									}
+
+									// Filter to only ZIP/CBZ files
+									const zipFiles = allFiles.filter(file => {
+										const mimeType = file.mimeType.toLowerCase();
+										return mimeType.includes('zip') || mimeType.includes('cbz');
+									});
+
+									resolve(zipFiles);
+								} else if (data[google.picker.Response.ACTION] === google.picker.Action.CANCEL) {
+									resolve([]); // User cancelled
+								}
+							} catch (error) {
+								reject(new ProviderError(
+									`Failed to process selected files: ${error instanceof Error ? error.message : 'Unknown error'}`,
+									'google-drive',
+									'PICKER_PROCESSING_FAILED',
+									false,
+									false
+								));
+							}
+						})
+						.build();
+
+					picker.setVisible(true);
+				} catch (error) {
+					reject(new ProviderError(
+						`Failed to show file picker: ${error instanceof Error ? error.message : 'Unknown error'}`,
+						'google-drive',
+						'PICKER_FAILED',
+						false,
+						false
+					));
+				}
+			};
+
+			showPicker();
+		});
+	}
+
+	/**
+	 * List all files in a folder recursively
+	 * Expands subfolders and returns all ZIP/CBZ files
+	 */
+	private async listFilesInFolder(folderId: string): Promise<import('../../provider-interface').PickedFile[]> {
+		try {
+			const files = await driveApiClient.listFiles(
+				`'${folderId}' in parents and (mimeType='application/zip' or mimeType='application/x-zip-compressed' or mimeType='application/vnd.comicbook+zip' or mimeType='application/x-cbz' or mimeType='application/vnd.google-apps.folder') and trashed=false`,
+				'files(id, name, mimeType)'
+			);
+
+			const allFiles: import('../../provider-interface').PickedFile[] = [];
+
+			for (const file of files) {
+				if (file.mimeType === 'application/vnd.google-apps.folder') {
+					// Recursively process subfolder
+					const subfolderFiles = await this.listFilesInFolder(file.id);
+					allFiles.push(...subfolderFiles);
+				} else {
+					// Add file
+					allFiles.push({
+						id: file.id,
+						name: file.name,
+						mimeType: file.mimeType
+					});
+				}
+			}
+
+			return allFiles;
+		} catch (error) {
+			console.error('Error listing files in folder:', error);
+			return [];
+		}
+	}
+
+	/**
+	 * Convert picked files from file picker to full CloudFileMetadata objects
+	 * Fetches size and modifiedTime from Drive API for each file
+	 */
+	async getCloudFileMetadata(
+		pickedFiles: import('../../provider-interface').PickedFile[]
+	): Promise<import('../../provider-interface').CloudFileMetadata[]> {
+		if (!this.isAuthenticated()) {
+			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// Fetch full metadata for each file in parallel
+			const metadataPromises = pickedFiles.map(async (picked) => {
+				const metadata = await driveApiClient.getFileMetadata(
+					picked.id,
+					'name,size,modifiedTime'
+				);
+
+				return {
+					provider: 'google-drive' as const,
+					fileId: picked.id,
+					path: metadata.name, // Use filename as path (no folders for sideloaded files)
+					modifiedTime: metadata.modifiedTime || new Date().toISOString(),
+					size: parseInt(metadata.size || '0', 10)
+				};
+			});
+
+			return await Promise.all(metadataPromises);
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to fetch file metadata: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'google-drive',
+				'METADATA_FETCH_FAILED',
+				false,
+				false
+			);
+		}
+	}
+
+	/**
 	 * Ensure the mokuro-reader folder exists in Google Drive
 	 */
 	private async ensureReaderFolder(): Promise<string> {
