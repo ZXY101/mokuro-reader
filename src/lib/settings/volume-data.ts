@@ -4,6 +4,7 @@ import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
 import { currentSeries, currentVolume } from '$lib/catalog';
 import { settings as globalSettings } from './settings';
+import { db } from '$lib/catalog/db';
 
 import type { PageViewMode } from './settings';
 
@@ -40,7 +41,7 @@ export type VolumeSettings = {
 export type VolumeSettingsKey = keyof VolumeSettings;
 
 // Session tracking types
-export type PageTurn = [number, number]; // [timestamp_ms, page_number]
+export type PageTurn = [number, number, number]; // [timestamp_ms, page_number, char_count]
 
 // Aggregate session data (for reading speed calculation)
 export type AggregateSession = {
@@ -60,9 +61,13 @@ type VolumeDataJSON = {
   recentPageTurns?: PageTurn[];
   // Aggregate session data for reading speed calculation
   sessions?: AggregateSession[];
+  // Volume metadata for self-describing sync data
+  series_uuid?: string;
+  series_title?: string;
+  volume_title?: string;
 };
 
-class VolumeData implements VolumeDataJSON {
+export class VolumeData implements VolumeDataJSON {
   progress: number;
   chars: number;
   completed: boolean;
@@ -71,6 +76,9 @@ class VolumeData implements VolumeDataJSON {
   lastProgressUpdate: string;
   recentPageTurns: PageTurn[];
   sessions: AggregateSession[];
+  series_uuid?: string;
+  series_title?: string;
+  volume_title?: string;
 
   constructor(data: Partial<VolumeDataJSON> = {}) {
     this.progress = typeof data.progress === 'number' ? data.progress : 0;
@@ -83,6 +91,11 @@ class VolumeData implements VolumeDataJSON {
     // Session tracking fields
     this.recentPageTurns = data.recentPageTurns || [];
     this.sessions = data.sessions || [];
+
+    // Volume metadata (optional, for self-describing sync data)
+    this.series_uuid = data.series_uuid;
+    this.series_title = data.series_title;
+    this.volume_title = data.volume_title;
 
     // Only store explicitly set values, leave others undefined to fall back to global defaults
     this.settings = {};
@@ -157,6 +170,17 @@ class VolumeData implements VolumeDataJSON {
       result.sessions = this.sessions;
     }
 
+    // Include volume metadata if present (for self-describing sync data)
+    if (this.series_uuid) {
+      result.series_uuid = this.series_uuid;
+    }
+    if (this.series_title) {
+      result.series_title = this.series_title;
+    }
+    if (this.volume_title) {
+      result.volume_title = this.volume_title;
+    }
+
     return result;
   }
 }
@@ -179,6 +203,56 @@ export function parseVolumesFromJson(storedData: string): Volumes {
   } catch {
     return {};
   }
+}
+
+/**
+ * Enriches VolumeData with metadata from IndexedDB
+ * Useful for populating self-describing sync data
+ */
+export async function enrichVolumeDataWithMetadata(
+  volumeUuid: string,
+  volumeData: VolumeData
+): Promise<VolumeData> {
+  if (!browser) return volumeData;
+
+  try {
+    const metadata = await db.volumes.get(volumeUuid);
+    if (metadata) {
+      return new VolumeData({
+        ...volumeData,
+        series_uuid: metadata.series_uuid,
+        series_title: metadata.series_title,
+        volume_title: metadata.volume_title
+      });
+    }
+  } catch (error) {
+    console.warn(`Failed to fetch metadata for volume ${volumeUuid}:`, error);
+  }
+
+  return volumeData;
+}
+
+/**
+ * Updates metadata for a specific volume in the store
+ */
+export function updateVolumeMetadata(
+  volumeUuid: string,
+  series_uuid?: string,
+  series_title?: string,
+  volume_title?: string
+) {
+  volumes.update((prev) => {
+    const currentVolume = prev[volumeUuid] || new VolumeData();
+    return {
+      ...prev,
+      [volumeUuid]: new VolumeData({
+        ...currentVolume,
+        series_uuid,
+        series_title,
+        volume_title
+      })
+    };
+  });
 }
 
 const initial: Volumes = browser
@@ -258,8 +332,30 @@ export function updateProgress(
       }
     }
 
-    // Add new turn
-    recentPageTurns = [...recentPageTurns, [now, progress]];
+    // Add new turn with cumulative character count
+    // Store cumulative chars so we can calculate reading speed even if volume is deleted from IndexedDB
+    const cumulativeChars = chars ?? currentVolume.chars;
+    recentPageTurns = [...recentPageTurns, [now, progress, cumulativeChars]];
+
+    // Lazy metadata population: If metadata is missing, fetch it asynchronously
+    // This ensures stats pages work even if IndexedDB is later deleted
+    if (!currentVolume.series_uuid && browser) {
+      enrichVolumeDataWithMetadata(volume, currentVolume).then(enriched => {
+        if (enriched.series_uuid) {
+          volumes.update(vols => ({
+            ...vols,
+            [volume]: new VolumeData({
+              ...(vols[volume] || currentVolume),
+              series_uuid: enriched.series_uuid,
+              series_title: enriched.series_title,
+              volume_title: enriched.volume_title
+            })
+          }));
+        }
+      }).catch(err => {
+        console.warn(`Failed to enrich metadata for ${volume}:`, err);
+      });
+    }
 
     return {
       ...prev,

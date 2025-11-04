@@ -1,18 +1,12 @@
 import { writable, derived } from 'svelte/store';
 import { driveApiClient } from './api-client';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
-import { syncService } from './sync-service';
+import { unifiedCloudManager } from '../sync/unified-cloud-manager';
 import type { CloudCache } from '../sync/cloud-cache-interface';
+import type { DriveFileMetadata } from '../sync/provider-interface';
 
-export interface DriveFileMetadata {
-  fileId: string;
-  name: string;
-  modifiedTime: string;
-  size?: number;
-  path: string; // Relative path like "series/volume.cbz"
-  description?: string; // Verified series title for sideloaded files
-  parentId?: string; // Parent folder ID (for deleting series folders)
-}
+// Re-export for convenience
+export type { DriveFileMetadata };
 
 /**
  * In-memory representation of Google Drive's mokuro-reader folder state
@@ -125,10 +119,11 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         if (parentName) {
           const path = `${parentName}/${file.name}`;
           const metadata: DriveFileMetadata = {
+            provider: 'google-drive',
             fileId: file.id,
             name: file.name,
             modifiedTime: file.modifiedTime || new Date().toISOString(),
-            size: file.size ? parseInt(file.size) : undefined,
+            size: file.size ? parseInt(file.size) : 0,
             path: path,
             description: file.description,
             parentId: parentId
@@ -148,13 +143,15 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
       if (volumeDataFiles.length > 0) {
         const volumeDataMetadata = volumeDataFiles.map(file => {
           console.log('Volume data file from API:', file);
-          return {
+          const metadata: DriveFileMetadata = {
+            provider: 'google-drive',
             fileId: file.id,
             name: file.name,
             modifiedTime: file.modifiedTime || new Date().toISOString(),
-            size: file.size ? parseInt(file.size) : undefined,
+            size: file.size ? parseInt(file.size) : 0,
             path: file.name
           };
+          return metadata;
         });
 
         console.log('Cached volume data metadata:', volumeDataMetadata);
@@ -186,7 +183,7 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         console.log('Cache loaded, triggering requested sync...');
         localStorage.removeItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.SYNC_AFTER_LOGIN);
 
-        syncService.syncReadProgress().catch(err =>
+        unifiedCloudManager.syncProgress({ silent: false }).catch((err: Error) =>
           console.error('Sync after login failed:', err)
         );
       }
@@ -219,10 +216,11 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         files.push(...subFiles);
       } else if (item.name.endsWith('.cbz')) {
         files.push({
+          provider: 'google-drive',
           fileId: item.id,
           name: item.name,
           modifiedTime: item.modifiedTime || new Date().toISOString(),
-          size: item.size ? parseInt(item.size) : undefined,
+          size: item.size ? parseInt(item.size) : 0,
           path: currentPath
         });
       }

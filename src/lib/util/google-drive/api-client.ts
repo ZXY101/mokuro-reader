@@ -33,8 +33,30 @@ export class DriveApiError extends Error {
 class DriveApiClient {
   private isInitialized = false;
 
+  /**
+   * Wait for gapi global to be available (loaded from script tag)
+   */
+  private async waitForGapi(): Promise<void> {
+    if (typeof gapi !== 'undefined' && gapi?.load) return;
+
+    console.log('⏳ Waiting for Google API (gapi) to load...');
+    const maxWait = 10000; // 10 seconds
+    const start = Date.now();
+
+    while (typeof gapi === 'undefined' || !gapi?.load) {
+      if (Date.now() - start > maxWait) {
+        throw new Error('Timeout waiting for Google API (gapi) to load');
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    console.log('✅ Google API (gapi) loaded');
+  }
+
   async initialize(): Promise<void> {
     if (this.isInitialized) return;
+
+    // Wait for gapi to be available first
+    await this.waitForGapi();
 
     return new Promise((resolve, reject) => {
       gapi.load('client:picker', async () => {
@@ -44,7 +66,7 @@ class DriveApiClient {
             discoveryDocs: [GOOGLE_DRIVE_CONFIG.DISCOVERY_DOC]
           });
 
-          tokenManager.initTokenClient();
+          await tokenManager.initTokenClient();
           this.isInitialized = true;
           resolve();
         } catch (error) {

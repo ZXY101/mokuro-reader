@@ -1,7 +1,6 @@
 import { writable } from 'svelte/store';
 import { tokenManager } from './token-manager';
 import { driveApiClient, DriveApiError } from './api-client';
-import { syncService } from './sync-service';
 import { driveState } from './drive-state';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
 import { providerManager } from '../sync/provider-manager';
@@ -9,16 +8,14 @@ import { unifiedCloudManager } from '../sync/unified-cloud-manager';
 import { driveFilesCache } from './drive-files-cache';
 
 // Re-export the main modules
-export { tokenManager, driveApiClient, DriveApiError, syncService, driveState, GOOGLE_DRIVE_CONFIG, driveFilesCache };
+export { tokenManager, driveApiClient, DriveApiError, driveState, GOOGLE_DRIVE_CONFIG, driveFilesCache };
 export type { TokenInfo, DriveFile, SyncProgress } from './types';
 export type { DriveState } from './drive-state';
 export type { DriveFileMetadata } from './drive-files-cache';
 
 // Backward compatibility exports for old API
-// TODO: Migrate cloud/+page.svelte to use tokenManager, syncService directly
 export const accessTokenStore = tokenManager.token;
 export const tokenClientStore = tokenManager.tokenClient;
-export const readerFolderIdStore = syncService.readerFolderId;
 export const volumeDataIdStore = writable<string>(''); // Legacy - not used by new implementation
 export const profilesIdStore = writable<string>(''); // Legacy - not used by new implementation
 
@@ -45,8 +42,11 @@ export async function initGoogleDriveApi(): Promise<void> {
 }
 
 // Convenience functions for external use
-export function signInToGoogleDrive(): void {
+export async function signInToGoogleDrive(): Promise<void> {
   if (!tokenManager.isAuthenticated()) {
+    // Initialize Drive API first (lazy load)
+    await driveApiClient.initialize();
+
     // Will auto-detect if first-time (consent) or re-auth (minimal)
     // Cache fetch happens automatically in token manager callback
     // Provider status will be updated automatically in token manager callback
@@ -65,7 +65,8 @@ export function isSignedIn(): boolean {
 }
 
 export async function syncReadProgress(): Promise<void> {
-  await syncService.syncReadProgress();
+  // Use unified sync manager for progress sync
+  await unifiedCloudManager.syncProgress({ silent: false });
 }
 
 // Backward compatibility aliases

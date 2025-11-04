@@ -1,4 +1,5 @@
 import type { VolumeMetadata } from '$lib/types';
+import { updateVolumeMetadata } from '$lib/settings/volume-data';
 
 export interface VolumeSpeedData {
 	volumeId: string;
@@ -97,25 +98,45 @@ export function processVolumeSpeedData(
 			continue;
 		}
 
-		// Try to get catalog info, but allow volumes without it
-		const volumeInfo = catalogMap.get(volumeId);
+		// First try to use metadata from progress data itself (synced from cloud)
+		// If missing, fall back to catalog lookup (IndexedDB)
+		// Only use placeholders as last resort
+		let volumeTitle = data.volume_title;
+		let seriesTitle = data.series_title;
+		let seriesId = data.series_uuid;
 
-		// For volumes without catalog info, group them all together
-		// under a single "[Missing Series Info]" entry
-		const seriesId = volumeInfo?.series_uuid || 'missing-series-info';
-		const seriesTitle = volumeInfo?.series_title || '[Missing Series Info]';
+		// If metadata is missing from progress data, try catalog and save it
+		if (!volumeTitle || !seriesTitle || !seriesId) {
+			const volumeInfo = catalogMap.get(volumeId);
+			volumeTitle = volumeTitle || volumeInfo?.volume_title || `Volume ${volumeId.slice(0, 8)}...`;
+			seriesTitle = seriesTitle || volumeInfo?.series_title || '[Missing Series Info]';
+			seriesId = seriesId || volumeInfo?.series_uuid || 'missing-series-info';
+
+			// Save to progress data for existing users (one-time enrichment)
+			if (volumeInfo) {
+				updateVolumeMetadata(
+					volumeId,
+					volumeInfo.series_uuid,
+					volumeInfo.series_title,
+					volumeInfo.volume_title
+				);
+			}
+		}
+
+		// Get thumbnail from catalog (never stored in progress data to keep JSON small)
+		const volumeInfo = catalogMap.get(volumeId);
+		const thumbnail = volumeInfo?.thumbnail;
 
 		completed.push({
 			volumeId,
-			// Use catalog data if available, otherwise use placeholders
-			volumeTitle: volumeInfo?.volume_title || `Volume ${volumeId.slice(0, 8)}...`,
+			volumeTitle,
 			seriesTitle,
 			seriesId,
 			completionDate,
 			durationMinutes: timeInMinutes,
 			charsRead: data.chars,
 			charsPerMinute: cpm,
-			thumbnail: volumeInfo?.thumbnail,
+			thumbnail,
 			isPersonalBest: false,
 			isSlowest: false,
 			percentVsAverage: 0

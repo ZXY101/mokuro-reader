@@ -1,16 +1,16 @@
 import { writable } from 'svelte/store';
 import type { CloudCache } from '../../cloud-cache-interface';
-import type { CloudVolumeMetadata } from '../../provider-interface';
+import type { CloudFileMetadata } from '../../provider-interface';
 import { megaProvider } from './mega-provider';
 
 /**
  * MEGA Cache Wrapper
  *
- * Returns Map<seriesTitle, CloudVolumeMetadata[]> for efficient series-based operations.
+ * Returns Map<seriesTitle, CloudFileMetadata[]> for efficient series-based operations.
  * Cache is grouped by series folder names extracted from file paths.
  */
-class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
-	private cache = writable<Map<string, CloudVolumeMetadata[]>>(new Map());
+class MegaCacheManager implements CloudCache<CloudFileMetadata> {
+	private cache = writable<Map<string, CloudFileMetadata[]>>(new Map());
 	private isFetchingStore = writable<boolean>(false);
 	private fetchingFlag = false;
 	private loadedFlag = false;
@@ -46,7 +46,7 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 			const volumes = await megaProvider.listCloudVolumes();
 
 			// Group by series title (extracted from path: "SeriesTitle/VolumeTitle.cbz")
-			const cacheMap = new Map<string, CloudVolumeMetadata[]>();
+			const cacheMap = new Map<string, CloudFileMetadata[]>();
 			for (const volume of volumes) {
 				// Extract series title from path
 				const seriesTitle = volume.path.split('/')[0];
@@ -73,7 +73,7 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 	}
 
 	has(path: string): boolean {
-		let currentCache: Map<string, CloudVolumeMetadata[]> = new Map();
+		let currentCache: Map<string, CloudFileMetadata[]> = new Map();
 		this.cache.subscribe((value) => {
 			currentCache = value;
 		})();
@@ -84,8 +84,8 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 		return seriesFiles?.some(f => f.path === path) || false;
 	}
 
-	get(path: string): CloudVolumeMetadata | null {
-		let currentCache: Map<string, CloudVolumeMetadata[]> = new Map();
+	get(path: string): CloudFileMetadata | null {
+		let currentCache: Map<string, CloudFileMetadata[]> = new Map();
 		this.cache.subscribe((value) => {
 			currentCache = value;
 		})();
@@ -96,8 +96,8 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 		return seriesFiles?.find(f => f.path === path) || null;
 	}
 
-	getAll(path: string): CloudVolumeMetadata[] {
-		let currentCache: Map<string, CloudVolumeMetadata[]> = new Map();
+	getAll(path: string): CloudFileMetadata[] {
+		let currentCache: Map<string, CloudFileMetadata[]> = new Map();
 		this.cache.subscribe((value) => {
 			currentCache = value;
 		})();
@@ -108,26 +108,26 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 		return seriesFiles?.filter(f => f.path === path) || [];
 	}
 
-	getBySeries(seriesTitle: string): CloudVolumeMetadata[] {
-		let currentCache: Map<string, CloudVolumeMetadata[]> = new Map();
+	getBySeries(seriesTitle: string): CloudFileMetadata[] {
+		let currentCache: Map<string, CloudFileMetadata[]> = new Map();
 		this.cache.subscribe((value) => {
 			currentCache = value;
 		})();
 
-		const result: CloudVolumeMetadata[] = [];
+		const result: CloudFileMetadata[] = [];
 		for (const files of currentCache.values()) {
 			result.push(...files.filter((file) => file.path.startsWith(`${seriesTitle}/`)));
 		}
 		return result;
 	}
 
-	getAllFiles(): CloudVolumeMetadata[] {
-		let currentCache: Map<string, CloudVolumeMetadata[]> = new Map();
+	getAllFiles(): CloudFileMetadata[] {
+		let currentCache: Map<string, CloudFileMetadata[]> = new Map();
 		this.cache.subscribe((value) => {
 			currentCache = value;
 		})();
 
-		const result: CloudVolumeMetadata[] = [];
+		const result: CloudFileMetadata[] = [];
 		for (const files of currentCache.values()) {
 			result.push(...files);
 		}
@@ -148,7 +148,7 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 	}
 
 	// Optional methods for cache updates
-	add(path: string, metadata: CloudVolumeMetadata): void {
+	add(path: string, metadata: CloudFileMetadata): void {
 		this.cache.update((cache) => {
 			const newCache = new Map(cache);
 
@@ -196,7 +196,7 @@ class MegaCacheManager implements CloudCache<CloudVolumeMetadata> {
 		});
 	}
 
-	update(fileId: string, updates: Partial<CloudVolumeMetadata>): void {
+	update(fileId: string, updates: Partial<CloudFileMetadata>): void {
 		this.cache.update((cache) => {
 			const newCache = new Map(cache);
 

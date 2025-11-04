@@ -150,6 +150,67 @@ export function queueSeriesVolumes(volumes: VolumeMetadata[]): void {
 }
 
 /**
+ * Parse a filename to extract series and volume information
+ * Examples:
+ *   "Dragon Ball 01.cbz" => { series: "Dragon Ball", volume: "01" }
+ *   "The Girl From the Other Side Vol 05.cbz" => { series: "The Girl From the Other Side", volume: "05" }
+ */
+function parseFilename(filename: string): { series: string; volume: string } {
+	// Remove extension
+	const nameWithoutExt = filename.replace(/\.(cbz|zip)$/i, '');
+
+	// Try to match common patterns: "Series Name 01", "Series Name v01", "Series Name Vol 01", etc.
+	const volumePattern = /^(.+?)\s+(?:vol\.?\s*|v\.?\s*)?(\d+)$/i;
+	const match = nameWithoutExt.match(volumePattern);
+
+	if (match) {
+		return {
+			series: match[1].trim(),
+			volume: match[2].padStart(2, '0') // Ensure 2-digit volume numbers
+		};
+	}
+
+	// Fallback: use entire filename as series, no volume number
+	return {
+		series: nameWithoutExt,
+		volume: '01'
+	};
+}
+
+/**
+ * Queue volumes from cloud file metadata (for sideloaded files)
+ * Converts CloudFileMetadata to placeholder VolumeMetadata and queues for download
+ */
+export function queueVolumesFromCloudFiles(
+	cloudFiles: import('./sync/provider-interface').CloudFileMetadata[]
+): void {
+	const placeholders: VolumeMetadata[] = cloudFiles.map(file => {
+		const { series, volume } = parseFilename(file.path);
+
+		// Generate UUIDs for the placeholder
+		const seriesUuid = crypto.randomUUID();
+		const volumeUuid = crypto.randomUUID();
+
+		return {
+			mokuro_version: '0.0.0', // Placeholder - will be updated after download
+			series_title: series,
+			series_uuid: seriesUuid,
+			volume_title: `${series} ${volume}`,
+			volume_uuid: volumeUuid,
+			page_count: 0, // Placeholder - will be updated after download
+			character_count: 0, // Placeholder - will be updated after download
+			isPlaceholder: true,
+			cloudProvider: file.provider,
+			cloudFileId: file.fileId,
+			cloudModifiedTime: file.modifiedTime,
+			cloudSize: file.size
+		};
+	});
+
+	queueSeriesVolumes(placeholders);
+}
+
+/**
  * Check if a specific volume is in the queue
  */
 export function isVolumeInQueue(volumeUuid: string): boolean {

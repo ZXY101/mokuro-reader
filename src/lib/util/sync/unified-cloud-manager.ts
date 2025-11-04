@@ -1,13 +1,13 @@
 import { derived, type Readable } from 'svelte/store';
-import type { SyncProvider, CloudVolumeMetadata, ProviderType } from './provider-interface';
+import type { SyncProvider, CloudFileMetadata, ProviderType } from './provider-interface';
 import { unifiedSyncService, type SyncOptions, type SyncResult } from './unified-sync-service';
 import { cacheManager } from './cache-manager';
 import { providerManager } from './provider-manager';
 
 /**
- * CloudVolumeMetadata with provider information for placeholder generation
+ * CloudFileMetadata with provider information for placeholder generation
  */
-export interface CloudVolumeWithProvider extends CloudVolumeMetadata {
+export interface CloudVolumeWithProvider extends CloudFileMetadata {
 	provider: ProviderType;
 }
 
@@ -128,12 +128,13 @@ class UnifiedCloudManager {
 	 * Download a volume CBZ using the active provider
 	 */
 	async downloadVolumeCbz(
-		fileId: string,
+		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
 		const provider = this.getActiveProvider();
 		console.log('[Unified Cloud Manager] downloadVolumeCbz:', {
-			fileId,
+			fileId: file.fileId,
+			path: file.path,
 			activeProvider: provider?.type,
 			hasProvider: !!provider
 		});
@@ -142,24 +143,24 @@ class UnifiedCloudManager {
 			throw new Error(`No cloud provider authenticated`);
 		}
 
-		return await provider.downloadVolumeCbz(fileId, onProgress);
+		return await provider.downloadVolumeCbz(file, onProgress);
 	}
 
 	/**
 	 * Delete a volume CBZ from the current provider
 	 */
-	async deleteVolumeCbz(fileId: string): Promise<void> {
+	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
 		const provider = this.getActiveProvider();
 		if (!provider) {
 			throw new Error('No cloud provider authenticated');
 		}
 
-		await provider.deleteVolumeCbz(fileId);
+		await provider.deleteVolumeCbz(file);
 
 		// Remove from cache via cacheManager
 		const cache = cacheManager.getCache(provider.type);
 		if (cache && cache.removeById) {
-			cache.removeById(fileId);
+			cache.removeById(file.fileId);
 		}
 	}
 
@@ -204,7 +205,7 @@ class UnifiedCloudManager {
 
 			for (const volume of seriesVolumes) {
 				try {
-					await this.deleteVolumeCbz(volume.fileId);
+					await this.deleteVolumeCbz(volume);
 					successCount++;
 				} catch (error) {
 					console.error(`Failed to delete ${volume.path}:`, error);
