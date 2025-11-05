@@ -65,11 +65,18 @@
           }
 
           // If both have the same completion status, sort by last updated date
+          // Only consider volumes with actual progress (page > 1)
           const aLastUpdated = Math.max(
-            ...aVolumes.map((volId) => new Date($volumes[volId]?.lastProgressUpdate || 0).getTime())
+            ...aVolumes
+              .filter((volId) => ($volumes[volId]?.progress || 0) > 1)
+              .map((volId) => new Date($volumes[volId]?.lastProgressUpdate || 0).getTime()),
+            0  // Default to 0 if no volumes have progress
           );
           const bLastUpdated = Math.max(
-            ...bVolumes.map((volId) => new Date($volumes[volId]?.lastProgressUpdate || 0).getTime())
+            ...bVolumes
+              .filter((volId) => ($volumes[volId]?.progress || 0) > 1)
+              .map((volId) => new Date($volumes[volId]?.lastProgressUpdate || 0).getTime()),
+            0  // Default to 0 if no volumes have progress
           );
 
           if (aLastUpdated !== bLastUpdated) {
