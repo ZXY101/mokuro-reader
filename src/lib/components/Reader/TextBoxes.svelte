@@ -21,6 +21,7 @@
     writingMode: string;
     lines: string[];
     area: number;
+    useMinDimensions: boolean;
   }
 
   let textBoxes = $derived(
@@ -31,16 +32,28 @@
 
         let [_xmin, _ymin, _xmax, _ymax] = box;
 
-        // Expand bounding box by 10% (5% on each side) to give text more room
-        const originalWidth = _xmax - _xmin;
-        const originalHeight = _ymax - _ymin;
-        const expansionX = originalWidth * 0.05;
-        const expansionY = originalHeight * 0.05;
+        // Only expand bounding boxes when using auto font sizing
+        // Manual font sizes should use exact OCR bounding boxes
+        let xmin, ymin, xmax, ymax;
 
-        const xmin = clamp(_xmin - expansionX, 0, img_width);
-        const ymin = clamp(_ymin - expansionY, 0, img_height);
-        const xmax = clamp(_xmax + expansionX, 0, img_width);
-        const ymax = clamp(_ymax + expansionY, 0, img_height);
+        if ($settings.fontSize === 'auto') {
+          // Expand bounding box by 10% (5% on each side) to give text more room
+          const originalWidth = _xmax - _xmin;
+          const originalHeight = _ymax - _ymin;
+          const expansionX = originalWidth * 0.05;
+          const expansionY = originalHeight * 0.05;
+
+          xmin = clamp(_xmin - expansionX, 0, img_width);
+          ymin = clamp(_ymin - expansionY, 0, img_height);
+          xmax = clamp(_xmax + expansionX, 0, img_width);
+          ymax = clamp(_ymax + expansionY, 0, img_height);
+        } else {
+          // Use exact OCR bounding boxes for manual font sizes
+          xmin = _xmin;
+          ymin = _ymin;
+          xmax = _xmax;
+          ymax = _ymax;
+        }
 
         const width = xmax - xmin;
         const height = ymax - ymin;
@@ -60,7 +73,8 @@
           fontSize: $settings.fontSize === 'auto' ? `${font_size}px` : `${$settings.fontSize}pt`,
           writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
           lines: processedLines,
-          area
+          area,
+          useMinDimensions: $settings.fontSize !== 'auto'
         };
 
         return textBox;
@@ -147,13 +161,13 @@
     };
   }
 
-  // Handle hover event to calculate resize on demand
+  // Handle hover event to calculate resize on demand (only for auto font sizing)
   function handleTextBoxHover(element: HTMLDivElement, params: [number, string]) {
     const [index, initialFontSize] = params;
 
     const onMouseEnter = () => {
-      // Skip if already processed or OCR is hidden
-      if (processedTextBoxes.has(index) || display !== 'block') return;
+      // Skip if already processed, OCR is hidden, or using manual font size
+      if (processedTextBoxes.has(index) || display !== 'block' || $settings.fontSize !== 'auto') return;
 
       // Mark as processed immediately to prevent duplicate calculations
       processedTextBoxes.add(index);
@@ -224,12 +238,14 @@
   }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode }, index (`${volumeUuid}-textBox-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions }, index (`${volumeUuid}-textBox-${index}`)}
   <div
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
-    style:width
-    style:height
+    style:width={useMinDimensions ? undefined : width}
+    style:height={useMinDimensions ? undefined : height}
+    style:min-width={useMinDimensions ? width : undefined}
+    style:min-height={useMinDimensions ? height : undefined}
     style:left
     style:top
     style:font-size={adjustedFontSizes.get(index) || fontSize}
