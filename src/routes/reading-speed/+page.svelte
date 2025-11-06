@@ -92,6 +92,27 @@
   // Toggle for showing all achievements
   let showAllAchievements = $state(false);
 
+  // Series filter for chart
+  let selectedSeriesId: string | null = $state(null);
+
+  // Generate evenly distributed colors using HSL color space for maximum visual separation
+  function generateSeriesColor(index: number, totalSeries: number): string {
+    // Start with blue (210°) for consistency
+    const startingHue = 210;
+
+    // Use golden ratio for optimal distribution
+    const goldenRatio = 0.618033988749895;
+
+    // Calculate hue with golden angle distribution for better color separation
+    const hue = (startingHue + (index * goldenRatio * 360)) % 360;
+
+    // Use high saturation and moderate lightness for good visibility on dark background
+    const saturation = 70;
+    const lightness = 60;
+
+    return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+  }
+
   // Derived stores
   const volumeSpeedData = derived(
     [volumes, catalogStore],
@@ -110,6 +131,30 @@
 
   const seriesInfo = derived(volumeSpeedData, ($volumeSpeedData) => {
     return getSeriesSpeedInfo($volumeSpeedData);
+  });
+
+  // Create a map of series IDs to colors based on all volume data
+  const seriesColors = $derived.by(() => {
+    // Sort by completion date to get consistent ordering
+    const sortedData = [...$volumeSpeedData].sort((a, b) => a.completionDate.getTime() - b.completionDate.getTime());
+
+    // Get unique series IDs in order of first appearance
+    const uniqueSeriesIds: string[] = [];
+    sortedData.forEach(vol => {
+      if (!uniqueSeriesIds.includes(vol.seriesId)) {
+        uniqueSeriesIds.push(vol.seriesId);
+      }
+    });
+
+    const totalSeries = uniqueSeriesIds.length;
+
+    // Generate colors with maximum visual separation
+    const colors = new Map<string, string>();
+    uniqueSeriesIds.forEach((seriesId, index) => {
+      colors.set(seriesId, generateSeriesColor(index, totalSeries));
+    });
+
+    return colors;
   });
 
   // Count all completed volumes (including those without speed tracking)
@@ -194,6 +239,14 @@
     }
   }
 
+  function toggleSeriesFilter(seriesId: string) {
+    if (selectedSeriesId === seriesId) {
+      selectedSeriesId = null; // Deselect if already selected
+    } else {
+      selectedSeriesId = seriesId; // Select the series
+    }
+  }
+
   function createChart(data: VolumeSpeedData[]) {
     if (!chartCanvas || data.length === 0) return;
 
@@ -202,29 +255,15 @@
       chart.destroy();
     }
 
+    // Filter data by selected series if one is selected
+    const filteredData = selectedSeriesId
+      ? data.filter(vol => vol.seriesId === selectedSeriesId)
+      : data;
+
+    if (filteredData.length === 0) return;
+
     // Sort data by date (oldest first for chart)
-    const sortedData = [...data].sort((a, b) => a.completionDate.getTime() - b.completionDate.getTime());
-
-    // Generate colors for each series
-    const seriesColors = new Map<string, string>();
-    const colorPalette = [
-      '#3b82f6', // blue
-      '#ef4444', // red
-      '#10b981', // green
-      '#f59e0b', // amber
-      '#8b5cf6', // violet
-      '#ec4899', // pink
-      '#14b8a6', // teal
-      '#f97316', // orange
-    ];
-
-    let colorIndex = 0;
-    sortedData.forEach(vol => {
-      if (!seriesColors.has(vol.seriesId)) {
-        seriesColors.set(vol.seriesId, colorPalette[colorIndex % colorPalette.length]);
-        colorIndex++;
-      }
-    });
+    const sortedData = [...filteredData].sort((a, b) => a.completionDate.getTime() - b.completionDate.getTime());
 
     // Calculate trend line (linear regression)
     const n = sortedData.length;
@@ -249,8 +288,8 @@
           {
             label: 'Reading Speed',
             data: sortedData.map(v => v.charsPerMinute),
-            backgroundColor: sortedData.map(v => seriesColors.get(v.seriesId) || '#3b82f6'),
-            borderColor: sortedData.map(v => seriesColors.get(v.seriesId) || '#3b82f6'),
+            backgroundColor: sortedData.map(v => seriesColors.get(v.seriesId) || generateSeriesColor(0, 1)),
+            borderColor: sortedData.map(v => seriesColors.get(v.seriesId) || generateSeriesColor(0, 1)),
             borderWidth: 2,
             pointRadius: 6,
             pointHoverRadius: 8,
@@ -339,8 +378,16 @@
     });
   }
 
-  // Update chart when data changes
+  // Update chart when data changes or series filter changes
   $effect(() => {
+    if (chartCanvas && $volumeSpeedData) {
+      createChart($volumeSpeedData);
+    }
+  });
+
+  // Also watch for series filter changes
+  $effect(() => {
+    selectedSeriesId;
     if (chartCanvas && $volumeSpeedData) {
       createChart($volumeSpeedData);
     }
@@ -446,7 +493,7 @@
       case '⅝ Native': return 'Unlocked at >250 chars/min reading speed';
       case '¾ Native': return 'Unlocked at >300 chars/min reading speed';
       case '⅞ Native': return 'Unlocked at >350 chars/min reading speed';
-      case 'Native': return 'Unlocked at >450 chars/min reading speed';
+      case 'Native': return 'Unlocked at >400 chars/min reading speed';
 
       // Volume count badges (10 levels)
       case 'First Volume': return 'Unlocked after completing 1 volume';
@@ -740,8 +787,19 @@
           </TableHead>
           <TableBody>
             {#each $seriesInfo as series}
-              <TableBodyRow>
-                <TableBodyCell>{series.seriesTitle}</TableBodyCell>
+              <TableBodyRow
+                class="cursor-pointer hover:bg-gray-700 {selectedSeriesId === series.seriesId ? 'bg-gray-700/50' : ''}"
+                on:click={() => toggleSeriesFilter(series.seriesId)}
+              >
+                <TableBodyCell>
+                  <div class="flex items-center gap-2">
+                    <div
+                      class="w-3 h-3 rounded-full flex-shrink-0"
+                      style="background-color: {seriesColors.get(series.seriesId) || generateSeriesColor(0, 1)};"
+                    ></div>
+                    <span>{series.seriesTitle}</span>
+                  </div>
+                </TableBodyCell>
                 <TableBodyCell>{series.volumeCount}</TableBodyCell>
                 <TableBodyCell>{Math.round(series.averageSpeed)} cpm</TableBodyCell>
                 <TableBodyCell>
@@ -761,7 +819,7 @@
                 </TableBodyCell>
                 <TableBodyCell>
                   {#if series.seriesTitle === '[Missing Series Info]' && $orphanedVolumeIds.length > 0}
-                    <Button size="xs" color="red" on:click={confirmDeleteOrphaned}>
+                    <Button size="xs" color="red" on:click={(e) => { e.stopPropagation(); confirmDeleteOrphaned(); }}>
                       <TrashBinSolid class="w-3 h-3" />
                     </Button>
                   {/if}
@@ -801,7 +859,15 @@
         <TableBody>
           {#each sortedVolumes as volume}
             <TableBodyRow>
-              <TableBodyCell>{volume.seriesTitle}</TableBodyCell>
+              <TableBodyCell>
+                <div class="flex items-center gap-2">
+                  <div
+                    class="w-3 h-3 rounded-full flex-shrink-0"
+                    style="background-color: {seriesColors.get(volume.seriesId) || generateSeriesColor(0, 1)};"
+                  ></div>
+                  <span>{volume.seriesTitle}</span>
+                </div>
+              </TableBodyCell>
               <TableBodyCell>{volume.volumeTitle}</TableBodyCell>
               <TableBodyCell>
                 <div class="flex flex-col">

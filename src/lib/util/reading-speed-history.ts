@@ -277,7 +277,7 @@ export function calculateReadingSpeedStats(
 	if (currentPersonalizedSpeed > 350) {
 		badges.push('⅞ Native');
 	}
-	if (currentPersonalizedSpeed > 450) {
+	if (currentPersonalizedSpeed > 400) {
 		badges.push('Native');
 	}
 
