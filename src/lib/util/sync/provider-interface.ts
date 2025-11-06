@@ -67,22 +67,6 @@ class ExportProvider {
 		throw new Error('Export provider does not support logout');
 	}
 
-	async uploadVolumeData(): Promise<void> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
-	async downloadVolumeData(): Promise<any | null> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
-	async uploadProfiles(): Promise<void> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
-	async downloadProfiles(): Promise<any | null> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
 	async listCloudVolumes(): Promise<CloudFileMetadata[]> {
 		throw new Error('Export provider does not support cloud operations');
 	}
@@ -219,30 +203,6 @@ export interface SyncProvider {
 
 	/** Logout and clear stored credentials */
 	logout(): Promise<void>;
-
-	/**
-	 * Upload volume data (read progress)
-	 * @param data Volume data object to upload
-	 */
-	uploadVolumeData(data: any): Promise<void>;
-
-	/**
-	 * Download volume data (read progress)
-	 * @returns Volume data object or null if not found
-	 */
-	downloadVolumeData(): Promise<any | null>;
-
-	/**
-	 * Upload profile data
-	 * @param data Profile data object to upload
-	 */
-	uploadProfiles(data: any): Promise<void>;
-
-	/**
-	 * Download profile data
-	 * @returns Profile data object or null if not found
-	 */
-	downloadProfiles(): Promise<any | null>;
 
 	// GENERIC FILE OPERATIONS (BLOB-BASED)
 	/**

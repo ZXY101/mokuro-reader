@@ -132,124 +132,6 @@ export class WebDAVProvider implements SyncProvider {
 		console.log('WebDAV logged out');
 	}
 
-	async uploadVolumeData(data: any): Promise<void> {
-		if (!this.isAuthenticated() || !this.client) {
-			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-			const content = JSON.stringify(data);
-			await this.client.putFileContents(VOLUME_DATA_FILE, content, {
-				overwrite: true
-			});
-			console.log('✅ Volume data uploaded to WebDAV');
-		} catch (error) {
-			throw new ProviderError(
-				`Failed to upload volume data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'webdav',
-				'UPLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async downloadVolumeData(): Promise<any | null> {
-		if (!this.isAuthenticated() || !this.client) {
-			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-
-			// Check if file exists
-			const exists = await this.client.exists(VOLUME_DATA_FILE);
-			if (!exists) {
-				return null;
-			}
-
-			const content = await this.client.getFileContents(VOLUME_DATA_FILE, {
-				format: 'text'
-			});
-
-			return JSON.parse(content as string);
-		} catch (error) {
-			// File not found is not an error, just return null
-			const errorMessage = error instanceof Error ? error.message : '';
-			if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-				return null;
-			}
-
-			throw new ProviderError(
-				`Failed to download volume data: ${errorMessage || 'Unknown error'}`,
-				'webdav',
-				'DOWNLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async uploadProfiles(data: any): Promise<void> {
-		if (!this.isAuthenticated() || !this.client) {
-			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-			const content = JSON.stringify(data);
-			await this.client.putFileContents(PROFILES_FILE, content, {
-				overwrite: true
-			});
-			console.log('✅ Profiles uploaded to WebDAV');
-		} catch (error) {
-			throw new ProviderError(
-				`Failed to upload profiles: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'webdav',
-				'UPLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async downloadProfiles(): Promise<any | null> {
-		if (!this.isAuthenticated() || !this.client) {
-			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-
-			// Check if file exists
-			const exists = await this.client.exists(PROFILES_FILE);
-			if (!exists) {
-				return null;
-			}
-
-			const content = await this.client.getFileContents(PROFILES_FILE, {
-				format: 'text'
-			});
-
-			return JSON.parse(content as string);
-		} catch (error) {
-			// File not found is not an error, just return null
-			const errorMessage = error instanceof Error ? error.message : '';
-			if (errorMessage.includes('404') || errorMessage.includes('not found')) {
-				return null;
-			}
-
-			throw new ProviderError(
-				`Failed to download profiles: ${errorMessage || 'Unknown error'}`,
-				'webdav',
-				'DOWNLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
 	private async loadPersistedCredentials(): Promise<void> {
 		if (!browser) return;
 
@@ -284,6 +166,111 @@ export class WebDAVProvider implements SyncProvider {
 				`Failed to ensure mokuro folder exists: ${error instanceof Error ? error.message : 'Unknown error'}`,
 				'webdav',
 				'FOLDER_ERROR'
+			);
+		}
+	}
+
+	// GENERIC FILE OPERATIONS
+
+	async listCloudVolumes(): Promise<import('../../provider-interface').CloudFileMetadata[]> {
+		if (!this.isAuthenticated() || !this.client) {
+			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// TODO: Implement WebDAV listCloudVolumes
+			console.warn('WebDAV listCloudVolumes not yet implemented');
+			return [];
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to list cloud volumes: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'webdav',
+				'LIST_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	async uploadFile(
+		path: string,
+		blob: Blob,
+		description?: string
+	): Promise<string> {
+		if (!this.isAuthenticated() || !this.client) {
+			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			await this.ensureMokuroFolder();
+
+			// Convert Blob to ArrayBuffer
+			const arrayBuffer = await blob.arrayBuffer();
+			const fullPath = `${MOKURO_FOLDER}/${path}`;
+
+			// Upload file
+			await this.client.putFileContents(fullPath, arrayBuffer, {
+				overwrite: true
+			});
+
+			console.log(`✅ Uploaded ${path} to WebDAV`);
+			return fullPath;
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'webdav',
+				'UPLOAD_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	async downloadFile(
+		file: import('../../provider-interface').CloudFileMetadata,
+		onProgress?: (loaded: number, total: number) => void
+	): Promise<Blob> {
+		if (!this.isAuthenticated() || !this.client) {
+			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// For WebDAV, fileId is the full path
+			const content = await this.client.getFileContents(file.fileId, {
+				format: 'binary'
+			});
+
+			// Convert to Blob
+			const blob = new Blob([content as ArrayBuffer]);
+			console.log(`✅ Downloaded ${file.path} from WebDAV`);
+			return blob;
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'webdav',
+				'DOWNLOAD_FAILED',
+				false,
+				true
+			);
+		}
+	}
+
+	async deleteFile(file: import('../../provider-interface').CloudFileMetadata): Promise<void> {
+		if (!this.isAuthenticated() || !this.client) {
+			throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
+		}
+
+		try {
+			// For WebDAV, fileId is the full path
+			await this.client.deleteFile(file.fileId);
+			console.log(`✅ Deleted ${file.path} from WebDAV`);
+		} catch (error) {
+			throw new ProviderError(
+				`Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				'webdav',
+				'DELETE_FAILED',
+				false,
+				true
 			);
 		}
 	}
