@@ -255,6 +255,56 @@ export function updateVolumeMetadata(
   });
 }
 
+/**
+ * Enriches ALL orphaned volumes (those lacking metadata) from the catalog
+ * This is more aggressive than lazy enrichment and runs proactively
+ */
+export async function enrichAllOrphanedVolumes() {
+  if (!browser) return;
+
+  try {
+    const catalog = await db.volumes.toArray();
+    const catalogMap = new Map(catalog.map(v => [v.volume_uuid, v]));
+
+    volumes.update((prev) => {
+      const updated = { ...prev };
+      let enrichedCount = 0;
+
+      Object.entries(prev).forEach(([volumeId, volumeData]) => {
+        // Check if volume lacks metadata
+        const needsEnrichment =
+          !volumeData.series_uuid ||
+          volumeData.series_uuid === 'missing-series-info' ||
+          !volumeData.series_title ||
+          volumeData.series_title === '[Missing Series Info]' ||
+          !volumeData.volume_title ||
+          volumeData.volume_title.startsWith('Volume ');
+
+        if (needsEnrichment) {
+          const catalogInfo = catalogMap.get(volumeId);
+          if (catalogInfo) {
+            updated[volumeId] = new VolumeData({
+              ...volumeData,
+              series_uuid: catalogInfo.series_uuid,
+              series_title: catalogInfo.series_title,
+              volume_title: catalogInfo.volume_title
+            });
+            enrichedCount++;
+          }
+        }
+      });
+
+      if (enrichedCount > 0) {
+        console.log(`Enriched ${enrichedCount} orphaned volume(s) with catalog metadata`);
+      }
+
+      return updated;
+    });
+  } catch (error) {
+    console.warn('Failed to enrich orphaned volumes:', error);
+  }
+}
+
 const initial: Volumes = browser
   ? parseVolumesFromJson(window.localStorage.getItem('volumes') || '{}')
   : {};
@@ -299,6 +349,16 @@ export function clearVolumeSpeedData(volume: string) {
         // Keep: progress, chars, completed, settings, recentPageTurns, sessions
       })
     };
+  });
+}
+
+export function clearOrphanedVolumeData(volumeIds: string[]) {
+  volumes.update((prev) => {
+    const updated = { ...prev };
+    volumeIds.forEach(id => {
+      delete updated[id];
+    });
+    return updated;
   });
 }
 
