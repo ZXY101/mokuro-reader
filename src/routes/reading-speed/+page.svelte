@@ -9,7 +9,7 @@
     formatRelativeDate,
     type VolumeSpeedData
   } from '$lib/util/reading-speed-history';
-  import { volumes, clearVolumeSpeedData } from '$lib/settings/volume-data';
+  import { volumes, clearVolumeSpeedData, clearOrphanedVolumeData } from '$lib/settings/volume-data';
   import { volumes as catalogStore } from '$lib/catalog';
   import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
   import { Badge, Card, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Button, Modal } from 'flowbite-svelte';
@@ -86,6 +86,9 @@
   let deleteModalOpen = $state(false);
   let volumeToDelete: VolumeSpeedData | null = $state(null);
 
+  // Orphaned data deletion modal
+  let orphanedDeleteModalOpen = $state(false);
+
   // Toggle for showing all achievements
   let showAllAchievements = $state(false);
 
@@ -112,6 +115,34 @@
   // Count all completed volumes (including those without speed tracking)
   const totalCompletedVolumes = derived(volumes, ($volumes) => {
     return Object.values($volumes).filter(vol => vol.completed).length;
+  });
+
+  // Detect ALL orphaned volumes (lacking metadata) in the entire volumes store
+  const orphanedVolumeIds = derived(volumes, ($volumes) => {
+    return Object.keys($volumes).filter(volumeId => {
+      const vol = $volumes[volumeId];
+      return (
+        !vol.series_uuid ||
+        vol.series_uuid === 'missing-series-info' ||
+        !vol.series_title ||
+        vol.series_title === '[Missing Series Info]' ||
+        !vol.volume_title ||
+        vol.volume_title.startsWith('Volume ')
+      );
+    });
+  });
+
+  // Count orphaned volumes visible in speed data vs. not visible
+  const orphanedCounts = $derived.by(() => {
+    const visibleIds = new Set($volumeSpeedData.filter(v => v.seriesId === 'missing-series-info').map(v => v.volumeId));
+    const speedTracked = $orphanedVolumeIds.filter(id => visibleIds.has(id)).length;
+
+    // Split non-speed-tracked into marked as read vs. other
+    const notSpeedTracked = $orphanedVolumeIds.filter(id => !visibleIds.has(id));
+    const markedAsRead = notSpeedTracked.filter(id => $volumes[id]?.completed).length;
+    const other = notSpeedTracked.length - markedAsRead;
+
+    return { speedTracked, markedAsRead, other, total: $orphanedVolumeIds.length };
   });
 
   // Sorted volume list using $derived for reactivity
@@ -490,6 +521,15 @@
     volumeToDelete = null;
   }
 
+  function confirmDeleteOrphaned() {
+    orphanedDeleteModalOpen = true;
+  }
+
+  function deleteOrphanedData() {
+    clearOrphanedVolumeData($orphanedVolumeIds);
+    orphanedDeleteModalOpen = false;
+  }
+
   // Get animation class for prestige and mythic tier badges
   function getBadgeAnimation(badge: string): string {
     // Tier 6 (Prestige Bronze) - Bronze shimmer effect
@@ -692,6 +732,7 @@
             <TableHeadCell>Volumes</TableHeadCell>
             <TableHeadCell>Avg Speed</TableHeadCell>
             <TableHeadCell>Improvement</TableHeadCell>
+            <TableHeadCell>Actions</TableHeadCell>
           </TableHead>
           <TableBody>
             {#each $seriesInfo as series}
@@ -712,6 +753,13 @@
                     </span>
                   {:else}
                     <span class="text-gray-500">-</span>
+                  {/if}
+                </TableBodyCell>
+                <TableBodyCell>
+                  {#if series.seriesTitle === '[Missing Series Info]' && $orphanedVolumeIds.length > 0}
+                    <Button size="xs" color="red" on:click={confirmDeleteOrphaned}>
+                      <TrashBinSolid class="w-3 h-3" />
+                    </Button>
                   {/if}
                 </TableBodyCell>
               </TableBodyRow>
@@ -799,6 +847,61 @@
         Yes, delete
       </Button>
       <Button color="alternative" on:click={() => { deleteModalOpen = false; volumeToDelete = null; }}>
+        Cancel
+      </Button>
+    </div>
+  </div>
+</Modal>
+
+<!-- Orphaned Data Deletion Modal -->
+<Modal bind:open={orphanedDeleteModalOpen} size="sm" autoclose={false}>
+  <div class="text-center">
+    <TrashBinSolid size="lg" class="mx-auto mb-4 text-gray-400 dark:text-gray-200" />
+    <h3 class="mb-4 text-xl font-semibold text-gray-300">
+      Remove Orphaned Volume Data?
+    </h3>
+    <p class="mb-4 text-base text-gray-400">
+      You have <span class="font-semibold text-white">{orphanedCounts.total} volume(s)</span> with missing series information in your reading history.
+    </p>
+    {#if orphanedCounts.speedTracked > 0 || orphanedCounts.markedAsRead > 0 || orphanedCounts.other > 0}
+      <div class="mb-4 text-sm text-gray-400 text-left bg-gray-800 p-3 rounded">
+        <p class="mb-1">This includes:</p>
+        <ul class="list-disc list-inside ml-2">
+          {#if orphanedCounts.speedTracked > 0}
+            <li>Speed-tracked volumes: <span class="font-semibold">{orphanedCounts.speedTracked}</span></li>
+          {/if}
+          {#if orphanedCounts.markedAsRead > 0}
+            <li>Marked as read: <span class="font-semibold">{orphanedCounts.markedAsRead}</span></li>
+          {/if}
+          {#if orphanedCounts.other > 0}
+            <li>Other orphaned volumes: <span class="font-semibold">{orphanedCounts.other}</span></li>
+          {/if}
+        </ul>
+      </div>
+    {/if}
+    <p class="mb-3 text-sm text-gray-400 text-left">
+      This reading data lacks title and series information, making it difficult to identify.
+    </p>
+    <div class="mb-5 text-sm text-gray-400 text-left bg-yellow-900/20 border border-yellow-600/30 p-3 rounded">
+      <p class="mb-2 font-semibold text-yellow-400">⚠️ Important:</p>
+      <p class="mb-2">
+        <span class="font-semibold text-blue-400">If you re-upload these volumes now</span>, we can find these orphans' parents and enrich them with proper metadata.
+      </p>
+      <p class="mb-2">
+        You may delete the volumes from your catalog afterwards—we'll persist the data on series and volume titles.
+      </p>
+      <p class="font-semibold text-red-400">
+        However, if you delete now, you cannot enrich these orphans later. They will be gone forever.
+      </p>
+    </div>
+    <p class="mb-5 text-base font-semibold text-gray-300">
+      Are you sure you want to permanently remove this orphaned data?
+    </p>
+    <div class="flex justify-center gap-4">
+      <Button color="red" on:click={deleteOrphanedData}>
+        Yes, Remove {orphanedCounts.total} volume{orphanedCounts.total !== 1 ? 's' : ''}
+      </Button>
+      <Button color="alternative" on:click={() => { orphanedDeleteModalOpen = false; }}>
         Cancel
       </Button>
     </div>

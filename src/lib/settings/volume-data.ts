@@ -302,6 +302,16 @@ export function clearVolumeSpeedData(volume: string) {
   });
 }
 
+export function clearOrphanedVolumeData(volumeIds: string[]) {
+  volumes.update((prev) => {
+    const updated = { ...prev };
+    volumeIds.forEach(id => {
+      delete updated[id];
+    });
+    return updated;
+  });
+}
+
 export function updateProgress(
   volume: string,
   progress: number,
