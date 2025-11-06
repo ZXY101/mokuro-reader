@@ -3,6 +3,7 @@ import type { SyncProvider, ProviderStatus, CloudFileMetadata, DriveFileMetadata
 import { ProviderError } from '../../provider-interface';
 import { tokenManager } from '$lib/util/google-drive/token-manager';
 import { driveApiClient } from '$lib/util/google-drive/api-client';
+import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
 import { parseVolumesFromJson } from '$lib/settings';
 import { getOrCreateFolder, uploadCbzToDrive } from '$lib/util/backup';
@@ -682,24 +683,33 @@ export class GoogleDriveProvider implements SyncProvider {
 
 	/**
 	 * Ensure the mokuro-reader folder exists in Google Drive
+	 * Uses cache to avoid race conditions from simultaneous calls
 	 */
 	private async ensureReaderFolder(): Promise<string> {
+		// Check local cache first (fast path for repeated calls within this provider)
 		if (this.readerFolderId) {
 			return this.readerFolderId;
 		}
 
-		const folders = await driveApiClient.listFiles(
-			`mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}' and name='${GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER}'`,
-			'files(id)'
-		);
+		// Get folder ID from shared cache (waits if fetch is in progress)
+		const cachedFolderId = await driveFilesCache.getReaderFolderId();
 
-		if (folders.length === 0) {
-			this.readerFolderId = await driveApiClient.createFolder(GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER);
-		} else {
-			this.readerFolderId = folders[0].id;
+		if (cachedFolderId) {
+			// Found in cache
+			this.readerFolderId = cachedFolderId;
+			return cachedFolderId;
 		}
 
-		return this.readerFolderId;
+		// Folder doesn't exist - create it
+		// Note: This only happens once per account (or if folder is deleted)
+		console.log('Creating mokuro-reader folder...');
+		const newFolderId = await driveApiClient.createFolder(GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER);
+
+		// Store in both caches
+		this.readerFolderId = newFolderId;
+		driveFilesCache.setReaderFolderId(newFolderId);
+
+		return newFolderId;
 	}
 }
 

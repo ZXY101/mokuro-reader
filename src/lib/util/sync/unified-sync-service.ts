@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { progressTrackerStore } from '../progress-tracker';
-import { volumes, profiles, parseVolumesFromJson } from '$lib/settings';
+import { volumesWithTrash, profiles, parseVolumesFromJson } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import type { SyncProvider, ProviderType } from './provider-interface';
 
@@ -227,21 +227,24 @@ class UnifiedSyncService {
 		// Step 1: Download cloud data
 		const cloudVolumes = await provider.downloadVolumeData();
 
-		// Step 2: Get local data
-		const localVolumes = get(volumes);
+		// Step 2: Get local data (including tombstones for deletion sync)
+		const localVolumes = get(volumesWithTrash);
 
-		// Step 3: Merge data (newest wins)
+		// Step 3: Merge data (handles deletedOn/addedOn timestamps)
 		const mergedVolumes = this.mergeVolumeData(localVolumes, cloudVolumes || {});
 
-		// Step 4: Update local storage
-		volumes.set(mergedVolumes);
+		// Step 4: Purge tombstones older than 30 days
+		const purgedVolumes = this.purgeTombstones(mergedVolumes);
 
-		// Step 5: Upload merged data if changed
-		const mergedJson = JSON.stringify(mergedVolumes);
+		// Step 5: Update local storage (including tombstones)
+		volumesWithTrash.set(purgedVolumes);
+
+		// Step 6: Upload purged data if changed
+		const purgedJson = JSON.stringify(purgedVolumes);
 		const cloudJson = JSON.stringify(cloudVolumes || {});
 
-		if (mergedJson !== cloudJson) {
-			await provider.uploadVolumeData(mergedVolumes);
+		if (purgedJson !== cloudJson) {
+			await provider.uploadVolumeData(purgedVolumes);
 		}
 	}
 
@@ -271,8 +274,8 @@ class UnifiedSyncService {
 	}
 
 	/**
-	 * Merge volume data using newest-wins strategy for progress data
-	 * But preserves static metadata from both records (favors completeness)
+	 * Merge volume data using newest-wins strategy with deletion tracking support
+	 * Handles addedOn/deletedOn timestamps to properly sync deletions across devices
 	 * IMPORTANT: Always returns VolumeData class instances to ensure toJSON() is available
 	 */
 	private mergeVolumeData(local: any, cloud: any): any {
@@ -288,42 +291,85 @@ class UnifiedSyncService {
 
 			if (!localVol) {
 				// Only in cloud - parse plain object to VolumeData instance
-				// Use parseVolumesFromJson to ensure proper VolumeData instances
 				const parsed = parseVolumesFromJson(JSON.stringify({ [volumeId]: cloudVol }));
 				merged[volumeId] = parsed[volumeId];
 			} else if (!cloudVol) {
 				// Only in local - already a VolumeData instance
 				merged[volumeId] = localVol;
 			} else {
-				// In both - keep newer based on lastProgressUpdate for progress data
-				// But preserve static metadata from both records (favor completeness)
-				const localDate = new Date(localVol.lastProgressUpdate || 0).getTime();
-				const cloudDate = new Date(cloudVol.lastProgressUpdate || 0).getTime();
+				// In both - determine which operation is newer (addition OR deletion)
+				// Treat undefined timestamps as epoch (0) for legacy volumes
+				const localAdded = new Date(localVol.addedOn || 0).getTime();
+				const cloudAdded = new Date(cloudVol.addedOn || 0).getTime();
+				const localDeleted = new Date(localVol.deletedOn || 0).getTime();
+				const cloudDeleted = new Date(cloudVol.deletedOn || 0).getTime();
 
-				let newerVol, olderVol;
-				if (localDate >= cloudDate) {
-					newerVol = localVol;
-					olderVol = cloudVol;
-				} else {
-					// Convert cloud to VolumeData instance
+				// Most recent operation on each device (either add or delete)
+				const localMostRecent = Math.max(localAdded, localDeleted);
+				const cloudMostRecent = Math.max(cloudAdded, cloudDeleted);
+
+				let winner;
+				if (cloudMostRecent > localMostRecent) {
+					// Cloud is newer
 					const parsed = parseVolumesFromJson(JSON.stringify({ [volumeId]: cloudVol }));
-					newerVol = parsed[volumeId];
-					olderVol = localVol;
+					winner = parsed[volumeId];
+				} else if (localMostRecent > cloudMostRecent) {
+					// Local is newer
+					winner = localVol;
+				} else {
+					// Timestamps equal (including both at epoch)
+					// Prefer active over deleted to prevent accidental data loss
+					if (cloudVol.deletedOn && !localVol.deletedOn) {
+						winner = localVol; // Local is active, keep it
+					} else if (localVol.deletedOn && !cloudVol.deletedOn) {
+						const parsed = parseVolumesFromJson(JSON.stringify({ [volumeId]: cloudVol }));
+						winner = parsed[volumeId]; // Cloud is active, keep it
+					} else {
+						// Both same state (both active or both deleted) - arbitrary choice: local
+						winner = localVol;
+					}
 				}
 
 				// Preserve metadata from both records - fill in missing fields
-				merged[volumeId] = parseVolumesFromJson(JSON.stringify({
-					[volumeId]: {
-						...newerVol,
-						series_uuid: newerVol.series_uuid || olderVol.series_uuid,
-						series_title: newerVol.series_title || olderVol.series_title,
-						volume_title: newerVol.volume_title || olderVol.volume_title
-					}
-				}))[volumeId];
+				// (only if the winner is not deleted - tombstones keep minimal data)
+				if (!winner.deletedOn) {
+					merged[volumeId] = parseVolumesFromJson(JSON.stringify({
+						[volumeId]: {
+							...winner,
+							series_uuid: winner.series_uuid || localVol.series_uuid || cloudVol.series_uuid,
+							series_title: winner.series_title || localVol.series_title || cloudVol.series_title,
+							volume_title: winner.volume_title || localVol.volume_title || cloudVol.volume_title
+						}
+					}))[volumeId];
+				} else {
+					// Winner is a tombstone - keep it as-is (minimal data)
+					merged[volumeId] = winner;
+				}
 			}
 		});
 
 		return merged;
+	}
+
+	/**
+	 * Purge tombstones (deleted volumes) older than 30 days
+	 * This prevents the sync data from accumulating deleted entries indefinitely
+	 */
+	private purgeTombstones(volumes: any): any {
+		const now = Date.now();
+		const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+		return Object.fromEntries(
+			Object.entries(volumes).filter(([volumeId, vol]: [string, any]) => {
+				// Keep active volumes (no deletedOn timestamp)
+				if (!vol.deletedOn) return true;
+
+				// Purge tombstones older than 30 days
+				const deletedTimestamp = new Date(vol.deletedOn).getTime();
+				const age = now - deletedTimestamp;
+				return age < THIRTY_DAYS_MS;
+			})
+		);
 	}
 
 	/**

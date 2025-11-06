@@ -26,6 +26,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
   private cacheLoadedStore = writable<boolean>(false);
   private fetchingFlag = false;
   private lastFetchTime: number | null = null;
+  private readerFolderId: string | null = null;
+  private fetchPromise: Promise<void> | null = null;
 
   get store() {
     // Return Map grouped by series for efficient series-based operations
@@ -61,11 +63,18 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
   async fetchAllFiles(): Promise<void> {
     if (this.fetchingFlag) {
       console.log('Drive files cache fetch already in progress');
+      // Return existing promise to allow callers to wait
+      if (this.fetchPromise) {
+        return this.fetchPromise;
+      }
       return;
     }
 
     this.fetchingFlag = true;
     this.isFetchingStore.set(true);
+
+    // Create promise for this fetch operation
+    this.fetchPromise = (async () => {
     try {
       console.log('Fetching all Drive file metadata...');
 
@@ -91,6 +100,12 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
           folderNames.set(item.id, item.name);
           foundFolderNames.push(item.name);
+
+          // Capture mokuro-reader folder ID
+          if (item.name === GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER) {
+            this.readerFolderId = item.id;
+            console.log('Found mokuro-reader folder ID:', item.id);
+          }
         } else if (item.name.endsWith('.cbz')) {
           cbzFiles.push(item);
         } else if (item.name === GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA) {
@@ -174,6 +189,7 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
     } finally {
       this.fetchingFlag = false;
       this.isFetchingStore.set(false);
+      this.fetchPromise = null;
 
       // Check if sync was requested after login (do this in finally to ensure fetch is complete)
       const shouldSync = typeof window !== 'undefined' &&
@@ -188,6 +204,38 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         );
       }
     }
+    })();
+
+    return this.fetchPromise;
+  }
+
+  /**
+   * Get the mokuro-reader folder ID from cache
+   * Waits for ongoing fetch if needed
+   * Returns null if folder doesn't exist (needs to be created)
+   */
+  async getReaderFolderId(): Promise<string | null> {
+    // If we have the folder ID cached, return it immediately
+    if (this.readerFolderId) {
+      return this.readerFolderId;
+    }
+
+    // If a fetch is in progress, wait for it to complete
+    if (this.fetchPromise) {
+      console.log('Waiting for cache fetch to complete...');
+      await this.fetchPromise;
+      return this.readerFolderId;
+    }
+
+    // Cache is loaded but no folder found - it needs to be created
+    return null;
+  }
+
+  /**
+   * Set the reader folder ID in cache (after creating the folder)
+   */
+  setReaderFolderId(folderId: string): void {
+    this.readerFolderId = folderId;
   }
 
   /**
@@ -399,6 +447,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
     this.cache.set(new Map());
     this.cacheLoadedStore.set(false);
     this.lastFetchTime = null;
+    this.readerFolderId = null;
+    this.fetchPromise = null;
   }
 
   /**

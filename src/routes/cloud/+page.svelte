@@ -3,7 +3,6 @@
 
   import { profiles } from '$lib/settings';
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
-  import { volumes } from '$lib/settings/volume-data';
 
   import {
     promptConfirmation,
@@ -325,23 +324,11 @@
     showSnackbar('Logged out of MEGA');
   }
 
-  async function handleMegaSync() {
+  async function handleProviderSync() {
     try {
-      // Download from MEGA
-      const volumeData = await megaProvider.downloadVolumeData();
-
-      // Update local store if we got data
-      if (volumeData && Object.keys(volumeData).length > 0) {
-        volumes.update(() => volumeData);
-        showSnackbar('Downloaded read progress from MEGA');
-      }
-
-      // Upload current local data to MEGA
-      let currentVolumes;
-      volumes.subscribe(v => { currentVolumes = v; })();
-      await megaProvider.uploadVolumeData(currentVolumes);
-
-      showSnackbar('Synced read progress with MEGA');
+      // Use unified sync service - handles merge logic, deletion tracking, and tombstone purging
+      await unifiedCloudManager.syncProgress();
+      showSnackbar('Synced read progress');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(`Sync failed: ${message}`);
@@ -388,28 +375,6 @@
     showSnackbar('Logged out of WebDAV');
   }
 
-  async function handleWebDAVSync() {
-    try {
-      // Download from WebDAV
-      const volumeData = await webdavProvider.downloadVolumeData();
-
-      // Update local store if we got data
-      if (volumeData && Object.keys(volumeData).length > 0) {
-        volumes.update(() => volumeData);
-        showSnackbar('Downloaded read progress from WebDAV');
-      }
-
-      // Upload current local data to WebDAV
-      let currentVolumes;
-      volumes.subscribe(v => { currentVolumes = v; })();
-      await webdavProvider.uploadVolumeData(currentVolumes);
-
-      showSnackbar('Synced read progress with WebDAV');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      showSnackbar(`Sync failed: ${message}`);
-    }
-  }
 
   async function backupAllSeries() {
     // Get default provider
@@ -716,7 +681,7 @@
               {/if}
             </div>
 
-            <Button color="blue" on:click={handleMegaSync}>
+            <Button color="blue" on:click={handleProviderSync}>
               Sync read progress
             </Button>
 
@@ -781,7 +746,7 @@
               {/if}
             </div>
 
-            <Button color="blue" on:click={handleWebDAVSync}>
+            <Button color="blue" on:click={handleProviderSync}>
               Sync read progress
             </Button>
 
