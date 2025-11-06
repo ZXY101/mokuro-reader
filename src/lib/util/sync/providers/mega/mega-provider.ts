@@ -625,7 +625,7 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	async uploadVolumeCbz(
+	async uploadFile(
 		path: string,
 		blob: Blob,
 		description?: string
@@ -696,7 +696,7 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	async downloadVolumeCbz(
+	async downloadFile(
 		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
@@ -780,7 +780,7 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
+	async deleteFile(file: CloudFileMetadata): Promise<void> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
 		}

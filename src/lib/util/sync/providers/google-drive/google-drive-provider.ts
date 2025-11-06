@@ -143,21 +143,56 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 
 		try {
-			// Ensure reader folder exists
-			const folderId = await this.ensureReaderFolder();
+			// Get all volume-data.json files from cache
+			const volumeDataFiles = driveFilesCache.getVolumeDataFiles();
 
-			// Query for volume-data.json file
-			const files = await driveApiClient.listFiles(
-				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA}' and trashed=false`,
-				'files(id)'
-			);
-
-			if (files.length === 0) {
+			if (volumeDataFiles.length === 0) {
 				return null;
 			}
 
-			// Download and parse
-			const content = await driveApiClient.getFileContent(files[0].id);
+			// Handle duplicates: download all, merge, and clean up
+			if (volumeDataFiles.length > 1) {
+				console.log(`📦 Found ${volumeDataFiles.length} volume-data.json files - merging and deduplicating...`);
+
+				// Download all files in parallel
+				const allVolumesData = await Promise.all(
+					volumeDataFiles.map(async (file) => {
+						const content = await driveApiClient.getFileContent(file.fileId);
+						return parseVolumesFromJson(content);
+					})
+				);
+
+				// Merge all volumes (newest lastProgressUpdate wins per volume)
+				const merged: any = {};
+				for (const volumesData of allVolumesData) {
+					for (const [volumeId, volumeData] of Object.entries(volumesData)) {
+						const existing = merged[volumeId];
+						if (!existing) {
+							merged[volumeId] = volumeData;
+						} else {
+							// Keep the volume with the most recent progress update
+							const existingTime = new Date(existing.lastProgressUpdate || 0).getTime();
+							const newTime = new Date((volumeData as any).lastProgressUpdate || 0).getTime();
+							if (newTime > existingTime) {
+								merged[volumeId] = volumeData;
+							}
+						}
+					}
+				}
+
+				// Delete duplicate files (keep the first one)
+				for (let i = 1; i < volumeDataFiles.length; i++) {
+					console.log(`🗑️ Deleting duplicate volume-data.json (${volumeDataFiles[i].fileId})`);
+					await driveApiClient.deleteFile(volumeDataFiles[i].fileId);
+					driveFilesCache.removeById(volumeDataFiles[i].fileId);
+				}
+
+				console.log(`✅ Merged ${volumeDataFiles.length} files into 1`);
+				return merged;
+			}
+
+			// Single file - download normally
+			const content = await driveApiClient.getFileContent(volumeDataFiles[0].fileId);
 			return parseVolumesFromJson(content);
 		} catch (error) {
 			// File not found is not an error
@@ -316,7 +351,7 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 	}
 
-	async uploadVolumeCbz(
+	async uploadFile(
 		path: string,
 		blob: Blob,
 		description?: string
@@ -360,7 +395,7 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 	}
 
-	async downloadVolumeCbz(
+	async downloadFile(
 		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
@@ -426,7 +461,7 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 	}
 
-	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
+	async deleteFile(file: CloudFileMetadata): Promise<void> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}

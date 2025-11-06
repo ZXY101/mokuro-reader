@@ -87,15 +87,15 @@ class ExportProvider {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async uploadVolumeCbz(): Promise<string> {
+	async uploadFile(): Promise<string> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async downloadVolumeCbz(_file: CloudFileMetadata): Promise<Blob> {
+	async downloadFile(_file: CloudFileMetadata): Promise<Blob> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async deleteVolumeCbz(_file: CloudFileMetadata): Promise<void> {
+	async deleteFile(_file: CloudFileMetadata): Promise<void> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 }
@@ -244,38 +244,38 @@ export interface SyncProvider {
 	 */
 	downloadProfiles(): Promise<any | null>;
 
-	// VOLUME STORAGE METHODS
+	// GENERIC FILE OPERATIONS (BLOB-BASED)
 	/**
-	 * List all CBZ files in cloud storage
+	 * List all files in cloud storage
 	 * @returns Array of cloud file metadata
 	 */
 	listCloudVolumes(): Promise<CloudFileMetadata[]>;
 
 	/**
-	 * Upload a CBZ file to cloud storage
-	 * @param path Target path "SeriesTitle/VolumeTitle.cbz"
-	 * @param blob CBZ file data
+	 * Upload a file to cloud storage
+	 * @param path Target path (e.g., "SeriesTitle/VolumeTitle.cbz")
+	 * @param blob File data as Blob
 	 * @param description Optional file description
 	 * @returns File ID in cloud storage
 	 */
-	uploadVolumeCbz(path: string, blob: Blob, description?: string): Promise<string>;
+	uploadFile(path: string, blob: Blob, description?: string): Promise<string>;
 
 	/**
-	 * Download a CBZ file from cloud storage
+	 * Download a file from cloud storage
 	 * @param file Cloud file metadata (provider extracts internal ID)
 	 * @param onProgress Optional progress callback (loaded, total)
-	 * @returns CBZ file data
+	 * @returns File data as Blob
 	 */
-	downloadVolumeCbz(
+	downloadFile(
 		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob>;
 
 	/**
-	 * Delete a CBZ file from cloud storage
+	 * Delete a file from cloud storage
 	 * @param file Cloud file metadata (provider extracts internal ID)
 	 */
-	deleteVolumeCbz(file: CloudFileMetadata): Promise<void>;
+	deleteFile(file: CloudFileMetadata): Promise<void>;
 }
 
 export class ProviderError extends Error {
