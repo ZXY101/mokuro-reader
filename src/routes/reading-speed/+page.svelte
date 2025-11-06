@@ -9,7 +9,7 @@
     formatRelativeDate,
     type VolumeSpeedData
   } from '$lib/util/reading-speed-history';
-  import { volumes, clearVolumeSpeedData, clearOrphanedVolumeData } from '$lib/settings/volume-data';
+  import { volumes, clearVolumeSpeedData, clearOrphanedVolumeData, enrichAllOrphanedVolumes } from '$lib/settings/volume-data';
   import { volumes as catalogStore } from '$lib/catalog';
   import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
   import { Badge, Card, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell, Button, Modal } from 'flowbite-svelte';
@@ -347,6 +347,10 @@
   });
 
   onMount(() => {
+    // Proactively enrich ALL orphaned volumes when page loads
+    // This ensures even volumes that don't pass speed filters get enriched
+    enrichAllOrphanedVolumes();
+
     return () => {
       if (chart) {
         chart.destroy();
