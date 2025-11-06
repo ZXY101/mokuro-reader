@@ -451,7 +451,8 @@ async function processBackup(item: BackupQueueItem, processId: string): Promise<
 	// Estimate volume size (rough estimate: page count * 0.5MB average per page)
 	const estimatedSize = (item.volumeMetadata.page_count || 10) * 0.5 * 1024 * 1024;
 	// Estimate memory requirement (compression + upload buffer)
-	const memoryRequirement = Math.max(estimatedSize * 2.8, 50 * 1024 * 1024);
+	// Compression overhead can be 2-3x the input size during processing
+	const memoryRequirement = Math.max(estimatedSize * 6.0, 50 * 1024 * 1024);
 
 	// Calculate effective concurrency limit for export tasks
 	// Export is CPU/memory bound, so we use pool limit minus 2 to leave headroom for other operations

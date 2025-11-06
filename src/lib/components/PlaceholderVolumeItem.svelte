@@ -112,7 +112,7 @@
             size: cloudSize || 0
           };
 
-          await unifiedCloudManager.deleteVolumeCbz(cloudFile);
+          await unifiedCloudManager.deleteFile(cloudFile);
           showSnackbar(`Deleted ${volName} from ${providerName}`);
         } catch (error) {
           console.error(`Failed to delete from ${providerName}:`, error);

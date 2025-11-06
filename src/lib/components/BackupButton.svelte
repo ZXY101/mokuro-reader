@@ -115,7 +115,7 @@
     }
 
     try {
-      await unifiedCloudManager.deleteVolumeCbz(cloudFile);
+      await unifiedCloudManager.deleteFile(cloudFile);
       showSnackbar(`Deleted from ${cloudFile.provider}`);
     } catch (error) {
       console.error('Delete failed:', error);

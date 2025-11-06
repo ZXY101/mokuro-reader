@@ -223,102 +223,6 @@ export class MegaProvider implements SyncProvider {
 		console.log('MEGA logged out');
 	}
 
-	async uploadVolumeData(data: any): Promise<void> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-			const content = JSON.stringify(data);
-			await this.uploadFile(VOLUME_DATA_FILE, content);
-			console.log('✅ Volume data uploaded to MEGA');
-		} catch (error) {
-			throw new ProviderError(
-				`Failed to upload volume data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'mega',
-				'UPLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async downloadVolumeData(): Promise<any | null> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-			const content = await this.downloadFile(VOLUME_DATA_FILE);
-			if (!content) return null;
-
-			return JSON.parse(content);
-		} catch (error) {
-			// File not found is not an error, just return null
-			if (error instanceof Error && error.message.includes('not found')) {
-				return null;
-			}
-
-			throw new ProviderError(
-				`Failed to download volume data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'mega',
-				'DOWNLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async uploadProfiles(data: any): Promise<void> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-			const content = JSON.stringify(data);
-			await this.uploadFile(PROFILES_FILE, content);
-			console.log('✅ Profiles uploaded to MEGA');
-		} catch (error) {
-			throw new ProviderError(
-				`Failed to upload profiles: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'mega',
-				'UPLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async downloadProfiles(): Promise<any | null> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			await this.ensureMokuroFolder();
-			const content = await this.downloadFile(PROFILES_FILE);
-			if (!content) return null;
-
-			return JSON.parse(content);
-		} catch (error) {
-			// File not found is not an error, just return null
-			if (error instanceof Error && error.message.includes('not found')) {
-				return null;
-			}
-
-			throw new ProviderError(
-				`Failed to download profiles: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'mega',
-				'DOWNLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
 	async loadPersistedCredentials(): Promise<void> {
 		if (!browser) return;
 
@@ -450,81 +354,6 @@ export class MegaProvider implements SyncProvider {
 		});
 	}
 
-	private async uploadFile(filename: string, content: string): Promise<void> {
-		// Wrap JSON file uploads with smart cache refresh retry
-		return retryWithCacheRefresh(async () => {
-			const mokuroFolder = await this.ensureMokuroFolder();
-
-			return new Promise<void>(async (resolve, reject) => {
-				try {
-					// Check if file already exists using storage.files
-					const children = await this.listFolder(mokuroFolder);
-					const existingFile = children.find((f: any) => f.name === filename && !f.directory);
-
-					const uploadNew = () => {
-						// Convert string to Uint8Array (browser-compatible)
-						const encoder = new TextEncoder();
-						const contentBuffer = encoder.encode(content);
-
-						mokuroFolder.upload(
-							{
-								name: filename,
-								size: contentBuffer.length
-							},
-							contentBuffer,
-							(error: Error | null) => {
-								if (error) reject(error);
-								else resolve();
-							}
-						);
-					};
-
-					if (existingFile) {
-						// Delete existing file first
-						existingFile.delete(true, (deleteError: Error | null) => {
-							if (deleteError) {
-								reject(deleteError);
-							} else {
-								uploadNew();
-							}
-						});
-					} else {
-						uploadNew();
-					}
-				} catch (error) {
-					reject(error);
-				}
-			});
-		}, `Upload ${filename}`, this.reinitialize.bind(this));
-	}
-
-	private async downloadFile(filename: string): Promise<string | null> {
-		// Wrap JSON file downloads with smart cache refresh retry
-		return retryWithCacheRefresh(async () => {
-			const mokuroFolder = await this.ensureMokuroFolder();
-
-			const children = await this.listFolder(mokuroFolder);
-			const file = children.find((f: any) => f.name === filename && !f.directory);
-
-			if (!file) {
-				return null;
-			}
-
-			return new Promise<string>((resolve, reject) => {
-				file.download((error: Error | null, data: Uint8Array) => {
-					if (error) {
-						reject(error);
-					} else {
-						// Convert Uint8Array to string (browser-compatible)
-						const decoder = new TextDecoder('utf-8');
-						const text = decoder.decode(data);
-						resolve(text);
-					}
-				});
-			});
-		}, `Download ${filename}`, this.reinitialize.bind(this));
-	}
-
 	// VOLUME STORAGE METHODS
 
 	async listCloudVolumes(): Promise<import('../../provider-interface').CloudFileMetadata[]> {
@@ -549,16 +378,19 @@ export class MegaProvider implements SyncProvider {
 				(f: any) => f.name === MOKURO_FOLDER && f.directory
 			);
 
-			// Filter CBZ files that are in ANY mokuro-reader folder or its subfolders
-			const cbzFiles: import('../../provider-interface').CloudFileMetadata[] = [];
+			// Filter CBZ and JSON files that are in ANY mokuro-reader folder or its subfolders
+			const allFiles: import('../../provider-interface').CloudFileMetadata[] = [];
 
 			for (const file of files) {
 				// Skip non-files
 				if ((file as any).directory) continue;
 
-				// Check if file is a CBZ
+				// Check if file is a CBZ or JSON
 				const name = (file as any).name || '';
-				if (!name.toLowerCase().endsWith('.cbz')) continue;
+				const isCbz = name.toLowerCase().endsWith('.cbz');
+				const isJson = name === 'volume-data.json' || name === 'profiles.json';
+
+				if (!isCbz && !isJson) continue;
 
 				// Check if file is in ANY mokuro-reader folder or subfolder
 				let parent = (file as any).parent;
@@ -591,9 +423,17 @@ export class MegaProvider implements SyncProvider {
 
 				// If we found mokuro root, this file is under a mokuro-reader folder
 				if (foundMokuroRoot) {
-					// Build path as "SeriesTitle/VolumeTitle.cbz"
-					pathParts.push(name);
-					const path = pathParts.join('/');
+					// For JSON files in the mokuro root, use just the filename as path
+					// For CBZ files, build full path as "SeriesTitle/VolumeTitle.cbz"
+					let path: string;
+					if (isJson && pathParts.length === 0) {
+						// JSON file directly in mokuro folder
+						path = name;
+					} else {
+						// CBZ file or JSON in subfolder
+						pathParts.push(name);
+						path = pathParts.join('/');
+					}
 
 					// Get file metadata
 					const fileId = (file as any).nodeId || (file as any).id || '';
@@ -602,7 +442,7 @@ export class MegaProvider implements SyncProvider {
 						: new Date().toISOString();
 					const size = (file as any).size || 0;
 
-					cbzFiles.push({
+					allFiles.push({
 						provider: 'mega',
 						fileId,
 						path,
@@ -612,8 +452,8 @@ export class MegaProvider implements SyncProvider {
 				}
 			}
 
-			console.log(`✅ Listed ${cbzFiles.length} CBZ files from MEGA`);
-			return cbzFiles;
+			console.log(`✅ Listed ${allFiles.length} files from MEGA`);
+			return allFiles;
 		} catch (error) {
 			throw new ProviderError(
 				`Failed to list cloud volumes: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -625,7 +465,7 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	async uploadVolumeCbz(
+	async uploadFile(
 		path: string,
 		blob: Blob,
 		description?: string
@@ -696,7 +536,7 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	async downloadVolumeCbz(
+	async downloadFile(
 		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
@@ -780,7 +620,7 @@ export class MegaProvider implements SyncProvider {
 		}
 	}
 
-	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
+	async deleteFile(file: CloudFileMetadata): Promise<void> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
 		}

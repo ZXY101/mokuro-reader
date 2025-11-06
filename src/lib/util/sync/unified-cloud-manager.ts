@@ -97,7 +97,7 @@ class UnifiedCloudManager {
 	/**
 	 * Upload a volume CBZ to the current provider
 	 */
-	async uploadVolumeCbz(
+	async uploadFile(
 		path: string,
 		blob: Blob,
 		description?: string
@@ -107,7 +107,7 @@ class UnifiedCloudManager {
 			throw new Error('No cloud provider authenticated');
 		}
 
-		const fileId = await provider.uploadVolumeCbz(path, blob, description);
+		const fileId = await provider.uploadFile(path, blob, description);
 
 		// Update cache via cacheManager
 		const cache = cacheManager.getCache(provider.type);
@@ -127,12 +127,12 @@ class UnifiedCloudManager {
 	/**
 	 * Download a volume CBZ using the active provider
 	 */
-	async downloadVolumeCbz(
+	async downloadFile(
 		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
 		const provider = this.getActiveProvider();
-		console.log('[Unified Cloud Manager] downloadVolumeCbz:', {
+		console.log('[Unified Cloud Manager] downloadFile:', {
 			fileId: file.fileId,
 			path: file.path,
 			activeProvider: provider?.type,
@@ -143,19 +143,19 @@ class UnifiedCloudManager {
 			throw new Error(`No cloud provider authenticated`);
 		}
 
-		return await provider.downloadVolumeCbz(file, onProgress);
+		return await provider.downloadFile(file, onProgress);
 	}
 
 	/**
 	 * Delete a volume CBZ from the current provider
 	 */
-	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
+	async deleteFile(file: CloudFileMetadata): Promise<void> {
 		const provider = this.getActiveProvider();
 		if (!provider) {
 			throw new Error('No cloud provider authenticated');
 		}
 
-		await provider.deleteVolumeCbz(file);
+		await provider.deleteFile(file);
 
 		// Remove from cache via cacheManager
 		const cache = cacheManager.getCache(provider.type);
@@ -205,7 +205,7 @@ class UnifiedCloudManager {
 
 			for (const volume of seriesVolumes) {
 				try {
-					await this.deleteVolumeCbz(volume);
+					await this.deleteFile(volume);
 					successCount++;
 				} catch (error) {
 					console.error(`Failed to delete ${volume.path}:`, error);

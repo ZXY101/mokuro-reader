@@ -65,6 +65,9 @@ type VolumeDataJSON = {
   series_uuid?: string;
   series_title?: string;
   volume_title?: string;
+  // Deletion tracking for sync (mutually exclusive)
+  addedOn?: string;    // ISO datetime when volume was added/created
+  deletedOn?: string;  // ISO datetime when metadata was deleted
 };
 
 export class VolumeData implements VolumeDataJSON {
@@ -79,6 +82,8 @@ export class VolumeData implements VolumeDataJSON {
   series_uuid?: string;
   series_title?: string;
   volume_title?: string;
+  addedOn?: string;    // ISO datetime when volume was added/created
+  deletedOn?: string;  // ISO datetime when metadata was deleted
 
   constructor(data: Partial<VolumeDataJSON> = {}) {
     this.progress = typeof data.progress === 'number' ? data.progress : 0;
@@ -96,6 +101,10 @@ export class VolumeData implements VolumeDataJSON {
     this.series_uuid = data.series_uuid;
     this.series_title = data.series_title;
     this.volume_title = data.volume_title;
+
+    // Deletion tracking (optional, undefined means epoch in merge logic)
+    this.addedOn = data.addedOn;
+    this.deletedOn = data.deletedOn;
 
     // Only store explicitly set values, leave others undefined to fall back to global defaults
     this.settings = {};
@@ -181,6 +190,14 @@ export class VolumeData implements VolumeDataJSON {
       result.volume_title = this.volume_title;
     }
 
+    // Include deletion tracking timestamps if present (for sync)
+    if (this.addedOn) {
+      result.addedOn = this.addedOn;
+    }
+    if (this.deletedOn) {
+      result.deletedOn = this.deletedOn;
+    }
+
     return result;
   }
 }
@@ -241,7 +258,7 @@ export function updateVolumeMetadata(
   series_title?: string,
   volume_title?: string
 ) {
-  volumes.update((prev) => {
+  _volumesInternal.update((prev) => {
     const currentVolume = prev[volumeUuid] || new VolumeData();
     return {
       ...prev,
@@ -266,11 +283,14 @@ export async function enrichAllOrphanedVolumes() {
     const catalog = await db.volumes.toArray();
     const catalogMap = new Map(catalog.map(v => [v.volume_uuid, v]));
 
-    volumes.update((prev) => {
+    _volumesInternal.update((prev) => {
       const updated = { ...prev };
       let enrichedCount = 0;
 
       Object.entries(prev).forEach(([volumeId, volumeData]) => {
+        // Skip deleted volumes (tombstones)
+        if (volumeData.deletedOn) return;
+
         // Check if volume lacks metadata
         const needsEnrichment =
           !volumeData.series_uuid ||
@@ -309,30 +329,60 @@ const initial: Volumes = browser
   ? parseVolumesFromJson(window.localStorage.getItem('volumes') || '{}')
   : {};
 
-export const volumes = writable<Volumes>(initial);
+// Internal writable store containing all volumes including tombstones (deleted entries)
+const _volumesInternal = writable<Volumes>(initial);
+
+// Full writable store for sync and special operations (includes tombstones)
+// Sync code should use this to read/write all volume data including deleted entries
+export const volumesWithTrash = _volumesInternal;
+
+// Public derived store - filters out deleted volumes (tombstones)
+// This is what UI and stats code should use
+export const volumes = derived(_volumesInternal, ($internal) => {
+  return Object.fromEntries(
+    Object.entries($internal).filter(([_, vol]) => !vol.deletedOn)
+  );
+});
 
 export function initializeVolume(volume: string) {
-  volumes.update((prev) => {
+  _volumesInternal.update((prev) => {
     return {
       ...prev,
-      [volume]: new VolumeData()
+      [volume]: new VolumeData({
+        addedOn: new Date().toISOString()
+      })
     };
   });
 }
 
 export function deleteVolume(volume: string) {
-  volumes.update((prev) => {
-    delete prev[volume];
-    return prev;
+  _volumesInternal.update((prev) => {
+    const existing = prev[volume];
+    if (!existing) return prev; // Already gone or never existed
+
+    // Create tombstone with deletion timestamp
+    const tombstone = new VolumeData({
+      deletedOn: new Date().toISOString(),
+      // Keep metadata for sync identification
+      series_uuid: existing.series_uuid,
+      series_title: existing.series_title,
+      volume_title: existing.volume_title,
+      lastProgressUpdate: new Date().toISOString()
+    });
+
+    return {
+      ...prev,
+      [volume]: tombstone
+    };
   });
 }
 
 export function clearVolumes() {
-  volumes.set({});
+  _volumesInternal.set({});
 }
 
 export function clearVolumeSpeedData(volume: string) {
-  volumes.update((prev) => {
+  _volumesInternal.update((prev) => {
     const currentVolume = prev[volume];
     if (!currentVolume) return prev;
 
@@ -353,11 +403,24 @@ export function clearVolumeSpeedData(volume: string) {
 }
 
 export function clearOrphanedVolumeData(volumeIds: string[]) {
-  volumes.update((prev) => {
+  _volumesInternal.update((prev) => {
     const updated = { ...prev };
+    const now = new Date().toISOString();
+
     volumeIds.forEach(id => {
-      delete updated[id];
+      const existing = updated[id];
+      if (existing) {
+        // Create tombstone instead of deleting
+        updated[id] = new VolumeData({
+          deletedOn: now,
+          series_uuid: existing.series_uuid,
+          series_title: existing.series_title,
+          volume_title: existing.volume_title,
+          lastProgressUpdate: now
+        });
+      }
     });
+
     return updated;
   });
 }
@@ -368,7 +431,7 @@ export function updateProgress(
   chars?: number,
   completed = false
 ) {
-  volumes.update((prev) => {
+  _volumesInternal.update((prev) => {
     const currentVolume = prev[volume] || new VolumeData();
     const now = Date.now();
 
@@ -402,7 +465,7 @@ export function updateProgress(
     if (!currentVolume.series_uuid && browser) {
       enrichVolumeDataWithMetadata(volume, currentVolume).then(enriched => {
         if (enriched.series_uuid) {
-          volumes.update(vols => ({
+          _volumesInternal.update(vols => ({
             ...vols,
             [volume]: new VolumeData({
               ...(vols[volume] || currentVolume),
@@ -433,7 +496,7 @@ export function updateProgress(
 
 export function startCount(volume: string) {
   return setInterval(() => {
-    volumes.update((prev) => {
+    _volumesInternal.update((prev) => {
       const currentVolume = prev[volume] || new VolumeData();
       return {
         ...prev,
@@ -446,7 +509,8 @@ export function startCount(volume: string) {
   }, 60 * 1000);
 }
 
-volumes.subscribe((volumes) => {
+// Save internal store (including tombstones) to localStorage
+_volumesInternal.subscribe((volumes) => {
   if (browser) {
     const serializedVolumes = volumes
       ? Object.fromEntries(Object.entries(volumes).map(([key, value]) => [key, value.toJSON()]))
@@ -522,7 +586,7 @@ export const effectiveVolumeSettings = readable(
 );
 
 export function updateVolumeSetting(volume: string, key: VolumeSettingsKey, value: any) {
-  volumes.update((prev) => {
+  _volumesInternal.update((prev) => {
     const currentVolume = prev[volume] || new VolumeData();
     return {
       ...prev,
