@@ -39,6 +39,7 @@ export interface SeriesSpeedInfo {
 	averageSpeed: number;
 	volumeCount: number;
 	speedImprovement: number; // First volume to latest
+	mostRecentDate: Date; // Most recent completion date for sorting
 }
 
 /**
@@ -276,7 +277,7 @@ export function calculateReadingSpeedStats(
 	if (currentPersonalizedSpeed > 350) {
 		badges.push('⅞ Native');
 	}
-	if (currentPersonalizedSpeed > 450) {
+	if (currentPersonalizedSpeed > 400) {
 		badges.push('Native');
 	}
 
@@ -420,17 +421,21 @@ export function getSeriesSpeedInfo(volumeData: VolumeSpeedData[]): SeriesSpeedIn
 		const lastSpeed = sorted[sorted.length - 1].charsPerMinute;
 		const improvement = ((lastSpeed - firstSpeed) / firstSpeed) * 100;
 
+		// Find most recent completion date
+		const mostRecentDate = sorted[sorted.length - 1].completionDate;
+
 		seriesInfo.push({
 			seriesId,
 			seriesTitle: vols[0].seriesTitle,
 			averageSpeed: avgSpeed,
 			volumeCount: vols.length,
-			speedImprovement: improvement
+			speedImprovement: improvement,
+			mostRecentDate
 		});
 	});
 
-	// Sort by average speed (descending)
-	seriesInfo.sort((a, b) => b.averageSpeed - a.averageSpeed);
+	// Sort by most recent date (descending - most recent first)
+	seriesInfo.sort((a, b) => b.mostRecentDate.getTime() - a.mostRecentDate.getTime());
 
 	return seriesInfo;
 }

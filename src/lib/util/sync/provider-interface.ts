@@ -67,35 +67,19 @@ class ExportProvider {
 		throw new Error('Export provider does not support logout');
 	}
 
-	async uploadVolumeData(): Promise<void> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
-	async downloadVolumeData(): Promise<any | null> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
-	async uploadProfiles(): Promise<void> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
-	async downloadProfiles(): Promise<any | null> {
-		throw new Error('Export provider does not support sync operations');
-	}
-
 	async listCloudVolumes(): Promise<CloudFileMetadata[]> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async uploadVolumeCbz(): Promise<string> {
+	async uploadFile(): Promise<string> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async downloadVolumeCbz(_file: CloudFileMetadata): Promise<Blob> {
+	async downloadFile(_file: CloudFileMetadata): Promise<Blob> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 
-	async deleteVolumeCbz(_file: CloudFileMetadata): Promise<void> {
+	async deleteFile(_file: CloudFileMetadata): Promise<void> {
 		throw new Error('Export provider does not support cloud operations');
 	}
 }
@@ -220,62 +204,38 @@ export interface SyncProvider {
 	/** Logout and clear stored credentials */
 	logout(): Promise<void>;
 
+	// GENERIC FILE OPERATIONS (BLOB-BASED)
 	/**
-	 * Upload volume data (read progress)
-	 * @param data Volume data object to upload
-	 */
-	uploadVolumeData(data: any): Promise<void>;
-
-	/**
-	 * Download volume data (read progress)
-	 * @returns Volume data object or null if not found
-	 */
-	downloadVolumeData(): Promise<any | null>;
-
-	/**
-	 * Upload profile data
-	 * @param data Profile data object to upload
-	 */
-	uploadProfiles(data: any): Promise<void>;
-
-	/**
-	 * Download profile data
-	 * @returns Profile data object or null if not found
-	 */
-	downloadProfiles(): Promise<any | null>;
-
-	// VOLUME STORAGE METHODS
-	/**
-	 * List all CBZ files in cloud storage
+	 * List all files in cloud storage
 	 * @returns Array of cloud file metadata
 	 */
 	listCloudVolumes(): Promise<CloudFileMetadata[]>;
 
 	/**
-	 * Upload a CBZ file to cloud storage
-	 * @param path Target path "SeriesTitle/VolumeTitle.cbz"
-	 * @param blob CBZ file data
+	 * Upload a file to cloud storage
+	 * @param path Target path (e.g., "SeriesTitle/VolumeTitle.cbz")
+	 * @param blob File data as Blob
 	 * @param description Optional file description
 	 * @returns File ID in cloud storage
 	 */
-	uploadVolumeCbz(path: string, blob: Blob, description?: string): Promise<string>;
+	uploadFile(path: string, blob: Blob, description?: string): Promise<string>;
 
 	/**
-	 * Download a CBZ file from cloud storage
+	 * Download a file from cloud storage
 	 * @param file Cloud file metadata (provider extracts internal ID)
 	 * @param onProgress Optional progress callback (loaded, total)
-	 * @returns CBZ file data
+	 * @returns File data as Blob
 	 */
-	downloadVolumeCbz(
+	downloadFile(
 		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob>;
 
 	/**
-	 * Delete a CBZ file from cloud storage
+	 * Delete a file from cloud storage
 	 * @param file Cloud file metadata (provider extracts internal ID)
 	 */
-	deleteVolumeCbz(file: CloudFileMetadata): Promise<void>;
+	deleteFile(file: CloudFileMetadata): Promise<void>;
 }
 
 export class ProviderError extends Error {

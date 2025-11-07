@@ -3,6 +3,7 @@ import type { SyncProvider, ProviderStatus, CloudFileMetadata, DriveFileMetadata
 import { ProviderError } from '../../provider-interface';
 import { tokenManager } from '$lib/util/google-drive/token-manager';
 import { driveApiClient } from '$lib/util/google-drive/api-client';
+import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
 import { parseVolumesFromJson } from '$lib/settings';
 import { getOrCreateFolder, uploadCbzToDrive } from '$lib/util/backup';
@@ -99,156 +100,6 @@ export class GoogleDriveProvider implements SyncProvider {
 		console.log('Google Drive logged out');
 	}
 
-	async uploadVolumeData(data: any): Promise<void> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			// Ensure reader folder exists
-			const folderId = await this.ensureReaderFolder();
-
-			// Query for existing volume-data.json file
-			const files = await driveApiClient.listFiles(
-				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA}' and trashed=false`,
-				'files(id)'
-			);
-			const existingFileId = files.length > 0 ? files[0].id : null;
-
-			// Upload (create or update)
-			const content = JSON.stringify(data);
-			const metadata = {
-				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA,
-				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
-				...(existingFileId ? {} : { parents: [folderId] })
-			};
-
-			await driveApiClient.uploadFile(content, metadata, existingFileId || undefined);
-			console.log('✅ Volume data uploaded to Google Drive');
-		} catch (error) {
-			throw new ProviderError(
-				`Failed to upload volume data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'google-drive',
-				'UPLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async downloadVolumeData(): Promise<any | null> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			// Ensure reader folder exists
-			const folderId = await this.ensureReaderFolder();
-
-			// Query for volume-data.json file
-			const files = await driveApiClient.listFiles(
-				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA}' and trashed=false`,
-				'files(id)'
-			);
-
-			if (files.length === 0) {
-				return null;
-			}
-
-			// Download and parse
-			const content = await driveApiClient.getFileContent(files[0].id);
-			return parseVolumesFromJson(content);
-		} catch (error) {
-			// File not found is not an error
-			if (error instanceof Error && error.message.includes('not found')) {
-				return null;
-			}
-
-			throw new ProviderError(
-				`Failed to download volume data: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'google-drive',
-				'DOWNLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async uploadProfiles(data: any): Promise<void> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			// Ensure reader folder exists
-			const folderId = await this.ensureReaderFolder();
-
-			// Find existing profiles.json file
-			const files = await driveApiClient.listFiles(
-				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES}'`,
-				'files(id)'
-			);
-			const existingFileId = files.length > 0 ? files[0].id : null;
-
-			// Upload (create or update)
-			const content = JSON.stringify(data);
-			const metadata = {
-				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES,
-				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
-				...(existingFileId ? {} : { parents: [folderId] })
-			};
-
-			await driveApiClient.uploadFile(content, metadata, existingFileId || undefined);
-			console.log('✅ Profiles uploaded to Google Drive');
-		} catch (error) {
-			throw new ProviderError(
-				`Failed to upload profiles: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'google-drive',
-				'UPLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
-	async downloadProfiles(): Promise<any | null> {
-		if (!this.isAuthenticated()) {
-			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
-		}
-
-		try {
-			// Ensure reader folder exists
-			const folderId = await this.ensureReaderFolder();
-
-			// Find profiles.json file
-			const files = await driveApiClient.listFiles(
-				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES}'`,
-				'files(id)'
-			);
-
-			if (files.length === 0) {
-				return null;
-			}
-
-			// Download and parse
-			const content = await driveApiClient.getFileContent(files[0].id);
-			return JSON.parse(content);
-		} catch (error) {
-			// File not found is not an error
-			if (error instanceof Error && error.message.includes('not found')) {
-				return null;
-			}
-
-			throw new ProviderError(
-				`Failed to download profiles: ${error instanceof Error ? error.message : 'Unknown error'}`,
-				'google-drive',
-				'DOWNLOAD_FAILED',
-				false,
-				true
-			);
-		}
-	}
-
 	// VOLUME STORAGE METHODS
 
 	async listCloudVolumes(): Promise<CloudFileMetadata[]> {
@@ -257,7 +108,7 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 
 		try {
-			console.log('Querying Google Drive for CBZ files...');
+			console.log('Querying Google Drive for files...');
 
 			// Query Drive API directly for all files owned by user
 			const allItems = await driveApiClient.listFiles(
@@ -268,20 +119,25 @@ export class GoogleDriveProvider implements SyncProvider {
 			// Build folder map (folder ID -> folder name)
 			const folderNames = new Map<string, string>();
 			const cbzFiles: any[] = [];
+			const jsonFiles: any[] = [];
 
 			for (const item of allItems) {
 				if (item.mimeType === GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER) {
 					folderNames.set(item.id, item.name);
 				} else if (item.name.endsWith('.cbz')) {
 					cbzFiles.push(item);
+				} else if (item.name === GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA ||
+						   item.name === GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES) {
+					jsonFiles.push(item);
 				}
 			}
 
-			console.log(`Found ${cbzFiles.length} CBZ files and ${folderNames.size} folders`);
+			console.log(`Found ${cbzFiles.length} CBZ files, ${jsonFiles.length} JSON files, and ${folderNames.size} folders`);
 
-			// Transform CBZ files to DriveFileMetadata format with paths
+			// Transform all files to DriveFileMetadata format with paths
 			const cloudVolumes: DriveFileMetadata[] = [];
 
+			// Add CBZ files (with parent folder in path)
 			for (const file of cbzFiles) {
 				const parentId = file.parents?.[0];
 				const parentName = parentId ? folderNames.get(parentId) : null;
@@ -302,7 +158,21 @@ export class GoogleDriveProvider implements SyncProvider {
 				}
 			}
 
-			console.log(`✅ Listed ${cloudVolumes.length} CBZ files from Google Drive`);
+			// Add JSON files (no parent folder in path, just filename)
+			for (const file of jsonFiles) {
+				cloudVolumes.push({
+					provider: 'google-drive',
+					fileId: file.id,
+					path: file.name, // Just the filename for JSON files
+					modifiedTime: file.modifiedTime || new Date().toISOString(),
+					size: file.size ? parseInt(file.size) : 0,
+					description: file.description,
+					parentId: file.parents?.[0],
+					name: file.name
+				});
+			}
+
+			console.log(`✅ Listed ${cloudVolumes.length} files from Google Drive (${cbzFiles.length} CBZ, ${jsonFiles.length} JSON)`);
 			return cloudVolumes;
 		} catch (error) {
 			throw new ProviderError(
@@ -315,7 +185,7 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 	}
 
-	async uploadVolumeCbz(
+	async uploadFile(
 		path: string,
 		blob: Blob,
 		description?: string
@@ -359,7 +229,7 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 	}
 
-	async downloadVolumeCbz(
+	async downloadFile(
 		file: CloudFileMetadata,
 		onProgress?: (loaded: number, total: number) => void
 	): Promise<Blob> {
@@ -425,7 +295,7 @@ export class GoogleDriveProvider implements SyncProvider {
 		}
 	}
 
-	async deleteVolumeCbz(file: CloudFileMetadata): Promise<void> {
+	async deleteFile(file: CloudFileMetadata): Promise<void> {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
@@ -682,24 +552,33 @@ export class GoogleDriveProvider implements SyncProvider {
 
 	/**
 	 * Ensure the mokuro-reader folder exists in Google Drive
+	 * Uses cache to avoid race conditions from simultaneous calls
 	 */
 	private async ensureReaderFolder(): Promise<string> {
+		// Check local cache first (fast path for repeated calls within this provider)
 		if (this.readerFolderId) {
 			return this.readerFolderId;
 		}
 
-		const folders = await driveApiClient.listFiles(
-			`mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}' and name='${GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER}'`,
-			'files(id)'
-		);
+		// Get folder ID from shared cache (waits if fetch is in progress)
+		const cachedFolderId = await driveFilesCache.getReaderFolderId();
 
-		if (folders.length === 0) {
-			this.readerFolderId = await driveApiClient.createFolder(GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER);
-		} else {
-			this.readerFolderId = folders[0].id;
+		if (cachedFolderId) {
+			// Found in cache
+			this.readerFolderId = cachedFolderId;
+			return cachedFolderId;
 		}
 
-		return this.readerFolderId;
+		// Folder doesn't exist - create it
+		// Note: This only happens once per account (or if folder is deleted)
+		console.log('Creating mokuro-reader folder...');
+		const newFolderId = await driveApiClient.createFolder(GOOGLE_DRIVE_CONFIG.FOLDER_NAMES.READER);
+
+		// Store in both caches
+		this.readerFolderId = newFolderId;
+		driveFilesCache.setReaderFolderId(newFolderId);
+
+		return newFolderId;
 	}
 }
 

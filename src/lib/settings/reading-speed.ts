@@ -1,5 +1,5 @@
 import { derived } from 'svelte/store';
-import { volumes, VolumeData } from './volume-data';
+import { volumes, volumesWithTrash, VolumeData } from './volume-data';
 import { settings } from './settings';
 import { calculateReadingSpeed, type ReadingSpeedResult } from '$lib/util/reading-speed';
 import { db } from '$lib/catalog/db';
@@ -117,7 +117,7 @@ export const personalizedReadingSpeed = derived(
       // Update volumes with migrated data
       const validMigrations = results.filter((r): r is { volumeId: string; migrated: PageTurn[] } => r !== null);
       if (validMigrations.length > 0) {
-        volumes.update(vols => {
+        volumesWithTrash.update(vols => {
           const updated = { ...vols };
           for (const { volumeId, migrated } of validMigrations) {
             if (updated[volumeId]) {
