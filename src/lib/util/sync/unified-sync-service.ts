@@ -532,24 +532,28 @@ class UnifiedSyncService {
 				// Only in local - already a VolumeData instance
 				merged[volumeId] = localVol;
 			} else {
-				// In both - determine which operation is newer (addition OR deletion)
+				// In both - determine which has the most recent user action
+				// Consider all timestamps: lastProgressUpdate (reading), addedOn (import), deletedOn (deletion)
 				// Treat undefined timestamps as epoch (0) for legacy volumes
-				const localAdded = new Date(localVol.addedOn || 0).getTime();
-				const cloudAdded = new Date(cloudVol.addedOn || 0).getTime();
-				const localDeleted = new Date(localVol.deletedOn || 0).getTime();
-				const cloudDeleted = new Date(cloudVol.deletedOn || 0).getTime();
+				const localMostRecent = Math.max(
+					new Date(localVol.lastProgressUpdate || 0).getTime(),
+					new Date(localVol.addedOn || 0).getTime(),
+					new Date(localVol.deletedOn || 0).getTime()
+				);
 
-				// Most recent operation on each device (either add or delete)
-				const localMostRecent = Math.max(localAdded, localDeleted);
-				const cloudMostRecent = Math.max(cloudAdded, cloudDeleted);
+				const cloudMostRecent = Math.max(
+					new Date(cloudVol.lastProgressUpdate || 0).getTime(),
+					new Date(cloudVol.addedOn || 0).getTime(),
+					new Date(cloudVol.deletedOn || 0).getTime()
+				);
 
 				let winner;
 				if (cloudMostRecent > localMostRecent) {
-					// Cloud is newer
+					// Cloud has more recent user action
 					const parsed = parseVolumesFromJson(JSON.stringify({ [volumeId]: cloudVol }));
 					winner = parsed[volumeId];
 				} else if (localMostRecent > cloudMostRecent) {
-					// Local is newer
+					// Local has more recent user action
 					winner = localVol;
 				} else {
 					// Timestamps equal (including both at epoch)
