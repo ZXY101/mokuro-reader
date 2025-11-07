@@ -28,9 +28,8 @@ This document provides a comprehensive analysis of the differences between the G
 **Key Highlights**:
 - 498 commits ahead of upstream
 - 3 major architectural overhauls
-- 11 fully operational new features
-- 3 features in development (WebDAV, session compaction, P/Z shortcuts)
-- 4 reverted experimental features
+- 10 fully operational new features (including 3 cloud providers)
+- 1 experimental feature (WebDAV provider)
 
 ---
 
@@ -83,7 +82,7 @@ Transformed from Google Drive-only to a fully extensible multi-provider cloud st
 2. **Implemented Providers**:
    - ✅ **Google Drive**: Fully operational with OAuth2
    - ✅ **MEGA**: Fully operational with email/password auth
-   - 🟡 **WebDAV**: Code complete, marked "Under Development" in UI
+   - 🟡 **WebDAV**: Untested, marked "Under Development" in UI
 
 3. **Provider-Specific Features**:
    - Concurrency limits per provider (configurable)
@@ -91,15 +90,15 @@ Transformed from Google Drive-only to a fully extensible multi-provider cloud st
    - Custom error handling and retry logic
    - Provider-specific metadata types
 
-**Concurrency Limits** (reverted to original values per commit `6c4bf0e`):
+**Concurrency Limits**:
 - Google Drive: upload 4, download 4
 - MEGA: upload 6, download 6
 - WebDAV: upload 2, download 2
 
 **Export Pseudo-Provider**:
 - Special "provider" for local browser downloads
-- Works uniformly with backup queue
-- No network operations, purely CPU/memory bound
+- Works uniformly with backup queue=
+- Allows for fast multithreaded volume exports
 
 ---
 
@@ -139,134 +138,139 @@ Complete rewrite of the file upload system to handle large ZIP files without out
    - Filters `._*` hidden files (lines 230-235)
    - Comprehensive list of Windows/Linux/macOS system files (lines 186-224)
 
-6. **Data Integrity**:
-   - Case-insensitive file sorting (line 127)
-   - Natural sorting with locale awareness
-   - Thumbnail generation on upload (line 140)
-
-**Before & After**:
-- **Before**: ~1GB ZIP files would cause browser crashes
-- **After**: Can handle multi-GB files (slower but reliable)
-
 ---
 
 ## Major New Features
 
-### 4. Google Drive Integration
+### 4. Unified Cloud Storage Support
 
-**Status**: ✅ **FULLY OPERATIONAL**
-**Files**: `src/lib/util/google-drive/*`, `src/routes/cloud/+page.svelte`
+**Status**: ✅ **FULLY OPERATIONAL** (Google Drive, MEGA) + 🟡 **WIP** (WebDAV)
+**Total Commits**: ~137 cloud-related commits (97 Drive, 40 MEGA)
+**Files**:
+- `src/lib/util/sync/providers/google-drive/*`
+- `src/lib/util/sync/providers/mega/*`
+- `src/lib/util/sync/providers/webdav/*`
+- `src/routes/cloud/+page.svelte`
 
 **Description**:
-Complete Google Drive integration for cross-device sync and cloud backup. One of the largest feature additions with ~97 related commits.
+Complete multi-provider cloud integration for cross-device sync and cloud backup. Supports Google Drive, MEGA, and WebDAV (experimental) through a unified provider interface.
 
-**Features**:
+---
 
-1. **Authentication**:
-   - OAuth2 implicit flow (access tokens only, no backend required)
-   - Automatic token refresh attempts
-   - Token expiry monitoring
-   - Persistent login between sessions
-   - Proper account switching with token revocation
+#### Common Cloud Features (All Providers)
 
-2. **Read Progress Sync**:
-   - Upload progress data to Drive
-   - Download progress data from Drive
+1. **Read Progress Sync**:
+   - automatic read progress sync with the cloud
    - Intelligent merge logic (preserves newer data)
    - Conflict resolution
-
-3. **Profile Sync**:
-   - Sync user profiles across devices
-   - Merge profiles from multiple devices
-   - Settings persistence
-
-4. **Volume Backup**:
-   - Upload full CBZ files to Drive
-   - Series backup (bulk backup entire series)
-   - Progress tracking with persistence
-   - Skip already backed up volumes
-
-5. **Sideload Download**:
-   - Download CBZ files from Drive to local library
-   - Worker-based parallel downloads
-   - Progress tracking per file
-
-6. **Drive Cache**:
-   - Single API call instead of N+1 queries
-   - Efficient file lookup by path
-   - Pagination support for >1000 files
-   - Automatic cache refresh
-
-7. **API Optimizations**:
-   - Query string escaping utility (`escapeNameForDriveQuery`)
-   - Bulk operations
-   - Reduced quota usage
-   - Service worker cache clearing for downloads
-
-8. **UI Features**:
-   - Connection state visibility
-   - Token expiry warnings
-   - Error indicators (red for connection issues)
-   - Backup progress display
-   - Delete from Drive functionality
-
-**Technical Details**:
-- **Token Lifecycle**: Tokens expire after ~1 hour, automatic renewal with minimal UI
-- **Re-auth Experience**: `prompt: ''` (empty) for minimal UI on re-auth, not full consent screen
-
----
-
-### 5. MEGA Cloud Storage
-
-**Status**: ✅ **FULLY OPERATIONAL**
-**Files**: `src/lib/util/sync/providers/mega/*`
-
-**Description**:
-Full MEGA integration as an alternative cloud storage provider. ~40 MEGA-specific commits.
-
-**Features**:
-
-1. **Authentication**:
-   - Email/password authentication
-   - Credential persistence in localStorage
-   - Automatic re-authentication
-
-2. **Volume Storage**:
-   - Upload CBZ files to MEGA
-   - Download CBZ files from MEGA
-   - Progress tracking
-
-3. **Share Link System**:
-   - Workers download via MEGA share links
-   - Main thread creates share links
-   - Automatic share link cleanup after downloads
-   - Prevents leftover public links
-
-4. **Rate Limiting**:
-   - Exponential backoff with jitter (lines 23-70 in `mega-provider.ts`)
-   - Handles EAGAIN errors
-   - Handles rate limit (429) errors
-   - Up to 8 retries with increasing delays
-
-5. **Memory Management**:
-   - RAM-aware download queuing
-   - OOM prevention on low-memory devices
-   - Configurable concurrency
-
-6. **Error Recovery**:
-   - Stale folder reference detection
-   - ENOENT error recovery
-   - Smart cache refresh
    - Cross-device sync support
 
-**Technical Details**:
-- **Worker Downloads**: Main thread authenticates, workers download via share links
-- **supportsWorkerDownload**: `false` (MEGA SDK requires main thread auth)
-- **Concurrency**: 6 uploads / 6 downloads (hardware-based)
+2.  **Volume Backup**:
+   - Upload full CBZ files to cloud storage
+   - Series backup (bulk backup entire series)
+   - Library backup
+   - Progress tracking
+   - Skip already backed up volumes
+   - Worker-based parallel downloads
+   - Progress tracking per file
+   - Memory-aware download queuing
+
+3.  **Improved Download**:
+   - Download CBZ files from cloud to local library
+   - Worker-based parallel downloads
+   - Progress tracking per file
+   - Memory-aware download queuing
+
+4.  **UI Features**:
+   - Connection state visibility
+   - Error indicators for connection issues
+   - Backup progress display
+   - Delete from cloud functionality
+   - Provider-specific status badges
+   - Cloud placeholders in the catalog and series pages for 1 click downloads
 
 ---
 
-### 6. Reading Speed Tracking System
+#### Provider-Specific Features
+
+##### **Google Drive** (✅ Fully Operational)
+
+**Authentication**:
+- OAuth2 implicit flow (access tokens only, no backend required)
+- Token expiry monitoring (tokens expire after ~1 hour)
+- Renewal with minimal UI
+- Persistent login between sessions
+- Proper account switching with token revocation
+- Re-auth experience: `prompt: ''` (empty) for minimal UI, not full consent screen
+
+**Unique Features**:
+- **Drive Cache**: Single API call instead of N+1 queries
+- **Pagination Support**: Handles >1000 files efficiently
+- **Query String Escaping**: Utility for special characters (`escapeNameForDriveQuery`)
+- **Service Worker Cache Clearing**: Prevents stale cached responses
+- **Token Expiry Warnings**: Proactive UI notifications
+
+**Technical Details**:
+- Concurrency: 4 uploads / 4 downloads
+- `supportsWorkerDownload`: `true` (workers can download directly with access token)
+- API optimizations: Bulk operations, reduced quota usage
+- File lookup: Efficient path matching (filename-only)
+
+---
+
+##### **MEGA** (✅ Fully Operational)
+
+**Authentication**:
+- Email/password authentication
+- Credential persistence in localStorage
+- Automatic re-authentication
+
+**Unique Features**:
+- **Share Link System**:
+  - Workers download via MEGA share links
+  - Main thread creates share links
+  - Automatic share link cleanup after downloads
+  - Prevents leftover public links
+- **Advanced Rate Limiting**:
+  - Exponential backoff with jitter (up to 8 retries)
+  - Handles EAGAIN errors
+  - Handles rate limit (429) errors
+  - Increasing delays between retries
+- **Error Recovery**:
+  - Stale folder reference detection
+  - ENOENT error recovery
+  - Smart cache refresh
+
+**Technical Details**:
+- Concurrency: 6 uploads / 6 downloads (higher than Drive due to different constraints)
+- `supportsWorkerDownload`: `false` (MEGA SDK requires main thread auth)
+- Worker Downloads: Main thread authenticates, then workers download via share links
+- RAM-aware queuing: OOM prevention on low-memory devices
+
+---
+
+##### **WebDAV** (🟡 Untested / Under Development)
+
+**Authentication**:
+- Server URL + username/password
+- Credential persistence in localStorage
+- Support for Nextcloud, ownCloud, NAS devices
+
+**Implementation Status**:
+- Provider code complete
+- Marked "Under Development" in UI
+- Needs testing with real WebDAV servers
+- ~80% complete
+
+**Technical Details**:
+- Concurrency: 2 uploads / 2 downloads (conservative for server compatibility)
+- `supportsWorkerDownload`: `true` (workers can download with Basic Auth)
+- Basic Auth support
+- WebDAV standard compliance
+
+---
+
+### 5. Reading Speed Tracking System (beta)
 
 **Status**: ✅ **CONFIRMED**
 **Files**:
@@ -300,13 +304,8 @@ Sophisticated reading speed tracking system with personalized estimates, achieve
 4. **Reading Speed History**:
    - Sortable table of completed volumes
    - Shows CPM, duration, completion date
-   - Thumbnail previews
 
 5. **Achievement Badges**:
-   - **Personal Best**: Fastest reading speed
-   - **Slowest**: Slowest reading speed (for awareness)
-   - **Percent vs Average**: How this volume compares to your average
-   - **Percent vs Series Average**: How you're progressing in this series
    - **Milestones**: 1, 5, 10, 25, 50, 100 volumes completed
    - Color-coded badges with gradients
    - Hover tooltips for details
@@ -321,7 +320,6 @@ Sophisticated reading speed tracking system with personalized estimates, achieve
    - Filters garbage dates (before 2005)
    - Validates CPM ranges (0-1000)
    - Strict validation for session data
-   - Handles legacy 2-tuple format gracefully
 
 **Technical Details**:
 - **Idle Detection**: Configurable timeout (e.g., 5 minutes) to filter pauses
@@ -330,7 +328,7 @@ Sophisticated reading speed tracking system with personalized estimates, achieve
 
 ---
 
-### 7. Text-Only View
+### 6. Text-Only View
 
 **Status**: ✅ **CONFIRMED**
 **Files**:
@@ -348,7 +346,7 @@ Dedicated text-only view pages for language learners to analyze OCR text without
 
 ---
 
-### 8. Keyboard Shortcuts
+### 7. Keyboard Shortcuts
 
 **Status**: ✅ **PARTIALLY CONFIRMED**
 **Files**:
@@ -356,13 +354,15 @@ Dedicated text-only view pages for language learners to analyze OCR text without
 - `src/lib/components/Reader/Reader.svelte` (lines 186, 195)
 
 **Verified Shortcuts**:
-- ✅ **Escape**: Navigate back from series page to catalog
+- ✅ **Escape**: Navigate back from Reader to Series, and from Series to Catalog
 - ✅ **ArrowUp**: Scroll up in reader (75% of visible page height, smooth animation)
 - ✅ **ArrowDown**: Scroll down in reader (75% of visible page height, smooth animation)
+- ✅ **Z**: Rotates through the zoom modes
+- ✅ **P**: Rotates through the page layout modes
+- ✅ **N**: Toggles Night Mode
+- ✅ **I**: Toggles the invert filter
+- ✅ **C**: Toggles First image is cover
 
-**Mentioned in Commits but Not Found**:
-- 🟡 **P**: Toggle page mode (not found - may have been reverted)
-- 🟡 **Z**: Toggle zoom mode (not found - may have been reverted)
 
 **Scroll Behavior**:
 - Smooth animations for arrow key scrolling
@@ -372,7 +372,7 @@ Dedicated text-only view pages for language learners to analyze OCR text without
 
 ---
 
-### 9. Night Mode with Red Filter
+### 8. Night Mode with Red Filter
 
 **Status**: ✅ **CONFIRMED**
 **File**: `src/lib/components/NightModeFilter.svelte`
@@ -394,10 +394,9 @@ Night mode implementation with red filter to reduce eye strain during nighttime 
 
 ---
 
-### 10. Worker Pool System
+### 9. Worker Pool System
 
 **Status**: ✅ **CONFIRMED**
-**Files**: `src/lib/util/worker-pool.ts`, `src/lib/workers/download-worker.ts`
 
 **Description**:
 Advanced worker pool system for parallel downloads and background processing with memory management.
@@ -405,7 +404,6 @@ Advanced worker pool system for parallel downloads and background processing wit
 **Features**:
 
 1. **Parallel Processing**:
-   - Configurable concurrency (defaults to `navigator.hardwareConcurrency`)
    - Multiple workers running simultaneously
    - Task queue with prioritization
 
@@ -432,7 +430,7 @@ Advanced worker pool system for parallel downloads and background processing wit
 
 ---
 
-### 11. Volume Export/Extraction
+### 10. Volume Export/Extraction
 
 **Status**: ✅ **CONFIRMED**
 **Files**: `src/lib/util/compress-volume.ts`, `src/lib/util/zip.ts`, `src/lib/util/modals.ts`
@@ -451,22 +449,31 @@ Export manga volumes from the library as CBZ files for sharing or backup.
 
 ## Performance & Memory Optimizations
 
-### Google Drive API Optimizations
+### Cloud API Optimizations
 
-1. **Drive Cache**:
-   - Single API call instead of N+1 queries
-   - Efficient path matching (filename-only)
-   - Reduced API quota usage
-   - Automatic pagination for >1000 files
-
-2. **Bulk Operations**:
+**Common Optimizations (All Providers)**:
+1. **Bulk Operations**:
    - Sort volumes before bulk backup
    - Skip already backed up volumes
    - Batch operations where possible
 
-3. **Service Worker Cache**:
-   - Automatic clearing for Drive downloads
-   - Prevents stale cached responses
+2. **Memory-Aware Queuing**:
+   - RAM-aware download queuing
+   - OOM prevention on low-memory devices
+   - Provider-specific concurrency limits
+
+**Provider-Specific Optimizations**:
+
+**Google Drive**:
+- **Drive Cache**: Single API call instead of N+1 queries, efficient path matching
+- **Pagination**: Automatic handling for >1000 files
+- **Reduced Quota Usage**: Optimized API calls and bulk operations
+- **Service Worker Cache Clearing**: Prevents stale cached responses
+
+**MEGA**:
+- **Rate Limiting**: Exponential backoff with jitter, handles EAGAIN/429 errors
+- **Share Link Cleanup**: Automatic cleanup to prevent leftover public links
+- **Error Recovery**: Smart cache refresh, stale folder reference detection
 
 ### Memory Efficiency
 
@@ -491,12 +498,6 @@ Export manga volumes from the library as CBZ files for sharing or backup.
    - Shared memory manager
    - Configurable limits
    - Per-task memory requirements
-
-### Bundle Size Optimization
-
-- Dynamic imports for heavy dependencies
-- Code splitting improvements
-- Tree shaking optimizations
 
 ---
 
@@ -549,24 +550,9 @@ Export manga volumes from the library as CBZ files for sharing or backup.
    - Smoother transitions
    - Two-page mode improvements
 
-### Settings & Configuration
-
-1. **Profile System**:
-   - Multiple user profiles
-   - Profile-based settings
-   - Volume-specific overrides
-
-2. **Persistent Settings**:
-   - Settings sync to localStorage
-   - Google Drive sync for profiles
-
 ### Visual Polish
 
 1. **Achievement Badges**:
-   - Gradient sweep animations (no pulsing)
-   - Color progression
-   - Hover tooltips
-   - Unicode fractions
 
 2. **Connection Status**:
    - Visual indicators for cloud providers
@@ -579,94 +565,24 @@ Export manga volumes from the library as CBZ files for sharing or backup.
 
 ---
 
-## Bug Fixes & Stability
-
-### Major Fixes
-
-1. ✅ Two-Page Mode Navigation
-2. ✅ Volume Settings Bleed
-3. ✅ Reader Flashing
-4. ✅ Timer Bugs
-5. ✅ Text Selection handling
-6. ✅ Font Size Integration
-7. ✅ Drive Cache Reactivity
-8. ✅ MEGA Stale Folder References
-9. ✅ Production Reactivity Freeze
-10. ✅ Race Conditions (text view, Drive cache, volume data)
-11. ✅ IndexedDB SSR Errors
-12. ✅ Extraction Modal Settings
-13. ✅ Range Slider Thumbs (Svelte 5)
-14. ✅ Firefox Mobile Compatibility
-15. ✅ Circular Dependencies
-16. ✅ Drive API Query Syntax (escaping)
-17. ✅ Activity Tracker Callback Spam
-18. ✅ Delete Button Reactivity
-19. ✅ Backup Button Visibility
-20. ✅ Page Input Handling
-
-### Data Integrity
-
-1. **Metadata Preservation**:
-   - During sync merges
-   - During provider switches
-   - During volume deletions (optional)
-
-2. **VolumeData Class**:
-   - Safer initialization
-   - Proper serialization
-   - Type safety
-
-3. **Stats Preservation**:
-   - Optional preservation when deleting
-   - Confirmation popups
-   - Reading history retention
-
-4. **Legacy Data Migration**:
-   - Page turn character counts
-   - 2-tuple → 3-tuple format
-   - Backward compatibility
-
 ### Svelte 5 Migration
 
 - Migrated all components to Svelte 5 runes (`$state`, `$derived`, `$effect`)
-- Fixed range slider thumbs visibility
 - Updated reactivity patterns
-- TypeScript type fixes
 
 ---
 
-## Reverted or Experimental Features
-
-### Reverted Features
-
-1. ❌ **Line-Height Changes** (commit `b64b808`)
-   - Reverted to original 1.1em
-   - Actual fixes: Noto Sans JP font + text-size-adjust
-
-2. ❌ **Smart Caching in currentVolumeData** (commit `6cfb646`)
-   - Caused infinite loading wheel
-   - Reverted to simple synchronous approach
-
-3. ❌ **TailwindCSS v4** (commit `3367a81`)
-   - Compatibility issues with Flowbite
-   - Reverted to v3
-
-4. ❌ **Aggressive Concurrency Limits** (commit `6c4bf0e`)
-   - Reverted to original values
-
 ### Experimental / WIP Features
 
-1. 🟡 **WebDAV Provider**
-   - Code complete, marked "Under Development"
+1. 🟡 **WebDAV Provider** (see Cloud Storage section above)
+   - Code complete, marked "Under Development" in UI
+   - Needs testing with real WebDAV servers
    - ~80% complete
 
 2. 🟡 **Session Compaction Algorithm**
    - Mentioned in code, not implemented
    - Falls back to completed volume calculation
-
-3. 🟡 **P/Z Keyboard Shortcuts**
-   - Mentioned in commits, not in current code
-   - May have been reverted
+   - Would compress page turn data into aggregate sessions
 
 ---
 
@@ -676,12 +592,13 @@ Export manga volumes from the library as CBZ files for sharing or backup.
 |----------|-------|--------|
 | **Total Commits** | 498 | ✅ Verified |
 | **Major Architecture Changes** | 3 | ✅ All confirmed |
-| **Operational Features** | 11 | ✅ Code verified |
-| **WIP Features** | 3 | 🟡 Experimental |
+| **Operational Features** | 10 | ✅ Code verified |
+| **Cloud Providers** | 2 operational + 1 WIP | ✅ Drive/MEGA + 🟡 WebDAV |
 | **Reverted Features** | 4 | ❌ Removed |
-| **Google Drive Commits** | ~97 | ✅ Integrated |
-| **MEGA Commits** | ~40 | ✅ Integrated |
-| **Multi-Provider Commits** | ~57 | ✅ Integrated |
+| **Total Cloud Commits** | ~137 | ✅ Integrated |
+| **├─ Google Drive** | ~97 | ✅ Integrated |
+| **├─ MEGA** | ~40 | ✅ Integrated |
+| **└─ Multi-Provider Framework** | ~57 | ✅ Integrated |
 | **Stats/Achievement Commits** | ~23 | ✅ Integrated |
 | **Upload/Import Commits** | ~56 | ✅ Integrated |
 | **Performance Commits** | ~34 | ✅ Integrated |
@@ -711,14 +628,21 @@ Export manga volumes from the library as CBZ files for sharing or backup.
 ### Phase 2: Cloud Storage (Review Second)
 
 **Components**:
-- Google Drive integration (97 commits)
-- MEGA integration (40 commits)
-- Multi-provider manager
+- Unified cloud storage system (~137 commits)
+  - Google Drive integration (97 commits)
+  - MEGA integration (40 commits)
+  - Multi-provider framework (57 commits)
 - Backup/restore queue
+- Provider interface architecture
 
-**Why Second**: Builds on Phase 1, largest features
+**Why Second**: Builds on Phase 1, largest feature addition
 
-**Review Focus**: OAuth security, data privacy, error handling, sync logic
+**Review Focus**:
+- OAuth security (Google Drive)
+- Credential storage (MEGA, WebDAV)
+- Data privacy across providers
+- Error handling and rate limiting
+- Sync logic and conflict resolution
 
 **Est. Time**: 6-8 hours
 
