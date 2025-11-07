@@ -6,6 +6,7 @@ export type MiscSettings = {
   gallerySorting: 'ASC' | 'DESC' | 'SMART';
   deviceRamGB: 4 | 8 | 16 | 32;
   turboMode: boolean;
+  gdriveAutoReAuth: boolean;
 };
 
 export type MiscSettingsKey = keyof MiscSettings;
@@ -28,7 +29,8 @@ const defaultSettings: MiscSettings = {
   galleryLayout: 'grid',
   gallerySorting: 'SMART',
   deviceRamGB: getDefaultRamSetting(),
-  turboMode: false // Default to single-operation mode (patient users)
+  turboMode: false, // Default to single-operation mode (patient users)
+  gdriveAutoReAuth: true // Keep users synced during long reading sessions
 };
 
 const stored = browser ? window.localStorage.getItem('miscSettings') : undefined;

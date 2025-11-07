@@ -1,5 +1,8 @@
 import { GOOGLE_DRIVE_CONFIG, type DriveFile } from './constants';
 import { tokenManager } from './token-manager';
+import { miscSettings } from '$lib/settings/misc';
+import { showSnackbar } from '../snackbar';
+import { get } from 'svelte/store';
 
 /**
  * Escapes special characters in file/folder names for use in Google Drive API queries.
@@ -91,10 +94,31 @@ class DriveApiClient {
       if (!isNetworkError && (error.status === 401 || error.status === 403)) {
         console.log('API call failed with auth error, token may be expired');
 
-        // Clear the expired token
+        // Check if auto re-auth is enabled
+        const settings = get(miscSettings);
+        if (settings.gdriveAutoReAuth && retryOnAuth) {
+          console.log('Auto re-auth enabled, triggering re-authentication...');
+          showSnackbar('Session expired. Re-authenticating...');
+
+          // Trigger re-authentication WITHOUT clearing the token first
+          // This prevents the app from entering "logged out" state during re-auth
+          // The token will be replaced when re-auth succeeds
+          // If re-auth fails/is cancelled, the token will be cleared in the callback
+          tokenManager.reAuthenticate();
+
+          // Still throw the error to fail the current operation
+          // The user mentioned we don't need retry logic since syncs
+          // happen as part of the connection flow after re-auth
+          throw new DriveApiError(
+            'Authentication expired. Re-authentication in progress...',
+            error.status,
+            false
+          );
+        }
+
+        // If auto re-auth is disabled, clear the token and throw error
         tokenManager.clearToken();
 
-        // If retry is enabled and we haven't retried yet, prompt for re-auth
         if (retryOnAuth) {
           throw new DriveApiError(
             'Authentication expired. Please sign in again.',

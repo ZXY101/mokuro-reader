@@ -3,6 +3,8 @@ import { browser } from '$app/environment';
 import { GOOGLE_DRIVE_CONFIG, type TokenInfo } from './constants';
 import { showSnackbar } from '../snackbar';
 import { providerManager } from '../sync/provider-manager';
+import { miscSettings } from '$lib/settings/misc';
+import { get } from 'svelte/store';
 
 class TokenManager {
   private tokenStore = writable<string>('');
@@ -44,19 +46,21 @@ class TokenManager {
       const now = Date.now();
       const expiry = parseInt(expiresAt, 10);
 
-      // Check if token is still valid (with some buffer time)
-      if (expiry > now) {
-        // Just update the store, don't modify localStorage
-        this.tokenStore.set(token);
+      // Load the token into the store regardless of expiry
+      // This preserves authentication state for auto re-auth
+      this.tokenStore.set(token);
 
-        // Only set gapi token if gapi is loaded
-        if (typeof gapi !== 'undefined' && gapi.client) {
-          gapi.client.setToken({ access_token: token });
-        }
+      // Only set gapi token if gapi is loaded AND token is still valid
+      if (typeof gapi !== 'undefined' && gapi.client && expiry > now) {
+        gapi.client.setToken({ access_token: token });
+      }
+
+      if (expiry > now) {
         console.log('Loaded persisted token, expires in', Math.round((expiry - now) / 60000), 'minutes');
       } else {
-        console.log('Token expired, will need re-authentication');
-        this.clearToken();
+        console.log('Token expired, needs re-authentication');
+        this.needsAttentionStore.set(true);
+        // DON'T clear the token - keep it for auth history
       }
     }
   }
@@ -76,12 +80,22 @@ class TokenManager {
       const expiry = parseInt(expiresAt, 10);
       const timeUntilExpiry = expiry - now;
 
-      // Token expired, clear it
+      // Token expired - trigger auto re-auth if enabled, otherwise just notify
       if (timeUntilExpiry <= 0) {
-        console.log('❌ Token expired, clearing...');
-        this.clearToken();
+        console.log('❌ Token expired');
         this.needsAttentionStore.set(true);
-        showSnackbar('Google Drive session expired. Please sign in again.');
+
+        // Check if auto re-auth is enabled
+        const settings = get(miscSettings);
+        if (settings.gdriveAutoReAuth) {
+          console.log('Auto re-auth enabled, triggering re-authentication...');
+          showSnackbar('Session expired. Re-authenticating...');
+          this.reAuthenticate();
+        } else {
+          showSnackbar('Google Drive session expired. Please sign in again.');
+        }
+
+        // DON'T clear the token - keep it for auth history
         return;
       }
 
@@ -393,7 +407,13 @@ class TokenManager {
   }
 
   isAuthenticated(): boolean {
-    return this.getCurrentToken() !== '';
+    // User is authenticated if they have auth history AND a token (even if expired)
+    // This allows auto re-auth to work without forcing full logout
+    const hasAuthHistory = browser &&
+      localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED) === 'true';
+    const hasToken = this.getCurrentToken() !== '';
+
+    return hasAuthHistory && hasToken;
   }
 
   getTimeUntilExpiry(): number | null {
