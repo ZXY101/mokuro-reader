@@ -247,6 +247,63 @@ await db.volumes.add(volumeMetadata);
 await db.volumes.update(volume_uuid, { thumbnail: newThumbnail });
 ```
 
+## Extension Compatibility & DOM Keying
+
+This app is designed for Japanese learning extensions (Yomitan, Migaku, etc.) that manipulate text content in the DOM. These extensions can interfere with Svelte's reactivity.
+
+### The Problem
+
+Japanese learning extensions aggressively mutate the DOM:
+- **Yomitan**: Wraps text in `<span>` tags for dictionary lookups (relatively clean)
+- **Migaku**: Aggressively mutates text based on user settings (very invasive)
+  - Causes text carryover between manga pages
+  - Prevents UI elements from updating correctly
+  - Modifies settings panel controls
+
+### The Solution: Keyed Blocks
+
+Use Svelte's `{#key}` blocks to force DOM recreation when extensions interfere. When a key changes, Svelte destroys the old DOM and creates a fresh one, bypassing extension mutations.
+
+**Why This Works for This App:**
+- Page changes are discrete user actions (not continuous scrolling)
+- No form state to preserve during reading
+- Performance cost acceptable for intentional page transitions
+- Extensions can't carry stale state across fresh DOM nodes
+
+### Required Keying
+
+**Manga Page Layout** (prevents text carryover):
+```svelte
+{#key currentPage}
+  <MangaPage {pageData} />
+{/key}
+```
+
+**Status Indicators** (counters, timers, badges):
+```svelte
+{#key tokenMinutesLeft}
+  <span>{tokenMinutesLeft}m</span>
+{/key}
+```
+
+**Any Dynamic Text** that extensions modify and needs to stay fresh.
+
+### Where Keying Doesn't Help
+
+**Settings Panel**: Migaku modifies the controls themselves, not just their parents. Keying the parent doesn't prevent this. Known issue with no current workaround.
+
+### When NOT to Use Keyed Blocks
+
+Don't use keyed blocks for:
+- Form inputs (will lose focus/state)
+- Large component trees (performance impact)
+- Static content (unnecessary)
+- Content that SHOULD persist across updates
+
+### Testing
+
+Test with Migaku enabled to catch DOM mutation issues.
+
 ## Known Issues and Considerations
 
 - Google Drive auth expires every hour (access token limitation without backend), but re-auth should be minimal (just account selection, not full consent)

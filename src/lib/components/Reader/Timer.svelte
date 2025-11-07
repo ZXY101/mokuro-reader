@@ -77,7 +77,7 @@
   class="mix-blend-difference z-10 fixed opacity-50 right-20 top-5 p-10 m-[-2.5rem]"
   onclick={onClick}
 >
-  {#key $volumeStats?.timeReadInMinutes}
+  {#key `${active}-${$volumeStats?.timeReadInMinutes}`}
     <div class="text-right">
       <p>
         {active ? 'Active' : 'Paused'} | Minutes read: {$volumeStats?.timeReadInMinutes}
