@@ -34,6 +34,9 @@
   // Track if any cloud providers are authenticated
   let hasAuthenticatedProviders = $state<boolean>(false);
 
+  // Track if sync is in progress
+  let isSyncing = $state<boolean>(false);
+
   // Get active provider's display name
   let providerDisplayName = $derived.by(() => {
     const provider = unifiedCloudManager.getActiveProvider();
@@ -98,12 +101,19 @@
     goto('/reading-speed');
   }
   
-  function handleSync() {
-    // Sync with all authenticated providers
-    unifiedCloudManager.syncProgress().catch(error => {
+  async function handleSync() {
+    if (isSyncing) return; // Prevent multiple simultaneous syncs
+
+    isSyncing = true;
+    try {
+      // Sync with all authenticated providers
+      await unifiedCloudManager.syncProgress();
+    } catch (error) {
       console.error('Manual sync failed:', error);
       showSnackbar('Sync failed');
-    });
+    } finally {
+      isSyncing = false;
+    }
   }
 
   // Google Drive specific: Manual token refresh handler
@@ -176,9 +186,10 @@
         <button
           onclick={handleSync}
           class="flex items-center justify-center w-6 h-6"
-          title={`Sync read progress with ${providerDisplayName}`}
+          title={isSyncing ? 'Syncing...' : `Sync read progress with ${providerDisplayName}`}
+          disabled={isSyncing}
         >
-          <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+          <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer {isSyncing ? 'animate-spin' : ''}" />
         </button>
       {/if}
     </div>
