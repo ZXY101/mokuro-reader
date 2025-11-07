@@ -53,6 +53,11 @@
   let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
   let hasAnyProvider = $derived($providerStatusStore.hasAnyAuthenticated);
 
+  // Check if providers are configured (even if not currently connected)
+  let googleDriveConfigured = $derived($providerStatusStore.providers['google-drive']?.hasStoredCredentials || false);
+  let megaConfigured = $derived($providerStatusStore.providers['mega']?.hasStoredCredentials || false);
+  let webdavConfigured = $derived($providerStatusStore.providers['webdav']?.hasStoredCredentials || false);
+
   // Google Drive login state
   let googleDriveLoading = $state(false);
 
@@ -193,7 +198,20 @@
   async function performSync() {
     await syncReadProgress();
   }
-  
+
+  /**
+   * Common post-login handler for all providers
+   * Automatically syncs progress after successful login
+   */
+  async function handlePostLogin() {
+    try {
+      await performSync();
+    } catch (error) {
+      // Silently catch sync errors - don't block successful login
+      console.error('Post-login sync failed:', error);
+    }
+  }
+
   onMount(() => {
     // Clear service worker cache for Google Drive downloads
     // This is cloud-page-specific and not part of global init
@@ -282,6 +300,9 @@
       showSnackbar('Connected to Google Drive - loading cloud data...');
       await unifiedCloudManager.fetchAllCloudVolumes();
       showSnackbar('Google Drive connected');
+
+      // Automatically sync after login
+      await handlePostLogin();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Login failed';
       showSnackbar(message);
@@ -307,6 +328,9 @@
       // Clear form and trigger reactivity
       megaEmail = '';
       megaPassword = '';
+
+      // Automatically sync after login
+      await handlePostLogin();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(message);
@@ -357,6 +381,9 @@
       webdavUrl = '';
       webdavUsername = '';
       webdavPassword = '';
+
+      // Automatically sync after login
+      await handlePostLogin();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       showSnackbar(message);

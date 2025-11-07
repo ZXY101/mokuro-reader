@@ -176,6 +176,9 @@ class UnifiedSyncService {
 		provider: SyncProvider,
 		options: SyncOptions = {}
 	): Promise<ProviderSyncResult> {
+		// Set syncing state
+		this.isSyncingStore.set(true);
+
 		try {
 			console.log(`🔄 Syncing with ${provider.name}...`);
 
@@ -218,6 +221,9 @@ class UnifiedSyncService {
 				success: false,
 				error: errorMessage
 			};
+		} finally {
+			// Clear syncing state
+			this.isSyncingStore.set(false);
 		}
 	}
 

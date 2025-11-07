@@ -34,6 +34,9 @@
   // Track if any cloud providers are authenticated
   let hasAuthenticatedProviders = $state<boolean>(false);
 
+  // Track global sync state
+  let isSyncing = $state<boolean>(false);
+
   // Get active provider's display name
   let providerDisplayName = $derived.by(() => {
     const provider = unifiedCloudManager.getActiveProvider();
@@ -48,11 +51,21 @@
     return unsubscribe;
   });
 
-  // Check for authenticated providers and determine provider type
+  // Subscribe to global sync state
+  $effect(() => {
+    const unsubscribe = unifiedCloudManager.isSyncing.subscribe(value => {
+      isSyncing = value;
+    });
+    return unsubscribe;
+  });
+
+  // Check for configured providers (even if not currently connected) and determine provider type
   $effect(() => {
     const checkProviders = () => {
+      // Check if any provider has stored credentials (even if not connected)
+      hasAuthenticatedProviders = state.hasStoredCredentials;
+
       const activeProvider = unifiedCloudManager.getActiveProvider();
-      hasAuthenticatedProviders = activeProvider !== null;
       isGoogleDrive = activeProvider?.type === 'google-drive';
     };
 
@@ -96,12 +109,17 @@
     goto('/reading-speed');
   }
   
-  function handleSync() {
-    // Sync with all authenticated providers
-    unifiedCloudManager.syncProgress().catch(error => {
+  async function handleSync() {
+    if (isSyncing) return; // Prevent multiple simultaneous syncs
+
+    try {
+      // Sync with all authenticated providers
+      // State is managed automatically by unifiedSyncService
+      await unifiedCloudManager.syncProgress();
+    } catch (error) {
       console.error('Manual sync failed:', error);
       showSnackbar('Sync failed');
-    });
+    }
   }
 
   // Google Drive specific: Manual token refresh handler
@@ -174,9 +192,10 @@
         <button
           onclick={handleSync}
           class="flex items-center justify-center w-6 h-6"
-          title={`Sync read progress with ${providerDisplayName}`}
+          title={isSyncing ? 'Syncing...' : `Sync read progress with ${providerDisplayName}`}
+          disabled={isSyncing}
         >
-          <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+          <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer {isSyncing ? 'animate-spin' : ''}" />
         </button>
       {/if}
     </div>

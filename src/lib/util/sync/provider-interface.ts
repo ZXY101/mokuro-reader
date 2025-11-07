@@ -53,6 +53,7 @@ class ExportProvider {
 	getStatus(): ProviderStatus {
 		return {
 			isAuthenticated: true,
+			hasStoredCredentials: true,
 			needsAttention: false,
 			statusMessage: 'Ready to export'
 		};
@@ -91,6 +92,8 @@ export const exportProvider = new ExportProvider();
 
 export interface ProviderStatus {
 	isAuthenticated: boolean;
+	/** Whether credentials are configured (even if not currently connected) */
+	hasStoredCredentials: boolean;
 	needsAttention: boolean;
 	statusMessage: string;
 }

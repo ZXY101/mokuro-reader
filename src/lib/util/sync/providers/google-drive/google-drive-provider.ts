@@ -41,16 +41,22 @@ export class GoogleDriveProvider implements SyncProvider {
 
 	getStatus(): ProviderStatus {
 		const authenticated = this.isAuthenticated();
+		const hasCredentials = browser && localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED) === 'true';
 		const timeLeft = tokenManager.getTimeUntilExpiry();
 		const needsAttention = authenticated && timeLeft !== null && timeLeft < 5 * 60 * 1000; // Less than 5 minutes
 
 		let statusMessage = 'Not connected';
 		if (authenticated) {
 			statusMessage = needsAttention ? 'Token expiring soon' : 'Connected to Google Drive';
+		} else if (hasCredentials) {
+			statusMessage = 'Configured (not connected)';
+		} else {
+			statusMessage = 'Not configured';
 		}
 
 		return {
 			isAuthenticated: authenticated,
+			hasStoredCredentials: hasCredentials,
 			needsAttention,
 			statusMessage
 		};
