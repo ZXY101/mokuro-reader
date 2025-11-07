@@ -34,7 +34,7 @@
   // Track if any cloud providers are authenticated
   let hasAuthenticatedProviders = $state<boolean>(false);
 
-  // Track if sync is in progress
+  // Track global sync state
   let isSyncing = $state<boolean>(false);
 
   // Get active provider's display name
@@ -47,6 +47,14 @@
   $effect(() => {
     const unsubscribe = unifiedProviderState.subscribe(value => {
       state = value;
+    });
+    return unsubscribe;
+  });
+
+  // Subscribe to global sync state
+  $effect(() => {
+    const unsubscribe = unifiedCloudManager.isSyncing.subscribe(value => {
+      isSyncing = value;
     });
     return unsubscribe;
   });
@@ -104,15 +112,13 @@
   async function handleSync() {
     if (isSyncing) return; // Prevent multiple simultaneous syncs
 
-    isSyncing = true;
     try {
       // Sync with all authenticated providers
+      // State is managed automatically by unifiedSyncService
       await unifiedCloudManager.syncProgress();
     } catch (error) {
       console.error('Manual sync failed:', error);
       showSnackbar('Sync failed');
-    } finally {
-      isSyncing = false;
     }
   }
 
