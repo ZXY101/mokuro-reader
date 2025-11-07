@@ -177,16 +177,18 @@
         {/if}
       </button>
       {#if isGoogleDrive && state.isAuthenticated && tokenMinutesLeft !== null}
-        <button
-          onclick={handleTokenRefresh}
-          class="flex items-center justify-center px-2 py-1 rounded text-xs font-mono cursor-pointer transition-colors
-            {tokenMinutesLeft > 30 ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20' :
-             tokenMinutesLeft > 10 ? 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' :
-             'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20'}"
-          title="Token expires in {tokenMinutesLeft} minutes. Click to refresh now."
-        >
-          {tokenMinutesLeft}m
-        </button>
+        {#key tokenMinutesLeft}
+          <button
+            onclick={handleTokenRefresh}
+            class="flex items-center justify-center px-2 py-1 rounded text-xs font-mono cursor-pointer transition-colors
+              {tokenMinutesLeft > 30 ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20' :
+               tokenMinutesLeft > 10 ? 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' :
+               'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20'}"
+            title="Token expires in {tokenMinutesLeft} minutes. Click to refresh now."
+          >
+            {tokenMinutesLeft}m
+          </button>
+        {/key}
       {/if}
       {#if hasAuthenticatedProviders}
         <button
