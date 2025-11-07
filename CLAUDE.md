@@ -302,7 +302,7 @@ Don't use keyed blocks for:
 
 ### Testing
 
-Always test with Yomitan and Migaku enabled to catch real-world extension issues. The manga text boxes themselves should NOT use keyed blocks - you want extensions to enhance them, not fight them.
+Test with Migaku enabled to catch DOM mutation issues.
 
 ## Known Issues and Considerations
 
