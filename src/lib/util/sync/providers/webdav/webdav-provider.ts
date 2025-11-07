@@ -50,10 +50,19 @@ export class WebDAVProvider implements SyncProvider {
 	}
 
 	getStatus(): ProviderStatus {
+		const hasCredentials = !!(
+			browser &&
+			localStorage.getItem(STORAGE_KEYS.SERVER_URL) &&
+			localStorage.getItem(STORAGE_KEYS.USERNAME) &&
+			localStorage.getItem(STORAGE_KEYS.PASSWORD)
+		);
+		const isConnected = this.isAuthenticated();
+
 		return {
-			isAuthenticated: this.isAuthenticated(),
+			isAuthenticated: isConnected,
+			hasStoredCredentials: hasCredentials,
 			needsAttention: false,
-			statusMessage: this.isAuthenticated() ? 'Connected to WebDAV' : 'Not connected'
+			statusMessage: isConnected ? 'Connected to WebDAV' : hasCredentials ? 'Configured (not connected)' : 'Not configured'
 		};
 	}
 
@@ -144,9 +153,24 @@ export class WebDAVProvider implements SyncProvider {
 				await this.login({ serverUrl, username, password });
 				console.log('Restored WebDAV session from stored credentials');
 			} catch (error) {
-				console.error('Failed to restore WebDAV session:', error);
-				// Clear invalid credentials
-				this.logout();
+				const errorMessage = error instanceof Error ? error.message : String(error);
+
+				// Only clear credentials if they're actually invalid (wrong credentials/URL)
+				// Don't clear on network errors or temporary server issues
+				const isAuthError =
+					errorMessage.includes('401') ||
+					errorMessage.includes('403') ||
+					errorMessage.includes('unauthorized') ||
+					errorMessage.includes('authentication') ||
+					errorMessage.includes('credentials');
+
+				if (isAuthError) {
+					console.error('WebDAV credentials invalid, clearing stored credentials');
+					this.logout();
+				} else {
+					// Temporary error - keep credentials for retry later
+					console.warn('Failed to restore WebDAV session (temporary error), will retry on next sync:', errorMessage);
+				}
 			}
 		}
 	}

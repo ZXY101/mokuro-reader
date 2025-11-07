@@ -48,11 +48,13 @@
     return unsubscribe;
   });
 
-  // Check for authenticated providers and determine provider type
+  // Check for configured providers (even if not currently connected) and determine provider type
   $effect(() => {
     const checkProviders = () => {
+      // Check if any provider has stored credentials (even if not connected)
+      hasAuthenticatedProviders = state.hasStoredCredentials;
+
       const activeProvider = unifiedCloudManager.getActiveProvider();
-      hasAuthenticatedProviders = activeProvider !== null;
       isGoogleDrive = activeProvider?.type === 'google-drive';
     };
 

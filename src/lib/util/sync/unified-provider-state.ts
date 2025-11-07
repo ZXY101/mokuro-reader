@@ -10,8 +10,10 @@ import { providerManager } from './provider-manager';
  * - Provider availability
  */
 export interface UnifiedProviderState {
-	/** Whether a provider is authenticated */
+	/** Whether a provider is authenticated and connected */
 	isAuthenticated: boolean;
+	/** Whether credentials are configured (even if not currently connected) */
+	hasStoredCredentials: boolean;
 	/** Whether the cache is currently loading */
 	isCacheLoading: boolean;
 	/** Whether the cache has been loaded at least once */
@@ -44,6 +46,7 @@ function createUnifiedProviderState(): Readable<UnifiedProviderState> {
 			if (!provider) {
 				return {
 					isAuthenticated: false,
+					hasStoredCredentials: false,
 					isCacheLoading: false,
 					isCacheLoaded: hasLoadedOnce,
 					isFullyConnected: false,
@@ -57,6 +60,7 @@ function createUnifiedProviderState(): Readable<UnifiedProviderState> {
 
 			return {
 				isAuthenticated: status.isAuthenticated,
+				hasStoredCredentials: status.hasStoredCredentials,
 				isCacheLoading: $isCacheLoading,
 				isCacheLoaded: hasLoadedOnce,
 				isFullyConnected,

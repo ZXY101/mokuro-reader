@@ -149,10 +149,18 @@ export class MegaProvider implements SyncProvider {
 	}
 
 	getStatus(): ProviderStatus {
+		const hasCredentials = !!(
+			browser &&
+			localStorage.getItem(STORAGE_KEYS.EMAIL) &&
+			localStorage.getItem(STORAGE_KEYS.PASSWORD)
+		);
+		const isConnected = this.isAuthenticated();
+
 		return {
-			isAuthenticated: this.isAuthenticated(),
+			isAuthenticated: isConnected,
+			hasStoredCredentials: hasCredentials,
 			needsAttention: false,
-			statusMessage: this.isAuthenticated() ? 'Connected to MEGA' : 'Not connected'
+			statusMessage: isConnected ? 'Connected to MEGA' : hasCredentials ? 'Configured (not connected)' : 'Not configured'
 		};
 	}
 
@@ -234,9 +242,24 @@ export class MegaProvider implements SyncProvider {
 				await this.login({ email, password });
 				console.log('Restored MEGA session from stored credentials');
 			} catch (error) {
-				console.error('Failed to restore MEGA session:', error);
-				// Clear invalid credentials
-				this.logout();
+				const errorMessage = error instanceof Error ? error.message : String(error);
+
+				// Only clear credentials if they're actually invalid (wrong password/email)
+				// Don't clear on network errors, rate limiting, or temporary server issues
+				const isAuthError =
+					errorMessage.includes('ENOENT') ||
+					errorMessage.includes('incorrect') ||
+					errorMessage.includes('invalid') ||
+					errorMessage.includes('authentication failed') ||
+					errorMessage.includes('wrong password');
+
+				if (isAuthError) {
+					console.error('MEGA credentials invalid, clearing stored credentials');
+					this.logout();
+				} else {
+					// Temporary error - keep credentials for retry later
+					console.warn('Failed to restore MEGA session (temporary error), will retry on next sync:', errorMessage);
+				}
 			}
 		}
 	}
@@ -285,6 +308,10 @@ export class MegaProvider implements SyncProvider {
 
 		console.log('🔄 Reinitializing MEGA connection to refresh cache...');
 
+		// Save current storage in case reconnection fails
+		const oldStorage = this.storage;
+		const oldMokuroFolder = this.mokuroFolder;
+
 		// Clear current storage
 		this.storage = null;
 		this.mokuroFolder = null;
@@ -294,8 +321,14 @@ export class MegaProvider implements SyncProvider {
 			await this.login({ email, password });
 			console.log('✅ MEGA connection reinitialized successfully');
 		} catch (error) {
-			console.error('Failed to reinitialize MEGA:', error);
-			throw error;
+			// Restore previous connection on failure so user doesn't get logged out
+			console.error('Failed to reinitialize MEGA, restoring previous connection:', error);
+			this.storage = oldStorage;
+			this.mokuroFolder = oldMokuroFolder;
+
+			// Don't throw - allow operations to continue with stale cache
+			// This prevents temporary network issues from appearing as logouts
+			console.warn('Continuing with potentially stale MEGA cache');
 		}
 	}
 

@@ -53,6 +53,11 @@
   let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
   let hasAnyProvider = $derived($providerStatusStore.hasAnyAuthenticated);
 
+  // Check if providers are configured (even if not currently connected)
+  let googleDriveConfigured = $derived($providerStatusStore.providers['google-drive']?.hasStoredCredentials || false);
+  let megaConfigured = $derived($providerStatusStore.providers['mega']?.hasStoredCredentials || false);
+  let webdavConfigured = $derived($providerStatusStore.providers['webdav']?.hasStoredCredentials || false);
+
   // Google Drive login state
   let googleDriveLoading = $state(false);
 
