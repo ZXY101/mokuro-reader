@@ -629,6 +629,17 @@
           {/if}
         </div>
 
+        <div class="flex flex-col gap-2 mt-4">
+          <div class="flex items-center gap-3">
+            <Toggle bind:checked={$miscSettings.gdriveAutoReAuth} on:change={() => updateMiscSetting('gdriveAutoReAuth', $miscSettings.gdriveAutoReAuth)}>
+              Auto re-authenticate on token expiration
+            </Toggle>
+          </div>
+          <p class="text-xs text-gray-500">
+            Keeps your progress synced during long reading sessions. Automatically prompts re-authentication when your session expires (~1 hour).
+          </p>
+        </div>
+
         <div class="flex-col gap-2 flex">
           <Button
             color="dark"
