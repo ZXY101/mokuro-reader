@@ -374,14 +374,13 @@ class UnifiedSyncService {
 			const existingFileId = existingFiles.length > 0 ? existingFiles[0].fileId : null;
 
 			// Upload (create or update)
-			const content = await blob.text();
 			const metadata = {
 				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA,
 				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
 				...(existingFileId ? {} : { parents: [folderId] })
 			};
 
-			await driveApiClient.uploadFile(content, metadata, existingFileId || undefined);
+			await driveApiClient.uploadFile(blob, metadata, existingFileId || undefined);
 			console.log('✅ Volume data uploaded to Google Drive');
 		} else {
 			// For MEGA and WebDAV, use generic uploadFile
@@ -489,14 +488,13 @@ class UnifiedSyncService {
 			const existingFileId = files.length > 0 ? files[0].id : null;
 
 			// Upload (create or update)
-			const content = await blob.text();
 			const metadata = {
 				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES,
 				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
 				...(existingFileId ? {} : { parents: [folderId] })
 			};
 
-			await driveApiClient.uploadFile(content, metadata, existingFileId || undefined);
+			await driveApiClient.uploadFile(blob, metadata, existingFileId || undefined);
 			console.log('✅ Profiles uploaded to Google Drive');
 		} else {
 			// For MEGA and WebDAV, use generic uploadFile
