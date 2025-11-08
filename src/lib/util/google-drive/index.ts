@@ -50,7 +50,7 @@ export async function signInToGoogleDrive(): Promise<void> {
     // Will auto-detect if first-time (consent) or re-auth (minimal)
     // Cache fetch happens automatically in token manager callback
     // Provider status will be updated automatically in token manager callback
-    tokenManager.requestNewToken(false, false);
+    tokenManager.requestNewToken(false);
   }
 }
 

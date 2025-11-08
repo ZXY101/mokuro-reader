@@ -13,12 +13,6 @@ class TokenManager {
   private refreshIntervalId: number | null = null;
   private isRefreshing = false;
 
-  // Layer 1: Smart refresh tracking
-  private refreshAttemptCount = 0;
-  private ssoHealthy = true;
-  private currentScheduleIndex = -1;
-  private pendingRetryTimeout: number | null = null;
-
   constructor() {
     if (browser) {
       this.loadPersistedToken();
@@ -71,7 +65,7 @@ class TokenManager {
       clearInterval(this.refreshIntervalId);
     }
 
-    // Layer 1: Smart multi-attempt refresh checker
+    // Simple token expiry monitor - just checks if token is expired and sets attention flag
     this.refreshIntervalId = window.setInterval(() => {
       const expiresAt = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN_EXPIRES);
       if (!expiresAt || !this.isAuthenticated()) return;
@@ -80,70 +74,28 @@ class TokenManager {
       const expiry = parseInt(expiresAt, 10);
       const timeUntilExpiry = expiry - now;
 
-      // Token expired - trigger auto re-auth if enabled, otherwise just notify
+      // Token expired - set attention flag
+      // Auto re-auth happens in api-client.ts when user actually tries to use Drive
       if (timeUntilExpiry <= 0) {
         console.log('❌ Token expired');
         this.needsAttentionStore.set(true);
-
-        // Check if auto re-auth is enabled
-        const settings = get(miscSettings);
-        if (settings.gdriveAutoReAuth) {
-          console.log('Auto re-auth enabled, triggering re-authentication...');
-          showSnackbar('Session expired. Re-authenticating...');
-          this.reAuthenticate();
-        } else {
-          showSnackbar('Google Drive session expired. Please sign in again.');
-        }
-
-        // DON'T clear the token - keep it for auth history
         return;
       }
 
-      // Check if we've entered a new refresh schedule window
-      const schedulePoint = this.getActiveSchedulePoint(timeUntilExpiry);
-
-      if (schedulePoint !== null && schedulePoint !== this.currentScheduleIndex) {
-        // New schedule point reached
-        console.log(`📅 Entered refresh schedule point ${schedulePoint} (${Math.round(timeUntilExpiry / 60000)} min left)`);
-        this.currentScheduleIndex = schedulePoint;
-        this.refreshAttemptCount = 0; // Reset attempt counter for this schedule point
-        this.attemptSmartRefresh();
-      }
-      // Show warning if refresh attempts are failing and we're getting close to expiry
-      else if (timeUntilExpiry <= GOOGLE_DRIVE_CONFIG.TOKEN_WARNING_BUFFER_MS && !this.ssoHealthy) {
+      // Show warning when getting close to expiry
+      if (timeUntilExpiry <= GOOGLE_DRIVE_CONFIG.TOKEN_WARNING_BUFFER_MS) {
         const minutesLeft = Math.round(timeUntilExpiry / 60000);
         if (minutesLeft > 0 && minutesLeft <= 10 && minutesLeft % 5 === 0) {
-          console.warn(`⚠️ Token expires in ${minutesLeft} minutes, refresh attempts failing`);
+          console.warn(`⚠️ Token expires in ${minutesLeft} minutes`);
         }
       }
     }, GOOGLE_DRIVE_CONFIG.TOKEN_REFRESH_CHECK_INTERVAL_MS);
-  }
-
-  // Determine which schedule point is active based on time until expiry
-  private getActiveSchedulePoint(timeUntilExpiry: number): number | null {
-    for (let i = 0; i < GOOGLE_DRIVE_CONFIG.REFRESH_SCHEDULE.length; i++) {
-      const schedule = GOOGLE_DRIVE_CONFIG.REFRESH_SCHEDULE[i];
-      // Check if we're within the window (with 30 second buffer to avoid missing)
-      if (timeUntilExpiry <= schedule.at && timeUntilExpiry > schedule.at - 30000) {
-        return i;
-      }
-    }
-    return null;
   }
 
   setToken(token: string, expiresIn?: number): void {
     this.tokenStore.set(token);
     this.isRefreshing = false;
     this.needsAttentionStore.set(false); // Clear attention flag when token is set
-
-    // Layer 1: Mark SSO as healthy and reset refresh state on successful token acquisition
-    this.ssoHealthy = true;
-    this.currentScheduleIndex = -1; // Reset schedule to allow new refresh cycle
-    this.refreshAttemptCount = 0;
-    if (this.pendingRetryTimeout) {
-      clearTimeout(this.pendingRetryTimeout);
-      this.pendingRetryTimeout = null;
-    }
 
     if (browser) {
       localStorage.setItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN, token);
@@ -244,10 +196,9 @@ class TokenManager {
             // Preserve all state so they can try again immediately
             showSnackbar('Sign-in cancelled. Please try again when ready.');
           } else if (response.error === 'popup_failed_to_open' || response.error === 'popup_blocked') {
-            // Silent refresh failed (no popup shown) - this is expected during background refresh
-            // Layer 1: Handle this gracefully with retry logic
-            console.log('Silent refresh attempt failed (SSO may be expired)');
-            this.handleRefreshFailure();
+            // Popup was blocked by browser
+            console.log('Popup was blocked by browser');
+            showSnackbar('Popup blocked. Please allow popups for this site and try again.');
           } else {
             // Other errors (network issues, etc.) - keep auth history but clear token
             // Next sign-in will use minimal prompt since permissions weren't explicitly denied
@@ -281,7 +232,7 @@ class TokenManager {
     }
   }
 
-  requestNewToken(silent = false, forceConsent = false): void {
+  requestNewToken(forceConsent = false): void {
     const tokenClient = this.tokenClientStore;
     let client: any;
 
@@ -291,19 +242,7 @@ class TokenManager {
       // Determine if user has authenticated before
       const hasAuthenticated = browser && localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED) === 'true';
 
-      // Debug logging
-      console.log('🔍 requestNewToken called:', {
-        silent,
-        forceConsent,
-        hasAuthenticated,
-        willUseConsent: forceConsent || !hasAuthenticated
-      });
-
-      if (silent) {
-        // Attempt silent refresh (no UI shown)
-        console.log('→ Using silent refresh (prompt: "none")');
-        client.requestAccessToken({ prompt: 'none' });
-      } else if (forceConsent || !hasAuthenticated) {
+      if (forceConsent || !hasAuthenticated) {
         // Force full consent screen (for initial auth or when explicitly requested)
         console.log('→ Using full consent screen (prompt: "consent")');
         client.requestAccessToken({ prompt: 'consent' });
@@ -314,72 +253,6 @@ class TokenManager {
       }
     } else {
       throw new Error('Token client not initialized');
-    }
-  }
-
-  // Layer 1: Smart multi-attempt refresh with retry logic
-  private attemptSmartRefresh(): void {
-    if (this.isRefreshing) {
-      console.log('🔄 Token refresh already in progress, skipping...');
-      return;
-    }
-
-    const schedule = GOOGLE_DRIVE_CONFIG.REFRESH_SCHEDULE[this.currentScheduleIndex];
-    if (!schedule) return;
-
-    // Check if we've exceeded max retries for this schedule point
-    if (this.refreshAttemptCount >= schedule.maxRetries) {
-      console.log(`⏭️ Max retries (${schedule.maxRetries}) reached for schedule point ${this.currentScheduleIndex}`);
-      return;
-    }
-
-    this.refreshAttemptCount++;
-    this.isRefreshing = true;
-
-    console.log(`🔄 Refresh attempt #${this.refreshAttemptCount} at schedule point ${this.currentScheduleIndex}`);
-
-    try {
-      // Try silent refresh leveraging SSO
-      this.requestNewToken(true); // silent = true
-
-      // Success/failure will be handled in the callback
-      // If it fails, we'll schedule a retry with exponential backoff
-
-    } catch (error) {
-      console.error('❌ Silent token refresh failed:', error);
-      this.isRefreshing = false;
-      this.handleRefreshFailure();
-    }
-  }
-
-  // Handle refresh failure and schedule retry if appropriate
-  private handleRefreshFailure(): void {
-    this.ssoHealthy = false;
-
-    const schedule = GOOGLE_DRIVE_CONFIG.REFRESH_SCHEDULE[this.currentScheduleIndex];
-    if (!schedule) return;
-
-    // Schedule retry with exponential backoff if we haven't hit max retries
-    if (this.refreshAttemptCount < schedule.maxRetries) {
-      // Exponential backoff: 10s, 20s, 40s, etc.
-      const retryDelay = Math.min(10000 * Math.pow(2, this.refreshAttemptCount - 1), 60000);
-      console.log(`⏰ Scheduling retry in ${retryDelay / 1000}s (attempt ${this.refreshAttemptCount}/${schedule.maxRetries})`);
-
-      if (this.pendingRetryTimeout) {
-        clearTimeout(this.pendingRetryTimeout);
-      }
-
-      this.pendingRetryTimeout = window.setTimeout(() => {
-        this.attemptSmartRefresh();
-      }, retryDelay);
-    } else {
-      // All retries exhausted for this schedule point
-      const timeLeft = this.getTimeUntilExpiry();
-      const minutesLeft = timeLeft ? Math.round(timeLeft / 60000) : 0;
-
-      if (minutesLeft > 0 && minutesLeft <= 5) {
-        showSnackbar(`Google Drive session expires in ${minutesLeft} minutes. Please re-authenticate to continue.`);
-      }
     }
   }
 
@@ -431,7 +304,7 @@ class TokenManager {
 
   // Manual re-authentication (minimal UI, reuses existing permissions)
   reAuthenticate(): void {
-    this.requestNewToken(false, false);
+    this.requestNewToken(false);
   }
 }
 
