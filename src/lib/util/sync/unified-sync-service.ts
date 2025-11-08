@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { progressTrackerStore } from '../progress-tracker';
-import { volumesWithTrash, profiles, parseVolumesFromJson } from '$lib/settings';
+import { volumesWithTrash, profiles, profilesWithTrash, parseVolumesFromJson } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import type { SyncProvider, ProviderType, CloudFileMetadata } from './provider-interface';
 import { cacheManager } from './cache-manager';
@@ -420,6 +420,14 @@ class UnifiedSyncService {
 
 	/**
 	 * Download profiles.json file from provider using generic file operations
+	 * Public method for manual profile downloads
+	 */
+	async downloadProfiles(provider: SyncProvider): Promise<any | null> {
+		return await this.downloadProfilesFile(provider);
+	}
+
+	/**
+	 * Download profiles.json file from provider using generic file operations
 	 */
 	private async downloadProfilesFile(provider: SyncProvider): Promise<any | null> {
 		try {
@@ -442,6 +450,14 @@ class UnifiedSyncService {
 			}
 			throw error;
 		}
+	}
+
+	/**
+	 * Upload profiles to provider using generic file operations
+	 * Public method for manual profile uploads
+	 */
+	async uploadProfiles(provider: SyncProvider, profiles: any): Promise<void> {
+		await this.uploadProfilesFile(provider, profiles);
 	}
 
 	/**
@@ -496,21 +512,24 @@ class UnifiedSyncService {
 		// Step 1: Download cloud profiles
 		const cloudProfiles = await this.downloadProfilesFile(provider);
 
-		// Step 2: Get local profiles
-		const localProfiles = get(profiles);
+		// Step 2: Get local profiles (including tombstones for deletion sync)
+		const localProfiles = get(profilesWithTrash);
 
-		// Step 3: Merge profiles (newest wins based on profile name)
+		// Step 3: Merge profiles (handles deletedOn timestamps)
 		const mergedProfiles = this.mergeProfiles(localProfiles, cloudProfiles || {});
 
-		// Step 4: Update local storage
-		profiles.set(mergedProfiles);
+		// Step 4: Purge tombstones older than 30 days
+		const purgedProfiles = this.purgeProfileTombstones(mergedProfiles);
 
-		// Step 5: Upload merged profiles if changed
-		const mergedJson = JSON.stringify(mergedProfiles);
+		// Step 5: Update local storage (including tombstones)
+		profilesWithTrash.set(purgedProfiles);
+
+		// Step 6: Upload purged profiles if changed
+		const mergedJson = JSON.stringify(purgedProfiles);
 		const cloudJson = JSON.stringify(cloudProfiles || {});
 
 		if (mergedJson !== cloudJson) {
-			await this.uploadProfilesFile(provider, mergedProfiles);
+			await this.uploadProfilesFile(provider, purgedProfiles);
 		}
 	}
 
@@ -618,15 +637,97 @@ class UnifiedSyncService {
 	}
 
 	/**
-	 * Merge profiles (Record<string, Settings>) keeping all unique profile names
+	 * Purge tombstones (deleted profiles) older than 30 days
+	 * This prevents the sync data from accumulating deleted entries indefinitely
+	 */
+	private purgeProfileTombstones(profiles: any): any {
+		const now = Date.now();
+		const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+		return Object.fromEntries(
+			Object.entries(profiles).filter(([profileName, profile]: [string, any]) => {
+				// Keep active profiles (no deletedOn timestamp)
+				if (!profile.deletedOn) return true;
+
+				// Purge tombstones older than 30 days
+				const deletedTimestamp = new Date(profile.deletedOn).getTime();
+				const age = now - deletedTimestamp;
+				return age < THIRTY_DAYS_MS;
+			})
+		);
+	}
+
+	/**
+	 * Merge profiles using timestamp-based conflict resolution
+	 * Handles deletedOn timestamps to properly sync deletions across devices
 	 */
 	private mergeProfiles(local: any, cloud: any): any {
-		// For profiles, we'll combine them with cloud profiles taking precedence
-		// Profiles are Record<string, Settings> where key is profile name
-		return {
-			...local,
-			...cloud
-		};
+		const merged: any = {};
+		const allProfileNames = new Set([
+			...Object.keys(local || {}),
+			...Object.keys(cloud || {})
+		]);
+
+		allProfileNames.forEach(profileName => {
+			const localProfile = local?.[profileName];
+			const cloudProfile = cloud?.[profileName];
+
+			if (!localProfile) {
+				// Only in cloud - use cloud version
+				merged[profileName] = this.ensureProfileTimestamp(cloudProfile);
+			} else if (!cloudProfile) {
+				// Only in local - use local version
+				merged[profileName] = this.ensureProfileTimestamp(localProfile);
+			} else {
+				// In both - determine which has the most recent user action
+				// Consider all timestamps: lastUpdated (settings change), deletedOn (deletion)
+				// Treat undefined timestamps as epoch (0) for legacy profiles
+				const localMostRecent = Math.max(
+					new Date(localProfile.lastUpdated || 0).getTime(),
+					new Date(localProfile.deletedOn || 0).getTime()
+				);
+
+				const cloudMostRecent = Math.max(
+					new Date(cloudProfile.lastUpdated || 0).getTime(),
+					new Date(cloudProfile.deletedOn || 0).getTime()
+				);
+
+				let winner;
+				if (cloudMostRecent > localMostRecent) {
+					winner = cloudProfile;
+				} else if (localMostRecent > cloudMostRecent) {
+					winner = localProfile;
+				} else {
+					// Timestamps equal (including both at epoch)
+					// Prefer active over deleted to prevent accidental data loss
+					if (cloudProfile.deletedOn && !localProfile.deletedOn) {
+						winner = localProfile; // Local is active, keep it
+					} else if (localProfile.deletedOn && !cloudProfile.deletedOn) {
+						winner = cloudProfile; // Cloud is active, keep it
+					} else {
+						// Both same state (both active or both deleted) - prefer local
+						winner = localProfile;
+					}
+				}
+
+				merged[profileName] = winner;
+			}
+		});
+
+		return merged;
+	}
+
+	/**
+	 * Ensure profile has a timestamp (migration for old profiles)
+	 */
+	private ensureProfileTimestamp(profile: any): any {
+		if (!profile.lastUpdated) {
+			return {
+				...profile,
+				lastUpdated: new Date().toISOString()
+			};
+		}
+		return profile;
 	}
 }
 
