@@ -277,14 +277,17 @@
 
       // Wait for authentication to complete by watching the accessToken store
       await new Promise<void>((resolve, reject) => {
+        let unsubscribe: (() => void) | undefined;
+
         const timeout = setTimeout(() => {
+          unsubscribe?.(); // Clean up subscription on timeout
           reject(new Error('Login timeout'));
         }, 90000); // 90 second timeout for OAuth popup
 
-        const unsubscribe = accessTokenStore.subscribe(token => {
+        unsubscribe = accessTokenStore.subscribe(token => {
           if (token) {
             clearTimeout(timeout);
-            unsubscribe();
+            unsubscribe?.(); // Use optional chaining in case callback fires immediately
             resolve();
           }
         });

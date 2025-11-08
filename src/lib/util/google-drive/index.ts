@@ -3,8 +3,6 @@ import { tokenManager } from './token-manager';
 import { driveApiClient, DriveApiError } from './api-client';
 import { driveState } from './drive-state';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
-import { providerManager } from '../sync/provider-manager';
-import { unifiedCloudManager } from '../sync/unified-cloud-manager';
 import { driveFilesCache } from './drive-files-cache';
 
 // Re-export the main modules
@@ -56,6 +54,11 @@ export async function signInToGoogleDrive(): Promise<void> {
 
 export async function signOutFromGoogleDrive(): Promise<void> {
   await tokenManager.logout();
+
+  // Dynamic imports to avoid circular dependency
+  const { unifiedCloudManager } = await import('../sync/unified-cloud-manager');
+  const { providerManager } = await import('../sync/provider-manager');
+
   unifiedCloudManager.clearCache();
   providerManager.updateStatus();
 }
@@ -65,7 +68,8 @@ export function isSignedIn(): boolean {
 }
 
 export async function syncReadProgress(): Promise<void> {
-  // Use unified sync manager for progress sync
+  // Use unified sync manager for progress sync (dynamic import to avoid circular dependency)
+  const { unifiedCloudManager } = await import('../sync/unified-cloud-manager');
   await unifiedCloudManager.syncProgress({ silent: false });
 }
 

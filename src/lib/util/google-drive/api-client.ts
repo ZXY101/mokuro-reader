@@ -1,8 +1,5 @@
 import { GOOGLE_DRIVE_CONFIG, type DriveFile } from './constants';
 import { tokenManager } from './token-manager';
-import { miscSettings } from '$lib/settings/misc';
-import { showSnackbar } from '../snackbar';
-import { get } from 'svelte/store';
 
 /**
  * Escapes special characters in file/folder names for use in Google Drive API queries.
@@ -31,6 +28,68 @@ export class DriveApiError extends Error {
     super(message);
     this.name = 'DriveApiError';
   }
+}
+
+/**
+ * Handle authentication errors (401/403) with auto re-auth support
+ * Extracted to be reusable across api-client and provider
+ *
+ * @param status HTTP status code
+ * @param retryOnAuth Whether to allow retry (prevents infinite loops)
+ * @throws DriveApiError with appropriate message
+ */
+export async function handleAuthError(status: number, retryOnAuth = true): Promise<never> {
+  console.log('API call failed with auth error, token may be expired');
+
+  // Check if auto re-auth is enabled
+  const { miscSettings } = await import('$lib/settings/misc');
+  const { get: getStore } = await import('svelte/store');
+  const { showSnackbar } = await import('../snackbar');
+
+  const settings = getStore(miscSettings);
+  console.log('🔍 Auto re-auth check:', {
+    gdriveAutoReAuth: settings.gdriveAutoReAuth,
+    retryOnAuth,
+    willAttemptReauth: settings.gdriveAutoReAuth && retryOnAuth
+  });
+
+  if (settings.gdriveAutoReAuth && retryOnAuth) {
+    console.log('🚀 Auto re-auth enabled, triggering re-authentication...');
+    showSnackbar('Session expired. Re-authenticating...');
+
+    // Trigger re-authentication WITHOUT clearing the token first
+    // This prevents the app from entering "logged out" state during re-auth
+    // The token will be replaced when re-auth succeeds
+    // If re-auth fails/is cancelled, the token will be cleared in the callback
+    tokenManager.reAuthenticate();
+
+    // Still throw the error to fail the current operation
+    // The user mentioned we don't need retry logic since syncs
+    // happen as part of the connection flow after re-auth
+    throw new DriveApiError(
+      'Authentication expired. Re-authentication in progress...',
+      status,
+      false
+    );
+  }
+
+  // If auto re-auth is disabled, clear the token and throw error
+  console.log('⚠️ Auto re-auth disabled or retryOnAuth=false, clearing token');
+  tokenManager.clearToken();
+
+  if (retryOnAuth) {
+    throw new DriveApiError(
+      'Authentication expired. Please sign in again.',
+      status,
+      false
+    );
+  }
+
+  throw new DriveApiError(
+    'Authentication error',
+    status,
+    false
+  );
 }
 
 class DriveApiClient {
@@ -92,40 +151,7 @@ class DriveApiClient {
 
       // Handle authentication errors
       if (!isNetworkError && (error.status === 401 || error.status === 403)) {
-        console.log('API call failed with auth error, token may be expired');
-
-        // Check if auto re-auth is enabled
-        const settings = get(miscSettings);
-        if (settings.gdriveAutoReAuth && retryOnAuth) {
-          console.log('Auto re-auth enabled, triggering re-authentication...');
-          showSnackbar('Session expired. Re-authenticating...');
-
-          // Trigger re-authentication WITHOUT clearing the token first
-          // This prevents the app from entering "logged out" state during re-auth
-          // The token will be replaced when re-auth succeeds
-          // If re-auth fails/is cancelled, the token will be cleared in the callback
-          tokenManager.reAuthenticate();
-
-          // Still throw the error to fail the current operation
-          // The user mentioned we don't need retry logic since syncs
-          // happen as part of the connection flow after re-auth
-          throw new DriveApiError(
-            'Authentication expired. Re-authentication in progress...',
-            error.status,
-            false
-          );
-        }
-
-        // If auto re-auth is disabled, clear the token and throw error
-        tokenManager.clearToken();
-
-        if (retryOnAuth) {
-          throw new DriveApiError(
-            'Authentication expired. Please sign in again.',
-            error.status,
-            false
-          );
-        }
+        await handleAuthError(error.status, retryOnAuth);
       }
 
       throw new DriveApiError(
@@ -180,25 +206,81 @@ class DriveApiClient {
     });
   }
 
-  async getFileContent(fileId: string): Promise<string> {
-    return this.handleApiCall(async () => {
-      const { body } = await gapi.client.drive.files.get({
-        fileId,
-        alt: 'media'
-      });
-      return body;
+  /**
+   * Download a file as Blob with progress tracking
+   * Uses XMLHttpRequest for progress events, includes automatic auth error handling
+   */
+  async downloadFile(
+    fileId: string,
+    onProgress?: (loaded: number, total: number) => void
+  ): Promise<Blob> {
+    // Get current access token
+    const token = this.getCurrentToken();
+    if (!token) {
+      throw new DriveApiError('No access token available', 401);
+    }
+
+    // First get file size for progress tracking
+    let totalSize = 0;
+    if (onProgress) {
+      try {
+        const metadata = await this.getFileMetadata(fileId, 'size');
+        totalSize = parseInt(metadata.size || '0', 10);
+      } catch (error) {
+        // Size fetch failed, continue without total size
+        console.warn('Could not fetch file size for progress tracking');
+      }
+    }
+
+    // Download file with XMLHttpRequest for progress tracking
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.responseType = 'blob';
+
+      xhr.onprogress = (event) => {
+        if (onProgress && event.lengthComputable) {
+          onProgress(event.loaded, totalSize || event.total);
+        }
+      };
+
+      xhr.onload = async () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(xhr.response as Blob);
+        } else if (xhr.status === 401 || xhr.status === 403) {
+          // Handle authentication errors using shared helper
+          try {
+            await handleAuthError(xhr.status);
+          } catch (error) {
+            reject(error);
+          }
+        } else {
+          reject(new DriveApiError(`HTTP error ${xhr.status}: ${xhr.statusText}`, xhr.status));
+        }
+      };
+
+      xhr.onerror = () => reject(new DriveApiError('Network error during download', 0, true));
+      xhr.ontimeout = () => reject(new DriveApiError('Download timed out', 0, true));
+      xhr.onabort = () => reject(new DriveApiError('Download aborted', 0, true));
+
+      xhr.send();
     });
   }
 
+  /**
+   * Upload a file (Blob) to Google Drive
+   * Handles both create (no fileId) and update (with fileId) operations
+   */
   async uploadFile(
-    content: string,
+    blob: Blob,
     metadata: { name: string; mimeType: string; parents?: string[] },
     fileId?: string
   ): Promise<{ id: string }> {
     return this.handleApiCall(async () => {
       const form = new FormData();
-      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: metadata.mimeType }));
-      form.append('file', new Blob([content], { type: metadata.mimeType }));
+      form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+      form.append('file', blob);
 
       const url = `https://www.googleapis.com/upload/drive/v3/files${fileId ? `/${fileId}` : ''}?uploadType=multipart`;
       const token = tokenManager.isAuthenticated() ? this.getCurrentToken() : null;

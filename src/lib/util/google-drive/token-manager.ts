@@ -2,7 +2,6 @@ import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { GOOGLE_DRIVE_CONFIG, type TokenInfo } from './constants';
 import { showSnackbar } from '../snackbar';
-import { providerManager } from '../sync/provider-manager';
 import { miscSettings } from '$lib/settings/misc';
 import { get } from 'svelte/store';
 
@@ -137,8 +136,10 @@ class TokenManager {
       gapi.client.setToken(null);
     }
 
-    // Update provider manager to trigger reactive updates
-    providerManager.updateStatus();
+    // Update provider manager to trigger reactive updates (dynamic import to avoid circular dependency)
+    import('../sync/provider-manager').then(({ providerManager }) => {
+      providerManager.updateStatus();
+    });
   }
 
   async revokeToken(token: string): Promise<void> {
@@ -216,8 +217,10 @@ class TokenManager {
           this.setToken(access_token, expires_in);
           gapi.client.setToken({ access_token });
 
-          // Update provider manager to trigger reactive updates
-          providerManager.updateStatus();
+          // Update provider manager to trigger reactive updates (dynamic import to avoid circular dependency)
+          import('../sync/provider-manager').then(({ providerManager }) => {
+            providerManager.updateStatus();
+          });
         }
       }
     });
@@ -304,6 +307,7 @@ class TokenManager {
 
   // Manual re-authentication (minimal UI, reuses existing permissions)
   reAuthenticate(): void {
+    console.log('🔄 reAuthenticate() called');
     this.requestNewToken(false);
   }
 }
