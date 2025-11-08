@@ -21,7 +21,7 @@
   } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { backupQueue } from '$lib/util/backup-queue';
-  import { driveState } from '$lib/util/google-drive';
+  import { driveState, tokenManager } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
@@ -277,14 +277,17 @@
 
       // Wait for authentication to complete by watching the accessToken store
       await new Promise<void>((resolve, reject) => {
+        let unsubscribe: (() => void) | undefined;
+
         const timeout = setTimeout(() => {
+          unsubscribe?.(); // Clean up subscription on timeout
           reject(new Error('Login timeout'));
         }, 90000); // 90 second timeout for OAuth popup
 
-        const unsubscribe = accessTokenStore.subscribe(token => {
+        unsubscribe = accessTokenStore.subscribe(token => {
           if (token) {
             clearTimeout(timeout);
-            unsubscribe();
+            unsubscribe?.(); // Use optional chaining in case callback fires immediately
             resolve();
           }
         });
@@ -402,6 +405,73 @@
     showSnackbar('Logged out of WebDAV');
   }
 
+  // Browser detection and settings URL generation
+  function getBrowserInfo() {
+    const ua = navigator.userAgent;
+    const isChrome = /Chrome/.test(ua) && /Google Inc/.test(navigator.vendor);
+    const isEdge = /Edg/.test(ua);
+    const isFirefox = /Firefox/.test(ua);
+    const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua);
+
+    // Get current site URL for settings
+    const siteUrl = encodeURIComponent(window.location.origin);
+
+    if (isEdge) {
+      return {
+        name: 'Edge',
+        settingsUrl: `edge://settings/content/siteDetails?site=${siteUrl}`,
+        instructions: [
+          'Click the link below to copy the Edge settings URL',
+          'Paste it into your address bar and press Enter',
+          'Toggle "Pop-ups and redirects" to "Allow"',
+          'Return here and click the test button to verify'
+        ]
+      };
+    } else if (isChrome) {
+      return {
+        name: 'Chrome',
+        settingsUrl: `chrome://settings/content/siteDetails?site=${siteUrl}`,
+        instructions: [
+          'Click the link below to copy the Chrome settings URL',
+          'Paste it into your address bar and press Enter',
+          'Toggle "Pop-ups and redirects" to "Allow"',
+          'Return here and click the test button to verify'
+        ]
+      };
+    } else if (isFirefox) {
+      return {
+        name: 'Firefox',
+        settingsUrl: 'about:preferences#privacy',
+        instructions: [
+          'Click the permissions icon (🔒) in the address bar',
+          'Find "Open pop-up windows" and change to "Allow"',
+          'Or: Settings → Privacy & Security → Permissions → Pop-ups → Exceptions'
+        ]
+      };
+    } else if (isSafari) {
+      return {
+        name: 'Safari',
+        settingsUrl: null,
+        instructions: [
+          'Safari → Settings → Websites → Pop-up Windows',
+          'Find this website in the list',
+          'Change setting to "Allow"'
+        ]
+      };
+    } else {
+      return {
+        name: 'Unknown',
+        settingsUrl: null,
+        instructions: [
+          'Click the popup blocked icon in your address bar',
+          'Select "Always allow popups from this site"',
+          'Click the test button below to verify it works'
+        ]
+      };
+    }
+  }
+
+  let browserInfo = $derived(getBrowserInfo());
 
   async function backupAllSeries() {
     // Get default provider
@@ -638,6 +708,66 @@
           <p class="text-xs text-gray-500">
             Keeps your progress synced during long reading sessions. Automatically prompts re-authentication when your session expires (~1 hour).
           </p>
+
+          {#if $miscSettings.gdriveAutoReAuth}
+            <div class="mt-2 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
+              <h4 class="text-sm font-semibold text-yellow-200 mb-2">⚠️ Popup Permission Required ({browserInfo.name})</h4>
+              <p class="text-xs text-gray-300 mb-3">
+                For auto re-authentication to work, you must allow popups for this site. Otherwise, the browser will block automatic re-authentication attempts.
+              </p>
+              <div class="text-xs text-gray-300 space-y-1 mb-3">
+                <p class="font-medium">To enable popups:</p>
+                <ol class="list-decimal list-inside pl-2 space-y-1">
+                  {#each browserInfo.instructions as instruction}
+                    <li>{instruction}</li>
+                  {/each}
+                </ol>
+                {#if browserInfo.settingsUrl}
+                  <div class="mt-2">
+                    <p class="text-xs text-gray-400">
+                      <span
+                        role="button"
+                        tabindex="0"
+                        class="text-yellow-400 underline cursor-pointer hover:text-yellow-300 font-mono"
+                        onclick={() => {
+                          navigator.clipboard.writeText(browserInfo.settingsUrl);
+                          showSnackbar(`Copied! Paste this into your address bar`);
+                        }}
+                        onkeydown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            navigator.clipboard.writeText(browserInfo.settingsUrl);
+                            showSnackbar(`Copied! Paste this into your address bar`);
+                          }
+                        }}
+                      >
+                        {browserInfo.settingsUrl}
+                      </span>
+                    </p>
+                  </div>
+                {/if}
+              </div>
+              <Button
+                size="xs"
+                color="yellow"
+                on:click={() => {
+                  showSnackbar('Testing in 5 seconds... Do NOT click or interact until the popup appears!');
+                  // Use 5 second timeout to escape Chrome's user gesture window (~2-5 seconds)
+                  // This properly tests if popups are allowed for true background triggers (like auto re-auth)
+                  setTimeout(() => {
+                    try {
+                      tokenManager.reAuthenticate();
+                      showSnackbar('✅ Test triggered - if you see the Google auth popup, popups are allowed!');
+                    } catch (error) {
+                      showSnackbar('❌ Test failed - popup was blocked! Please enable popups for this site.');
+                    }
+                  }, 5000);
+                }}
+              >
+                Test Popup Permission
+              </Button>
+            </div>
+          {/if}
         </div>
 
         <div class="flex-col gap-2 flex">
