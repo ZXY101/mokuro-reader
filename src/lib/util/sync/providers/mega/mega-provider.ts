@@ -644,7 +644,7 @@ export class MegaProvider implements SyncProvider {
 			});
 		} catch (error) {
 			throw new ProviderError(
-				`Failed to download volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,
 				'mega',
 				'DOWNLOAD_FAILED',
 				false,
