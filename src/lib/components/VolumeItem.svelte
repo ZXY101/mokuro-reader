@@ -275,7 +275,7 @@
   {:else}
     <!-- Grid view -->
     <div
-      class="relative flex flex-col gap-2 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-2 border-transparent"
+      class="relative flex flex-col gap-2 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-2 border-transparent sm:w-[250px]"
       class:!border-green-400={isComplete}
     >
       <!-- Actions menu button -->
@@ -310,19 +310,17 @@
 
       <a href="/{$page.params.manga}/{volume_uuid}" class="flex flex-col gap-2">
         {#if volume.thumbnail}
-          <div class="w-full aspect-[5/7] bg-black rounded border border-gray-300 dark:border-gray-700 flex items-center justify-center">
-            <img
-              src={URL.createObjectURL(volume.thumbnail)}
-              alt={volName}
-              class="object-contain w-full h-full rounded"
-            />
-          </div>
+          <img
+            src={URL.createObjectURL(volume.thumbnail)}
+            alt={volName}
+            class="object-contain sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border"
+          />
         {:else}
-          <div class="w-full aspect-[5/7] bg-gray-200 dark:bg-gray-700 rounded border border-gray-300 dark:border-gray-700 flex items-center justify-center">
+          <div class="sm:w-[250px] sm:h-[350px] bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-700 flex items-center justify-center">
             <span class="text-gray-400">No thumbnail</span>
           </div>
         {/if}
-        <div class="flex items-center gap-1">
+        <div class="flex items-center gap-1 sm:w-[250px]">
           <div
             class="text-sm font-medium truncate flex-1"
             class:text-green-400={isComplete}
@@ -333,7 +331,7 @@
             <CheckCircleSolid class="w-5 h-5 text-green-400 flex-shrink-0" />
           {/if}
         </div>
-        <div class="flex flex-wrap gap-x-2 items-center text-xs"
+        <div class="flex flex-wrap gap-x-2 items-center text-xs sm:w-[250px]"
           class:text-green-400={isComplete}
           class:text-gray-500={!isComplete}
           class:dark:text-gray-400={!isComplete}

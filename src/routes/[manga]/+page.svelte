@@ -642,7 +642,7 @@
     {:else}
       <!-- Grid view -->
       <div class="flex flex-col gap-4">
-        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
           {#each manga as volume (volume.volume_uuid)}
             <VolumeItem {volume} variant="grid" />
           {/each}
@@ -656,7 +656,7 @@
               Download all
             </Button>
           </div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
             {#each placeholders as placeholder (placeholder.volume_uuid)}
               <PlaceholderVolumeItem volume={placeholder} variant="grid" />
             {/each}
