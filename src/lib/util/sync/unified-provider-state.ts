@@ -34,8 +34,8 @@ function createUnifiedProviderState(): Readable<UnifiedProviderState> {
 	let hasLoadedOnce = false;
 
 	return derived(
-		[cacheManager.isFetchingState],
-		([$isCacheLoading]) => {
+		[cacheManager.isFetchingState, providerManager.status],
+		([$isCacheLoading, $providerStatus]) => {
 			const provider = providerManager.getActiveProvider();
 
 			// Track if cache has loaded at least once
@@ -55,7 +55,8 @@ function createUnifiedProviderState(): Readable<UnifiedProviderState> {
 				};
 			}
 
-			const status = provider.getStatus();
+			// Use status from providerManager (reactive) instead of calling getStatus() directly
+			const status = $providerStatus.providers[provider.type] || provider.getStatus();
 			const isFullyConnected = status.isAuthenticated && hasLoadedOnce && !$isCacheLoading;
 
 			return {

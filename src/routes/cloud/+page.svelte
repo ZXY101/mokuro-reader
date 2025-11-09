@@ -32,15 +32,18 @@
   import { providerManager, megaProvider, webdavProvider, googleDriveProvider } from '$lib/util/sync';
   import { queueVolumesFromCloudFiles } from '$lib/util/download-queue';
   import { unifiedSyncService } from '$lib/util/sync/unified-sync-service';
+  import { cacheManager } from '$lib/util/sync/cache-manager';
 
   // Get store references for auto-subscription
   const providerStatusStore = providerManager.status;
+  const cacheIsFetchingStore = cacheManager.isFetchingState;
 
   // Use Svelte's derived runes for automatic store subscriptions
   let accessToken = $derived($accessTokenStore);
   // Note: readerFolderId, volumeDataId, profilesId removed - legacy Drive-specific stores (now use unified provider system)
   let tokenClient = $derived($tokenClientStore);
   let state = $derived($driveState);
+  let cacheIsFetching = $derived($cacheIsFetchingStore);
 
   // Reactive provider authentication checks - now using provider manager for all providers
   // Use derived to reactively compute auth states from the status store
@@ -632,7 +635,7 @@
           <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-3">
               <h2 class="text-3xl font-semibold">{providerNames[currentProvider]}</h2>
-              {#if currentProvider === 'google-drive' && state.isCacheLoading && !state.isCacheLoaded}
+              {#if currentProvider === 'google-drive' && cacheIsFetching}
                 <Badge color="yellow">Loading Drive data...</Badge>
               {:else}
                 <Badge color="green">Connected</Badge>
