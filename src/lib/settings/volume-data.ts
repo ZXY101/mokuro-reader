@@ -2,7 +2,6 @@ import { browser } from '$app/environment';
 import { derived, writable, readable } from 'svelte/store';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
-import { currentVolume } from '$lib/catalog';
 import { settings as globalSettings } from './settings';
 import { db } from '$lib/catalog/db';
 
@@ -627,18 +626,4 @@ export const totalStats = derived([volumes, page], ([$volumes, $page]) => {
 });
 
 // mangaStats moved to series page to avoid circular dependency with currentSeries
-
-export const volumeStats = derived([currentVolume, volumes], ([$currentVolume, $volumes]) => {
-  if ($currentVolume && $volumes) {
-    const { chars, completed, timeReadInMinutes, progress, lastProgressUpdate } =
-      $volumes[$currentVolume.volume_uuid];
-    return { chars, completed, timeReadInMinutes, progress, lastProgressUpdate };
-  }
-  return {
-    chars: 0,
-    completed: 0,
-    timeReadInMinutes: 0,
-    progress: 0,
-    lastProgressUpdate: new Date(0).toISOString()
-  };
-});
+// volumeStats moved to Timer component to avoid circular dependency with currentVolume

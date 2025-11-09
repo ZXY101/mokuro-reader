@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { startCount, volumeStats, volumes } from '$lib/settings';
+  import { startCount, volumes } from '$lib/settings';
   import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
-  import { currentVolumeCharacterCount } from '$lib/catalog';
+  import { currentVolume, currentVolumeCharacterCount } from '$lib/catalog';
   import { calculateVolumeTimeToFinish } from '$lib/util/reading-speed';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
+  import { derived } from 'svelte/store';
 
   interface Props {
     count: number | undefined;
@@ -13,6 +14,22 @@
   }
 
   let { count = $bindable(), volumeId }: Props = $props();
+
+  // Local volumeStats to avoid circular dependency with currentVolume
+  const volumeStats = derived([currentVolume, volumes], ([$currentVolume, $volumes]) => {
+    if ($currentVolume && $volumes) {
+      const { chars, completed, timeReadInMinutes, progress, lastProgressUpdate } =
+        $volumes[$currentVolume.volume_uuid];
+      return { chars, completed, timeReadInMinutes, progress, lastProgressUpdate };
+    }
+    return {
+      chars: 0,
+      completed: 0,
+      timeReadInMinutes: 0,
+      progress: 0,
+      lastProgressUpdate: new Date(0).toISOString()
+    };
+  });
 
   let active = $derived(Boolean(count));
 
