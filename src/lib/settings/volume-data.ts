@@ -2,7 +2,7 @@ import { browser } from '$app/environment';
 import { derived, writable, readable } from 'svelte/store';
 import { zoomDefault } from '$lib/panzoom';
 import { page } from '$app/stores';
-import { currentSeries, currentVolume } from '$lib/catalog';
+import { currentVolume } from '$lib/catalog';
 import { settings as globalSettings } from './settings';
 import { db } from '$lib/catalog/db';
 
@@ -626,26 +626,7 @@ export const totalStats = derived([volumes, page], ([$volumes, $page]) => {
   }
 });
 
-export const mangaStats = derived([currentSeries, volumes], ([$titleVolumes, $volumes]) => {
-  if ($titleVolumes && $volumes) {
-    return $titleVolumes
-      .map((vol) => vol.volume_uuid)
-      .reduce(
-        (stats: any, volumeId) => {
-          const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
-          const chars = $volumes[volumeId]?.chars || 0;
-          const completed = $volumes[volumeId]?.completed || 0;
-
-          stats.timeReadInMinutes = stats.timeReadInMinutes + timeReadInMinutes;
-          stats.chars = stats.chars + chars;
-          stats.completed = stats.completed + completed;
-
-          return stats;
-        },
-        { timeReadInMinutes: 0, chars: 0, completed: 0 }
-      );
-  }
-});
+// mangaStats moved to series page to avoid circular dependency with currentSeries
 
 export const volumeStats = derived([currentVolume, volumes], ([$currentVolume, $volumes]) => {
   if ($currentVolume && $volumes) {

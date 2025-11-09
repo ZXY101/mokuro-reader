@@ -11,24 +11,156 @@
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { page } from '$app/stores';
   import type { VolumeMetadata } from '$lib/types';
-  import { deleteVolume, mangaStats } from '$lib/settings';
-  import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid, FileLinesOutline } from 'flowbite-svelte-icons';
+  import { deleteVolume, volumes, progress } from '$lib/settings';
+  import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
+  import { CloudArrowUpOutline, TrashBinSolid, DownloadSolid, FileLinesOutline, SortOutline, GridOutline, ListOutline } from 'flowbite-svelte-icons';
   import { backupQueue } from '$lib/util/backup-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
+  import { browser } from '$app/environment';
+  import { getCharCount } from '$lib/util/count-chars';
 
-  function sortManga(a: VolumeMetadata, b: VolumeMetadata) {
-    return a.volume_title.localeCompare(b.volume_title, undefined, {
-      numeric: true,
-      sensitivity: 'base'
-    });
+  // Calculate manga stats locally to avoid circular dependency
+  let mangaStats = $derived.by(() => {
+    if (!manga || manga.length === 0 || !$volumes) return null;
+
+    return manga
+      .map((vol) => vol.volume_uuid)
+      .reduce(
+        (stats, volumeId) => {
+          const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
+          const chars = $volumes[volumeId]?.chars || 0;
+          const completed = $volumes[volumeId]?.completed || 0;
+
+          stats.timeReadInMinutes = stats.timeReadInMinutes + timeReadInMinutes;
+          stats.chars = stats.chars + chars;
+          stats.completed = stats.completed + completed;
+
+          return stats;
+        },
+        { timeReadInMinutes: 0, chars: 0, completed: 0 }
+      );
+  });
+
+  // Track Japanese character counts per volume (calculated from pages)
+  let volumeJapaneseChars = $state<Map<string, number>>(new Map());
+
+  // Calculate Japanese character counts from pages data when manga list changes
+  $effect(() => {
+    if (!manga || manga.length === 0) return;
+
+    const fetchCharCounts = async () => {
+      const charCounts = new Map<string, number>();
+
+      for (const vol of manga) {
+        const volumeData = await db.volumes_data.get(vol.volume_uuid);
+        if (volumeData?.pages) {
+          const { charCount } = getCharCount(volumeData.pages);
+          charCounts.set(vol.volume_uuid, charCount);
+        }
+      }
+
+      volumeJapaneseChars = charCounts;
+    };
+
+    fetchCharCounts();
+  });
+
+  // Calculate total Japanese characters in series
+  let totalSeriesChars = $derived.by(() => {
+    if (!manga || manga.length === 0) return 0;
+    return manga.reduce((total, vol) => {
+      return total + (volumeJapaneseChars.get(vol.volume_uuid) || 0);
+    }, 0);
+  });
+
+  let estimatedMinutesLeft = $derived.by(() => {
+    if (!mangaStats || !totalSeriesChars) return null;
+
+    const charsRemaining = totalSeriesChars - mangaStats.chars;
+    if (charsRemaining <= 0) return null;
+
+    // Get personalized reading speed
+    const readingSpeed = $personalizedReadingSpeed;
+    if (!readingSpeed.isPersonalized || readingSpeed.charsPerMinute <= 0) {
+      return null;
+    }
+
+    return Math.ceil(charsRemaining / readingSpeed.charsPerMinute);
+  });
+
+  // Format time display
+  function formatTime(minutes: number): string {
+    if (minutes < 60) {
+      return `${minutes}m`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   }
 
-  let allVolumes = $derived(
-    $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes.sort(sortManga)
+  // View mode state (persisted to localStorage)
+  type ViewMode = 'list' | 'grid';
+  let viewMode = $state<ViewMode>(
+    (browser && localStorage.getItem('series-view-mode') as ViewMode) || 'list'
   );
+
+  // Sort mode state (persisted to localStorage)
+  type SortMode = 'unread-first' | 'alphabetical';
+  let sortMode = $state<SortMode>(
+    (browser && localStorage.getItem('series-sort-mode') as SortMode) || 'unread-first'
+  );
+
+  // Update localStorage when modes change
+  $effect(() => {
+    if (browser) {
+      localStorage.setItem('series-view-mode', viewMode);
+      localStorage.setItem('series-sort-mode', sortMode);
+    }
+  });
+
+  function toggleViewMode() {
+    viewMode = viewMode === 'list' ? 'grid' : 'list';
+  }
+
+  function toggleSortMode() {
+    sortMode = sortMode === 'unread-first' ? 'alphabetical' : 'unread-first';
+  }
+
+  // Reactive sorted volumes - avoids circular dependency by making sorting fully reactive
+  let allVolumes = $derived.by(() => {
+    const seriesVolumes = $catalog?.find((item) => item.series_uuid === $page.params.manga)?.volumes;
+    if (!seriesVolumes) return undefined;
+
+    // Create a copy to sort
+    const volumesToSort = [...seriesVolumes];
+
+    volumesToSort.sort((a, b) => {
+      if (sortMode === 'unread-first') {
+        // Get completion status from current page position only (source of truth)
+        const aCurrentPage = $progress?.[a.volume_uuid] || 0;
+        const bCurrentPage = $progress?.[b.volume_uuid] || 0;
+
+        const aComplete = aCurrentPage === a.page_count || aCurrentPage === a.page_count - 1;
+        const bComplete = bCurrentPage === b.page_count || bCurrentPage === b.page_count - 1;
+
+        // Sort unread first, then by title
+        if (aComplete !== bComplete) {
+          return aComplete ? 1 : -1; // Unread (false) comes before complete (true)
+        }
+      }
+
+      // Within same completion status (or alphabetical mode), sort alphabetically
+      return a.volume_title.localeCompare(b.volume_title, undefined, {
+        numeric: true,
+        sensitivity: 'base'
+      });
+    });
+
+    return volumesToSort;
+  });
 
   // Separate real volumes from placeholders
   let manga = $derived(allVolumes?.filter(v => !v.isPlaceholder) || []);
@@ -398,15 +530,18 @@
   <div class="flex justify-center items-center p-16">
     <Spinner size="12" />
   </div>
-{:else if manga && manga.length > 0 && $mangaStats}
+{:else if manga && manga.length > 0 && mangaStats}
   <div class="p-2 flex flex-col gap-5">
     <div class="flex flex-row justify-between">
       <div class="flex flex-col gap-2">
         <h3 class="font-bold">{manga[0].series_title}</h3>
         <div class="flex flex-col gap-0 sm:flex-row sm:gap-5">
-          <p>Volumes: {$mangaStats.completed} / {manga.length}</p>
-          <p>Characters read: {$mangaStats.chars}</p>
-          <p>Minutes read: {$mangaStats.timeReadInMinutes}</p>
+          <p>Volumes: {mangaStats.completed} / {manga.length}</p>
+          <p>Characters read: {mangaStats.chars}</p>
+          <p>Minutes read: {mangaStats.timeReadInMinutes}</p>
+          {#if estimatedMinutesLeft !== null}
+            <p>Minutes left: ~{formatTime(estimatedMinutesLeft)}</p>
+          {/if}
         </div>
       </div>
       <div class="flex flex-row gap-2 items-start">
@@ -441,7 +576,40 @@
         </Button>
       </div>
     </div>
-    <Listgroup active class="flex-1 h-full w-full">
+
+    <!-- View and Sort controls -->
+    <div class="flex gap-1 justify-end py-2">
+      <Button
+        size="sm"
+        color="alternative"
+        on:click={toggleViewMode}
+        class="min-w-10 h-10 flex items-center justify-center"
+      >
+        {#if viewMode === 'list'}
+          <GridOutline class="w-5 h-5" />
+        {:else}
+          <ListOutline class="w-5 h-5" />
+        {/if}
+      </Button>
+      <Button
+        size="sm"
+        color="alternative"
+        on:click={toggleSortMode}
+        class="min-w-10 h-10 flex items-center justify-center"
+      >
+        <SortOutline class="w-5 h-5" />
+        <span class="ml-1 text-xs">
+          {#if sortMode === 'unread-first'}
+            Unread
+          {:else}
+            A-Z
+          {/if}
+        </span>
+      </Button>
+    </div>
+
+    {#if viewMode === 'list'}
+      <Listgroup active class="flex-1 h-full w-full">
       {#if hasDuplicates && hasAnyProvider}
         <div class="mb-4 flex items-center justify-between px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded">
           <h4 class="text-sm font-semibold text-red-600 dark:text-red-400">Duplicates found in {providerDisplayName} ({duplicateCloudFiles.length})</h4>
@@ -453,7 +621,7 @@
       {/if}
 
       {#each manga as volume (volume.volume_uuid)}
-        <VolumeItem {volume} />
+        <VolumeItem {volume} variant="list" />
       {/each}
 
       {#if placeholders && placeholders.length > 0}
@@ -467,10 +635,35 @@
           {/if}
         </div>
         {#each placeholders as placeholder (placeholder.volume_uuid)}
-          <PlaceholderVolumeItem volume={placeholder} />
+          <PlaceholderVolumeItem volume={placeholder} variant="list" />
         {/each}
       {/if}
     </Listgroup>
+    {:else}
+      <!-- Grid view -->
+      <div class="flex flex-col gap-4">
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {#each manga as volume (volume.volume_uuid)}
+            <VolumeItem {volume} variant="grid" />
+          {/each}
+        </div>
+
+        {#if placeholders && placeholders.length > 0 && hasAnyProvider}
+          <div class="flex items-center justify-between px-2 pt-4">
+            <h4 class="text-sm font-semibold text-gray-400">Available in {providerDisplayName} ({placeholders.length})</h4>
+            <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
+              <DownloadSolid class="w-3 h-3 me-1" />
+              Download all
+            </Button>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {#each placeholders as placeholder (placeholder.volume_uuid)}
+              <PlaceholderVolumeItem volume={placeholder} variant="grid" />
+            {/each}
+          </div>
+        {/if}
+      </div>
+    {/if}
   </div>
 {:else}
   <div class="flex justify-center p-16">Manga not found</div>
