@@ -4,7 +4,7 @@
   import VolumeItem from '$lib/components/VolumeItem.svelte';
   import PlaceholderVolumeItem from '$lib/components/PlaceholderVolumeItem.svelte';
   import BackupButton from '$lib/components/BackupButton.svelte';
-  import { Button, Listgroup, Spinner } from 'flowbite-svelte';
+  import { Button, Listgroup, Spinner, Badge } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga, showSnackbar } from '$lib/util';
   import { promptExtraction } from '$lib/util/modals';
@@ -104,7 +104,7 @@
   // View mode state (persisted to localStorage)
   type ViewMode = 'list' | 'grid';
   let viewMode = $state<ViewMode>(
-    (browser && localStorage.getItem('series-view-mode') as ViewMode) || 'list'
+    (browser && localStorage.getItem('series-view-mode') as ViewMode) || 'grid'
   );
 
   // Sort mode state (persisted to localStorage)
@@ -532,79 +532,93 @@
   </div>
 {:else if manga && manga.length > 0 && mangaStats}
   <div class="p-2 flex flex-col gap-5">
-    <div class="flex flex-row justify-between">
-      <div class="flex flex-col gap-2">
-        <h3 class="font-bold">{manga[0].series_title}</h3>
-        <div class="flex flex-col gap-0 sm:flex-row sm:gap-5">
-          <p>Volumes: {mangaStats.completed} / {manga.length}</p>
-          <p>Characters read: {mangaStats.chars}</p>
-          <p>Minutes read: {mangaStats.timeReadInMinutes}</p>
-          {#if estimatedMinutesLeft !== null}
-            <p>Minutes left: ~{formatTime(estimatedMinutesLeft)}</p>
-          {/if}
-        </div>
-      </div>
-      <div class="flex flex-row gap-2 items-start">
-        <!-- Debug: hasAnyProvider={hasAnyProvider}, cacheHasLoaded={cacheHasLoaded}, isCloudReady={isCloudReady}, allBackedUp={allBackedUp}, anyBackedUp={anyBackedUp} -->
-        {#if isCloudReady}
-          {#if !allBackedUp}
-            <Button
-              color="light"
-              on:click={backupSeries}
-            >
-              <CloudArrowUpOutline class="w-4 h-4 me-2" />
-              {anyBackedUp ? 'Backup remaining volumes' : `Backup series to ${providerDisplayName}`}
-            </Button>
-          {/if}
-          {#if anyBackedUp}
-            <Button
-              color="red"
-              on:click={onDeleteFromCloud}
-            >
-              <TrashBinSolid class="w-4 h-4 me-2" />
-              Delete series from {providerDisplayName}
-            </Button>
-          {/if}
+    <!-- Header Row: Title on left, Stats on right -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+      <h3 class="text-2xl font-bold px-2 min-w-0 flex-shrink-2">{manga[0].series_title}</h3>
+      <div class="flex flex-row gap-2 px-2 text-base">
+        <Badge color="dark" class="!min-w-0 break-words">Volumes: {mangaStats.completed} / {manga.length}</Badge>
+        <Badge color="dark" class="!min-w-0 break-words">Characters: {mangaStats.chars}</Badge>
+        <Badge color="dark" class="!min-w-0 break-words">Minutes: {mangaStats.timeReadInMinutes}</Badge>
+        {#if estimatedMinutesLeft !== null}
+          <Badge color="dark" class="!min-w-0 break-words">Left: ~{formatTime(estimatedMinutesLeft)}</Badge>
         {/if}
-        <Button color="blue" on:click={goToSeriesText}>
-          <FileLinesOutline class="w-4 h-4 me-2" />
-          View Series Text
-        </Button>
-        <Button color="alternative" on:click={onDelete}>Remove manga</Button>
-        <Button color="light" on:click={onExtract} disabled={loading}>
-          {loading ? 'Extracting...' : 'Extract manga'}
-        </Button>
       </div>
     </div>
 
-    <!-- View and Sort controls -->
-    <div class="flex gap-1 justify-end py-2">
+    <!-- Actions Row: All buttons -->
+    <div class="flex flex-row gap-2 items-stretch justify-end">
+      <!-- Cloud buttons -->
+      {#if isCloudReady && !allBackedUp}
+        <Button
+          color="light"
+          on:click={backupSeries}
+          class="!min-w-0 self-stretch"
+        >
+          <CloudArrowUpOutline class="w-4 h-4 me-2 shrink-0" />
+          <span class="break-words">{anyBackedUp ? 'Backup remaining' : `Backup to ${providerDisplayName}`}</span>
+        </Button>
+      {/if}
+
+      {#if isCloudReady && anyBackedUp}
+        <Button
+          color="red"
+          on:click={onDeleteFromCloud}
+          class="!min-w-0 self-stretch"
+        >
+          <TrashBinSolid class="w-4 h-4 me-2 shrink-0" />
+          <span class="break-words">Delete from {providerDisplayName}</span>
+        </Button>
+      {/if}
+
+      <!-- Other action buttons -->
       <Button
-        size="sm"
-        color="alternative"
-        on:click={toggleViewMode}
-        class="min-w-10 h-10 flex items-center justify-center"
+        color="light"
+        on:click={onExtract}
+        disabled={loading}
+        class="!min-w-0 self-stretch"
       >
-        {#if viewMode === 'list'}
-          <GridOutline class="w-5 h-5" />
-        {:else}
-          <ListOutline class="w-5 h-5" />
-        {/if}
+        <DownloadSolid class="w-4 h-4 me-2 shrink-0" />
+        <span class="break-words">{loading ? 'Extracting...' : 'Extract'}</span>
       </Button>
+
+      <Button color="alternative" on:click={onDelete} class="!min-w-0 self-stretch">
+        <TrashBinSolid class="w-4 h-4 me-2 shrink-0" />
+        <span class="break-words">Remove manga</span>
+      </Button>
+
+      <!-- View buttons -->
+      <Button color="alternative" on:click={goToSeriesText} class="!min-w-0 self-stretch">
+        <FileLinesOutline class="w-4 h-4 me-2 shrink-0" />
+        <span class="break-words">View Series Text</span>
+      </Button>
+
       <Button
-        size="sm"
         color="alternative"
         on:click={toggleSortMode}
-        class="min-w-10 h-10 flex items-center justify-center"
+        class="!min-w-0 self-stretch"
       >
-        <SortOutline class="w-5 h-5" />
-        <span class="ml-1 text-xs">
+        <SortOutline class="w-5 h-5 me-2 shrink-0" />
+        <span class="break-words">
           {#if sortMode === 'unread-first'}
-            Unread
+            Unread first
           {:else}
             A-Z
           {/if}
         </span>
+      </Button>
+
+      <Button
+        color="alternative"
+        on:click={toggleViewMode}
+        class="!min-w-0 self-stretch"
+      >
+        {#if viewMode === 'list'}
+          <GridOutline class="w-5 h-5 me-2 shrink-0" />
+          <span class="break-words">Grid</span>
+        {:else}
+          <ListOutline class="w-5 h-5 me-2 shrink-0" />
+          <span class="break-words">List</span>
+        {/if}
       </Button>
     </div>
 
