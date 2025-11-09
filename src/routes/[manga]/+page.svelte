@@ -538,9 +538,9 @@
       <div class="flex flex-row gap-2 px-2 text-base">
         <Badge color="dark" class="!min-w-0 break-words">Volumes: {mangaStats.completed} / {manga.length}</Badge>
         <Badge color="dark" class="!min-w-0 break-words">Characters: {mangaStats.chars}</Badge>
-        <Badge color="dark" class="!min-w-0 break-words">Minutes: {mangaStats.timeReadInMinutes}</Badge>
+        <Badge color="dark" class="!min-w-0 break-words">Time Read: {formatTime(mangaStats.timeReadInMinutes)}</Badge>
         {#if estimatedMinutesLeft !== null}
-          <Badge color="dark" class="!min-w-0 break-words">Left: ~{formatTime(estimatedMinutesLeft)}</Badge>
+          <Badge color="dark" class="!min-w-0 break-words">Time Left: ~{formatTime(estimatedMinutesLeft)}</Badge>
         {/if}
       </div>
     </div>
