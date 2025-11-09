@@ -96,31 +96,26 @@ export const currentVolumeData: Readable<VolumeData | undefined> = derived(
 );
 
 /**
- * Effective character count for current volume - handles legacy volumes
- * where character_count wasn't stored in metadata by calculating from pages
+ * Japanese character count for current volume
+ * Always calculates from pages to ensure consistency with reading speed tracking
  */
 export const currentVolumeCharacterCount = derived(
   [currentVolume, currentVolumeData],
   ([$currentVolume, $currentVolumeData]) => {
     if (!$currentVolume) return 0;
 
-    // Prefer metadata if available
-    if ($currentVolume.character_count && $currentVolume.character_count > 0) {
-      return $currentVolume.character_count;
-    }
-
-    // Fallback: calculate from pages for legacy volumes
+    // Always calculate Japanese characters from pages
     if ($currentVolumeData && $currentVolumeData.pages) {
-      // Import getCharCount inline to avoid circular dependency
+      // Use getCharCount for consistency with reading tracker
+      // Import inline to avoid circular dependency
+      const japaneseRegex =
+        /[○◯々-〇〻ぁ-ゖゝ-ゞァ-ヺー\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Han}]/u;
+
       let totalChars = 0;
       for (const page of $currentVolumeData.pages) {
         for (const block of page.blocks) {
           for (const line of block.lines) {
-            // Count only Japanese characters (hiragana, katakana, kanji)
-            const japaneseChars = line.match(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/g);
-            if (japaneseChars) {
-              totalChars += japaneseChars.length;
-            }
+            totalChars += Array.from(line).filter((char) => japaneseRegex.test(char)).length;
           }
         }
       }

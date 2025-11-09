@@ -11,9 +11,10 @@
 
   interface Props {
     volume: VolumeMetadata;
+    variant?: 'list' | 'grid';
   }
 
-  let { volume }: Props = $props();
+  let { volume, variant = 'list' }: Props = $props();
 
   const volName = decodeURI(volume.volume_title);
 
@@ -123,34 +124,63 @@
   }
 </script>
 
-<Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
-  <ListgroupItem normalClass="py-4 opacity-70">
-    <DownloadSolid class="w-[50px] h-[70px] text-blue-400 mr-3" />
-    <div class="flex flex-row gap-5 items-center justify-between w-full">
-      <div>
-        <p class="font-semibold text-gray-400">{volName}</p>
-        <div class="flex items-center gap-2">
-          <p class="text-sm text-gray-500">In Cloud • {sizeDisplay}</p>
-          <Badge color={badgeColor} class="text-xs">{providerName}</Badge>
+{#if variant === 'list'}
+  <Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
+    <ListgroupItem normalClass="py-4 opacity-70">
+      <DownloadSolid class="w-[50px] h-[70px] text-blue-400 mr-3" />
+      <div class="flex flex-row gap-5 items-center justify-between w-full">
+        <div>
+          <p class="font-semibold text-gray-400">{volName}</p>
+          <div class="flex items-center gap-2">
+            <p class="text-sm text-gray-500">In Cloud • {sizeDisplay}</p>
+            <Badge color={badgeColor} class="text-xs">{providerName}</Badge>
+          </div>
+        </div>
+        <div class="flex gap-2 items-center">
+          {#if isDownloading}
+            <Button color="light" disabled={true}>
+              <Spinner size="4" class="me-2" />
+              {Math.round(downloadProgress)}%
+            </Button>
+          {:else}
+            <Button color="blue" onclick={onDownloadClicked}>
+              <DownloadSolid class="w-4 h-4 me-2" />
+              Download
+            </Button>
+            <Button color="red" onclick={onDeleteClicked}>
+              <TrashBinSolid class="w-4 h-4 me-2" />
+              Delete
+            </Button>
+          {/if}
         </div>
       </div>
-      <div class="flex gap-2 items-center">
-        {#if isDownloading}
-          <Button color="light" disabled={true}>
-            <Spinner size="4" class="me-2" />
-            {Math.round(downloadProgress)}%
-          </Button>
-        {:else}
-          <Button color="blue" onclick={onDownloadClicked}>
-            <DownloadSolid class="w-4 h-4 me-2" />
-            Download
-          </Button>
-          <Button color="red" onclick={onDeleteClicked}>
-            <TrashBinSolid class="w-4 h-4 me-2" />
-            Delete
-          </Button>
-        {/if}
-      </div>
+    </ListgroupItem>
+  </Frame>
+{:else}
+  <!-- Grid view -->
+  <button
+    onclick={onDownloadClicked}
+    disabled={isDownloading}
+    class="flex flex-col gap-2 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors opacity-60 sm:w-[278px]"
+    class:cursor-not-allowed={isDownloading}
+  >
+    <div class="sm:w-[250px] sm:h-[350px] bg-gray-200 dark:bg-gray-700 border border-dashed border-gray-400 dark:border-gray-600 flex items-center justify-center">
+      {#if isDownloading}
+        <div class="flex flex-col items-center gap-2">
+          <Spinner size="8" color="blue" />
+          <span class="text-xs text-blue-400">{Math.round(downloadProgress)}%</span>
+        </div>
+      {:else}
+        <DownloadSolid class="w-8 h-8 text-gray-400" />
+      {/if}
     </div>
-  </ListgroupItem>
-</Frame>
+    <div class="text-sm font-medium truncate">{volName}</div>
+    <div class="text-xs text-gray-500 dark:text-gray-400 flex flex-col gap-0.5">
+      <div class="flex items-center gap-1">
+        <span>In {providerName}</span>
+        <Badge color={badgeColor} class="text-xs px-1 py-0">{providerName}</Badge>
+      </div>
+      <span>{sizeDisplay}</span>
+    </div>
+  </button>
+{/if}
