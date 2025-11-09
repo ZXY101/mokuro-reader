@@ -1,38 +1,30 @@
 <script lang="ts">
-  import { Navbar, NavBrand, Tooltip, Spinner } from 'flowbite-svelte';
+  import { Navbar, NavBrand, Spinner } from 'flowbite-svelte';
   import { CloudArrowUpOutline, UploadSolid, UserSettingsSolid, RefreshOutline, ChartLineUpOutline } from 'flowbite-svelte-icons';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
-  import { onMount } from 'svelte';
   import { showSnackbar } from '$lib/util';
   import { tokenManager } from '$lib/util/google-drive';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { unifiedProviderState } from '$lib/util/sync/unified-provider-state';
-  import type { UnifiedProviderState } from '$lib/util/sync/unified-provider-state';
 
   // Use $state to make these reactive
   let settingsHidden = $state(true);
   let uploadModalOpen = $state(false);
   let isReader = $state(false);
 
-  let state = $state<UnifiedProviderState>({
-    isAuthenticated: false,
-    isCacheLoading: false,
-    isCacheLoaded: false,
-    isFullyConnected: false,
-    needsAttention: false,
-    statusMessage: 'No provider connected'
-  });
+  // Read unified provider state synchronously
+  let state = $derived($unifiedProviderState);
+
+  // Track if any cloud providers are authenticated
+  let hasAuthenticatedProviders = $derived(state.hasStoredCredentials);
 
   // Google Drive specific: Track token expiry for debug display
   let tokenMinutesLeft = $state<number | null>(null);
   let isGoogleDrive = $state<boolean>(false);
-
-  // Track if any cloud providers are authenticated
-  let hasAuthenticatedProviders = $state<boolean>(false);
 
   // Track global sync state
   let isSyncing = $state<boolean>(false);
@@ -41,14 +33,6 @@
   let providerDisplayName = $derived.by(() => {
     const provider = unifiedCloudManager.getActiveProvider();
     return provider?.name || 'cloud';
-  });
-
-  // Subscribe to unified provider state
-  $effect(() => {
-    const unsubscribe = unifiedProviderState.subscribe(value => {
-      state = value;
-    });
-    return unsubscribe;
   });
 
   // Subscribe to global sync state
@@ -162,7 +146,7 @@
       <button
         onclick={navigateToCloud}
         class="flex items-center justify-center w-6 h-6"
-        title={state.needsAttention ? `${providerDisplayName} - Action Required (click to sign in)` : state.isFullyConnected ? `${providerDisplayName} - Connected` : state.isAuthenticated ? `${providerDisplayName} - Loading...` : `${providerDisplayName} - Not connected`}
+        title={state.needsAttention ? `${providerDisplayName} - Action Required (click to sign in)` : state.isFullyConnected ? `${providerDisplayName} - Connected` : state.isAuthenticated ? `${providerDisplayName} - Loading...` : state.hasStoredCredentials ? `${providerDisplayName} - Initializing...` : `${providerDisplayName} - Not connected`}
       >
         {#if state.needsAttention}
           <CloudArrowUpOutline class="w-6 h-6 text-red-600 hover:text-red-700 cursor-pointer" />
@@ -171,6 +155,8 @@
         {:else if state.isFullyConnected}
           <CloudArrowUpOutline class="w-6 h-6 text-green-600 hover:text-green-700 cursor-pointer" />
         {:else if state.isAuthenticated}
+          <CloudArrowUpOutline class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer" />
+        {:else if state.hasStoredCredentials}
           <CloudArrowUpOutline class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer" />
         {:else}
           <CloudArrowUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />

@@ -5,42 +5,9 @@ import { megaProvider } from './providers/mega/mega-provider';
 import { webdavProvider } from './providers/webdav/webdav-provider';
 import { unifiedCloudManager } from './unified-cloud-manager';
 import { driveApiClient } from '$lib/util/google-drive/api-client';
+import { tokenManager } from '$lib/util/google-drive/token-manager';
 import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
-
-/**
- * Check which provider (if any) has stored credentials
- * Since providers are mutually exclusive, returns the active provider type or null
- */
-function getActiveProviderType(): 'google-drive' | 'mega' | 'webdav' | null {
-	if (!browser) return null;
-
-	// Check Google Drive token (and ensure it's not expired)
-	const gdriveToken = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN);
-	const gdriveExpiry = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN_EXPIRES);
-	if (gdriveToken && gdriveExpiry) {
-		const expiryTime = parseInt(gdriveExpiry, 10);
-		if (expiryTime > Date.now()) {
-			return 'google-drive';
-		}
-	}
-
-	// Check MEGA credentials
-	const megaEmail = localStorage.getItem('mega_email');
-	const megaPassword = localStorage.getItem('mega_password');
-	if (megaEmail && megaPassword) {
-		return 'mega';
-	}
-
-	// Check WebDAV credentials
-	const webdavUrl = localStorage.getItem('webdav_server_url');
-	const webdavUsername = localStorage.getItem('webdav_username');
-	const webdavPassword = localStorage.getItem('webdav_password');
-	if (webdavUrl && webdavUsername && webdavPassword) {
-		return 'webdav';
-	}
-
-	return null; // No provider has credentials
-}
+import { getConfiguredProviderType } from './provider-detection';
 
 /**
  * Initialize all sync providers and register them with the provider manager.
@@ -61,7 +28,7 @@ export async function initializeProviders(): Promise<void> {
 
 	// Check which provider (if any) is active
 	// Providers are mutually exclusive - only one can be logged in at a time
-	const activeProvider = getActiveProviderType();
+	const activeProvider = getConfiguredProviderType();
 
 	// If no provider is active, we're done - providers will lazy-init when user clicks login
 	if (!activeProvider) {
@@ -76,13 +43,43 @@ export async function initializeProviders(): Promise<void> {
 		try {
 			await driveApiClient.initialize();
 			console.log('✅ Google Drive API client initialized');
+
+			// Check if token is expired and handle re-authentication
+			const gdriveExpiry = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN_EXPIRES);
+			if (gdriveExpiry) {
+				const expiryTime = parseInt(gdriveExpiry, 10);
+				const isExpired = expiryTime <= Date.now();
+
+				if (isExpired) {
+					console.log('⚠️ Google Drive token expired');
+
+					// Update provider status to reflect expired state (triggers UI updates)
+					providerManager.updateStatus();
+
+					// Check if auto re-auth is enabled
+					const { miscSettings } = await import('$lib/settings/misc');
+					const { get } = await import('svelte/store');
+					const settings = get(miscSettings);
+
+					if (settings.gdriveAutoReAuth) {
+						console.log('🔄 Auto re-auth enabled, triggering re-authentication...');
+						const { showSnackbar } = await import('../snackbar');
+						showSnackbar('Google Drive session expired. Re-authenticating...');
+
+						// Trigger re-auth popup
+						tokenManager.reAuthenticate();
+					} else {
+						console.log('⚠️ Auto re-auth disabled. User must manually re-authenticate.');
+					}
+				}
+			}
 		} catch (error) {
 			console.warn('⚠️ Failed to initialize Google Drive API client:', error);
 		}
 	}
 
-	// Update status after registration
-	providerManager.updateStatus();
+	// Don't update status here - wait for providers to finish loading credentials
+	// The constructor already set initial "configured" state, don't overwrite it
 
 	// Wait for providers to be ready (MEGA/WebDAV restore credentials on init)
 	console.log('⏳ Waiting for providers to be ready...');
@@ -98,20 +95,36 @@ export async function initializeProviders(): Promise<void> {
 	// Initialize the current provider (detects which one is authenticated)
 	providerManager.initializeCurrentProvider();
 
-	// Fetch cloud volumes cache if a provider is authenticated
+	// Fetch cloud volumes cache if a provider is authenticated AND token is valid
 	const currentProvider = providerManager.getActiveProvider();
 	if (currentProvider) {
-		console.log(`📦 Populating cloud cache from ${currentProvider.type}...`);
-		try {
-			await unifiedCloudManager.fetchAllCloudVolumes();
-			console.log('✅ Cloud cache populated on app startup');
+		// For Google Drive, check if token is still valid before trying to use it
+		// For other providers, they handle their own token validity
+		let shouldFetch = true;
+		if (currentProvider.type === 'google-drive') {
+			const gdriveExpiry = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN_EXPIRES);
+			if (gdriveExpiry) {
+				const expiryTime = parseInt(gdriveExpiry, 10);
+				if (expiryTime <= Date.now()) {
+					console.log('ℹ️ Google Drive token expired, skipping fetch/sync until re-authentication');
+					shouldFetch = false;
+				}
+			}
+		}
 
-			// Sync progress after cache is populated
-			console.log('🔄 Syncing progress on app startup...');
-			await unifiedCloudManager.syncProgress({ silent: true });
-			console.log('✅ Initial sync completed');
-		} catch (error) {
-			console.warn('⚠️ Failed to populate cloud cache or sync on startup:', error);
+		if (shouldFetch) {
+			console.log(`📦 Populating cloud cache from ${currentProvider.type}...`);
+			try {
+				await unifiedCloudManager.fetchAllCloudVolumes();
+				console.log('✅ Cloud cache populated on app startup');
+
+				// Sync progress after cache is populated
+				console.log('🔄 Syncing progress on app startup...');
+				await unifiedCloudManager.syncProgress({ silent: true });
+				console.log('✅ Initial sync completed');
+			} catch (error) {
+				console.warn('⚠️ Failed to populate cloud cache or sync on startup:', error);
+			}
 		}
 	} else {
 		console.log('ℹ️ No provider authenticated, skipping cache population and sync');
