@@ -237,7 +237,7 @@
       class:cursor-pointer={isPlaceholderOnly}
     >
       {#if isPlaceholderOnly}
-        <div class="sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border flex items-center justify-center">
+        <div class="sm:w-[325px] sm:h-[385px] bg-black border-gray-900 border flex items-center justify-center">
           <div class="w-24 h-24 flex items-center justify-center">
             {#if isDownloading}
               <Spinner size="16" color="blue" />
