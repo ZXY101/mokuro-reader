@@ -1,6 +1,6 @@
 import { writable, get } from 'svelte/store';
 import { progressTrackerStore } from '../progress-tracker';
-import { volumesWithTrash, profiles, parseVolumesFromJson } from '$lib/settings';
+import { volumesWithTrash, profiles, profilesWithTrash, parseVolumesFromJson } from '$lib/settings';
 import { showSnackbar } from '../snackbar';
 import type { SyncProvider, ProviderType, CloudFileMetadata } from './provider-interface';
 import { cacheManager } from './cache-manager';
@@ -181,6 +181,7 @@ class UnifiedSyncService {
 
 		try {
 			console.log(`🔄 Syncing with ${provider.name}...`);
+			console.log('🔄 Sync options:', options);
 
 			// Check authentication - if provider needs to re-authenticate, let it handle that
 			if (!provider.isAuthenticated()) {
@@ -194,11 +195,17 @@ class UnifiedSyncService {
 			}
 
 			// Sync volume data (read progress)
+			console.log('🔄 Syncing volume data...');
 			await this.syncVolumeData(provider);
+			console.log('✅ Volume data synced');
 
 			// Optionally sync profiles
 			if (options.syncProfiles) {
+				console.log('🔄 options.syncProfiles is true, calling syncProfiles...');
 				await this.syncProfiles(provider);
+				console.log('✅ syncProfiles completed');
+			} else {
+				console.log('⏭️ Skipping profile sync (options.syncProfiles is false)');
 			}
 
 			console.log(`✅ ${provider.name} sync complete`);
@@ -374,14 +381,13 @@ class UnifiedSyncService {
 			const existingFileId = existingFiles.length > 0 ? existingFiles[0].fileId : null;
 
 			// Upload (create or update)
-			const content = await blob.text();
 			const metadata = {
 				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA,
 				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
 				...(existingFileId ? {} : { parents: [folderId] })
 			};
 
-			await driveApiClient.uploadFile(content, metadata, existingFileId || undefined);
+			await driveApiClient.uploadFile(blob, metadata, existingFileId || undefined);
 			console.log('✅ Volume data uploaded to Google Drive');
 		} else {
 			// For MEGA and WebDAV, use generic uploadFile
@@ -420,28 +426,54 @@ class UnifiedSyncService {
 
 	/**
 	 * Download profiles.json file from provider using generic file operations
+	 * Public method for manual profile downloads
+	 */
+	async downloadProfiles(provider: SyncProvider): Promise<any | null> {
+		return await this.downloadProfilesFile(provider);
+	}
+
+	/**
+	 * Download profiles.json file from provider using generic file operations
 	 */
 	private async downloadProfilesFile(provider: SyncProvider): Promise<any | null> {
 		try {
+			console.log('🔎 Finding profiles.json in cache...');
 			const profilesFile = await this.findProfilesFile(provider);
+			console.log('🔎 findProfilesFile result:', profilesFile);
 
 			if (!profilesFile) {
+				console.log('⚠️ profiles.json not found in cache, returning null');
 				return null;
 			}
 
+			console.log('⬇️ Downloading profiles.json from cloud...');
 			const blob = await provider.downloadFile(profilesFile);
-			return await this.blobToJson(blob);
+			console.log('⬇️ Downloaded blob, converting to JSON...');
+			const json = await this.blobToJson(blob);
+			console.log('✅ Successfully parsed profiles JSON:', json);
+			return json;
 		} catch (error) {
+			console.error('❌ Error downloading profiles:', error);
 			// File not found is not an error
 			if (error instanceof Error && (
 				error.message.includes('not found') ||
 				error.message.includes('404') ||
 				error.message.includes('ENOENT')
 			)) {
+				console.log('📝 Error was "not found", returning null');
 				return null;
 			}
+			console.log('🔥 Re-throwing error (not a "not found" error)');
 			throw error;
 		}
+	}
+
+	/**
+	 * Upload profiles to provider using generic file operations
+	 * Public method for manual profile uploads
+	 */
+	async uploadProfiles(provider: SyncProvider, profiles: any): Promise<void> {
+		await this.uploadProfilesFile(provider, profiles);
 	}
 
 	/**
@@ -473,14 +505,13 @@ class UnifiedSyncService {
 			const existingFileId = files.length > 0 ? files[0].id : null;
 
 			// Upload (create or update)
-			const content = await blob.text();
 			const metadata = {
 				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES,
 				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
 				...(existingFileId ? {} : { parents: [folderId] })
 			};
 
-			await driveApiClient.uploadFile(content, metadata, existingFileId || undefined);
+			await driveApiClient.uploadFile(blob, metadata, existingFileId || undefined);
 			console.log('✅ Profiles uploaded to Google Drive');
 		} else {
 			// For MEGA and WebDAV, use generic uploadFile
@@ -493,24 +524,34 @@ class UnifiedSyncService {
 	 * Sync profiles with a provider
 	 */
 	private async syncProfiles(provider: SyncProvider): Promise<void> {
+		console.log('🔵 syncProfiles() function called for provider:', provider.name);
+
 		// Step 1: Download cloud profiles
+		console.log('📥 Downloading cloud profiles...');
 		const cloudProfiles = await this.downloadProfilesFile(provider);
+		console.log('📥 Downloaded cloud profiles:', cloudProfiles);
 
-		// Step 2: Get local profiles
-		const localProfiles = get(profiles);
+		// Step 2: Get local profiles (including tombstones for deletion sync)
+		const localProfiles = get(profilesWithTrash);
+		console.log('💾 Local profiles:', localProfiles);
 
-		// Step 3: Merge profiles (newest wins based on profile name)
+		// Step 3: Merge profiles (handles deletedOn timestamps)
+		console.log('🔀 About to merge profiles...');
 		const mergedProfiles = this.mergeProfiles(localProfiles, cloudProfiles || {});
+		console.log('✅ Merged profiles:', mergedProfiles);
 
-		// Step 4: Update local storage
-		profiles.set(mergedProfiles);
+		// Step 4: Purge tombstones older than 30 days
+		const purgedProfiles = this.purgeProfileTombstones(mergedProfiles);
 
-		// Step 5: Upload merged profiles if changed
-		const mergedJson = JSON.stringify(mergedProfiles);
+		// Step 5: Update local storage (including tombstones)
+		profilesWithTrash.set(purgedProfiles);
+
+		// Step 6: Upload purged profiles if changed
+		const mergedJson = JSON.stringify(purgedProfiles);
 		const cloudJson = JSON.stringify(cloudProfiles || {});
 
 		if (mergedJson !== cloudJson) {
-			await this.uploadProfilesFile(provider, mergedProfiles);
+			await this.uploadProfilesFile(provider, purgedProfiles);
 		}
 	}
 
@@ -618,15 +659,122 @@ class UnifiedSyncService {
 	}
 
 	/**
-	 * Merge profiles (Record<string, Settings>) keeping all unique profile names
+	 * Purge tombstones (deleted profiles) older than 30 days
+	 * This prevents the sync data from accumulating deleted entries indefinitely
+	 */
+	private purgeProfileTombstones(profiles: any): any {
+		const now = Date.now();
+		const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+
+		return Object.fromEntries(
+			Object.entries(profiles).filter(([profileName, profile]: [string, any]) => {
+				// Keep active profiles (no deletedOn timestamp)
+				if (!profile.deletedOn) return true;
+
+				// Purge tombstones older than 30 days
+				const deletedTimestamp = new Date(profile.deletedOn).getTime();
+				const age = now - deletedTimestamp;
+				return age < THIRTY_DAYS_MS;
+			})
+		);
+	}
+
+	/**
+	 * Merge profiles using timestamp-based conflict resolution
+	 * Handles deletedOn timestamps to properly sync deletions across devices
 	 */
 	private mergeProfiles(local: any, cloud: any): any {
-		// For profiles, we'll combine them with cloud profiles taking precedence
-		// Profiles are Record<string, Settings> where key is profile name
-		return {
-			...local,
-			...cloud
-		};
+		console.log('🔍 mergeProfiles called:', {
+			localProfiles: Object.keys(local || {}),
+			cloudProfiles: Object.keys(cloud || {}),
+			localData: local,
+			cloudData: cloud
+		});
+
+		const merged: any = {};
+		const allProfileNames = new Set([
+			...Object.keys(local || {}),
+			...Object.keys(cloud || {})
+		]);
+
+		allProfileNames.forEach(profileName => {
+			const localProfile = local?.[profileName];
+			const cloudProfile = cloud?.[profileName];
+
+			if (!localProfile) {
+				// Only in cloud - use cloud version
+				merged[profileName] = this.ensureProfileTimestamp(cloudProfile);
+			} else if (!cloudProfile) {
+				// Only in local - use local version
+				merged[profileName] = this.ensureProfileTimestamp(localProfile);
+			} else {
+				// In both - determine which has the most recent user action
+				// Consider all timestamps: lastUpdated (settings change), deletedOn (deletion)
+				// Treat undefined timestamps as epoch (0) for legacy profiles
+				const localMostRecent = Math.max(
+					new Date(localProfile.lastUpdated || 0).getTime(),
+					new Date(localProfile.deletedOn || 0).getTime()
+				);
+
+				const cloudMostRecent = Math.max(
+					new Date(cloudProfile.lastUpdated || 0).getTime(),
+					new Date(cloudProfile.deletedOn || 0).getTime()
+				);
+
+				console.log(`🔄 Profile merge [${profileName}]:`, {
+					local: {
+						charCount: localProfile.charCount,
+						lastUpdated: localProfile.lastUpdated,
+						timestamp: localMostRecent
+					},
+					cloud: {
+						charCount: cloudProfile.charCount,
+						lastUpdated: cloudProfile.lastUpdated,
+						timestamp: cloudMostRecent
+					}
+				});
+
+				let winner;
+				if (cloudMostRecent > localMostRecent) {
+					console.log(`  ☁️ Cloud wins (${cloudProfile.charCount})`);
+					winner = cloudProfile;
+				} else if (localMostRecent > cloudMostRecent) {
+					console.log(`  💻 Local wins (${localProfile.charCount})`);
+					winner = localProfile;
+				} else {
+					// Timestamps equal (including both at epoch)
+					// Prefer active over deleted to prevent accidental data loss
+					if (cloudProfile.deletedOn && !localProfile.deletedOn) {
+						console.log(`  💻 Local wins (active vs deleted)`);
+						winner = localProfile; // Local is active, keep it
+					} else if (localProfile.deletedOn && !cloudProfile.deletedOn) {
+						console.log(`  ☁️ Cloud wins (active vs deleted)`);
+						winner = cloudProfile; // Cloud is active, keep it
+					} else {
+						// Both same state (both active or both deleted) - prefer local
+						console.log(`  💻 Local wins (tie, prefer local)`);
+						winner = localProfile;
+					}
+				}
+
+				merged[profileName] = winner;
+			}
+		});
+
+		return merged;
+	}
+
+	/**
+	 * Ensure profile has a timestamp (migration for old profiles)
+	 */
+	private ensureProfileTimestamp(profile: any): any {
+		if (!profile.lastUpdated) {
+			return {
+				...profile,
+				lastUpdated: new Date().toISOString()
+			};
+		}
+		return profile;
 	}
 }
 

@@ -8,3 +8,4 @@ export * from './sync-store';
 export * from './google-drive';
 export * from './activity-tracker';
 export * from './backup';
+export * from './platform';

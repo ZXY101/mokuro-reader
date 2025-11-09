@@ -7,10 +7,7 @@
   import {
     promptConfirmation,
     showSnackbar,
-    uploadFile,
     accessTokenStore,
-    volumeDataIdStore,
-    profilesIdStore,
     tokenClientStore,
     signIn,
     logout,
@@ -21,7 +18,7 @@
   } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { backupQueue } from '$lib/util/backup-queue';
-  import { driveState } from '$lib/util/google-drive';
+  import { driveState, tokenManager } from '$lib/util/google-drive';
   import type { DriveState } from '$lib/util/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
@@ -34,15 +31,14 @@
   // Import multi-provider sync
   import { providerManager, megaProvider, webdavProvider, googleDriveProvider } from '$lib/util/sync';
   import { queueVolumesFromCloudFiles } from '$lib/util/download-queue';
+  import { unifiedSyncService } from '$lib/util/sync/unified-sync-service';
 
   // Get store references for auto-subscription
   const providerStatusStore = providerManager.status;
 
   // Use Svelte's derived runes for automatic store subscriptions
   let accessToken = $derived($accessTokenStore);
-  // Note: readerFolderId removed - was part of legacy sync-service (now deleted)
-  let volumeDataId = $derived($volumeDataIdStore);
-  let profilesId = $derived($profilesIdStore);
+  // Note: readerFolderId, volumeDataId, profilesId removed - legacy Drive-specific stores (now use unified provider system)
   let tokenClient = $derived($tokenClientStore);
   let state = $derived($driveState);
 
@@ -57,6 +53,47 @@
   let googleDriveConfigured = $derived($providerStatusStore.providers['google-drive']?.hasStoredCredentials || false);
   let megaConfigured = $derived($providerStatusStore.providers['mega']?.hasStoredCredentials || false);
   let webdavConfigured = $derived($providerStatusStore.providers['webdav']?.hasStoredCredentials || false);
+
+  // Determine current connected provider
+  let currentProvider = $derived(
+    googleDriveAuth ? 'google-drive' :
+    megaAuth ? 'mega' :
+    webdavAuth ? 'webdav' :
+    null
+  );
+
+  // Provider display names
+  const providerNames = {
+    'google-drive': 'Google Drive',
+    'mega': 'MEGA Cloud Storage',
+    'webdav': 'WebDAV Server'
+  };
+
+  // Provider info
+  const providerInfo = {
+    'google-drive': {
+      items: [
+        '15GB free storage',
+        'Seamless Google account integration',
+        'File picker for easy selection',
+        'Auto re-authentication support'
+      ]
+    },
+    'mega': {
+      items: [
+        '20GB free storage',
+        'End-to-end encryption',
+        'Persistent login (no re-authentication needed)'
+      ]
+    },
+    'webdav': {
+      items: [
+        'Compatible with Nextcloud, ownCloud, and NAS devices',
+        'Persistent login (no re-authentication needed)',
+        'Self-hosted and private'
+      ]
+    }
+  };
 
   // Google Drive login state
   let googleDriveLoading = $state(false);
@@ -143,57 +180,33 @@
   }
 
 
-  async function onUploadProfiles() {
-    const metadata = {
-      mimeType: type,
-      name: 'profiles.json',
-      parents: profilesId ? [] : undefined // Only set parents if creating new file
-    };
+  let isSyncingProfiles = $state(false);
 
-    const processId = 'upload-profiles';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: 'Uploading profiles',
-      progress: 0,
-      status: 'Starting upload...'
-    });
+  async function syncProfiles() {
+    console.log('🔘 Sync profiles button clicked');
+    const provider = providerManager.getActiveProvider();
+    if (!provider) {
+      showSnackbar('No cloud provider connected');
+      return;
+    }
 
+    console.log('🔘 Provider found:', provider.name);
+    isSyncingProfiles = true;
     try {
-      // Update progress to show it's in progress
-      progressTrackerStore.updateProcess(processId, {
-        progress: 50,
-        status: 'Uploading...'
-      });
-
-      const res = await uploadFile({
-        accessToken,
-        fileId: profilesId,
-        metadata,
-        localStorageId: 'profiles',
-        type
-      });
-
-      profilesId = res.id;
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 100,
-        status: 'Upload complete'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-      if (profilesId) {
-        showSnackbar('Profiles uploaded');
-      }
+      // Sync profiles using smart merge logic
+      console.log('🔘 Calling unifiedSyncService.syncProvider with syncProfiles: true');
+      await unifiedSyncService.syncProvider(provider, { syncProfiles: true, silent: false });
+      console.log('🔘 Sync completed successfully');
+      showSnackbar('Profiles synced');
     } catch (error) {
-      progressTrackerStore.updateProcess(processId, {
-        progress: 0,
-        status: 'Upload failed'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'uploading profiles');
+      console.error('Profile sync error:', error);
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      showSnackbar(`Sync failed: ${message}`);
+    } finally {
+      isSyncingProfiles = false;
     }
   }
-  
+
   // For backward compatibility with the button in the cloud page
   async function performSync() {
     await syncReadProgress();
@@ -218,53 +231,6 @@
     clearServiceWorkerCache();
   });
 
-  async function onDownloadProfiles() {
-    const processId = 'download-profiles';
-    progressTrackerStore.addProcess({
-      id: processId,
-      description: 'Downloading profiles',
-      progress: 0,
-      status: 'Starting download...'
-    });
-
-    try {
-      // Update progress to show it's in progress
-      progressTrackerStore.updateProcess(processId, {
-        progress: 50,
-        status: 'Downloading...'
-      });
-
-      const { body } = await gapi.client.drive.files.get({
-        fileId: profilesId,
-        alt: 'media'
-      });
-
-      const downloaded = JSON.parse(body);
-
-      profiles.update((prev) => {
-        return {
-          ...prev,
-          ...downloaded
-        };
-      });
-
-      progressTrackerStore.updateProcess(processId, {
-        progress: 100,
-        status: 'Download complete'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-
-      showSnackbar('Profiles downloaded');
-    } catch (error) {
-      progressTrackerStore.updateProcess(processId, {
-        progress: 0,
-        status: 'Download failed'
-      });
-      setTimeout(() => progressTrackerStore.removeProcess(processId), 3000);
-      handleDriveError(error, 'downloading profiles');
-    }
-  }
-
   // Google Drive handlers
   async function handleGoogleDriveLogin() {
     googleDriveLoading = true;
@@ -277,14 +243,17 @@
 
       // Wait for authentication to complete by watching the accessToken store
       await new Promise<void>((resolve, reject) => {
+        let unsubscribe: (() => void) | undefined;
+
         const timeout = setTimeout(() => {
+          unsubscribe?.(); // Clean up subscription on timeout
           reject(new Error('Login timeout'));
         }, 90000); // 90 second timeout for OAuth popup
 
-        const unsubscribe = accessTokenStore.subscribe(token => {
+        unsubscribe = accessTokenStore.subscribe(token => {
           if (token) {
             clearTimeout(timeout);
-            unsubscribe();
+            unsubscribe?.(); // Use optional chaining in case callback fires immediately
             resolve();
           }
         });
@@ -336,6 +305,17 @@
       showSnackbar(message);
     } finally {
       megaLoading = false;
+    }
+  }
+
+  // Unified logout handler
+  async function handleLogout() {
+    if (currentProvider === 'google-drive') {
+      await logout();
+    } else if (currentProvider === 'mega') {
+      await handleMegaLogout();
+    } else if (currentProvider === 'webdav') {
+      await handleWebDAVLogout();
     }
   }
 
@@ -402,6 +382,73 @@
     showSnackbar('Logged out of WebDAV');
   }
 
+  // Browser detection and settings URL generation
+  function getBrowserInfo() {
+    const ua = navigator.userAgent;
+    const isChrome = /Chrome/.test(ua) && /Google Inc/.test(navigator.vendor);
+    const isEdge = /Edg/.test(ua);
+    const isFirefox = /Firefox/.test(ua);
+    const isSafari = /Safari/.test(ua) && !/Chrome/.test(ua);
+
+    // Get current site URL for settings
+    const siteUrl = encodeURIComponent(window.location.origin);
+
+    if (isEdge) {
+      return {
+        name: 'Edge',
+        settingsUrl: `edge://settings/content/siteDetails?site=${siteUrl}`,
+        instructions: [
+          'Click the link below to copy the Edge settings URL',
+          'Paste it into your address bar and press Enter',
+          'Toggle "Pop-ups and redirects" to "Allow"',
+          'Return here and click the test button to verify'
+        ]
+      };
+    } else if (isChrome) {
+      return {
+        name: 'Chrome',
+        settingsUrl: `chrome://settings/content/siteDetails?site=${siteUrl}`,
+        instructions: [
+          'Click the link below to copy the Chrome settings URL',
+          'Paste it into your address bar and press Enter',
+          'Toggle "Pop-ups and redirects" to "Allow"',
+          'Return here and click the test button to verify'
+        ]
+      };
+    } else if (isFirefox) {
+      return {
+        name: 'Firefox',
+        settingsUrl: 'about:preferences#privacy',
+        instructions: [
+          'Click the permissions icon (🔒) in the address bar',
+          'Find "Open pop-up windows" and change to "Allow"',
+          'Or: Settings → Privacy & Security → Permissions → Pop-ups → Exceptions'
+        ]
+      };
+    } else if (isSafari) {
+      return {
+        name: 'Safari',
+        settingsUrl: null,
+        instructions: [
+          'Safari → Settings → Websites → Pop-up Windows',
+          'Find this website in the list',
+          'Change setting to "Allow"'
+        ]
+      };
+    } else {
+      return {
+        name: 'Unknown',
+        settingsUrl: null,
+        instructions: [
+          'Click the popup blocked icon in your address bar',
+          'Select "Always allow popups from this site"',
+          'Click the test button below to verify it works'
+        ]
+      };
+    }
+  }
+
+  let browserInfo = $derived(getBrowserInfo());
 
   async function backupAllSeries() {
     // Get default provider
@@ -577,122 +624,44 @@
       </div>
     </div>
   {:else}
-    <!-- Connected Provider Interface -->
-    {#if googleDriveAuth}
-      <!-- Google Drive Connected -->
-      <div class="flex justify-between items-center gap-6 flex-col">
-        <div class="flex justify-between items-center w-full max-w-3xl">
-          <div class="flex items-center gap-3">
-            <h2 class="text-3xl font-semibold text-center pt-2">Google Drive:</h2>
-            {#if state.isCacheLoading && !state.isCacheLoaded}
-              <Badge color="yellow">Loading Drive data...</Badge>
-            {:else if state.isCacheLoaded}
-              <Badge color="green">Connected</Badge>
+    <!-- Unified Connected Provider Interface -->
+    {#if currentProvider}
+      <div class="flex justify-center items-center flex-col gap-6">
+        <div class="w-full max-w-3xl">
+          <!-- Header with provider name and logout -->
+          <div class="flex justify-between items-center mb-6">
+            <div class="flex items-center gap-3">
+              <h2 class="text-3xl font-semibold">{providerNames[currentProvider]}</h2>
+              {#if currentProvider === 'google-drive' && state.isCacheLoading && !state.isCacheLoaded}
+                <Badge color="yellow">Loading Drive data...</Badge>
+              {:else}
+                <Badge color="green">Connected</Badge>
+              {/if}
+            </div>
+            <Button color="red" on:click={handleLogout}>Log out</Button>
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <!-- Provider-specific instructions -->
+            {#if currentProvider === 'google-drive'}
+              <p class="text-center text-gray-300">
+                Add your zipped manga files (ZIP or CBZ) to the <span class="text-primary-700">{READER_FOLDER}</span> folder in your Google Drive.
+              </p>
+              <p class="text-center text-sm text-gray-500">
+                You can select multiple ZIP/CBZ files or entire folders at once.
+              </p>
+            {:else}
+              <p class="text-center text-gray-300 mb-2">
+                Your read progress is synced with {providerNames[currentProvider]}.
+              </p>
             {/if}
-          </div>
-          <Button color="red" on:click={logout}>Log out</Button>
-        </div>
-      <p class="text-center">
-        Add your zipped manga files (ZIP or CBZ) to the <span class="text-primary-700"
-          >{READER_FOLDER}</span
-        > folder in your Google Drive.
-      </p>
-      <p class="text-center text-sm text-gray-500">
-        You can select multiple ZIP/CBZ files or entire folders at once.
-      </p>
-      <div class="flex flex-col gap-4 w-full max-w-3xl">
-        <Button color="blue" on:click={createPicker}>Download Manga</Button>
 
-        <div class="flex flex-col gap-2">
-          <div class="flex items-center gap-3">
-            <Toggle bind:checked={$miscSettings.turboMode} on:change={() => updateMiscSetting('turboMode', $miscSettings.turboMode)}>
-              Turbo Mode
-            </Toggle>
-          </div>
-          <p class="text-xs text-gray-500">
-            For users with fast internet and a lack of patience. Enables parallel downloads/uploads.
-          </p>
+            <!-- Download Manga button (Google Drive only) -->
+            {#if currentProvider === 'google-drive'}
+              <Button color="blue" on:click={createPicker}>Download Manga</Button>
+            {/if}
 
-          {#if $miscSettings.turboMode}
-            <div class="flex flex-col gap-2 mt-2">
-              <div class="text-sm font-medium">Device RAM Configuration</div>
-              <div class="flex gap-4">
-                <Radio name="ram-config" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
-                <Radio name="ram-config" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
-                <Radio name="ram-config" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
-                <Radio name="ram-config" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
-              </div>
-              <p class="text-xs text-gray-500">
-                Configure your device's RAM to optimize parallel download performance and prevent memory issues.
-              </p>
-            </div>
-          {/if}
-        </div>
-
-        <div class="flex flex-col gap-2 mt-4">
-          <div class="flex items-center gap-3">
-            <Toggle bind:checked={$miscSettings.gdriveAutoReAuth} on:change={() => updateMiscSetting('gdriveAutoReAuth', $miscSettings.gdriveAutoReAuth)}>
-              Auto re-authenticate on token expiration
-            </Toggle>
-          </div>
-          <p class="text-xs text-gray-500">
-            Keeps your progress synced during long reading sessions. Automatically prompts re-authentication when your session expires (~1 hour).
-          </p>
-        </div>
-
-        <div class="flex-col gap-2 flex">
-          <Button
-            color="dark"
-            on:click={performSync}
-          >
-            Sync read progress
-          </Button>
-        </div>
-
-        <div class="flex-col gap-2 flex">
-          <Button
-            color="purple"
-            on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
-          >
-            Backup all series to cloud
-          </Button>
-        </div>
-        <div class="flex-col gap-2 flex">
-          <Button
-            color="dark"
-            on:click={() => promptConfirmation('Upload profiles?', onUploadProfiles)}
-          >
-            Upload profiles
-          </Button>
-          {#if profilesId}
-            <Button
-              color="alternative"
-              on:click={() =>
-                promptConfirmation('Download and overwrite profiles?', onDownloadProfiles)}
-            >
-              Download profiles
-            </Button>
-          {/if}
-        </div>
-      </div>
-    </div>
-    {:else if megaAuth}
-      <!-- MEGA Connected -->
-      <div class="flex justify-center items-center flex-col gap-6">
-        <div class="w-full max-w-3xl">
-          <div class="flex justify-between items-center mb-6">
-            <div class="flex items-center gap-3">
-              <h2 class="text-3xl font-semibold">MEGA Cloud Storage</h2>
-              <Badge color="green">Connected</Badge>
-            </div>
-            <Button color="red" on:click={handleMegaLogout}>Log out</Button>
-          </div>
-
-          <div class="flex flex-col gap-4">
-            <p class="text-center text-gray-300 mb-2">
-              Your read progress is synced with MEGA cloud storage.
-            </p>
-
+            <!-- Turbo Mode toggle with RAM configuration -->
             <div class="flex flex-col gap-2">
               <div class="flex items-center gap-3">
                 <Toggle bind:checked={$miscSettings.turboMode} on:change={() => updateMiscSetting('turboMode', $miscSettings.turboMode)}>
@@ -707,10 +676,10 @@
                 <div class="flex flex-col gap-2 mt-2">
                   <div class="text-sm font-medium">Device RAM Configuration</div>
                   <div class="flex gap-4">
-                    <Radio name="ram-config-mega" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
-                    <Radio name="ram-config-mega" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
-                    <Radio name="ram-config-mega" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
-                    <Radio name="ram-config-mega" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
+                    <Radio name="ram-config-{currentProvider}" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
+                    <Radio name="ram-config-{currentProvider}" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
+                    <Radio name="ram-config-{currentProvider}" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
+                    <Radio name="ram-config-{currentProvider}" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
                   </div>
                   <p class="text-xs text-gray-500">
                     Configure your device's RAM to optimize parallel download performance and prevent memory issues.
@@ -719,75 +688,86 @@
               {/if}
             </div>
 
-            <Button color="blue" on:click={handleProviderSync}>
-              Sync read progress
-            </Button>
+            <!-- Auto re-authenticate toggle (Google Drive only) -->
+            {#if currentProvider === 'google-drive'}
+              <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-3">
+                  <Toggle bind:checked={$miscSettings.gdriveAutoReAuth} on:change={() => updateMiscSetting('gdriveAutoReAuth', $miscSettings.gdriveAutoReAuth)}>
+                    Auto re-authenticate on token expiration
+                  </Toggle>
+                </div>
+                <p class="text-xs text-gray-500">
+                  Keeps your progress synced during long reading sessions. Automatically prompts re-authentication when your session expires (~1 hour).
+                </p>
 
-            <Button
-              color="purple"
-              on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
-            >
-              Backup all series to cloud
-            </Button>
-
-            <div class="mt-4 p-4 bg-gray-800 rounded-lg">
-              <h3 class="font-semibold mb-2">About MEGA</h3>
-              <ul class="text-sm text-gray-300 space-y-1">
-                <li>20GB free storage</li>
-                <li>End-to-end encryption</li>
-                <li>Persistent login (no re-authentication needed)</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    {:else if webdavAuth}
-      <!-- WebDAV Connected -->
-      <div class="flex justify-center items-center flex-col gap-6">
-        <div class="w-full max-w-3xl">
-          <div class="flex justify-between items-center mb-6">
-            <div class="flex items-center gap-3">
-              <h2 class="text-3xl font-semibold">WebDAV Server</h2>
-              <Badge color="green">Connected</Badge>
-            </div>
-            <Button color="red" on:click={handleWebDAVLogout}>Log out</Button>
-          </div>
-
-          <div class="flex flex-col gap-4">
-            <p class="text-center text-gray-300 mb-2">
-              Your read progress is synced with your WebDAV server.
-            </p>
-
-            <div class="flex flex-col gap-2">
-              <div class="flex items-center gap-3">
-                <Toggle bind:checked={$miscSettings.turboMode} on:change={() => updateMiscSetting('turboMode', $miscSettings.turboMode)}>
-                  Turbo Mode
-                </Toggle>
+                {#if $miscSettings.gdriveAutoReAuth}
+                  <div class="mt-2 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
+                    <h4 class="text-sm font-semibold text-yellow-200 mb-2">⚠️ Popup Permission Required ({browserInfo.name})</h4>
+                    <p class="text-xs text-gray-300 mb-3">
+                      For auto re-authentication to work, you must allow popups for this site. Otherwise, the browser will block automatic re-authentication attempts.
+                    </p>
+                    <div class="text-xs text-gray-300 space-y-1 mb-3">
+                      <p class="font-medium">To enable popups:</p>
+                      <ol class="list-decimal list-inside pl-2 space-y-1">
+                        {#each browserInfo.instructions as instruction}
+                          <li>{instruction}</li>
+                        {/each}
+                      </ol>
+                      {#if browserInfo.settingsUrl}
+                        <div class="mt-2">
+                          <p class="text-xs text-gray-400">
+                            <span
+                              role="button"
+                              tabindex="0"
+                              class="text-yellow-400 underline cursor-pointer hover:text-yellow-300 font-mono"
+                              onclick={() => {
+                                navigator.clipboard.writeText(browserInfo.settingsUrl);
+                                showSnackbar(`Copied! Paste this into your address bar`);
+                              }}
+                              onkeydown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  navigator.clipboard.writeText(browserInfo.settingsUrl);
+                                  showSnackbar(`Copied! Paste this into your address bar`);
+                                }
+                              }}
+                            >
+                              {browserInfo.settingsUrl}
+                            </span>
+                          </p>
+                        </div>
+                      {/if}
+                    </div>
+                    <Button
+                      size="xs"
+                      color="yellow"
+                      on:click={() => {
+                        showSnackbar('Testing in 5 seconds... Do NOT click or interact until the popup appears!');
+                        // Use 5 second timeout to escape Chrome's user gesture window (~2-5 seconds)
+                        // This properly tests if popups are allowed for true background triggers (like auto re-auth)
+                        setTimeout(() => {
+                          try {
+                            tokenManager.reAuthenticate();
+                            showSnackbar('✅ Test triggered - if you see the Google auth popup, popups are allowed!');
+                          } catch (error) {
+                            showSnackbar('❌ Test failed - popup was blocked! Please enable popups for this site.');
+                          }
+                        }, 5000);
+                      }}
+                    >
+                      Test Popup Permission
+                    </Button>
+                  </div>
+                {/if}
               </div>
-              <p class="text-xs text-gray-500">
-                For users with fast internet and a lack of patience. Enables parallel downloads/uploads.
-              </p>
+            {/if}
 
-              {#if $miscSettings.turboMode}
-                <div class="flex flex-col gap-2 mt-2">
-                  <div class="text-sm font-medium">Device RAM Configuration</div>
-                  <div class="flex gap-4">
-                    <Radio name="ram-config-webdav" value={4} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio>
-                    <Radio name="ram-config-webdav" value={8} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio>
-                    <Radio name="ram-config-webdav" value={16} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio>
-                    <Radio name="ram-config-webdav" value={32} bind:group={$miscSettings.deviceRamGB} on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio>
-                  </div>
-                  <p class="text-xs text-gray-500">
-                    Configure your device's RAM to optimize parallel download performance and prevent memory issues.
-                  </p>
-                </div>
-              {/if}
-            </div>
-
-            <Button color="blue" on:click={handleProviderSync}>
+            <!-- Sync read progress button -->
+            <Button color="dark" on:click={currentProvider === 'google-drive' ? performSync : handleProviderSync}>
               Sync read progress
             </Button>
 
+            <!-- Backup all series button -->
             <Button
               color="purple"
               on:click={() => promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
@@ -795,12 +775,27 @@
               Backup all series to cloud
             </Button>
 
+            <!-- Profile sync button -->
+            <Button
+              color="blue"
+              on:click={syncProfiles}
+              disabled={isSyncingProfiles}
+            >
+              {#if isSyncingProfiles}
+                <Spinner size="4" class="mr-2" />
+                Syncing profiles...
+              {:else}
+                Sync profiles
+              {/if}
+            </Button>
+
+            <!-- Provider info box -->
             <div class="mt-4 p-4 bg-gray-800 rounded-lg">
-              <h3 class="font-semibold mb-2">WebDAV Server</h3>
+              <h3 class="font-semibold mb-2">About {providerNames[currentProvider]}</h3>
               <ul class="text-sm text-gray-300 space-y-1">
-                <li>Compatible with Nextcloud, ownCloud, and NAS devices</li>
-                <li>Persistent login (no re-authentication needed)</li>
-                <li>Self-hosted and private</li>
+                {#each providerInfo[currentProvider].items as item}
+                  <li>{item}</li>
+                {/each}
               </ul>
             </div>
           </div>

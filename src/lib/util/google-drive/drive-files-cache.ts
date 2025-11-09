@@ -90,6 +90,7 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
       const typeCounts: Record<string, number> = {};
       const cbzFiles: any[] = [];
       const volumeDataFiles: any[] = [];
+      const profilesFiles: any[] = [];
       const folderNames = new Map<string, string>();
       const foundFolderNames: string[] = [];
 
@@ -110,6 +111,8 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
           cbzFiles.push(item);
         } else if (item.name === GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA) {
           volumeDataFiles.push(item);
+        } else if (item.name === GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES) {
+          profilesFiles.push(item);
         }
       }
 
@@ -173,7 +176,26 @@ class DriveFilesCacheManager implements CloudCache<DriveFileMetadata> {
         cacheMap.set(GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA, volumeDataMetadata);
       }
 
-      console.log(`Cached ${cbzFiles.length} .cbz files and ${volumeDataFiles.length} volume-data.json file(s)`);
+      // Add profiles.json files as an array
+      if (profilesFiles.length > 0) {
+        const profilesMetadata = profilesFiles.map(file => {
+          console.log('Profiles file from API:', file);
+          const metadata: DriveFileMetadata = {
+            provider: 'google-drive',
+            fileId: file.id,
+            name: file.name,
+            modifiedTime: file.modifiedTime || new Date().toISOString(),
+            size: file.size ? parseInt(file.size) : 0,
+            path: file.name
+          };
+          return metadata;
+        });
+
+        console.log('Cached profiles metadata:', profilesMetadata);
+        cacheMap.set(GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES, profilesMetadata);
+      }
+
+      console.log(`Cached ${cbzFiles.length} .cbz files, ${volumeDataFiles.length} volume-data.json file(s), and ${profilesFiles.length} profiles.json file(s)`);
       this.cache.set(cacheMap);
       this.lastFetchTime = Date.now();
       this.cacheLoadedStore.set(true);

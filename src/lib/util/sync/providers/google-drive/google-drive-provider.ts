@@ -5,7 +5,6 @@ import { tokenManager } from '$lib/util/google-drive/token-manager';
 import { driveApiClient } from '$lib/util/google-drive/api-client';
 import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
-import { parseVolumesFromJson } from '$lib/settings';
 import { getOrCreateFolder, uploadCbzToDrive } from '$lib/util/backup';
 
 /**
@@ -247,52 +246,13 @@ export class GoogleDriveProvider implements SyncProvider {
 		const fileId = file.fileId;
 
 		try {
-			// Get current access token
-			let token = '';
-			tokenManager.token.subscribe(value => { token = value; })();
-
-			if (!token) {
-				throw new Error('No access token available');
-			}
-
-			// First get file size for progress tracking
-			let totalSize = 0;
-			if (onProgress) {
-				const metadata = await driveApiClient.getFileMetadata(fileId, 'size');
-				totalSize = parseInt(metadata.size || '0', 10);
-			}
-
-			// Download file with XMLHttpRequest for progress tracking
-			return new Promise((resolve, reject) => {
-				const xhr = new XMLHttpRequest();
-				xhr.open('GET', `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
-				xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-				xhr.responseType = 'blob';
-
-				xhr.onprogress = (event) => {
-					if (onProgress && event.lengthComputable) {
-						onProgress(event.loaded, totalSize || event.total);
-					}
-				};
-
-				xhr.onload = () => {
-					if (xhr.status >= 200 && xhr.status < 300) {
-						console.log(`✅ Downloaded CBZ from Google Drive (${fileId})`);
-						resolve(xhr.response as Blob);
-					} else {
-						reject(new Error(`HTTP error ${xhr.status}: ${xhr.statusText}`));
-					}
-				};
-
-				xhr.onerror = () => reject(new Error('Network error during download'));
-				xhr.ontimeout = () => reject(new Error('Download timed out'));
-				xhr.onabort = () => reject(new Error('Download aborted'));
-
-				xhr.send();
-			});
+			// Use api-client's downloadFile method (includes auth error handling)
+			const blob = await driveApiClient.downloadFile(fileId, onProgress);
+			console.log(`✅ Downloaded file from Google Drive (${fileId})`);
+			return blob;
 		} catch (error) {
 			throw new ProviderError(
-				`Failed to download volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				`Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,
 				'google-drive',
 				'DOWNLOAD_FAILED',
 				false,

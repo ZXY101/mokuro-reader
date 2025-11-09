@@ -1,5 +1,6 @@
 import { browser } from '$app/environment';
 import { derived, get, writable } from 'svelte/store';
+import { isMobilePlatform } from '$lib/util/platform';
 
 export type FontSize =
   | 'auto'
@@ -67,6 +68,8 @@ export type Settings = {
   inactivityTimeoutMinutes: number;
   volumeDefaults: VolumeDefaults;
   ankiConnectSettings: AnkiConnectSettings;
+  lastUpdated?: string; // ISO 8601 timestamp for sync conflict resolution
+  deletedOn?: string; // ISO 8601 timestamp when profile was deleted (tombstone)
 };
 
 export type SettingsKey = keyof Settings;
@@ -114,23 +117,97 @@ const defaultSettings: Settings = {
   }
 };
 
-type Profiles = Record<string, Settings>;
-
-const defaultProfiles: Profiles = {
-  Default: defaultSettings
+// Mobile-optimized default settings
+const mobileDefaultSettings: Settings = {
+  ...defaultSettings,
+  mobile: true,
+  defaultFullscreen: true,
+  edgeButtonWidth: 60,
+  showTimer: false,
+  swipeThreshold: 50
 };
 
+// Desktop-optimized default settings
+const desktopDefaultSettings: Settings = {
+  ...defaultSettings,
+  mobile: false,
+  defaultFullscreen: false,
+  edgeButtonWidth: 40,
+  showTimer: true,
+  swipeThreshold: 50
+};
+
+type Profiles = Record<string, Settings>;
+
+// Built-in profiles that cannot be deleted or renamed
+export const BUILT_IN_PROFILES = ['Mobile', 'Desktop'] as const;
+export type BuiltInProfile = typeof BUILT_IN_PROFILES[number];
+
+// Default profiles include both built-in profiles
+const builtInProfiles: Profiles = {
+  Mobile: mobileDefaultSettings,
+  Desktop: desktopDefaultSettings
+};
+
+/**
+ * Migrate old profiles without timestamps to new format
+ */
+function migrateProfiles(profiles: Profiles): Profiles {
+  const migrated: Profiles = {};
+
+  for (const [name, profile] of Object.entries(profiles)) {
+    if (!profile.lastUpdated) {
+      // Add timestamp to profile without one (old format)
+      const newTimestamp = new Date().toISOString();
+      console.log(`📝 Profile migration: Adding timestamp to [${name}]`, newTimestamp);
+      migrated[name] = {
+        ...profile,
+        lastUpdated: newTimestamp
+      };
+    } else {
+      migrated[name] = profile;
+    }
+  }
+
+  return migrated;
+}
+
+// Initialize profiles: merge stored user profiles with built-in profiles
+// Built-in profiles always exist and take precedence to ensure they're never missing
 const storedProfiles = browser ? window.localStorage.getItem('profiles') : undefined;
-const initialProfiles: Profiles =
-  storedProfiles && browser ? JSON.parse(storedProfiles) : defaultProfiles;
-export const profiles = writable<Profiles>(initialProfiles);
+const rawUserProfiles: Profiles = storedProfiles && browser ? JSON.parse(storedProfiles) : {};
+const userProfiles = migrateProfiles(rawUserProfiles);
 
-const storedCurrentProfile = browser
-  ? window.localStorage.getItem('currentProfile') || 'Default'
-  : 'Default';
-export const currentProfile = writable(storedCurrentProfile);
+// Merge: built-ins first (always present), then user profiles (can override built-ins)
+const initialProfiles: Profiles = migrateProfiles({
+  ...builtInProfiles,
+  ...userProfiles
+});
 
-profiles.subscribe((profiles) => {
+// Internal writable store containing all profiles including tombstones (deleted entries)
+const _profilesInternal = writable<Profiles>(initialProfiles);
+
+// Full writable store for sync and special operations (includes tombstones)
+// Sync code should use this to read/write all profile data including deleted entries
+export const profilesWithTrash = _profilesInternal;
+
+// Public derived store - filters out deleted profiles (tombstones)
+// This is what UI code should use
+export const profiles = derived(_profilesInternal, ($internal) => {
+  return Object.fromEntries(
+    Object.entries($internal).filter(([_, profile]) => !profile.deletedOn)
+  );
+});
+
+// Initialize current profile: use stored preference, or detect platform
+const storedCurrentProfile = browser ? window.localStorage.getItem('currentProfile') : null;
+const platformDefaultProfile = isMobilePlatform() ? 'Mobile' : 'Desktop';
+const initialCurrentProfile = storedCurrentProfile || platformDefaultProfile;
+
+export const currentProfile = writable(initialCurrentProfile);
+
+// Save internal store (including tombstones) to localStorage
+_profilesInternal.subscribe((profiles) => {
   if (browser) {
     window.localStorage.setItem('profiles', JSON.stringify(profiles));
   }
@@ -146,95 +223,150 @@ export const settings = derived([profiles, currentProfile], ([profiles, currentP
   return profiles[currentProfile];
 });
 
+/**
+ * Helper function to update a profile's timestamp
+ */
+function touchProfile(profile: Settings): Settings {
+  return {
+    ...profile,
+    lastUpdated: new Date().toISOString()
+  };
+}
+
 export function updateSetting(key: SettingsKey, value: any) {
-  profiles.update((profiles) => {
+  _profilesInternal.update((profiles) => {
+    const profileId = get(currentProfile);
     return {
       ...profiles,
-      [get(currentProfile)]: {
-        ...profiles[get(currentProfile)],
+      [profileId]: touchProfile({
+        ...profiles[profileId],
         [key]: value
-      }
+      })
     };
   });
 }
 
 export function updateVolumeDefaults(key: VolumeDefaultsKey, value: any) {
-  profiles.update((profiles) => {
+  _profilesInternal.update((profiles) => {
+    const profileId = get(currentProfile);
     return {
       ...profiles,
-      [get(currentProfile)]: {
-        ...profiles[get(currentProfile)],
+      [profileId]: touchProfile({
+        ...profiles[profileId],
         volumeDefaults: {
-          ...profiles[get(currentProfile)].volumeDefaults,
+          ...profiles[profileId].volumeDefaults,
           [key]: value
         }
-      }
+      })
     };
   });
 }
 
 export function updateAnkiSetting(key: AnkiSettingsKey, value: any) {
-  profiles.update((profiles) => {
+  _profilesInternal.update((profiles) => {
+    const profileId = get(currentProfile);
     return {
       ...profiles,
-      [get(currentProfile)]: {
-        ...profiles[get(currentProfile)],
+      [profileId]: touchProfile({
+        ...profiles[profileId],
         ankiConnectSettings: {
-          ...profiles[get(currentProfile)].ankiConnectSettings,
+          ...profiles[profileId].ankiConnectSettings,
           [key]: value
         }
-      }
+      })
     };
   });
 }
 
 export function resetSettings() {
-  profiles.update((profiles) => {
+  const profile = get(currentProfile);
+
+  // Determine which default to use based on profile name
+  let defaultForProfile: Settings;
+  if (profile === 'Mobile') {
+    defaultForProfile = mobileDefaultSettings;
+  } else if (profile === 'Desktop') {
+    defaultForProfile = desktopDefaultSettings;
+  } else {
+    // Custom profile - reset to generic default
+    defaultForProfile = defaultSettings;
+  }
+
+  _profilesInternal.update((profiles) => {
     return {
       ...profiles,
-      [get(currentProfile)]: defaultSettings
+      [profile]: touchProfile(defaultForProfile)
     };
   });
 }
 
 export function createProfile(profileId: string) {
-  profiles.update((profiles) => {
+  _profilesInternal.update((profiles) => {
     return {
       ...profiles,
-      [profileId]: defaultSettings
+      [profileId]: touchProfile(defaultSettings)
     };
   });
 }
 
 export function deleteProfile(profileId: string) {
-  if (get(currentProfile) === profileId) {
-    currentProfile.set('Default');
+  // Protect built-in profiles from deletion
+  if (BUILT_IN_PROFILES.includes(profileId as BuiltInProfile)) {
+    console.warn(`Cannot delete built-in profile: ${profileId}`);
+    return false;
   }
 
-  profiles.update((profiles) => {
-    delete profiles[profileId];
-    return profiles;
+  if (get(currentProfile) === profileId) {
+    currentProfile.set('Desktop');
+  }
+
+  _profilesInternal.update((profiles) => {
+    const existing = profiles[profileId];
+    if (!existing) return profiles; // Already gone or never existed
+
+    // Create tombstone with deletion timestamp
+    const tombstone: Settings = {
+      ...defaultSettings,
+      deletedOn: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+
+    return {
+      ...profiles,
+      [profileId]: tombstone
+    };
   });
+
+  return true;
 }
 
 export function renameProfile(oldName: string, newName: string) {
-  if (get(currentProfile) === oldName) {
-    currentProfile.set('Default');
+  // Protect built-in profiles from renaming
+  if (BUILT_IN_PROFILES.includes(oldName as BuiltInProfile)) {
+    console.warn(`Cannot rename built-in profile: ${oldName}`);
+    return false;
   }
 
-  profiles.update((profiles) => {
+  if (get(currentProfile) === oldName) {
+    currentProfile.set(newName);
+  }
+
+  _profilesInternal.update((profiles) => {
     delete Object.assign(profiles, { [newName]: profiles[oldName] })[oldName];
     return profiles;
   });
+
+  return true;
 }
 
 export function copyProfile(profileToCopy: string, newName: string) {
-  profiles.update((profiles) => {
+  _profilesInternal.update((profiles) => {
     return {
       ...profiles,
-      [newName]: {
-        ...profiles[profileToCopy]
-      }
+      [newName]: touchProfile({
+        ...profiles[profileToCopy],
+        deletedOn: undefined // Remove tombstone flag if copying a deleted profile
+      })
     };
   });
 }
