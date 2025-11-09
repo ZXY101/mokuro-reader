@@ -183,16 +183,20 @@
   let isSyncingProfiles = $state(false);
 
   async function syncProfiles() {
+    console.log('🔘 Sync profiles button clicked');
     const provider = providerManager.getActiveProvider();
     if (!provider) {
       showSnackbar('No cloud provider connected');
       return;
     }
 
+    console.log('🔘 Provider found:', provider.name);
     isSyncingProfiles = true;
     try {
       // Sync profiles using smart merge logic
+      console.log('🔘 Calling unifiedSyncService.syncProvider with syncProfiles: true');
       await unifiedSyncService.syncProvider(provider, { syncProfiles: true, silent: false });
+      console.log('🔘 Sync completed successfully');
       showSnackbar('Profiles synced');
     } catch (error) {
       console.error('Profile sync error:', error);

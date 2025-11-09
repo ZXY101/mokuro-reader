@@ -181,6 +181,7 @@ class UnifiedSyncService {
 
 		try {
 			console.log(`🔄 Syncing with ${provider.name}...`);
+			console.log('🔄 Sync options:', options);
 
 			// Check authentication - if provider needs to re-authenticate, let it handle that
 			if (!provider.isAuthenticated()) {
@@ -194,11 +195,17 @@ class UnifiedSyncService {
 			}
 
 			// Sync volume data (read progress)
+			console.log('🔄 Syncing volume data...');
 			await this.syncVolumeData(provider);
+			console.log('✅ Volume data synced');
 
 			// Optionally sync profiles
 			if (options.syncProfiles) {
+				console.log('🔄 options.syncProfiles is true, calling syncProfiles...');
 				await this.syncProfiles(provider);
+				console.log('✅ syncProfiles completed');
+			} else {
+				console.log('⏭️ Skipping profile sync (options.syncProfiles is false)');
 			}
 
 			console.log(`✅ ${provider.name} sync complete`);
@@ -430,23 +437,33 @@ class UnifiedSyncService {
 	 */
 	private async downloadProfilesFile(provider: SyncProvider): Promise<any | null> {
 		try {
+			console.log('🔎 Finding profiles.json in cache...');
 			const profilesFile = await this.findProfilesFile(provider);
+			console.log('🔎 findProfilesFile result:', profilesFile);
 
 			if (!profilesFile) {
+				console.log('⚠️ profiles.json not found in cache, returning null');
 				return null;
 			}
 
+			console.log('⬇️ Downloading profiles.json from cloud...');
 			const blob = await provider.downloadFile(profilesFile);
-			return await this.blobToJson(blob);
+			console.log('⬇️ Downloaded blob, converting to JSON...');
+			const json = await this.blobToJson(blob);
+			console.log('✅ Successfully parsed profiles JSON:', json);
+			return json;
 		} catch (error) {
+			console.error('❌ Error downloading profiles:', error);
 			// File not found is not an error
 			if (error instanceof Error && (
 				error.message.includes('not found') ||
 				error.message.includes('404') ||
 				error.message.includes('ENOENT')
 			)) {
+				console.log('📝 Error was "not found", returning null');
 				return null;
 			}
+			console.log('🔥 Re-throwing error (not a "not found" error)');
 			throw error;
 		}
 	}
@@ -507,14 +524,21 @@ class UnifiedSyncService {
 	 * Sync profiles with a provider
 	 */
 	private async syncProfiles(provider: SyncProvider): Promise<void> {
+		console.log('🔵 syncProfiles() function called for provider:', provider.name);
+
 		// Step 1: Download cloud profiles
+		console.log('📥 Downloading cloud profiles...');
 		const cloudProfiles = await this.downloadProfilesFile(provider);
+		console.log('📥 Downloaded cloud profiles:', cloudProfiles);
 
 		// Step 2: Get local profiles (including tombstones for deletion sync)
 		const localProfiles = get(profilesWithTrash);
+		console.log('💾 Local profiles:', localProfiles);
 
 		// Step 3: Merge profiles (handles deletedOn timestamps)
+		console.log('🔀 About to merge profiles...');
 		const mergedProfiles = this.mergeProfiles(localProfiles, cloudProfiles || {});
+		console.log('✅ Merged profiles:', mergedProfiles);
 
 		// Step 4: Purge tombstones older than 30 days
 		const purgedProfiles = this.purgeProfileTombstones(mergedProfiles);
@@ -660,6 +684,13 @@ class UnifiedSyncService {
 	 * Handles deletedOn timestamps to properly sync deletions across devices
 	 */
 	private mergeProfiles(local: any, cloud: any): any {
+		console.log('🔍 mergeProfiles called:', {
+			localProfiles: Object.keys(local || {}),
+			cloudProfiles: Object.keys(cloud || {}),
+			localData: local,
+			cloudData: cloud
+		});
+
 		const merged: any = {};
 		const allProfileNames = new Set([
 			...Object.keys(local || {}),
@@ -690,20 +721,38 @@ class UnifiedSyncService {
 					new Date(cloudProfile.deletedOn || 0).getTime()
 				);
 
+				console.log(`🔄 Profile merge [${profileName}]:`, {
+					local: {
+						charCount: localProfile.charCount,
+						lastUpdated: localProfile.lastUpdated,
+						timestamp: localMostRecent
+					},
+					cloud: {
+						charCount: cloudProfile.charCount,
+						lastUpdated: cloudProfile.lastUpdated,
+						timestamp: cloudMostRecent
+					}
+				});
+
 				let winner;
 				if (cloudMostRecent > localMostRecent) {
+					console.log(`  ☁️ Cloud wins (${cloudProfile.charCount})`);
 					winner = cloudProfile;
 				} else if (localMostRecent > cloudMostRecent) {
+					console.log(`  💻 Local wins (${localProfile.charCount})`);
 					winner = localProfile;
 				} else {
 					// Timestamps equal (including both at epoch)
 					// Prefer active over deleted to prevent accidental data loss
 					if (cloudProfile.deletedOn && !localProfile.deletedOn) {
+						console.log(`  💻 Local wins (active vs deleted)`);
 						winner = localProfile; // Local is active, keep it
 					} else if (localProfile.deletedOn && !cloudProfile.deletedOn) {
+						console.log(`  ☁️ Cloud wins (active vs deleted)`);
 						winner = cloudProfile; // Cloud is active, keep it
 					} else {
 						// Both same state (both active or both deleted) - prefer local
+						console.log(`  💻 Local wins (tie, prefer local)`);
 						winner = localProfile;
 					}
 				}

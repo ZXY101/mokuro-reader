@@ -158,9 +158,11 @@ function migrateProfiles(profiles: Profiles): Profiles {
   for (const [name, profile] of Object.entries(profiles)) {
     if (!profile.lastUpdated) {
       // Add timestamp to profile without one (old format)
+      const newTimestamp = new Date().toISOString();
+      console.log(`📝 Profile migration: Adding timestamp to [${name}]`, newTimestamp);
       migrated[name] = {
         ...profile,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: newTimestamp
       };
     } else {
       migrated[name] = profile;
