@@ -56,16 +56,20 @@ export const volumesWithPlaceholders = derived(
       set($volumes);
     });
   },
-  {} as Record<string, VolumeMetadata>
+  undefined as Record<string, VolumeMetadata> | undefined
 );
 
 // Each derived store needs to be passed as an array if using multiple inputs
-export const catalog = derived([volumesWithPlaceholders], ([$volumesWithPlaceholders]) =>
-  deriveSeriesFromVolumes(Object.values($volumesWithPlaceholders))
-);
+export const catalog = derived([volumesWithPlaceholders], ([$volumesWithPlaceholders]) => {
+  // Return null while loading (before first data emission)
+  if ($volumesWithPlaceholders === undefined) {
+    return null;
+  }
+  return deriveSeriesFromVolumes(Object.values($volumesWithPlaceholders));
+});
 
 export const currentSeries = derived([page, catalog], ([$page, $catalog]) =>
-  ($catalog.find((volume) => volume.series_uuid === $page.params.manga)?.volumes || []).sort(
+  ($catalog?.find((volume) => volume.series_uuid === $page.params.manga)?.volumes || []).sort(
     sortVolumes
   )
 );
