@@ -7,38 +7,7 @@ import { unifiedCloudManager } from './unified-cloud-manager';
 import { driveApiClient } from '$lib/util/google-drive/api-client';
 import { tokenManager } from '$lib/util/google-drive/token-manager';
 import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
-
-/**
- * Check which provider (if any) has stored credentials
- * Since providers are mutually exclusive, returns the active provider type or null
- */
-function getActiveProviderType(): 'google-drive' | 'mega' | 'webdav' | null {
-	if (!browser) return null;
-
-	// Check Google Drive auth history (not token validity - user needs to re-auth with expired token)
-	const hasGdriveAuth = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.HAS_AUTHENTICATED) === 'true';
-	const gdriveToken = localStorage.getItem(GOOGLE_DRIVE_CONFIG.STORAGE_KEYS.TOKEN);
-	if (hasGdriveAuth && gdriveToken) {
-		return 'google-drive';
-	}
-
-	// Check MEGA credentials
-	const megaEmail = localStorage.getItem('mega_email');
-	const megaPassword = localStorage.getItem('mega_password');
-	if (megaEmail && megaPassword) {
-		return 'mega';
-	}
-
-	// Check WebDAV credentials
-	const webdavUrl = localStorage.getItem('webdav_server_url');
-	const webdavUsername = localStorage.getItem('webdav_username');
-	const webdavPassword = localStorage.getItem('webdav_password');
-	if (webdavUrl && webdavUsername && webdavPassword) {
-		return 'webdav';
-	}
-
-	return null; // No provider has credentials
-}
+import { getConfiguredProviderType } from './provider-detection';
 
 /**
  * Initialize all sync providers and register them with the provider manager.
@@ -59,7 +28,7 @@ export async function initializeProviders(): Promise<void> {
 
 	// Check which provider (if any) is active
 	// Providers are mutually exclusive - only one can be logged in at a time
-	const activeProvider = getActiveProviderType();
+	const activeProvider = getConfiguredProviderType();
 
 	// If no provider is active, we're done - providers will lazy-init when user clicks login
 	if (!activeProvider) {
@@ -109,8 +78,8 @@ export async function initializeProviders(): Promise<void> {
 		}
 	}
 
-	// Update status after registration
-	providerManager.updateStatus();
+	// Don't update status here - wait for providers to finish loading credentials
+	// The constructor already set initial "configured" state, don't overwrite it
 
 	// Wait for providers to be ready (MEGA/WebDAV restore credentials on init)
 	console.log('⏳ Waiting for providers to be ready...');

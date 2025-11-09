@@ -50,18 +50,26 @@
   let googleDriveAuth = $derived($providerStatusStore.providers['google-drive']?.isAuthenticated || false);
   let megaAuth = $derived($providerStatusStore.providers['mega']?.isAuthenticated || false);
   let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
-  let hasAnyProvider = $derived($providerStatusStore.hasAnyAuthenticated);
+
+  // Check if any provider is configured (not just authenticated)
+  // This allows UI to show the provider page immediately while initializing
+  let hasAnyProvider = $derived(
+    $providerStatusStore.providers['google-drive']?.hasStoredCredentials ||
+    $providerStatusStore.providers['mega']?.hasStoredCredentials ||
+    $providerStatusStore.providers['webdav']?.hasStoredCredentials ||
+    false
+  );
 
   // Check if providers are configured (even if not currently connected)
   let googleDriveConfigured = $derived($providerStatusStore.providers['google-drive']?.hasStoredCredentials || false);
   let megaConfigured = $derived($providerStatusStore.providers['mega']?.hasStoredCredentials || false);
   let webdavConfigured = $derived($providerStatusStore.providers['webdav']?.hasStoredCredentials || false);
 
-  // Determine current connected provider
+  // Determine current configured provider (show UI even if still initializing)
   let currentProvider = $derived(
-    googleDriveAuth ? 'google-drive' :
-    megaAuth ? 'mega' :
-    webdavAuth ? 'webdav' :
+    googleDriveConfigured ? 'google-drive' :
+    megaConfigured ? 'mega' :
+    webdavConfigured ? 'webdav' :
     null
   );
 
@@ -271,6 +279,9 @@
       // After successful login, populate unified cache for placeholders
       showSnackbar('Connected to Google Drive - loading cloud data...');
       await unifiedCloudManager.fetchAllCloudVolumes();
+
+      // Update status after cache loads to ensure UI shows "Connected"
+      providerManager.updateStatus();
       showSnackbar('Google Drive connected');
 
       // Automatically sync after login
@@ -295,6 +306,9 @@
       // Populate unified cache for rest of app to use
       showSnackbar('Connected to MEGA - loading cloud data...');
       await unifiedCloudManager.fetchAllCloudVolumes();
+
+      // Update status after cache loads to ensure UI shows "Connected"
+      providerManager.updateStatus();
       showSnackbar('MEGA connected');
 
       // Clear form and trigger reactivity
@@ -635,7 +649,11 @@
           <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-3">
               <h2 class="text-3xl font-semibold">{providerNames[currentProvider]}</h2>
-              {#if currentProvider === 'google-drive' && cacheIsFetching}
+              {#if $providerStatusStore.providers[currentProvider]?.needsAttention}
+                <Badge color="red">Action Required</Badge>
+              {:else if !$providerStatusStore.providers[currentProvider]?.isAuthenticated}
+                <Badge color="yellow">Initializing...</Badge>
+              {:else if currentProvider === 'google-drive' && cacheIsFetching}
                 <Badge color="yellow">Loading Drive data...</Badge>
               {:else}
                 <Badge color="green">Connected</Badge>

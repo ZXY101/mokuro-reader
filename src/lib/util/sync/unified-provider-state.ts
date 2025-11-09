@@ -30,24 +30,36 @@ export interface UnifiedProviderState {
  * Create a reactive store that combines provider status and cache state
  */
 function createUnifiedProviderState(): Readable<UnifiedProviderState> {
-	// Track whether cache has ever finished loading (stays true once set)
+	// Track cache loading transitions to know when it's actually loaded
+	let wasLoading = false;
 	let hasLoadedOnce = false;
 
 	return derived(
 		[cacheManager.isFetchingState, providerManager.status],
 		([$isCacheLoading, $providerStatus]) => {
-			const provider = providerManager.getActiveProvider();
-
-			// Track if cache has loaded at least once
-			if (!$isCacheLoading && !hasLoadedOnce) {
+			// Track when cache finishes loading (transition from loading -> not loading)
+			if (wasLoading && !$isCacheLoading) {
 				hasLoadedOnce = true;
 			}
+			wasLoading = $isCacheLoading;
 
-			if (!provider) {
+			// Check if ANY provider has stored credentials (synchronous, immediate on page load)
+			// This ensures UI shows yellow "Initializing..." immediately
+			const hasStoredCredentials =
+				$providerStatus.providers['google-drive']?.hasStoredCredentials ||
+				$providerStatus.providers['mega']?.hasStoredCredentials ||
+				$providerStatus.providers['webdav']?.hasStoredCredentials ||
+				false;
+
+			// Get the configured provider type (if any)
+			const configuredType = $providerStatus.currentProviderType;
+
+			// If no provider configured, return minimal state
+			if (!configuredType) {
 				return {
 					isAuthenticated: false,
-					hasStoredCredentials: false,
-					isCacheLoading: false,
+					hasStoredCredentials,
+					isCacheLoading: $isCacheLoading,
 					isCacheLoaded: hasLoadedOnce,
 					isFullyConnected: false,
 					needsAttention: false,
@@ -55,8 +67,22 @@ function createUnifiedProviderState(): Readable<UnifiedProviderState> {
 				};
 			}
 
-			// Use status from providerManager (reactive) instead of calling getStatus() directly
-			const status = $providerStatus.providers[provider.type] || provider.getStatus();
+			// Get status for the configured provider
+			const status = $providerStatus.providers[configuredType];
+
+			// If status not yet available, return credentials-only state
+			if (!status) {
+				return {
+					isAuthenticated: false,
+					hasStoredCredentials,
+					isCacheLoading: $isCacheLoading,
+					isCacheLoaded: hasLoadedOnce,
+					isFullyConnected: false,
+					needsAttention: false,
+					statusMessage: 'Initializing...'
+				};
+			}
+
 			const isFullyConnected = status.isAuthenticated && hasLoadedOnce && !$isCacheLoading;
 
 			return {
