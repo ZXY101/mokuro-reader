@@ -33,9 +33,47 @@ export class GoogleDriveProvider implements SyncProvider {
 	readonly downloadConcurrencyLimit = 4;
 
 	private readerFolderId: string | null = null;
+	private initializePromise: Promise<void> | null = null;
 
 	isAuthenticated(): boolean {
 		return tokenManager.isAuthenticated();
+	}
+
+	/**
+	 * Ensure Drive API is initialized when we have auth credentials
+	 * This handles the case where app restarts with existing auth - we need to
+	 * initialize the API clients (gapi, tokenClient) even though we're already "authenticated"
+	 */
+	private async ensureInitialized(): Promise<void> {
+		// If we're already initializing, wait for that to complete
+		if (this.initializePromise) {
+			return this.initializePromise;
+		}
+
+		// If not authenticated, don't initialize
+		if (!this.isAuthenticated()) {
+			return;
+		}
+
+		// Check if already initialized by testing if gapi.client.drive exists
+		if (typeof gapi !== 'undefined' && gapi.client?.drive) {
+			return; // Already initialized
+		}
+
+		// Need to initialize - create promise and store it to prevent concurrent inits
+		this.initializePromise = (async () => {
+			try {
+				console.log('🔧 Initializing Drive API for existing auth...');
+				await driveApiClient.initialize();
+				console.log('✅ Drive API initialized');
+			} catch (error) {
+				console.error('Failed to initialize Drive API:', error);
+				this.initializePromise = null;
+				throw error;
+			}
+		})();
+
+		return this.initializePromise;
 	}
 
 	getStatus(): ProviderStatus {
@@ -70,8 +108,8 @@ export class GoogleDriveProvider implements SyncProvider {
 			// Initialize Drive API if needed (this also initializes the token client)
 			await driveApiClient.initialize();
 
-			// Request OAuth token (will show Google sign-in if needed)
-			tokenManager.requestNewToken(true, false);
+			// Request OAuth token with full consent screen (initial login)
+			tokenManager.requestNewToken(true);
 
 			// Wait for token to be set
 			await new Promise<void>((resolve, reject) => {
@@ -100,8 +138,10 @@ export class GoogleDriveProvider implements SyncProvider {
 	}
 
 	async logout(): Promise<void> {
-		tokenManager.clearToken();
+		// Use full logout (clears token + auth history) not just clearToken
+		await tokenManager.logout();
 		this.readerFolderId = null;
+		this.initializePromise = null; // Reset initialization state
 		console.log('Google Drive logged out');
 	}
 
@@ -111,6 +151,9 @@ export class GoogleDriveProvider implements SyncProvider {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
+
+		// Ensure API is initialized before using it
+		await this.ensureInitialized();
 
 		try {
 			console.log('Querying Google Drive for files...');
@@ -199,6 +242,9 @@ export class GoogleDriveProvider implements SyncProvider {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
 
+		// Ensure API is initialized before using it
+		await this.ensureInitialized();
+
 		try {
 			// Parse path: "SeriesTitle/VolumeTitle.cbz"
 			const pathParts = path.split('/');
@@ -242,6 +288,9 @@ export class GoogleDriveProvider implements SyncProvider {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
 
+		// Ensure API is initialized before using it
+		await this.ensureInitialized();
+
 		// Extract file ID from metadata
 		const fileId = file.fileId;
 
@@ -265,6 +314,9 @@ export class GoogleDriveProvider implements SyncProvider {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
+
+		// Ensure API is initialized before using it
+		await this.ensureInitialized();
 
 		// Extract file ID from metadata
 		const fileId = file.fileId;
@@ -292,6 +344,9 @@ export class GoogleDriveProvider implements SyncProvider {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
+
+		// Ensure API is initialized before using it
+		await this.ensureInitialized();
 
 		try {
 			// Ensure reader folder exists to get its ID
@@ -333,6 +388,9 @@ export class GoogleDriveProvider implements SyncProvider {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
+
+		// Ensure API is initialized before using it
+		await this.ensureInitialized();
 
 		return new Promise((resolve, reject) => {
 			const showPicker = async () => {
@@ -444,6 +502,7 @@ export class GoogleDriveProvider implements SyncProvider {
 	/**
 	 * List all files in a folder recursively
 	 * Expands subfolders and returns all ZIP/CBZ files
+	 * Note: ensureInitialized() is already called by showFilePicker() before this is invoked
 	 */
 	private async listFilesInFolder(folderId: string): Promise<PickedFile[]> {
 		try {
@@ -486,6 +545,9 @@ export class GoogleDriveProvider implements SyncProvider {
 		if (!this.isAuthenticated()) {
 			throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
 		}
+
+		// Ensure API is initialized before using it
+		await this.ensureInitialized();
 
 		try {
 			// Fetch full metadata for each file in parallel
