@@ -275,7 +275,7 @@
   {:else}
     <!-- Grid view -->
     <div
-      class="relative flex flex-col gap-2 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-2 border-transparent sm:w-[250px]"
+      class="relative flex flex-col gap-2 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-2 border-transparent sm:w-[278px]"
       class:!border-green-400={isComplete}
     >
       <!-- Actions menu button -->
@@ -309,17 +309,19 @@
       </Dropdown>
 
       <a href="/{$page.params.manga}/{volume_uuid}" class="flex flex-col gap-2">
-        {#if volume.thumbnail}
-          <img
-            src={URL.createObjectURL(volume.thumbnail)}
-            alt={volName}
-            class="object-contain sm:w-[250px] sm:h-[350px] bg-black border-gray-900 border"
-          />
-        {:else}
-          <div class="sm:w-[250px] sm:h-[350px] bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-700 flex items-center justify-center">
-            <span class="text-gray-400">No thumbnail</span>
-          </div>
-        {/if}
+        <div class="sm:w-[250px] sm:h-[350px] flex items-center justify-center">
+          {#if volume.thumbnail}
+            <img
+              src={URL.createObjectURL(volume.thumbnail)}
+              alt={volName}
+              class="sm:max-w-[250px] sm:max-h-[350px] h-auto w-auto bg-black border-gray-900 border"
+            />
+          {:else}
+            <div class="w-full h-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-700 flex items-center justify-center">
+              <span class="text-gray-400">No thumbnail</span>
+            </div>
+          {/if}
+        </div>
         <div class="flex items-center gap-1 sm:w-[250px]">
           <div
             class="text-sm font-medium truncate flex-1"
