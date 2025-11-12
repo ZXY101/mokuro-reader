@@ -4,6 +4,7 @@ import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
+import { generateFallbackVolumeData } from './image-only-fallback';
 
 export * from './web-import';
 
@@ -108,7 +109,7 @@ async function uploadVolumeData(
     uploadData &&
     uploadMetadata &&
     uploadMetadata.series_uuid &&
-    uploadMetadata.mokuro_version &&
+    uploadMetadata.mokuro_version !== undefined && // Allow empty string for image-only volumes
     uploadMetadata.volume_uuid &&
     uploadMetadata.series_title &&
     uploadMetadata.volume_title &&
@@ -376,6 +377,49 @@ async function processMokuroWithPendingImages(
   }
 }
 
+/**
+ * Process images that weren't matched to any .mokuro file (image-only volumes)
+ */
+async function processOrphanedImages(
+  pendingImagesByPath: Record<string, Record<string, File>>,
+  volumesByPath: Record<string, Partial<VolumeMetadata>>
+): Promise<void> {
+  const orphanedPaths = Object.keys(pendingImagesByPath);
+
+  if (orphanedPaths.length === 0) {
+    return;
+  }
+
+  showSnackbar(`Found ${orphanedPaths.length} image-only volume(s) without .mokuro files`, 5000);
+
+  for (const path of orphanedPaths) {
+    const imageFiles = pendingImagesByPath[path];
+
+    // Skip if no images
+    if (!imageFiles || Object.keys(imageFiles).length === 0) {
+      continue;
+    }
+
+    try {
+      showSnackbar(`Processing image-only volume: ${path}`, 3000);
+
+      // Generate fallback metadata and data
+      const { metadata, data } = await generateFallbackVolumeData(path, imageFiles);
+
+      // Store in volumesByPath
+      volumesByPath[path] = metadata;
+
+      // Upload to database
+      await uploadVolumeData(volumesByPath, path, data);
+
+      showSnackbar(`Added image-only volume: ${metadata.volume_title}`, 3000);
+    } catch (error) {
+      console.error(`Failed to process image-only volume at ${path}:`, error);
+      showSnackbar(`Failed to import images from ${path}`, 3000);
+    }
+  }
+}
+
 export async function processFiles(_files: File[]) {
   const volumesByPath: Record<string, Partial<VolumeMetadata>> = {};
   const volumesDataByPath: Record<string, Partial<VolumeData>> = {};
@@ -395,6 +439,9 @@ export async function processFiles(_files: File[]) {
   for (const file of fileStack) {
     await processFile(file, volumesByPath, volumesDataByPath, pendingImagesByPath);
   }
+
+  // Process orphaned images (images without .mokuro files) as image-only volumes
+  await processOrphanedImages(pendingImagesByPath, volumesByPath);
 
   showSnackbar('Files uploaded successfully');
   db.processThumbnails(5);

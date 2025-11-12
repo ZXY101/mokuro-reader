@@ -5,8 +5,8 @@
   import type { VolumeMetadata, Page } from '$lib/types';
   import { promptConfirmation, showSnackbar } from '$lib/util';
   import { getCurrentPage, getProgressDisplay, isVolumeComplete } from '$lib/util/volume-helpers';
-  import { Frame, ListgroupItem, Dropdown, DropdownItem } from 'flowbite-svelte';
-  import { CheckCircleSolid, TrashBinSolid, FileLinesOutline, DotsVerticalOutline, CloudArrowUpOutline } from 'flowbite-svelte-icons';
+  import { Frame, ListgroupItem, Dropdown, DropdownItem, Badge } from 'flowbite-svelte';
+  import { CheckCircleSolid, TrashBinSolid, FileLinesOutline, DotsVerticalOutline, CloudArrowUpOutline, ImageOutline } from 'flowbite-svelte-icons';
   import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
   import BackupButton from './BackupButton.svelte';
@@ -30,6 +30,9 @@
   let currentPage = $derived(getCurrentPage(volume.volume_uuid, $progress));
   let progressDisplay = $derived(getProgressDisplay(currentPage, volume.page_count));
   let isComplete = $derived(isVolumeComplete(currentPage, volume.page_count));
+
+  // Check if this is an image-only volume (no mokuro OCR data)
+  let isImageOnly = $derived(volume.mokuro_version === '');
 
   // Cloud backup state (for grid view menu)
   let cloudFiles = $state<Map<string, CloudVolumeWithProvider[]>>(new Map());
@@ -269,7 +272,15 @@
           class="flex flex-row gap-5 items-center justify-between w-full"
         >
           <div>
-            <p class="font-semibold" class:text-white={!isComplete}>{volName}</p>
+            <div class="flex items-center gap-2 mb-1">
+              <p class="font-semibold" class:text-white={!isComplete}>{volName}</p>
+              {#if isImageOnly}
+                <Badge color="blue" class="text-xs">
+                  <ImageOutline class="w-3 h-3 me-1 inline" />
+                  Image Only
+                </Badge>
+              {/if}
+            </div>
             <div class="flex flex-wrap gap-x-3 items-center">
               <p>{progressDisplay}</p>
               {#if statsDisplay}
@@ -346,15 +357,23 @@
             </div>
           {/if}
         </div>
-        <div class="flex items-center gap-1 sm:w-[250px]">
-          <div
-            class="text-sm font-medium truncate flex-1"
-            class:text-green-400={isComplete}
-          >
-            {volName}
+        <div class="flex flex-col gap-1 sm:w-[250px]">
+          <div class="flex items-center gap-1">
+            <div
+              class="text-sm font-medium truncate flex-1"
+              class:text-green-400={isComplete}
+            >
+              {volName}
+            </div>
+            {#if isComplete}
+              <CheckCircleSolid class="w-5 h-5 text-green-400 flex-shrink-0" />
+            {/if}
           </div>
-          {#if isComplete}
-            <CheckCircleSolid class="w-5 h-5 text-green-400 flex-shrink-0" />
+          {#if isImageOnly}
+            <Badge color="blue" class="text-xs w-fit">
+              <ImageOutline class="w-3 h-3 me-1 inline" />
+              Image Only
+            </Badge>
           {/if}
         </div>
         <div class="flex flex-wrap gap-x-2 items-center text-xs sm:w-[250px]"
