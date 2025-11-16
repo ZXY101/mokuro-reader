@@ -38,42 +38,25 @@ export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
 });
 
 // Merge local volumes with cloud placeholders
-// Track in-flight placeholder generation to prevent concurrent DB queries
-let placeholderGenerationId = 0;
-
 export const volumesWithPlaceholders = derived(
   [volumes, unifiedCloudManager.cloudFiles],
-  ([$volumes, $cloudFiles], set) => {
-    // Set local volumes immediately to avoid async gap
-    set($volumes);
-
-    // Skip placeholder generation if no cloud files (avoid unnecessary DB query)
+  ([$volumes, $cloudFiles]) => {
+    // Skip placeholder generation if no cloud files
     if ($cloudFiles.size === 0) {
-      return;
+      return $volumes;
     }
 
-    // Increment generation ID to cancel any in-flight operations
-    const currentGenerationId = ++placeholderGenerationId;
+    // Generate placeholders synchronously
+    const placeholders = generatePlaceholders($cloudFiles, Object.values($volumes));
 
-    // Then asynchronously enhance with placeholders
-    generatePlaceholders($cloudFiles).then(placeholders => {
-      // Check if this generation was superseded by a newer one
-      if (currentGenerationId !== placeholderGenerationId) {
-        return;
-      }
+    // Combine local volumes with placeholders
+    const combined = { ...$volumes };
 
-      // Combine local volumes with placeholders
-      const combined = { ...$volumes };
+    for (const placeholder of placeholders) {
+      combined[placeholder.volume_uuid] = placeholder;
+    }
 
-      for (const placeholder of placeholders) {
-        combined[placeholder.volume_uuid] = placeholder;
-      }
-
-      set(combined);
-    }).catch(error => {
-      console.error('Failed to generate placeholders:', error);
-      // On error, just use local volumes (already set above)
-    });
+    return combined;
   },
   {} as Record<string, VolumeMetadata>
 );
