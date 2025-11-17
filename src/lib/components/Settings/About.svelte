@@ -11,7 +11,7 @@
   {/snippet}
   <div class="flex flex-col gap-5">
     <div class="flex flex-row justify-between">
-      <p class="font-semibold">Mokuro reader {READER_VERSION} <Badge>BETA</Badge></p>
+      <p class="font-semibold">Mokuro reader {READER_VERSION}</p>
       <a
         class="hover:text-primary-600"
         href="https://github.com/ZXY101/mokuro-reader"
@@ -42,8 +42,9 @@
       file.
     </p>
     <Helper
-      >Created by <A href="https://github.com/ZXY101">ZXY101</A> & <A
-        href="https://github.com/kha-white">kha-white</A
+      >Created by <A href="https://github.com/ZXY101">ZXY101</A>, <A
+        href="https://github.com/kha-white">kha-white</A> & <A
+        href="https://github.com/Gnathonic">Gnathonic</A
       ></Helper
     >
   </div>
