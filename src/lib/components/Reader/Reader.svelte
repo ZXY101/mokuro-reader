@@ -382,7 +382,7 @@
     const durations = {
       crossfade: 200,
       vertical: 400,
-      pageTurn: 600,
+      pageTurn: 200,
       swipe: 350,
       none: 0
     };
@@ -412,15 +412,17 @@
         }
 
         if (transition === 'pageTurn') {
-          // New page flips in
-          const fromAngle = visualDirection === 'left' ? 180 : -180;
-          const currentAngle = fromAngle * (1 - t);
-          const origin = visualDirection === 'left' ? 'left center' : 'right center';
-          return `
-            transform: perspective(2000px) rotateY(${currentAngle}deg);
-            transform-origin: ${origin};
-            opacity: ${t};
-          `;
+          // New page wipes in on top of old page
+          // Wipe direction depends on reading direction and forward/backward
+          const clipPercent = visualDirection === 'right'
+            ? 100 * t          // Left to right wipe
+            : 100 * (1 - t);   // Right to left wipe
+
+          const clipPath = visualDirection === 'right'
+            ? `polygon(0 0, ${clipPercent}% 0, ${clipPercent}% 100%, 0 100%)`  // Left to right
+            : `polygon(${clipPercent}% 0, 100% 0, 100% 100%, ${clipPercent}% 100%)`;  // Right to left
+
+          return `clip-path: ${clipPath};`;
         }
 
         if (transition === 'swipe') {
@@ -448,7 +450,7 @@
     const durations = {
       crossfade: 200,
       vertical: 400,
-      pageTurn: 600,
+      pageTurn: 200,
       swipe: 350,
       none: 0
     };
@@ -478,15 +480,8 @@
         }
 
         if (transition === 'pageTurn') {
-          // Old page flips out in opposite direction
-          const toAngle = visualDirection === 'left' ? -180 : 180;
-          const currentAngle = toAngle * (1 - t);
-          const origin = visualDirection === 'left' ? 'right center' : 'left center';
-          return `
-            transform: perspective(2000px) rotateY(${currentAngle}deg);
-            transform-origin: ${origin};
-            opacity: ${t};
-          `;
+          // Old page stays visible underneath new page
+          return `opacity: 1`;
         }
 
         if (transition === 'swipe') {
