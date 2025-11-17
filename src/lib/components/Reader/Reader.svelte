@@ -26,9 +26,10 @@
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
   import { beforeNavigate, goto } from '$app/navigation';
-  import { onMount, tick } from 'svelte';
+  import { onMount, onDestroy, tick } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
+  import { ImageCache } from '$lib/reader/image-cache';
 
   // TODO: Refactor this whole mess
   interface Props {
@@ -364,6 +365,77 @@
   let page = $derived($progress?.[volume?.volume_uuid || 0] || 1);
   let index = $derived(page - 1);
 
+  // Image cache for preloading
+  let imageCache = new ImageCache();
+  let cachedImageUrl1 = $state<string | null>(null);
+  let cachedImageUrl2 = $state<string | null>(null);
+  let filesArray = $state<File[]>([]);
+  let lastVolumeUuid = $state<string>('');
+
+  // Update files array when volume changes (not on every volumeData update)
+  $effect(() => {
+    const files = volumeData?.files;
+    const volumeUuid = volume?.volume_uuid;
+
+    // Only recreate filesArray when the volume UUID actually changes
+    if (volumeUuid && volumeUuid !== lastVolumeUuid) {
+      lastVolumeUuid = volumeUuid;
+      if (files) {
+        filesArray = Object.values(files);
+      } else {
+        filesArray = [];
+      }
+    } else if (files && filesArray.length === 0) {
+      // Initial load: filesArray is empty but we have files
+      filesArray = Object.values(files);
+    }
+  });
+
+  // Update cache when page or volume data changes
+  $effect(() => {
+    const currentIndex = index;
+
+    if (filesArray.length > 0 && currentIndex >= 0) {
+      // Try to get current page image synchronously first (instant if already cached)
+      const syncUrl1 = imageCache.getImageSync(currentIndex);
+
+      if (syncUrl1) {
+        cachedImageUrl1 = syncUrl1;
+      } else {
+        // Not ready yet, get it async and update when ready
+        cachedImageUrl1 = null;
+        imageCache.getImage(currentIndex).then(url => {
+          cachedImageUrl1 = url;
+        });
+      }
+
+      // Update cache (non-blocking - preloads in background)
+      imageCache.updateCache(filesArray, currentIndex);
+
+      // Try to get next page image if showing second page
+      if (showSecondPage() && currentIndex + 1 < filesArray.length) {
+        const syncUrl2 = imageCache.getImageSync(currentIndex + 1);
+        if (syncUrl2) {
+          cachedImageUrl2 = syncUrl2;
+        } else {
+          cachedImageUrl2 = null;
+          imageCache.getImage(currentIndex + 1).then(url => {
+            cachedImageUrl2 = url;
+          });
+        }
+      } else {
+        cachedImageUrl2 = null;
+      }
+    } else {
+      cachedImageUrl1 = null;
+      cachedImageUrl2 = null;
+    }
+  });
+
+  onDestroy(() => {
+    imageCache.cleanup();
+  });
+
   // Window size state for reactive auto-detection
   let windowWidth = $state(typeof window !== 'undefined' ? window.innerWidth : 0);
   let windowHeight = $state(typeof window !== 'undefined' ? window.innerHeight : 0);
@@ -638,9 +710,19 @@
         {#key page}
           {#if volumeData && volumeData.files}
             {#if showSecondPage()}
-              <MangaPage page={pages[index + 1]} src={Object.values(volumeData.files)[index + 1]} volumeUuid={volume.volume_uuid} />
+              <MangaPage
+                page={pages[index + 1]}
+                src={Object.values(volumeData.files)[index + 1]}
+                cachedUrl={cachedImageUrl2}
+                volumeUuid={volume.volume_uuid}
+              />
             {/if}
-            <MangaPage page={pages[index]} src={Object.values(volumeData.files)[index]} volumeUuid={volume.volume_uuid} />
+            <MangaPage
+              page={pages[index]}
+              src={Object.values(volumeData.files)[index]}
+              cachedUrl={cachedImageUrl1}
+              volumeUuid={volume.volume_uuid}
+            />
           {:else}
             <div class="flex items-center justify-center w-screen h-screen">
               <Spinner size="12" />
