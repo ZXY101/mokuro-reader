@@ -25,6 +25,8 @@ export type ZoomModes =
   | 'keepZoom'
   | 'keepZoomStart';
 
+export type PageTransition = 'none' | 'crossfade' | 'slide' | 'pageTurn' | 'swipe';
+
 export type AnkiConnectSettings = {
   enabled: boolean;
   pictureField: string;
@@ -63,6 +65,7 @@ export type Settings = {
   quickActions: boolean;
   fontSize: FontSize;
   zoomDefault: ZoomModes;
+  pageTransition: PageTransition;
   invertColors: boolean;
   nightMode: boolean;
   inactivityTimeoutMinutes: number;
@@ -95,6 +98,7 @@ const defaultSettings: Settings = {
   quickActions: true,
   fontSize: 'auto',
   zoomDefault: 'zoomFitToScreen',
+  pageTransition: 'crossfade',
   invertColors: false,
   nightMode: false,
   inactivityTimeoutMinutes: 5,
