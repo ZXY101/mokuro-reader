@@ -381,7 +381,7 @@
 
     const durations = {
       crossfade: 200,
-      slide: 400,
+      vertical: 400,
       pageTurn: 600,
       swipe: 350,
       none: 0
@@ -401,13 +401,13 @@
           return `opacity: ${t}`;
         }
 
-        if (transition === 'slide') {
-          // Slide by the full viewport width
-          const viewportWidth = window.innerWidth;
-          const startOffset = visualDirection === 'left' ? -viewportWidth : viewportWidth;
-          const currentPos = startOffset * (1 - t);
+        if (transition === 'vertical') {
+          // Slide vertically with a small gap between pages
+          const gap = 3; // Small gap between pages (in vh units)
+          const startOffset = direction === 'forward' ? 100 + gap : -(100 + gap);
+          const currentPos = startOffset * (1-t);
           return `
-            transform: translateX(${currentPos}px);
+            transform: translateY(${currentPos}vh);
           `;
         }
 
@@ -447,7 +447,7 @@
 
     const durations = {
       crossfade: 200,
-      slide: 400,
+      vertical: 400,
       pageTurn: 600,
       swipe: 350,
       none: 0
@@ -467,13 +467,13 @@
           return `opacity: ${t}`;
         }
 
-        if (transition === 'slide') {
-          // Slide by the full viewport width (opposite direction from intro)
-          const viewportWidth = window.innerWidth;
-          const endOffset = visualDirection === 'left' ? viewportWidth : -viewportWidth;
+        if (transition === 'vertical') {
+          // Slide vertically - now used for ENTERING page
+          const gap = 3; // Small gap between pages (in vh units)
+          const endOffset = direction === 'forward' ? -(100 + gap) : 100 + gap;
           const currentPos = endOffset * (1 - t);
           return `
-            transform: translateX(${currentPos}px);
+            transform: translateY(${currentPos}vh);
           `;
         }
 

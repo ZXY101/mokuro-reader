@@ -25,7 +25,7 @@ export type ZoomModes =
   | 'keepZoom'
   | 'keepZoomStart';
 
-export type PageTransition = 'none' | 'crossfade' | 'slide' | 'pageTurn' | 'swipe';
+export type PageTransition = 'none' | 'crossfade' | 'vertical' | 'pageTurn' | 'swipe';
 
 export type AnkiConnectSettings = {
   enabled: boolean;

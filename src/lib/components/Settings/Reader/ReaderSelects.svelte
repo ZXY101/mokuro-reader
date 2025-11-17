@@ -18,7 +18,7 @@
   let pageTransitions = [
     { value: 'none', name: 'None' },
     { value: 'crossfade', name: 'Crossfade' },
-    { value: 'slide', name: 'Slide' },
+    { value: 'vertical', name: 'Vertical' },
     { value: 'pageTurn', name: 'Page Turn' },
     { value: 'swipe', name: 'Swipe' }
   ];
