@@ -1,11 +1,11 @@
 import { browser } from '$app/environment';
 import type { SyncProvider, ProviderStatus, CloudFileMetadata, DriveFileMetadata } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
-import { tokenManager } from '$lib/util/google-drive/token-manager';
-import { driveApiClient } from '$lib/util/google-drive/api-client';
-import { driveFilesCache } from '$lib/util/google-drive/drive-files-cache';
-import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
-import { getOrCreateFolder, uploadCbzToDrive } from '$lib/util/backup';
+import { tokenManager } from '$lib/util/sync/providers/google-drive/token-manager';
+import { driveApiClient } from '$lib/util/sync/providers/google-drive/api-client';
+import { driveFilesCache } from '$lib/util/sync/providers/google-drive/drive-files-cache';
+import { GOOGLE_DRIVE_CONFIG } from '$lib/util/sync/providers/google-drive/constants';
+import { getOrCreateFolder, findFile } from '$lib/util/backup';
 
 /**
  * Metadata for a file selected from the Google Drive file picker
@@ -248,32 +248,49 @@ export class GoogleDriveProvider implements SyncProvider {
 		await this.ensureInitialized();
 
 		try {
-			// Parse path: "SeriesTitle/VolumeTitle.cbz"
+			// Parse path: "SeriesTitle/VolumeTitle.cbz" or "volume-data.json"
 			const pathParts = path.split('/');
 			const fileName = pathParts.pop() || path;
 			const seriesTitle = pathParts.join('/');
 
+			// Determine MIME type from extension
+			const mimeType = fileName.endsWith('.json')
+				? 'application/json'
+				: 'application/x-cbz';
+
 			// Ensure folder structure exists
-			const rootFolderId = await getOrCreateFolder('mokuro-reader');
+			const rootFolderId = await this.ensureReaderFolder();
 			let targetFolderId = rootFolderId;
 
 			if (seriesTitle) {
 				targetFolderId = await getOrCreateFolder(seriesTitle, rootFolderId);
 			}
 
-			// Upload the CBZ file
-			const fileId = await uploadCbzToDrive(blob, fileName, targetFolderId);
+			// Find existing file for replacement
+			const existingFileId = await findFile(fileName, targetFolderId);
+
+			// Upload (create or update)
+			const metadata = {
+				name: fileName,
+				mimeType,
+				...(existingFileId ? {} : { parents: [targetFolderId] })
+			};
+
+			const result = await driveApiClient.uploadFile(blob, metadata, existingFileId || undefined);
+
+			// Update cache
+			await driveFilesCache.fetch();
 
 			// Update file description if provided
 			if (description) {
-				await driveApiClient.updateFileDescription(fileId, description);
+				await driveApiClient.updateFileDescription(result.id, description);
 			}
 
-			console.log(`✅ Uploaded ${fileName} to Google Drive (${fileId})`);
-			return fileId;
+			console.log(`✅ Uploaded ${fileName} to Google Drive (${result.id})`);
+			return result.id;
 		} catch (error) {
 			throw new ProviderError(
-				`Failed to upload volume CBZ: ${error instanceof Error ? error.message : 'Unknown error'}`,
+				`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
 				'google-drive',
 				'UPLOAD_FAILED',
 				false,
@@ -327,6 +344,10 @@ export class GoogleDriveProvider implements SyncProvider {
 			// Delete from Drive
 			await driveApiClient.deleteFile(fileId);
 
+			// Update cache
+			const { driveFilesCache } = await import('$lib/util/sync/providers/google-drive/drive-files-cache');
+			driveFilesCache.removeById(fileId);
+
 			console.log(`✅ Deleted file from Google Drive (${fileId})`);
 		} catch (error) {
 			throw new ProviderError(
@@ -355,7 +376,7 @@ export class GoogleDriveProvider implements SyncProvider {
 			const readerFolderId = await this.ensureReaderFolder();
 
 			// Find the series folder using escapeNameForDriveQuery
-			const { escapeNameForDriveQuery } = await import('$lib/util/google-drive/api-client');
+			const { escapeNameForDriveQuery } = await import('$lib/util/sync/providers/google-drive/api-client');
 			const escapedName = escapeNameForDriveQuery(seriesTitle);
 			const query = `'${readerFolderId}' in parents and name='${escapedName}' and mimeType='${GOOGLE_DRIVE_CONFIG.MIME_TYPES.FOLDER}' and trashed=false`;
 

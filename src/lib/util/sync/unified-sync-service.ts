@@ -322,16 +322,9 @@ class UnifiedSyncService {
 					}
 				}
 
-				// Delete duplicate files (keep the first one)
-				if (provider.type === 'google-drive') {
-					const { driveApiClient } = await import('$lib/util/google-drive/api-client');
-					const { driveFilesCache } = await import('$lib/util/google-drive/drive-files-cache');
-
-					for (let i = 1; i < volumeDataFiles.length; i++) {
-						console.log(`🗑️ Deleting duplicate volume-data.json (${volumeDataFiles[i].fileId})`);
-						await provider.deleteFile(volumeDataFiles[i]);
-						driveFilesCache.removeById(volumeDataFiles[i].fileId);
-					}
+				for (let i = 1; i < volumeDataFiles.length; i++) {
+					console.log(`🗑️ Deleting duplicate volume-data.json (${volumeDataFiles[i].fileId})`);
+					await provider.deleteFile(volumeDataFiles[i]);
 				}
 
 				console.log(`✅ Merged ${volumeDataFiles.length} files into 1`);
@@ -370,39 +363,7 @@ class UnifiedSyncService {
 	private async uploadVolumeDataFile(provider: SyncProvider, data: any): Promise<void> {
 		const blob = this.jsonToBlob(data);
 		const path = 'volume-data.json';
-
-		// For Google Drive, we need to handle folder structure
-		if (provider.type === 'google-drive') {
-			// Upload using Google Drive API directly (it handles folder creation)
-			const { driveApiClient } = await import('$lib/util/google-drive/api-client');
-			const { GOOGLE_DRIVE_CONFIG } = await import('$lib/util/google-drive/constants');
-
-			// Get folder ID from cache
-			const { driveFilesCache } = await import('$lib/util/google-drive/drive-files-cache');
-			const folderId = await driveFilesCache.getReaderFolderId();
-
-			if (!folderId) {
-				throw new Error('Reader folder ID not found');
-			}
-
-			// Find existing volume-data.json file
-			const existingFiles = driveFilesCache.getVolumeDataFiles();
-			const existingFileId = existingFiles.length > 0 ? existingFiles[0].fileId : null;
-
-			// Upload (create or update)
-			const metadata = {
-				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.VOLUME_DATA,
-				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
-				...(existingFileId ? {} : { parents: [folderId] })
-			};
-
-			await driveApiClient.uploadFile(blob, metadata, existingFileId || undefined);
-			console.log('✅ Volume data uploaded to Google Drive');
-		} else {
-			// For MEGA and WebDAV, use generic uploadFile
-			// They handle folder structure internally
-			await provider.uploadFile(path, blob);
-		}
+		await provider.uploadFile(path, blob);
 	}
 
 	/**
@@ -491,42 +452,7 @@ class UnifiedSyncService {
 	private async uploadProfilesFile(provider: SyncProvider, data: any): Promise<void> {
 		const blob = this.jsonToBlob(data);
 		const path = 'profiles.json';
-
-		// For Google Drive, we need to handle folder structure
-		if (provider.type === 'google-drive') {
-			// Upload using Google Drive API directly (it handles folder creation)
-			const { driveApiClient } = await import('$lib/util/google-drive/api-client');
-			const { GOOGLE_DRIVE_CONFIG } = await import('$lib/util/google-drive/constants');
-
-			// Get folder ID from cache
-			const { driveFilesCache } = await import('$lib/util/google-drive/drive-files-cache');
-			const folderId = await driveFilesCache.getReaderFolderId();
-
-			if (!folderId) {
-				throw new Error('Reader folder ID not found');
-			}
-
-			// Find existing profiles.json file
-			const files = await driveApiClient.listFiles(
-				`'${folderId}' in parents and name='${GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES}'`,
-				'files(id)'
-			);
-			const existingFileId = files.length > 0 ? files[0].id : null;
-
-			// Upload (create or update)
-			const metadata = {
-				name: GOOGLE_DRIVE_CONFIG.FILE_NAMES.PROFILES,
-				mimeType: GOOGLE_DRIVE_CONFIG.MIME_TYPES.JSON,
-				...(existingFileId ? {} : { parents: [folderId] })
-			};
-
-			await driveApiClient.uploadFile(blob, metadata, existingFileId || undefined);
-			console.log('✅ Profiles uploaded to Google Drive');
-		} else {
-			// For MEGA and WebDAV, use generic uploadFile
-			// They handle folder structure internally
-			await provider.uploadFile(path, blob);
-		}
+		await provider.uploadFile(path, blob);
 	}
 
 	/**

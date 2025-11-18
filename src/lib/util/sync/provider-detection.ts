@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
+import { GOOGLE_DRIVE_CONFIG } from '$lib/util/sync/providers/google-drive/constants';
 import type { ProviderType } from './provider-interface';
 
 /**

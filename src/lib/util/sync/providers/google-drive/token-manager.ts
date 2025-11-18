@@ -1,7 +1,7 @@
 import { writable } from 'svelte/store';
 import { browser } from '$app/environment';
 import { GOOGLE_DRIVE_CONFIG, type TokenInfo } from './constants';
-import { showSnackbar } from '../snackbar';
+import { showSnackbar } from '$lib/util/snackbar';
 import { miscSettings } from '$lib/settings/misc';
 import { get } from 'svelte/store';
 
@@ -137,7 +137,7 @@ class TokenManager {
     }
 
     // Update provider manager to trigger reactive updates (dynamic import to avoid circular dependency)
-    import('../sync/provider-manager').then(({ providerManager }) => {
+    import('../../provider-manager').then(({ providerManager }) => {
       providerManager.updateStatus();
     });
   }
@@ -218,7 +218,7 @@ class TokenManager {
           gapi.client.setToken({ access_token });
 
           // Update provider manager to trigger reactive updates (dynamic import to avoid circular dependency)
-          import('../sync/provider-manager').then(({ providerManager }) => {
+          import('../../provider-manager').then(({ providerManager }) => {
             providerManager.updateStatus();
           });
         }

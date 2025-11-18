@@ -1,9 +1,9 @@
 import { writable, derived } from 'svelte/store';
 import { driveApiClient } from './api-client';
 import { GOOGLE_DRIVE_CONFIG } from './constants';
-import { unifiedCloudManager } from '../sync/unified-cloud-manager';
-import type { CloudCache } from '../sync/cloud-cache-interface';
-import type { DriveFileMetadata } from '../sync/provider-interface';
+import { unifiedCloudManager } from '../../unified-cloud-manager';
+import type { CloudCache } from '../../cloud-cache-interface';
+import type { DriveFileMetadata } from '../../provider-interface';
 
 // Re-export for convenience
 export type { DriveFileMetadata };
