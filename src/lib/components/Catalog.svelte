@@ -43,8 +43,15 @@
       updateMiscSetting('gallerySorting', 'SMART');
     }
   }
-  let sortedCatalog = $derived(
-    $catalog === null ? [] : $catalog
+  let sortedCatalog = $derived.by(() => {
+    if ($catalog === null) return [];
+
+    // Snapshot volumes state before sorting to prevent race conditions.
+    // Reading $volumes inside the sort comparator can cause deadlocks if the
+    // store updates mid-sort, violating the comparator's transitivity requirement.
+    const volumesSnapshot = $volumes;
+
+    return [...$catalog]
       .sort((a, b) => {
         if ($miscSettings.gallerySorting === 'ASC') {
           return a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' });
@@ -56,8 +63,8 @@
           const aVolumes = a.volumes.map((vol) => vol.volume_uuid);
           const bVolumes = b.volumes.map((vol) => vol.volume_uuid);
 
-          const aCompleted = aVolumes.every((volId) => $volumes[volId]?.completed);
-          const bCompleted = bVolumes.every((volId) => $volumes[volId]?.completed);
+          const aCompleted = aVolumes.every((volId) => volumesSnapshot[volId]?.completed);
+          const bCompleted = bVolumes.every((volId) => volumesSnapshot[volId]?.completed);
 
           // If completion status differs, completed series go to the end
           if (aCompleted !== bCompleted) {
@@ -68,14 +75,14 @@
           // Only consider volumes with actual progress (page > 1)
           const aLastUpdated = Math.max(
             ...aVolumes
-              .filter((volId) => ($volumes[volId]?.progress || 0) > 1)
-              .map((volId) => new Date($volumes[volId]?.lastProgressUpdate || 0).getTime()),
+              .filter((volId) => (volumesSnapshot[volId]?.progress || 0) > 1)
+              .map((volId) => new Date(volumesSnapshot[volId]?.lastProgressUpdate || 0).getTime()),
             0  // Default to 0 if no volumes have progress
           );
           const bLastUpdated = Math.max(
             ...bVolumes
-              .filter((volId) => ($volumes[volId]?.progress || 0) > 1)
-              .map((volId) => new Date($volumes[volId]?.lastProgressUpdate || 0).getTime()),
+              .filter((volId) => (volumesSnapshot[volId]?.progress || 0) > 1)
+              .map((volId) => new Date(volumesSnapshot[volId]?.lastProgressUpdate || 0).getTime()),
             0  // Default to 0 if no volumes have progress
           );
 
@@ -90,8 +97,8 @@
       })
       .filter((item) => {
         return item.title.toLowerCase().indexOf(search.toLowerCase()) !== -1;
-      })
-  );
+      });
+  });
 
   // Separate local series from placeholder-only series
   let localSeries = $derived(sortedCatalog.filter(series =>
