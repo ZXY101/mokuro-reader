@@ -29,8 +29,8 @@ async function migratePageTurnData(
     return null; // No migration needed
   }
 
-  // Check if any are 2-tuple format
-  const has2Tuple = turns.some(turn => turn.length === 2);
+  // Check if any are 2-tuple format (runtime check - type says 3 but old data may be 2)
+  const has2Tuple = turns.some(turn => (turn as number[]).length === 2);
   if (!has2Tuple) {
     return null; // No migration needed
   }
@@ -100,10 +100,16 @@ async function migratePageTurnData(
  * Character counts are now stored in page turns, so no IndexedDB pages needed
  * Migrates legacy 2-tuple data to 3-tuple format when possible
  */
-export const personalizedReadingSpeed = derived(
+export const personalizedReadingSpeed = derived<
+  [typeof volumes, typeof settings],
+  ReadingSpeedResult
+>(
   [volumes, settings],
   ([$volumes, $settings], set) => {
     const idleTimeoutMinutes = $settings.inactivityTimeoutMinutes;
+
+    // Set initial value immediately
+    set(calculateReadingSpeed($volumes, idleTimeoutMinutes));
 
     // Try to migrate any 2-tuple data
     const migrationPromises = Object.entries($volumes)
@@ -140,11 +146,8 @@ export const personalizedReadingSpeed = derived(
       const result = calculateReadingSpeed($volumes, idleTimeoutMinutes);
       set(result);
     });
-
-    // Return immediately with current data
-    return calculateReadingSpeed($volumes, idleTimeoutMinutes);
   },
-  // Initial value (typed)
+  // Initial value
   {
     charsPerMinute: 100,
     isPersonalized: false,

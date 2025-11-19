@@ -91,7 +91,7 @@
 
       return new Promise<void>((resolve) => {
         const img = new Image();
-        const url = URL.createObjectURL(vol.thumbnail);
+        const url = URL.createObjectURL(vol.thumbnail!);
         urlsToRevoke.push(url);
 
         img.onload = () => {

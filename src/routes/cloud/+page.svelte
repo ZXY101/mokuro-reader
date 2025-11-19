@@ -17,6 +17,7 @@
     API_KEY
   } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import type { ProviderType } from '$lib/util/sync/provider-interface';
   import { backupQueue } from '$lib/util/backup-queue';
   import { driveState, tokenManager } from '$lib/util/sync/providers/google-drive';
   import type { DriveState } from '$lib/util/sync/providers/google-drive';
@@ -66,7 +67,7 @@
   let webdavConfigured = $derived($providerStatusStore.providers['webdav']?.hasStoredCredentials || false);
 
   // Determine current configured provider (show UI even if still initializing)
-  let currentProvider = $derived(
+  let currentProvider = $derived<ProviderType | null>(
     googleDriveConfigured ? 'google-drive' :
     megaConfigured ? 'mega' :
     webdavConfigured ? 'webdav' :
@@ -74,7 +75,7 @@
   );
 
   // Provider display names
-  const providerNames = {
+  const providerNames: Record<ProviderType, string> = {
     'google-drive': 'Google Drive',
     'mega': 'MEGA Cloud Storage',
     'webdav': 'WebDAV Server'
@@ -477,8 +478,10 @@
 
     // Get all volumes from catalog
     const allVolumes: VolumeMetadata[] = [];
-    for (const series of $catalog) {
-      allVolumes.push(...series.volumes);
+    if ($catalog) {
+      for (const series of $catalog) {
+        allVolumes.push(...series.volumes);
+      }
     }
 
     if (allVolumes.length === 0) {

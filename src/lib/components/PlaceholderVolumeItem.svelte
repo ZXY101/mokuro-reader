@@ -44,7 +44,9 @@
     }
   }
 
-  function getProviderBadgeColor(provider: ProviderType): string {
+  type BadgeColor = 'blue' | 'purple' | 'green' | 'dark' | 'red' | 'yellow' | 'primary' | 'pink' | 'indigo' | 'none';
+
+  function getProviderBadgeColor(provider: ProviderType): BadgeColor {
     switch (provider) {
       case 'google-drive':
         return 'blue';

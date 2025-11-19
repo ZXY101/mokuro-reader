@@ -13,10 +13,10 @@ describe('Cloud Component', () => {
 			length: 0,
 			key: vi.fn()
 		};
-		global.localStorage = localStorageMock as any;
+		globalThis.localStorage = localStorageMock as any;
 
 		// Mock fetch API
-		global.fetch = vi.fn().mockResolvedValue({
+		globalThis.fetch = vi.fn().mockResolvedValue({
 			ok: true,
 			json: vi.fn().mockResolvedValue({})
 		});

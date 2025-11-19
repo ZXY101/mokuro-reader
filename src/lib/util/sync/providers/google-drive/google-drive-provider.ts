@@ -463,6 +463,7 @@ export class GoogleDriveProvider implements SyncProvider {
 							try {
 								if (data[google.picker.Response.ACTION] === google.picker.Action.PICKED) {
 									const docs = data[google.picker.Response.DOCUMENTS];
+									if (!docs) return;
 
 									// Expand folders and collect all files
 									const allFiles: PickedFile[] = [];
@@ -486,7 +487,7 @@ export class GoogleDriveProvider implements SyncProvider {
 
 									// Filter to only ZIP/CBZ files
 									const zipFiles = allFiles.filter(file => {
-										const mimeType = file.mimeType.toLowerCase();
+										const mimeType = (file.mimeType || '').toLowerCase();
 										return mimeType.includes('zip') || mimeType.includes('cbz');
 									});
 

@@ -83,13 +83,13 @@
     <div class="flex flex-col gap-4 mb-5">
       <div class="flex items-center justify-between">
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Extract as CBZ (recommended)</span>
-        <Toggle checked={asCbz} on:change={(e) => updateAsCbz(e.target.checked)} />
+        <Toggle checked={asCbz} on:change={(e) => updateAsCbz((e.target as HTMLInputElement)?.checked ?? false)} />
       </div>
       <div class="flex items-center justify-between">
         <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
           >Extract individual volumes (recommended)</span
         >
-        <Toggle checked={individualVolumes} on:change={(e) => updateIndividualVolumes(e.target.checked)} />
+        <Toggle checked={individualVolumes} on:change={(e) => updateIndividualVolumes((e.target as HTMLInputElement)?.checked ?? false)} />
       </div>
 
       {#if individualVolumes}
@@ -97,7 +97,7 @@
           <span class="text-sm font-medium text-gray-700 dark:text-gray-300"
             >Include series title in filename</span
           >
-          <Toggle checked={includeSeriesTitle} on:change={(e) => updateIncludeSeriesTitle(e.target.checked)} />
+          <Toggle checked={includeSeriesTitle} on:change={(e) => updateIncludeSeriesTitle((e.target as HTMLInputElement)?.checked ?? false)} />
         </div>
       {/if}
 

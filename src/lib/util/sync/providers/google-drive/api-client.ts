@@ -99,13 +99,13 @@ class DriveApiClient {
    * Wait for gapi global to be available (loaded from script tag)
    */
   private async waitForGapi(): Promise<void> {
-    if (typeof gapi !== 'undefined' && gapi?.load) return;
+    if (typeof gapi !== 'undefined' && typeof gapi.load === 'function') return;
 
     console.log('⏳ Waiting for Google API (gapi) to load...');
     const maxWait = 10000; // 10 seconds
     const start = Date.now();
 
-    while (typeof gapi === 'undefined' || !gapi?.load) {
+    while (typeof gapi === 'undefined' || typeof gapi.load !== 'function') {
       if (Date.now() - start > maxWait) {
         throw new Error('Timeout waiting for Google API (gapi) to load');
       }

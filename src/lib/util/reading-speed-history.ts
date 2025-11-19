@@ -10,7 +10,7 @@ export interface VolumeSpeedData {
 	durationMinutes: number;
 	charsRead: number;
 	charsPerMinute: number;
-	thumbnail?: string;
+	thumbnail?: File;
 
 	// Badges
 	isPersonalBest: boolean;

@@ -32,7 +32,7 @@
         (stats, volumeId) => {
           const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
           const chars = $volumes[volumeId]?.chars || 0;
-          const completed = $volumes[volumeId]?.completed || 0;
+          const completed = $volumes[volumeId]?.completed ? 1 : 0;
 
           stats.timeReadInMinutes = stats.timeReadInMinutes + timeReadInMinutes;
           stats.chars = stats.chars + chars;

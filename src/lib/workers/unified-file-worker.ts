@@ -259,7 +259,7 @@ async function downloadFromMega(
 				const totalSize = file.size || 0;
 
 				// Download file with progress tracking
-				const stream = file.download();
+				const stream = file.download({});
 				const chunks: Uint8Array[] = [];
 				let loaded = 0;
 
@@ -402,7 +402,7 @@ async function uploadToGoogleDrive(
 		xhr.onerror = () => reject(new Error('Network error during upload'));
 		xhr.ontimeout = () => reject(new Error('Upload timed out'));
 
-		xhr.send(cbzData);
+		xhr.send(cbzData as unknown as XMLHttpRequestBodyInit);
 	});
 }
 
@@ -454,7 +454,7 @@ async function uploadToWebDAV(
 		xhr.onerror = () => reject(new Error('Network error during WebDAV upload'));
 		xhr.ontimeout = () => reject(new Error('WebDAV upload timed out'));
 
-		xhr.send(cbzData);
+		xhr.send(cbzData as unknown as XMLHttpRequestBodyInit);
 	});
 }
 
