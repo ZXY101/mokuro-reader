@@ -4,7 +4,75 @@ import { showSnackbar } from '$lib/util/snackbar';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
-import { generateFallbackVolumeData } from './image-only-fallback';
+import {
+  generateFallbackVolumeData,
+  extractSeriesName,
+  type SeriesInfo
+} from './image-only-fallback';
+
+/**
+ * Groups orphaned images by their extracted series name
+ * This allows multiple volumes to be grouped into the same series
+ */
+interface SeriesGroup {
+  seriesName: string;
+  seriesUuid: string;
+  volumes: Array<{ path: string; images: Record<string, File> }>;
+}
+
+/**
+ * Generates a deterministic UUID from a string using a simple hash
+ * Duplicated here for grouping - same algorithm as in image-only-fallback
+ */
+function generateDeterministicUUID(input: string): string {
+  const normalized = input.toLowerCase().trim();
+  let hash1 = 5381;
+  let hash2 = 52711;
+
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized.charCodeAt(i);
+    hash1 = (hash1 * 33) ^ char;
+    hash2 = (hash2 * 33) ^ char;
+  }
+
+  hash1 = hash1 >>> 0;
+  hash2 = hash2 >>> 0;
+
+  const hex1 = hash1.toString(16).padStart(8, '0');
+  const hex2 = hash2.toString(16).padStart(8, '0');
+  const hash3 = ((hash1 ^ hash2) >>> 0).toString(16).padStart(8, '0');
+  const hash4 = ((hash1 + hash2) >>> 0).toString(16).padStart(8, '0');
+
+  return `${hex1}-${hex2.slice(0, 4)}-4${hex2.slice(5, 8)}-${(8 + (parseInt(hash3[0], 16) % 4)).toString(16)}${hash3.slice(1, 4)}-${hash3.slice(4)}${hash4.slice(0, 4)}`;
+}
+
+/**
+ * Groups orphaned images by their series name
+ * Volumes with the same extracted series name will be grouped together
+ */
+function groupOrphanedImagesBySeries(
+  pendingImagesByPath: Record<string, Record<string, File>>
+): SeriesGroup[] {
+  const groupsBySeriesName = new Map<string, SeriesGroup>();
+
+  for (const [path, images] of Object.entries(pendingImagesByPath)) {
+    const seriesName = extractSeriesName(path);
+
+    let group = groupsBySeriesName.get(seriesName);
+    if (!group) {
+      group = {
+        seriesName,
+        seriesUuid: generateDeterministicUUID(seriesName),
+        volumes: []
+      };
+      groupsBySeriesName.set(seriesName, group);
+    }
+
+    group.volumes.push({ path, images });
+  }
+
+  return Array.from(groupsBySeriesName.values());
+}
 
 export * from './web-import';
 
@@ -379,6 +447,7 @@ async function processMokuroWithPendingImages(
 
 /**
  * Process images that weren't matched to any .mokuro file (image-only volumes)
+ * Groups volumes by series name so they appear together in the catalog
  */
 async function processOrphanedImages(
   pendingImagesByPath: Record<string, Record<string, File>>,
@@ -390,32 +459,54 @@ async function processOrphanedImages(
     return;
   }
 
-  showSnackbar(`Found ${orphanedPaths.length} image-only volume(s) without .mokuro files`, 5000);
+  // Group orphaned images by series name
+  const seriesGroups = groupOrphanedImagesBySeries(pendingImagesByPath);
 
-  for (const path of orphanedPaths) {
-    const imageFiles = pendingImagesByPath[path];
+  const totalVolumes = seriesGroups.reduce((sum, group) => sum + group.volumes.length, 0);
+  const seriesCount = seriesGroups.length;
 
-    // Skip if no images
-    if (!imageFiles || Object.keys(imageFiles).length === 0) {
-      continue;
-    }
+  if (seriesCount === 1 && totalVolumes === 1) {
+    showSnackbar(`Found 1 image-only volume without .mokuro file`, 5000);
+  } else if (seriesCount === 1) {
+    showSnackbar(`Found ${totalVolumes} volumes in 1 series without .mokuro files`, 5000);
+  } else {
+    showSnackbar(
+      `Found ${totalVolumes} image-only volume(s) in ${seriesCount} series without .mokuro files`,
+      5000
+    );
+  }
 
-    try {
-      showSnackbar(`Processing image-only volume: ${path}`, 3000);
+  // Process each series group
+  for (const group of seriesGroups) {
+    const seriesInfo: SeriesInfo = {
+      seriesName: group.seriesName,
+      seriesUuid: group.seriesUuid
+    };
 
-      // Generate fallback metadata and data
-      const { metadata, data } = await generateFallbackVolumeData(path, imageFiles);
+    // Process each volume in the group
+    for (const { path, images } of group.volumes) {
+      // Skip if no images
+      if (!images || Object.keys(images).length === 0) {
+        continue;
+      }
 
-      // Store in volumesByPath
-      volumesByPath[path] = metadata;
+      try {
+        showSnackbar(`Processing: ${path}`, 3000);
 
-      // Upload to database
-      await uploadVolumeData(volumesByPath, path, data);
+        // Generate fallback metadata and data with shared series info
+        const { metadata, data } = await generateFallbackVolumeData(path, images, seriesInfo);
 
-      showSnackbar(`Added image-only volume: ${metadata.volume_title}`, 3000);
-    } catch (error) {
-      console.error(`Failed to process image-only volume at ${path}:`, error);
-      showSnackbar(`Failed to import images from ${path}`, 3000);
+        // Store in volumesByPath
+        volumesByPath[path] = metadata;
+
+        // Upload to database
+        await uploadVolumeData(volumesByPath, path, data);
+
+        showSnackbar(`Added: ${metadata.volume_title} (${group.seriesName})`, 3000);
+      } catch (error) {
+        console.error(`Failed to process image-only volume at ${path}:`, error);
+        showSnackbar(`Failed to import images from ${path}`, 3000);
+      }
     }
   }
 }
