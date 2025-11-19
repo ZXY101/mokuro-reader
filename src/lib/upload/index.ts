@@ -1,6 +1,7 @@
 import { db } from '$lib/catalog/db';
 import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
+import { promptImageOnlyImport, type SeriesImportInfo } from '$lib/util/modals';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
@@ -446,32 +447,30 @@ async function processMokuroWithPendingImages(
 }
 
 /**
- * Builds a confirmation message for image-only imports
+ * Shows the import confirmation modal and waits for user response
  */
-function buildImportConfirmationMessage(seriesGroups: SeriesGroup[]): string {
-  const totalVolumes = seriesGroups.reduce((sum, group) => sum + group.volumes.length, 0);
-  const seriesCount = seriesGroups.length;
+function showImportConfirmationModal(seriesGroups: SeriesGroup[]): Promise<boolean> {
+  return new Promise((resolve) => {
+    const totalVolumes = seriesGroups.reduce((sum, group) => sum + group.volumes.length, 0);
 
-  let message = `Image-Only Import\n\n`;
-  message += `Found ${totalVolumes} volume(s) in ${seriesCount} series without .mokuro files.\n`;
-  message += `These will be imported as image-only volumes (no OCR text).\n\n`;
-  message += `Series to import:\n`;
-  message += `─────────────────\n`;
+    // Sort by series name for display
+    const sortedGroups = [...seriesGroups].sort((a, b) =>
+      a.seriesName.localeCompare(b.seriesName, undefined, { sensitivity: 'base' })
+    );
 
-  // Sort by series name for display
-  const sortedGroups = [...seriesGroups].sort((a, b) =>
-    a.seriesName.localeCompare(b.seriesName, undefined, { sensitivity: 'base' })
-  );
+    // Convert to SeriesImportInfo format
+    const seriesList: SeriesImportInfo[] = sortedGroups.map((group) => ({
+      seriesName: group.seriesName,
+      volumeCount: group.volumes.length
+    }));
 
-  for (const group of sortedGroups) {
-    const volCount = group.volumes.length;
-    const volText = volCount === 1 ? '1 volume' : `${volCount} volumes`;
-    message += `• ${group.seriesName} (${volText})\n`;
-  }
-
-  message += `\nProceed with import?`;
-
-  return message;
+    promptImageOnlyImport(
+      seriesList,
+      totalVolumes,
+      () => resolve(true),
+      () => resolve(false)
+    );
+  });
 }
 
 /**
@@ -494,9 +493,8 @@ async function processOrphanedImages(
   const totalVolumes = seriesGroups.reduce((sum, group) => sum + group.volumes.length, 0);
   const seriesCount = seriesGroups.length;
 
-  // Build and show confirmation dialog
-  const confirmMessage = buildImportConfirmationMessage(seriesGroups);
-  const confirmed = confirm(confirmMessage);
+  // Show confirmation modal and wait for user response
+  const confirmed = await showImportConfirmationModal(seriesGroups);
 
   if (!confirmed) {
     showSnackbar(`Image-only import cancelled`, 3000);
