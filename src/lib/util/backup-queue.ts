@@ -2,7 +2,7 @@ import { writable, get } from 'svelte/store';
 import type { VolumeMetadata } from '$lib/types';
 import { progressTrackerStore } from './progress-tracker';
 import type { WorkerTask } from './worker-pool';
-import { tokenManager } from './google-drive/token-manager';
+import { tokenManager } from './sync/providers/google-drive/token-manager';
 import { showSnackbar } from './snackbar';
 import { db } from '$lib/catalog/db';
 import { unifiedCloudManager } from './sync/unified-cloud-manager';

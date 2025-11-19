@@ -56,8 +56,8 @@ export async function signOutFromGoogleDrive(): Promise<void> {
   await tokenManager.logout();
 
   // Dynamic imports to avoid circular dependency
-  const { unifiedCloudManager } = await import('../sync/unified-cloud-manager');
-  const { providerManager } = await import('../sync/provider-manager');
+  const { unifiedCloudManager } = await import('../../unified-cloud-manager');
+  const { providerManager } = await import('../../provider-manager');
 
   unifiedCloudManager.clearCache();
   providerManager.updateStatus();
@@ -69,7 +69,7 @@ export function isSignedIn(): boolean {
 
 export async function syncReadProgress(): Promise<void> {
   // Use unified sync manager for progress sync (dynamic import to avoid circular dependency)
-  const { unifiedCloudManager } = await import('../sync/unified-cloud-manager');
+  const { unifiedCloudManager } = await import('../../unified-cloud-manager');
   await unifiedCloudManager.syncProgress({ silent: false });
 }
 

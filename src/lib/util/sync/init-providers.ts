@@ -4,9 +4,9 @@ import { googleDriveProvider } from './providers/google-drive/google-drive-provi
 import { megaProvider } from './providers/mega/mega-provider';
 import { webdavProvider } from './providers/webdav/webdav-provider';
 import { unifiedCloudManager } from './unified-cloud-manager';
-import { driveApiClient } from '$lib/util/google-drive/api-client';
-import { tokenManager } from '$lib/util/google-drive/token-manager';
-import { GOOGLE_DRIVE_CONFIG } from '$lib/util/google-drive/constants';
+import { driveApiClient } from '$lib/util/sync/providers/google-drive/api-client';
+import { tokenManager } from '$lib/util/sync/providers/google-drive/token-manager';
+import { GOOGLE_DRIVE_CONFIG } from '$lib/util/sync/providers/google-drive/constants';
 import { getConfiguredProviderType } from './provider-detection';
 
 /**

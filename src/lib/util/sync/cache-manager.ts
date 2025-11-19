@@ -1,7 +1,7 @@
 import { derived, readable, writable, type Readable } from 'svelte/store';
 import type { CloudCache } from './cloud-cache-interface';
 import type { ProviderType } from './provider-interface';
-import { driveFilesCache, type DriveFileMetadata } from '../google-drive/drive-files-cache';
+import { driveFilesCache, type DriveFileMetadata } from './providers/google-drive/drive-files-cache';
 import { megaCache } from './providers/mega/mega-cache';
 
 /**

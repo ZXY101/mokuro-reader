@@ -18,8 +18,8 @@
   } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { backupQueue } from '$lib/util/backup-queue';
-  import { driveState, tokenManager } from '$lib/util/google-drive';
-  import type { DriveState } from '$lib/util/google-drive';
+  import { driveState, tokenManager } from '$lib/util/sync/providers/google-drive';
+  import type { DriveState } from '$lib/util/sync/providers/google-drive';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import { get } from 'svelte/store';
   import { Badge, Button, Radio, Toggle, Spinner } from 'flowbite-svelte';

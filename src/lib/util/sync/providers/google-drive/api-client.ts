@@ -44,7 +44,7 @@ export async function handleAuthError(status: number, retryOnAuth = true): Promi
   // Check if auto re-auth is enabled
   const { miscSettings } = await import('$lib/settings/misc');
   const { get: getStore } = await import('svelte/store');
-  const { showSnackbar } = await import('../snackbar');
+  const { showSnackbar } = await import('$lib/util/snackbar');
 
   const settings = getStore(miscSettings);
   console.log('🔍 Auto re-auth check:', {
