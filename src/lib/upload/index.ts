@@ -446,6 +446,35 @@ async function processMokuroWithPendingImages(
 }
 
 /**
+ * Builds a confirmation message for image-only imports
+ */
+function buildImportConfirmationMessage(seriesGroups: SeriesGroup[]): string {
+  const totalVolumes = seriesGroups.reduce((sum, group) => sum + group.volumes.length, 0);
+  const seriesCount = seriesGroups.length;
+
+  let message = `Image-Only Import\n\n`;
+  message += `Found ${totalVolumes} volume(s) in ${seriesCount} series without .mokuro files.\n`;
+  message += `These will be imported as image-only volumes (no OCR text).\n\n`;
+  message += `Series to import:\n`;
+  message += `─────────────────\n`;
+
+  // Sort by series name for display
+  const sortedGroups = [...seriesGroups].sort((a, b) =>
+    a.seriesName.localeCompare(b.seriesName, undefined, { sensitivity: 'base' })
+  );
+
+  for (const group of sortedGroups) {
+    const volCount = group.volumes.length;
+    const volText = volCount === 1 ? '1 volume' : `${volCount} volumes`;
+    message += `• ${group.seriesName} (${volText})\n`;
+  }
+
+  message += `\nProceed with import?`;
+
+  return message;
+}
+
+/**
  * Process images that weren't matched to any .mokuro file (image-only volumes)
  * Groups volumes by series name so they appear together in the catalog
  */
@@ -465,16 +494,16 @@ async function processOrphanedImages(
   const totalVolumes = seriesGroups.reduce((sum, group) => sum + group.volumes.length, 0);
   const seriesCount = seriesGroups.length;
 
-  if (seriesCount === 1 && totalVolumes === 1) {
-    showSnackbar(`Found 1 image-only volume without .mokuro file`, 5000);
-  } else if (seriesCount === 1) {
-    showSnackbar(`Found ${totalVolumes} volumes in 1 series without .mokuro files`, 5000);
-  } else {
-    showSnackbar(
-      `Found ${totalVolumes} image-only volume(s) in ${seriesCount} series without .mokuro files`,
-      5000
-    );
+  // Build and show confirmation dialog
+  const confirmMessage = buildImportConfirmationMessage(seriesGroups);
+  const confirmed = confirm(confirmMessage);
+
+  if (!confirmed) {
+    showSnackbar(`Image-only import cancelled`, 3000);
+    return;
   }
+
+  showSnackbar(`Importing ${totalVolumes} image-only volume(s) in ${seriesCount} series...`, 5000);
 
   // Process each series group
   for (const group of seriesGroups) {
