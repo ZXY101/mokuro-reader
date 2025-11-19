@@ -28,8 +28,9 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 - **Google Drive Sync** - Full integration with automatic token refresh and reconnection
 - **MEGA Support** - Alternative cloud storage option
 - **Automatic Progress Sync** - Seamlessly sync read progress and stats across devices
-- **Smart Placeholder System** - Cloud volumes appear as downloadable placeholders in your catalog
-- **One-Tap Downloads** - Download cloud volumes directly from the catalog
+- **Easy Backup** - Backup your entire library to Google Drive, MEGA, or WebDAV (coming soon)
+- **Smart Placeholder System** - Backed up volumes appear as downloadable placeholders in your catalog
+- **One-Tap Downloads** - Download cloud volumes directly from your catalog on your other devices
 - **Cross-Device Continuity** - Pick up exactly where you left off on any device
 
 ### 🎨 Customization & Profiles
@@ -40,7 +41,7 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 
 ### 🔧 Power Features
 - **Anki Connect Integration** - Export vocabulary with image cropping and configurable quality/size settings
-- **Text Analysis Tools** - Dedicated text pages for both volumes and series for analysis
+- **Text Analysis Tools** - Dedicated text pages for both volumes and series for analysis by browser extensions
 - **Advanced Sorting** - Multiple sorting modes for catalog and series pages
 - **Robust Import System** - Handles complex arrangements of ZIPs, CBZs, files, folders, and mokuro files
 - **Flexible File Handling** - Much more robust handling of special characters in file and folder names
@@ -114,8 +115,6 @@ The reader automatically tracks your reading speed and provides:
 - **Historical graphs** showing speed trends over time
 - **Time estimates** for finishing current volume and series
 - **Achievements** for reaching reading milestones
-
-Access your reading history through Settings → Stats → Reading Speed History.
 
 ### Text Analysis
 
