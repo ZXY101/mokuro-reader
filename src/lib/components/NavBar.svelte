@@ -19,8 +19,8 @@
   // Read unified provider state synchronously
   let state = $derived($unifiedProviderState);
 
-  // Track if any cloud providers are authenticated
-  let hasAuthenticatedProviders = $derived(state.hasStoredCredentials);
+  // Track if any cloud providers are authenticated (derived from state)
+  let hasAuthenticatedProviders = $derived(state?.hasStoredCredentials ?? false);
 
   // Google Drive specific: Track token expiry for debug display
   let tokenMinutesLeft = $state<number | null>(null);
@@ -46,9 +46,6 @@
   // Check for configured providers (even if not currently connected) and determine provider type
   $effect(() => {
     const checkProviders = () => {
-      // Check if any provider has stored credentials (even if not connected)
-      hasAuthenticatedProviders = state.hasStoredCredentials;
-
       const activeProvider = unifiedCloudManager.getActiveProvider();
       isGoogleDrive = activeProvider?.type === 'google-drive';
     };
