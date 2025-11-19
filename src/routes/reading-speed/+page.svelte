@@ -95,6 +95,24 @@
   // Series filter for chart
   let selectedSeriesId: string | null = $state(null);
 
+  // Demo data for empty state - single source of truth
+  const demoVolumeData: VolumeSpeedData[] = [
+    { volumeId: 'a1', volumeTitle: 'Vol 1', seriesTitle: 'Example A', seriesId: 'demo-a', completionDate: new Date(Date.now() - 63*24*60*60*1000), durationMinutes: 111, charsRead: 5000, charsPerMinute: 45, isPersonalBest: false, isSlowest: true, percentVsAverage: -32 },
+    { volumeId: 'b1', volumeTitle: 'Vol 1', seriesTitle: 'Example B', seriesId: 'demo-b', completionDate: new Date(Date.now() - 49*24*60*60*1000), durationMinutes: 91, charsRead: 5000, charsPerMinute: 55, isPersonalBest: false, isSlowest: false, percentVsAverage: -20 },
+    { volumeId: 'a2', volumeTitle: 'Vol 2', seriesTitle: 'Example A', seriesId: 'demo-a', completionDate: new Date(Date.now() - 42*24*60*60*1000), durationMinutes: 83, charsRead: 5000, charsPerMinute: 60, isPersonalBest: false, isSlowest: false, percentVsAverage: -9 },
+    { volumeId: 'b2', volumeTitle: 'Vol 2', seriesTitle: 'Example B', seriesId: 'demo-b', completionDate: new Date(Date.now() - 35*24*60*60*1000), durationMinutes: 74, charsRead: 5000, charsPerMinute: 68, isPersonalBest: false, isSlowest: false, percentVsAverage: -1 },
+    { volumeId: 'a3', volumeTitle: 'Vol 3', seriesTitle: 'Example A', seriesId: 'demo-a', completionDate: new Date(Date.now() - 28*24*60*60*1000), durationMinutes: 69, charsRead: 5000, charsPerMinute: 72, isPersonalBest: false, isSlowest: false, percentVsAverage: 9 },
+    { volumeId: 'b3', volumeTitle: 'Vol 3', seriesTitle: 'Example B', seriesId: 'demo-b', completionDate: new Date(Date.now() - 21*24*60*60*1000), durationMinutes: 63, charsRead: 5000, charsPerMinute: 79, isPersonalBest: false, isSlowest: false, percentVsAverage: 20 },
+    { volumeId: 'a4', volumeTitle: 'Vol 4', seriesTitle: 'Example A', seriesId: 'demo-a', completionDate: new Date(Date.now() - 14*24*60*60*1000), durationMinutes: 60, charsRead: 5000, charsPerMinute: 83, isPersonalBest: false, isSlowest: false, percentVsAverage: 26 },
+    { volumeId: 'b4', volumeTitle: 'Vol 4', seriesTitle: 'Example B', seriesId: 'demo-b', completionDate: new Date(Date.now() - 7*24*60*60*1000), durationMinutes: 56, charsRead: 5000, charsPerMinute: 90, isPersonalBest: true, isSlowest: false, percentVsAverage: 36 },
+  ];
+
+  // Derive series info from volume data
+  const demoSeriesInfo = getSeriesSpeedInfo(demoVolumeData);
+
+  // Demo colors
+  const demoSeriesColors = new Map([['demo-a', 'rgba(59, 130, 246, 0.6)'], ['demo-b', 'rgba(168, 85, 247, 0.6)']]);
+
   // Generate evenly distributed colors using HSL color space for maximum visual separation
   function generateSeriesColor(index: number, totalSeries: number): string {
     // Start with blue (210°) for consistency
@@ -248,7 +266,7 @@
   }
 
   function createChart(data: VolumeSpeedData[]) {
-    if (!chartCanvas || data.length === 0) return;
+    if (!chartCanvas) return;
 
     // Destroy existing chart
     if (chart) {
@@ -260,7 +278,11 @@
       ? data.filter(vol => vol.seriesId === selectedSeriesId)
       : data;
 
-    if (filteredData.length === 0) return;
+    // If no data, show placeholder chart
+    if (filteredData.length === 0) {
+      createPlaceholderChart();
+      return;
+    }
 
     // Sort data by date (oldest first for chart)
     const sortedData = [...filteredData].sort((a, b) => a.completionDate.getTime() - b.completionDate.getTime());
@@ -378,9 +400,131 @@
     });
   }
 
+  function createPlaceholderChart() {
+    if (!chartCanvas) return;
+
+    // Filter demo data by selected series
+    const filteredDemoData = selectedSeriesId
+      ? demoVolumeData.filter(vol => vol.seriesId === selectedSeriesId)
+      : demoVolumeData;
+
+    if (filteredDemoData.length === 0) return;
+
+    // Sort by date (oldest first for chart)
+    const sortedData = [...filteredDemoData].sort((a, b) => a.completionDate.getTime() - b.completionDate.getTime());
+
+    // Calculate trend line
+    const n = sortedData.length;
+    const xValues = sortedData.map((_, i) => i);
+    const yValues = sortedData.map(v => v.charsPerMinute);
+    const sumX = xValues.reduce((a, b) => a + b, 0);
+    const sumY = yValues.reduce((a, b) => a + b, 0);
+    const sumXY = xValues.reduce((sum, x, i) => sum + x * yValues[i], 0);
+    const sumXX = xValues.reduce((sum, x) => sum + x * x, 0);
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    const trendData = xValues.map(x => slope * x + intercept);
+
+    chart = new Chart(chartCanvas, {
+      type: 'line',
+      data: {
+        labels: sortedData.map(v => v.completionDate.toLocaleDateString()),
+        datasets: [
+          {
+            label: 'Example Progress',
+            data: sortedData.map(v => v.charsPerMinute),
+            backgroundColor: sortedData.map(v => demoSeriesColors.get(v.seriesId) || 'rgba(107, 114, 128, 0.5)'),
+            borderColor: sortedData.map(v => demoSeriesColors.get(v.seriesId) || 'rgba(107, 114, 128, 0.5)'),
+            borderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            tension: 0.1,
+            fill: false
+          },
+          {
+            label: 'Trend',
+            data: trendData,
+            borderColor: 'rgba(156, 163, 175, 0.3)',
+            borderWidth: 2,
+            borderDash: [5, 5],
+            pointRadius: 0,
+            pointHoverRadius: 0,
+            fill: false
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            labels: {
+              color: '#6b7280',
+              filter: (item) => item.text === 'Trend'
+            }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(17, 24, 39, 0.95)',
+            titleColor: '#9ca3af',
+            bodyColor: '#6b7280',
+            borderColor: '#374151',
+            borderWidth: 1,
+            callbacks: {
+              title: (items) => {
+                const index = items[0].dataIndex;
+                return sortedData[index].volumeTitle;
+              },
+              label: (context) => {
+                if (context.datasetIndex === 1) return '';
+                const index = context.dataIndex;
+                const vol = sortedData[index];
+                return [
+                  `Series: ${vol.seriesTitle}`,
+                  `Speed: ${Math.round(vol.charsPerMinute)} chars/min`,
+                  `(Example data)`
+                ];
+              }
+            }
+          }
+        },
+        scales: {
+          x: {
+            display: true,
+            grid: {
+              color: 'rgba(75, 85, 99, 0.1)'
+            },
+            ticks: {
+              color: '#6b7280',
+              maxRotation: 45,
+              minRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 10
+            }
+          },
+          y: {
+            display: true,
+            grid: {
+              color: 'rgba(75, 85, 99, 0.1)'
+            },
+            ticks: {
+              color: '#6b7280',
+              callback: (value) => `${value} cpm`
+            },
+            title: {
+              display: true,
+              text: 'Characters per Minute',
+              color: '#6b7280'
+            }
+          }
+        }
+      }
+    });
+  }
+
   // Update chart when data changes or series filter changes
   $effect(() => {
-    if (chartCanvas && $volumeSpeedData) {
+    if (chartCanvas) {
       createChart($volumeSpeedData);
     }
   });
@@ -388,7 +532,7 @@
   // Also watch for series filter changes
   $effect(() => {
     selectedSeriesId;
-    if (chartCanvas && $volumeSpeedData) {
+    if (chartCanvas) {
       createChart($volumeSpeedData);
     }
   });
@@ -656,15 +800,17 @@
   <h1 class="text-3xl font-bold mb-6">Reading Speed History</h1>
 
   {#if $volumeSpeedData.length === 0}
-    <!-- Empty State -->
-    <Card class="text-center py-12">
-      <BookSolid size="xl" class="mx-auto mb-4 text-gray-500" />
-      <h2 class="text-xl font-semibold mb-2 text-gray-300">No Reading History Yet</h2>
-      <p class="text-gray-400">
-        Complete your first volume to start tracking your reading speed and progress!
+    <!-- Empty State Message -->
+    <Card class="text-center py-8 mb-6">
+      <BookSolid size="lg" class="mx-auto mb-3 text-gray-500" />
+      <h2 class="text-lg font-semibold mb-2 text-gray-300">No Reading History Yet</h2>
+      <p class="text-gray-400 text-sm">
+        Complete your first volume or read for 30 minutes to start tracking your reading speed!
       </p>
     </Card>
-  {:else}
+  {/if}
+
+  {#if true}
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 w-full">
       <!-- Recent Speed -->
@@ -672,7 +818,7 @@
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm text-gray-400 mb-1">Recent Speed</p>
-            <p class="text-2xl font-bold">{Math.round($stats.currentSpeed)}</p>
+            <p class="text-2xl font-bold">{$volumeSpeedData.length === 0 ? 0 : Math.round($stats.currentSpeed)}</p>
             <p class="text-xs text-gray-500">chars/min</p>
           </div>
           <FireSolid size="lg" class="text-orange-500" />
@@ -727,7 +873,6 @@
     </div>
 
     <!-- Achievement Badges -->
-    {#if showAllAchievements || $stats.badges.length > 0}
       <Card class="mb-6 w-full max-w-none">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-2">
@@ -762,18 +907,23 @@
           {/each}
         </div>
       </Card>
-    {/if}
 
     <!-- Chart -->
     <Card class="mb-6 w-full max-w-none">
       <h2 class="text-xl font-semibold mb-4">Reading Speed Over Time</h2>
+      {#if $volumeSpeedData.length === 0}
+        <p class="text-sm text-gray-400 mb-4 italic">
+          Example data shown below. Your actual progress will appear after completing your first volume or 30 minutes of tracked reading.
+        </p>
+      {/if}
       <div class="w-full" style="height: 600px;">
         <canvas bind:this={chartCanvas}></canvas>
       </div>
     </Card>
 
     <!-- Series Breakdown -->
-    {#if $seriesInfo.length > 0}
+    {@const displaySeriesInfo = $seriesInfo.length > 0 ? $seriesInfo : demoSeriesInfo}
+    {@const isSeriesDemo = $seriesInfo.length === 0}
       <Card class="mb-6 w-full max-w-none">
         <h2 class="text-xl font-semibold mb-4">Speed by Series</h2>
         <div class="overflow-x-auto">
@@ -786,16 +936,16 @@
             <TableHeadCell>Actions</TableHeadCell>
           </TableHead>
           <TableBody>
-            {#each $seriesInfo as series}
+            {#each displaySeriesInfo as series}
               <TableBodyRow
-                class="cursor-pointer hover:bg-gray-700 {selectedSeriesId === series.seriesId ? 'bg-gray-700/50' : ''}"
+                class="cursor-pointer hover:bg-gray-700 {selectedSeriesId === series.seriesId ? 'bg-gray-700/50' : ''} {isSeriesDemo ? 'opacity-50' : ''}"
                 on:click={() => toggleSeriesFilter(series.seriesId)}
               >
                 <TableBodyCell>
                   <div class="flex items-center gap-2">
                     <div
                       class="w-3 h-3 rounded-full flex-shrink-0"
-                      style="background-color: {seriesColors.get(series.seriesId) || generateSeriesColor(0, 1)};"
+                      style="background-color: {isSeriesDemo ? (demoSeriesColors.get(series.seriesId) || 'rgba(107, 114, 128, 0.5)') : (seriesColors.get(series.seriesId) || generateSeriesColor(0, 1))};"
                     ></div>
                     <span>{series.seriesTitle}</span>
                   </div>
@@ -804,12 +954,12 @@
                 <TableBodyCell>{Math.round(series.averageSpeed)} cpm</TableBodyCell>
                 <TableBodyCell>
                   {#if series.speedImprovement > 0}
-                    <span class="text-green-500 flex items-center gap-1">
+                    <span class="{isSeriesDemo ? 'text-gray-400' : 'text-green-500'} flex items-center gap-1">
                       <ArrowUpOutline size="xs" />
                       +{Math.round(series.speedImprovement)}%
                     </span>
                   {:else if series.speedImprovement < 0}
-                    <span class="text-red-500 flex items-center gap-1">
+                    <span class="{isSeriesDemo ? 'text-gray-400' : 'text-red-500'} flex items-center gap-1">
                       <ArrowDownOutline size="xs" />
                       {Math.round(series.speedImprovement)}%
                     </span>
@@ -818,7 +968,7 @@
                   {/if}
                 </TableBodyCell>
                 <TableBodyCell>
-                  {#if series.seriesTitle === '[Missing Series Info]' && $orphanedVolumeIds.length > 0}
+                  {#if !isSeriesDemo && series.seriesTitle === '[Missing Series Info]' && $orphanedVolumeIds.length > 0}
                     <Button size="xs" color="red" on:click={(e) => { e.stopPropagation(); confirmDeleteOrphaned(); }}>
                       <TrashBinSolid class="w-3 h-3" />
                     </Button>
@@ -830,9 +980,10 @@
         </Table>
         </div>
       </Card>
-    {/if}
 
     <!-- Volume History -->
+    {@const displayVolumes = sortedVolumes.length > 0 ? sortedVolumes : demoVolumeData}
+    {@const isVolumeDemo = sortedVolumes.length === 0}
     <Card class="w-full max-w-none">
       <h2 class="text-xl font-semibold mb-4">Completed Volumes</h2>
 
@@ -857,13 +1008,13 @@
           <TableHeadCell>Actions</TableHeadCell>
         </TableHead>
         <TableBody>
-          {#each sortedVolumes as volume}
-            <TableBodyRow>
+          {#each displayVolumes as volume}
+            <TableBodyRow class={isVolumeDemo ? 'opacity-50' : ''}>
               <TableBodyCell>
                 <div class="flex items-center gap-2">
                   <div
                     class="w-3 h-3 rounded-full flex-shrink-0"
-                    style="background-color: {seriesColors.get(volume.seriesId) || generateSeriesColor(0, 1)};"
+                    style="background-color: {isVolumeDemo ? (demoSeriesColors.get(volume.seriesId) || 'rgba(107, 114, 128, 0.5)') : (seriesColors.get(volume.seriesId) || generateSeriesColor(0, 1))};"
                   ></div>
                   <span>{volume.seriesTitle}</span>
                 </div>
@@ -872,8 +1023,8 @@
               <TableBodyCell>
                 <div class="flex flex-col">
                   <span class="font-semibold">{Math.round(volume.charsPerMinute)} cpm</span>
-                  <span class="text-xs" class:text-green-500={volume.percentVsAverage > 0}
-                        class:text-red-500={volume.percentVsAverage < 0}>
+                  <span class="text-xs {isVolumeDemo ? 'text-gray-400' : ''}" class:text-green-500={!isVolumeDemo && volume.percentVsAverage > 0}
+                        class:text-red-500={!isVolumeDemo && volume.percentVsAverage < 0}>
                     {volume.percentVsAverage > 0 ? '+' : ''}{Math.round(volume.percentVsAverage)}% vs avg
                   </span>
                 </div>
@@ -887,9 +1038,11 @@
                 <div class="text-xs text-gray-500">{volume.completionDate.toLocaleDateString()}</div>
               </TableBodyCell>
               <TableBodyCell>
-                <Button size="xs" color="red" on:click={() => confirmDelete(volume)}>
-                  <TrashBinSolid class="w-3 h-3" />
-                </Button>
+                {#if !isVolumeDemo}
+                  <Button size="xs" color="red" on:click={() => confirmDelete(volume)}>
+                    <TrashBinSolid class="w-3 h-3" />
+                  </Button>
+                {/if}
               </TableBodyCell>
             </TableBodyRow>
           {/each}

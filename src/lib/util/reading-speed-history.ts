@@ -228,14 +228,15 @@ export function calculateReadingSpeedStats(
 	let speedTrend = 0;
 	let speedTrendLabel = 'stable';
 
-	if (volumeData.length >= 10) {
-		// Most recent 10 (they're sorted newest first)
-		const recent10 = volumeData.slice(0, 10);
-		const recentAvg = recent10.reduce((sum, v) => sum + v.charsPerMinute, 0) / 10;
+	if (volumeData.length >= 3) {
+		// Most recent half (they're sorted newest first)
+		const halfCount = Math.ceil(volumeData.length / 2);
+		const recentHalf = volumeData.slice(0, halfCount);
+		const recentAvg = recentHalf.reduce((sum, v) => sum + v.charsPerMinute, 0) / halfCount;
 
-		// First 10 (last 10 in the array)
-		const first10 = volumeData.slice(-10);
-		const firstAvg = first10.reduce((sum, v) => sum + v.charsPerMinute, 0) / 10;
+		// First half (last entries in the array)
+		const firstHalf = volumeData.slice(-halfCount);
+		const firstAvg = firstHalf.reduce((sum, v) => sum + v.charsPerMinute, 0) / halfCount;
 
 		speedTrend = ((recentAvg - firstAvg) / firstAvg) * 100;
 

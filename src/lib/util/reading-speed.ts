@@ -298,7 +298,7 @@ export function calculateReadingSpeed(
 	let confidence: 'high' | 'medium' | 'low' | 'none';
 	if (totalMinutes >= ESTIMATION_MINUTES * 0.75) confidence = 'high';
 	else if (totalMinutes >= ESTIMATION_MINUTES * 0.5) confidence = 'medium';
-	else if (totalMinutes >= ESTIMATION_MINUTES * 0.25) confidence = 'low';
+	else if (totalMinutes >= 5) confidence = 'low';
 	else confidence = 'none';
 
 	return {
