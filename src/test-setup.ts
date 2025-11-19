@@ -35,3 +35,37 @@ Object.defineProperty(window, 'matchMedia', {
 		dispatchEvent: vi.fn()
 	}))
 });
+
+// Mock Worker for jsdom environment
+// Web Workers aren't available in jsdom, but some modules import them
+class MockWorker {
+	onmessage: ((event: MessageEvent) => void) | null = null;
+	onerror: ((event: ErrorEvent) => void) | null = null;
+
+	constructor(_scriptURL: string | URL) {
+		// No-op constructor
+	}
+
+	postMessage(_message: any) {
+		// No-op - tests should mock specific worker behavior if needed
+	}
+
+	terminate() {
+		// No-op
+	}
+
+	addEventListener(_type: string, _listener: EventListener) {
+		// No-op
+	}
+
+	removeEventListener(_type: string, _listener: EventListener) {
+		// No-op
+	}
+
+	dispatchEvent(_event: Event): boolean {
+		return true;
+	}
+}
+
+// @ts-ignore - Worker type mismatch is expected for mock
+globalThis.Worker = MockWorker;
