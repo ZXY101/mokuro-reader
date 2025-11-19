@@ -43,7 +43,7 @@
   let accessToken = $derived($accessTokenStore);
   // Note: readerFolderId, volumeDataId, profilesId removed - legacy Drive-specific stores (now use unified provider system)
   let tokenClient = $derived($tokenClientStore);
-  let state = $derived($driveState);
+  let driveStateValue = $derived($driveState);
   let cacheIsFetching = $derived($cacheIsFetchingStore);
 
   // Reactive provider authentication checks - now using provider manager for all providers

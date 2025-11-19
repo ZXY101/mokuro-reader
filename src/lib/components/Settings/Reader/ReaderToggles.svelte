@@ -41,6 +41,6 @@
     min="1"
     max="30"
     value={$settings.inactivityTimeoutMinutes}
-    on:change={(e) => updateSetting('inactivityTimeoutMinutes', Number(e.target.value))}
+    on:change={(e) => updateSetting('inactivityTimeoutMinutes', Number((e.target as HTMLInputElement).value))}
   />
 </div>

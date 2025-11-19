@@ -19,7 +19,6 @@
     TrashBinSolid,
     UserEditSolid
   } from 'flowbite-svelte-icons';
-  import type { ListGroupItemType } from 'flowbite-svelte/dist/types';
 
   interface Props {
     open?: boolean;
@@ -29,7 +28,7 @@
 
   let items = $derived(Object.keys($profiles));
 
-  let newProfile: string = $state();
+  let newProfile: string = $state('');
 
   // Helper to check if a profile is built-in
   function isBuiltIn(profileName: string): boolean {
@@ -51,35 +50,35 @@
     newProfile = '';
   }
 
-  function onCopy(item: string | ListGroupItemType) {
+  function onCopy(item: string) {
     let newCopy = `${item} copy`;
 
     while (items.includes(newCopy)) {
       newCopy += ` copy`;
     }
 
-    copyProfile(item as string, newCopy);
+    copyProfile(item, newCopy);
   }
 
-  function onDelete(item: string | ListGroupItemType) {
-    if (isBuiltIn(item as string)) {
+  function onDelete(item: string) {
+    if (isBuiltIn(item)) {
       showSnackbar('Cannot delete built-in profile');
       return;
     }
 
     promptConfirmation(`Are you sure you would like to delete the [${item}] profile?`, () => {
-      const success = deleteProfile(item as string);
+      const success = deleteProfile(item);
       if (success) {
         showSnackbar('Profile deleted');
       }
     });
   }
 
-  let profileToEdit: string | ListGroupItemType = $state();
-  let newName: string | ListGroupItemType = $state();
+  let profileToEdit: string = $state('');
+  let newName: string = $state('');
 
-  function onEditClicked(item: string | ListGroupItemType) {
-    if (isBuiltIn(item as string)) {
+  function onEditClicked(item: string) {
+    if (isBuiltIn(item)) {
       showSnackbar('Cannot rename built-in profile');
       return;
     }
@@ -93,12 +92,12 @@
   }
 
   function onEdit() {
-    if (items.includes(newName as string)) {
+    if (items.includes(newName)) {
       showSnackbar('Profile already exists');
       return;
     }
 
-    const success = renameProfile(profileToEdit as string, newName as string);
+    const success = renameProfile(profileToEdit, newName);
     if (success) {
       profileToEdit = '';
       showSnackbar('Profile renamed');
@@ -111,12 +110,14 @@
 </script>
 
 <Modal size="xs" bind:open outsideclose>
+  <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
   <Listgroup {items}>
-    {#snippet children({ item })}
+    {#snippet children({ item }: { item: string })}
       <ListgroupItem class="flex flex-row justify-between gap-6">
         <div class="flex-1 flex items-center gap-2">
           {#if profileToEdit === item}
             <form onsubmit={preventDefault(onEdit)}>
+              <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
               <Input size="sm" bind:value={newName} autofocus onclick={onInputClick}>
                 {#snippet right()}
                   <EditOutline size="sm" onclick={onEdit} class="hover:text-primary-700" />
@@ -149,6 +150,7 @@
     {/snippet}
   </Listgroup>
   <form onsubmit={preventDefault(onSubmit)}>
+    <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
     <Input type="text" placeholder="New profile..." bind:value={newProfile}>
       {#snippet right()}
         <CirclePlusSolid class="hover:text-primary-700" onclick={onSubmit} />

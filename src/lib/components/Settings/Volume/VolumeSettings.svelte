@@ -11,9 +11,9 @@
   import { zoomDefault } from '$lib/panzoom';
   import { AccordionItem, Helper, Toggle, Label, Select } from 'flowbite-svelte';
 
-  const volumeId = $page.params.volume;
+  const volumeId = $page.params.volume!;
 
-  let settings = $derived($effectiveVolumeSettings[$page.params.volume]);
+  let settings = $derived($effectiveVolumeSettings[volumeId]);
 
   let toggles = $derived([
     { key: 'rightToLeft', text: 'Right to left', value: settings.rightToLeft },

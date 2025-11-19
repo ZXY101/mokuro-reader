@@ -17,10 +17,10 @@
   let isReader = $state(false);
 
   // Read unified provider state synchronously
-  let state = $derived($unifiedProviderState);
+  let providerState = $derived($unifiedProviderState);
 
   // Track if any cloud providers are authenticated (derived from state)
-  let hasAuthenticatedProviders = $derived(state?.hasStoredCredentials ?? false);
+  let hasAuthenticatedProviders = $derived(providerState?.hasStoredCredentials ?? false);
 
   // Google Drive specific: Track token expiry for debug display
   let tokenMinutesLeft = $state<number | null>(null);
@@ -58,7 +58,7 @@
 
   // Google Drive specific: Update token minutes every 10 seconds when authenticated
   $effect(() => {
-    if (!isGoogleDrive || !state.isAuthenticated) {
+    if (!isGoogleDrive || !providerState.isAuthenticated) {
       tokenMinutesLeft = null;
       return;
     }
@@ -105,7 +105,7 @@
 
   // Google Drive specific: Manual token refresh handler
   function handleTokenRefresh() {
-    if (isGoogleDrive && state.isAuthenticated) {
+    if (isGoogleDrive && providerState.isAuthenticated) {
       tokenManager.reAuthenticate();
       showSnackbar(`Refreshing ${providerDisplayName} session...`);
     }
@@ -143,23 +143,23 @@
       <button
         onclick={navigateToCloud}
         class="flex items-center justify-center w-6 h-6"
-        title={state.needsAttention ? `${providerDisplayName} - Action Required (click to sign in)` : state.isFullyConnected ? `${providerDisplayName} - Connected` : state.isAuthenticated ? `${providerDisplayName} - Loading...` : state.hasStoredCredentials ? `${providerDisplayName} - Initializing...` : `${providerDisplayName} - Not connected`}
+        title={providerState.needsAttention ? `${providerDisplayName} - Action Required (click to sign in)` : providerState.isFullyConnected ? `${providerDisplayName} - Connected` : providerState.isAuthenticated ? `${providerDisplayName} - Loading...` : providerState.hasStoredCredentials ? `${providerDisplayName} - Initializing...` : `${providerDisplayName} - Not connected`}
       >
-        {#if state.needsAttention}
+        {#if providerState.needsAttention}
           <CloudArrowUpOutline class="w-6 h-6 text-red-600 hover:text-red-700 cursor-pointer" />
-        {:else if state.isCacheLoading && !state.isCacheLoaded}
+        {:else if providerState.isCacheLoading && !providerState.isCacheLoaded}
           <Spinner size="4" />
-        {:else if state.isFullyConnected}
+        {:else if providerState.isFullyConnected}
           <CloudArrowUpOutline class="w-6 h-6 text-green-600 hover:text-green-700 cursor-pointer" />
-        {:else if state.isAuthenticated}
+        {:else if providerState.isAuthenticated}
           <CloudArrowUpOutline class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer" />
-        {:else if state.hasStoredCredentials}
+        {:else if providerState.hasStoredCredentials}
           <CloudArrowUpOutline class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer" />
         {:else}
           <CloudArrowUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
         {/if}
       </button>
-      {#if isGoogleDrive && state.isAuthenticated && tokenMinutesLeft !== null}
+      {#if isGoogleDrive && providerState.isAuthenticated && tokenMinutesLeft !== null}
         {#key tokenMinutesLeft}
           <button
             onclick={handleTokenRefresh}

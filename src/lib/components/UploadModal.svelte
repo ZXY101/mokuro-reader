@@ -12,7 +12,7 @@
   // In Svelte 5, we need to make sure the open prop is properly bindable
   let { open = $bindable(false) }: Props = $props();
 
-  let promise: Promise<void> = $state();
+  let promise: Promise<void> | undefined = $state(undefined);
   let files: FileList | undefined = $state(undefined);
   let isMobileDevice = $state(false);
 
@@ -203,8 +203,9 @@
               input.accept = '.mokuro,.zip,.cbz';
               input.multiple = true;
               input.onchange = (e) => {
-                if (e.target.files.length > 0) {
-                  files = e.target.files;
+                const target = e.target as HTMLInputElement;
+                if (target.files && target.files.length > 0) {
+                  files = target.files;
                 }
               };
               input.click();
@@ -222,8 +223,9 @@
                 input.type = 'file';
                 input.setAttribute('webkitdirectory', '');
                 input.onchange = (e) => {
-                  if (e.target.files.length > 0) {
-                    files = e.target.files;
+                  const target = e.target as HTMLInputElement;
+                  if (target.files && target.files.length > 0) {
+                    files = target.files;
                   }
                 };
                 input.click();
