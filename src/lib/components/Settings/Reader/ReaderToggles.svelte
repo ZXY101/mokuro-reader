@@ -18,6 +18,7 @@
     { key: 'mobile', text: 'Mobile', value: $settings.mobile },
     { key: 'showTimer', text: 'Show timer', value: $settings.showTimer },
     { key: 'quickActions', text: 'Show quick actions', value: $settings.quickActions },
+    { key: 'swapWheelBehavior', text: 'Swap mouse wheel scroll/zoom', value: $settings.swapWheelBehavior },
     { key: 'invertColors', text: 'Invert colors of the images', value: $settings.invertColors, shortcut: 'I' },
     { key: 'nightMode', text: 'Night mode (strong red filter)', value: $settings.nightMode, shortcut: 'N' }
   ] as { key: SettingsKey; text: string; value: any; shortcut?: string }[]);
