@@ -68,11 +68,8 @@
 
 <ManageProfilesModal bind:open={manageModalOpen} />
 
-<!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
 <AccordionItem>
-  {#snippet header()}
-    <span>Profile</span>
-  {/snippet}
+  <span slot="header">Profile</span>
   <div class="flex flex-col gap-5">
     <div class="flex flex-col gap-2">
       <Select {items} bind:value={profile} on:change={onChange} placeholder="Select profile ..." />

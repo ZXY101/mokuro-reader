@@ -3,11 +3,8 @@
   import { AccordionItem } from 'flowbite-svelte';
 </script>
 
-<!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
 <AccordionItem>
-  {#snippet header()}
-    <span>Stats</span>
-  {/snippet}
+  <span slot="header">Stats</span>
   <div>
     <p>Completed volumes: {$totalStats?.completed || 0}</p>
     <p>Pages read: {$totalStats?.pagesRead || 0}</p>

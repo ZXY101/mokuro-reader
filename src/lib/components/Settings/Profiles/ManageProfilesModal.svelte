@@ -110,51 +110,47 @@
 </script>
 
 <Modal size="xs" bind:open outsideclose>
-  <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
-  <Listgroup {items}>
-    {#snippet children({ item }: { item: string })}
-      <ListgroupItem class="flex flex-row justify-between gap-6">
-        <div class="flex-1 flex items-center gap-2">
-          {#if profileToEdit === item}
-            <form onsubmit={preventDefault(onEdit)}>
-              <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
-              <Input size="sm" bind:value={newName} autofocus onclick={onInputClick}>
-                {#snippet right()}
-                  <EditOutline size="sm" onclick={onEdit} class="hover:text-primary-700" />
-                {/snippet}
-              </Input>
-            </form>
-          {:else}
-            <p class="line-clamp-1">{item}</p>
-            {#if isBuiltIn(item)}
-              <span class="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full">Built-in</span>
-            {/if}
+  <Listgroup {items} let:item>
+    <ListgroupItem class="flex flex-row justify-between gap-6">
+      <div class="flex-1 flex items-center gap-2">
+        {#if profileToEdit === item}
+          <form onsubmit={preventDefault(onEdit)}>
+            <Input size="sm" bind:value={newName} autofocus onclick={onInputClick}>
+              <EditOutline
+                slot="right"
+                size="sm"
+                onclick={onEdit}
+                class="hover:text-primary-700"
+              />
+            </Input>
+          </form>
+        {:else}
+          <p class="line-clamp-1">{item}</p>
+          {#if isBuiltIn(item)}
+            <span class="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full">Built-in</span>
           {/if}
-        </div>
-        <div class="flex flex-row gap-2 items-center">
-          <FileCopySolid size="sm" class="hover:text-primary-700" onclick={() => onCopy(item)} />
-          {#if !isBuiltIn(item)}
-            <UserEditSolid
-              size="sm"
-              class="hover:text-primary-700"
-              onclick={() => onEditClicked(item)}
-            />
-            <TrashBinSolid
-              size="sm"
-              class="hover:text-primary-700"
-              onclick={() => onDelete(item)}
-            />
-          {/if}
-        </div>
-      </ListgroupItem>
-    {/snippet}
+        {/if}
+      </div>
+      <div class="flex flex-row gap-2 items-center">
+        <FileCopySolid size="sm" class="hover:text-primary-700" onclick={() => onCopy(item)} />
+        {#if !isBuiltIn(item)}
+          <UserEditSolid
+            size="sm"
+            class="hover:text-primary-700"
+            onclick={() => onEditClicked(item)}
+          />
+          <TrashBinSolid
+            size="sm"
+            class="hover:text-primary-700"
+            onclick={() => onDelete(item)}
+          />
+        {/if}
+      </div>
+    </ListgroupItem>
   </Listgroup>
   <form onsubmit={preventDefault(onSubmit)}>
-    <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
     <Input type="text" placeholder="New profile..." bind:value={newProfile}>
-      {#snippet right()}
-        <CirclePlusSolid class="hover:text-primary-700" onclick={onSubmit} />
-      {/snippet}
+      <CirclePlusSolid slot="right" class="hover:text-primary-700" onclick={onSubmit} />
     </Input>
   </form>
 </Modal>

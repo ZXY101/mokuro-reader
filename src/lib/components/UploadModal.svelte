@@ -114,11 +114,8 @@
     <div class="text-center"><Spinner /></div>
   {:then}
     <Accordion flush>
-      <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
       <AccordionItem>
-        {#snippet header()}
-          <span>What to upload?</span>
-        {/snippet}
+        <span slot="header">What to upload?</span>
         <div class="flex flex-col gap-5">
           <div>
             <p>

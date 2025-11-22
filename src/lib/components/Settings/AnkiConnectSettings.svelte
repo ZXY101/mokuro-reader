@@ -27,11 +27,8 @@
   ];
 </script>
 
-<!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
 <AccordionItem>
-  {#snippet header()}
-    <span>Anki Connect</span>
-  {/snippet}
+  <span slot="header">Anki Connect</span>
   <div class="flex flex-col gap-5">
     <Helper
       >For anki connect integration to work, you must add the reader (<code class="text-primary-500"

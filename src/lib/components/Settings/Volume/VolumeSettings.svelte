@@ -44,11 +44,8 @@
   }
 </script>
 
-<!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
 <AccordionItem open>
-  {#snippet header()}
-    <span>Volume settings</span>
-  {/snippet}
+  <span slot="header">Volume settings</span>
   <div class="flex flex-col gap-5">
     <Helper>These settings only apply to this volume</Helper>
     <div>

@@ -5,11 +5,8 @@
   import { GithubSolid } from 'flowbite-svelte-icons';
 </script>
 
-<!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
 <AccordionItem>
-  {#snippet header()}
-    <span>About</span>
-  {/snippet}
+  <span slot="header">About</span>
   <div class="flex flex-col gap-5">
     <div class="flex flex-row justify-between">
       <p class="font-semibold">Mokuro reader {READER_VERSION} <Badge>BETA</Badge></p>
