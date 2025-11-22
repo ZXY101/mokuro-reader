@@ -1074,7 +1074,7 @@
     <!-- Stats Cards -->
     <div class="mb-6 grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <!-- Recent Speed -->
-      <Card class="max-w-none">
+      <Card class="max-w-none p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="mb-1 text-sm text-gray-400">Recent Speed</p>
@@ -1088,7 +1088,7 @@
       </Card>
 
       <!-- Characters Read -->
-      <Card class="max-w-none">
+      <Card class="max-w-none p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="mb-1 text-sm text-gray-400">Characters Read</p>
@@ -1100,7 +1100,7 @@
       </Card>
 
       <!-- Volumes Completed -->
-      <Card class="max-w-none">
+      <Card class="max-w-none p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="mb-1 text-sm text-gray-400">Volumes Completed</p>
@@ -1112,7 +1112,7 @@
       </Card>
 
       <!-- Total Time -->
-      <Card class="max-w-none">
+      <Card class="max-w-none p-6">
         <div class="flex items-center justify-between">
           <div>
             <p class="mb-1 text-sm text-gray-400">Total Time</p>
@@ -1138,7 +1138,7 @@
     </div>
 
     <!-- Achievement Badges -->
-    <Card class="mb-6 w-full max-w-none">
+    <Card class="mb-6 w-full max-w-none p-6">
       <div class="mb-4 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <AwardSolid size="md" class="text-yellow-500" />
@@ -1180,7 +1180,7 @@
     </Card>
 
     <!-- Chart -->
-    <Card class="mb-6 w-full max-w-none">
+    <Card class="mb-6 w-full max-w-none p-6">
       <h2 class="mb-4 text-xl font-semibold">Reading Speed Over Time</h2>
       {#if $volumeSpeedData.length === 0}
         <p class="mb-4 text-sm text-gray-400 italic">
@@ -1196,7 +1196,7 @@
     <!-- Series Breakdown -->
     {@const displaySeriesInfo = $seriesInfo.length > 0 ? $seriesInfo : demoSeriesInfo}
     {@const isSeriesDemo = $seriesInfo.length === 0}
-    <Card class="mb-6 w-full max-w-none">
+    <Card class="mb-6 w-full max-w-none p-6">
       <h2 class="mb-4 text-xl font-semibold">Speed by Series</h2>
       <div class="overflow-x-auto">
         <Table>
@@ -1275,7 +1275,7 @@
     <!-- Volume History -->
     {@const displayVolumes = sortedVolumes.length > 0 ? sortedVolumes : demoVolumeData}
     {@const isVolumeDemo = sortedVolumes.length === 0}
-    <Card class="w-full max-w-none">
+    <Card class="w-full max-w-none p-6">
       <h2 class="mb-4 text-xl font-semibold">Completed Volumes</h2>
 
       <div class="w-full overflow-x-auto">
