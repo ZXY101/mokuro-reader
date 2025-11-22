@@ -69,6 +69,7 @@ export type Settings = {
   invertColors: boolean;
   nightMode: boolean;
   inactivityTimeoutMinutes: number;
+  swapWheelBehavior: boolean;
   volumeDefaults: VolumeDefaults;
   ankiConnectSettings: AnkiConnectSettings;
   lastUpdated?: string; // ISO 8601 timestamp for sync conflict resolution
@@ -102,6 +103,7 @@ const defaultSettings: Settings = {
   invertColors: false,
   nightMode: false,
   inactivityTimeoutMinutes: 5,
+  swapWheelBehavior: false,
   volumeDefaults: {
     singlePageView: 'auto',
     rightToLeft: true,

@@ -14,6 +14,7 @@ export const sessionFullscreenState = writable<boolean | undefined>(undefined);
 
 export function initPanzoom(node: HTMLElement) {
   container = node;
+
   pz = panzoom(node, {
     bounds: false,
     maxZoom: 10,
@@ -28,7 +29,12 @@ export function initPanzoom(node: HTMLElement) {
       // This allows text selection within text boxes
       return isTextBox;
     },
-    beforeWheel: (e) => !e.ctrlKey,
+    // When swapWheelBehavior is true: zoom without modifier, scroll with Ctrl
+    // When swapWheelBehavior is false (default): scroll without modifier, zoom with Ctrl
+    beforeWheel: (e) => {
+      const swapWheelBehavior = get(settings).swapWheelBehavior;
+      return swapWheelBehavior ? e.ctrlKey : !e.ctrlKey;
+    },
     onTouch: (e) => e.touches.length > 1,
     // Panzoom typing is wrong here
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -45,14 +51,19 @@ export function initPanzoom(node: HTMLElement) {
   pz.on('pan', () => keepInBounds());
   pz.on('zoom', () => keepInBounds());
 
-  // Add custom wheel handler for panning when Ctrl is not pressed
+  // Add custom wheel handler for panning/zooming based on swapWheelBehavior
   const wheelHandler = (e: WheelEvent) => {
-    if (!e.ctrlKey && pz) {
-      e.preventDefault();
-      const { x, y } = pz.getTransform();
-      // Pan vertically based on wheel deltaY
-      pz.moveTo(x, y - e.deltaY);
-      keepInBounds();
+    if (pz) {
+      const swapWheelBehavior = get(settings).swapWheelBehavior;
+      const shouldPan = swapWheelBehavior ? e.ctrlKey : !e.ctrlKey;
+
+      if (shouldPan) {
+        e.preventDefault();
+        const { x, y } = pz.getTransform();
+        // Pan vertically based on wheel deltaY
+        pz.moveTo(x, y - e.deltaY);
+        keepInBounds();
+      }
     }
   };
 
