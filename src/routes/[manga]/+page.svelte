@@ -563,19 +563,18 @@
     <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
       <h3 class="min-w-0 flex-shrink-2 px-2 text-2xl font-bold">{manga[0].series_title}</h3>
       <div class="flex flex-row gap-2 px-2 text-base">
-        <Badge color="dark" class="!min-w-0 break-words"
-          ><span class="font-semibold">Volumes:</span> {mangaStats.completed} / {manga.length}</Badge
+        <Badge color="dark" class="!min-w-0 break-words bg-gray-100 dark:bg-gray-700"
+          >Volumes: {mangaStats.completed} / {manga.length}</Badge
         >
-        <Badge color="dark" class="!min-w-0 break-words"
-          ><span class="font-semibold">Characters:</span> {mangaStats.chars}</Badge
+        <Badge color="dark" class="!min-w-0 break-words bg-gray-100 dark:bg-gray-700"
+          >Characters: {mangaStats.chars}</Badge
         >
-        <Badge color="dark" class="!min-w-0 break-words"
-          ><span class="font-semibold">Time Read:</span>
-          {formatTime(mangaStats.timeReadInMinutes)}</Badge
+        <Badge color="dark" class="!min-w-0 break-words bg-gray-100 dark:bg-gray-700"
+          >Time Read: {formatTime(mangaStats.timeReadInMinutes)}</Badge
         >
         {#if estimatedMinutesLeft !== null}
-          <Badge color="dark" class="!min-w-0 break-words"
-            ><span class="font-semibold">Time Left:</span> ~{formatTime(estimatedMinutesLeft)}</Badge
+          <Badge color="dark" class="!min-w-0 break-words bg-gray-100 dark:bg-gray-700"
+            >Time Left: ~{formatTime(estimatedMinutesLeft)}</Badge
           >
         {/if}
       </div>
