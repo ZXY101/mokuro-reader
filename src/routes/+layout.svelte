@@ -1,9 +1,9 @@
 <script lang="ts">
+  import './layout.css';
   import '../app.postcss';
   import { dev } from '$app/environment';
   import { inject } from '@vercel/analytics';
   import { onMount } from 'svelte';
-
   import NavBar from '$lib/components/NavBar.svelte';
   import Snackbar from '$lib/components/Snackbar.svelte';
   import ConfirmationPopup from '$lib/components/ConfirmationPopup.svelte';

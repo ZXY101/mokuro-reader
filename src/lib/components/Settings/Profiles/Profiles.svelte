@@ -79,7 +79,7 @@
     </div>
     <hr class="border-gray-100 opacity-10" />
     <div class="flex flex-col gap-2">
-      <input class="border border-slate-700 rounded-lg" type="file" accept=".json" bind:files />
+      <input class="rounded-lg border border-slate-700" type="file" accept=".json" bind:files />
       <Button onclick={importProfile} disabled={!files} size="sm" outline color="blue"
         >Import profiles</Button
       >

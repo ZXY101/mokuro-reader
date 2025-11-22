@@ -1056,15 +1056,15 @@
   <title>Reading Speed History</title>
 </svelte:head>
 
-<div class="p-4 min-h-[90svh] w-full">
-  <h1 class="text-3xl font-bold mb-6">Reading Speed History</h1>
+<div class="min-h-[90svh] w-full p-4">
+  <h1 class="mb-6 text-3xl font-bold">Reading Speed History</h1>
 
   {#if $volumeSpeedData.length === 0}
     <!-- Empty State Message -->
-    <Card class="text-center py-8 mb-6">
+    <Card class="mb-6 py-8 text-center">
       <BookSolid size="lg" class="mx-auto mb-3 text-gray-500" />
-      <h2 class="text-lg font-semibold mb-2 text-gray-300">No Reading History Yet</h2>
-      <p class="text-gray-400 text-sm">
+      <h2 class="mb-2 text-lg font-semibold text-gray-300">No Reading History Yet</h2>
+      <p class="text-sm text-gray-400">
         Complete your first volume or read for 30 minutes to start tracking your reading speed!
       </p>
     </Card>
@@ -1072,12 +1072,12 @@
 
   {#if true}
     <!-- Stats Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 w-full">
+    <div class="mb-6 grid w-full grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
       <!-- Recent Speed -->
       <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-400 mb-1">Recent Speed</p>
+            <p class="mb-1 text-sm text-gray-400">Recent Speed</p>
             <p class="text-2xl font-bold">
               {$volumeSpeedData.length === 0 ? 0 : Math.round($stats.currentSpeed)}
             </p>
@@ -1091,7 +1091,7 @@
       <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-400 mb-1">Characters Read</p>
+            <p class="mb-1 text-sm text-gray-400">Characters Read</p>
             <p class="text-2xl font-bold">{formatMetric($stats.totalCharsRead)}</p>
             <p class="text-xs text-gray-500">{formatNumber($stats.totalCharsRead)} total</p>
           </div>
@@ -1103,7 +1103,7 @@
       <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-400 mb-1">Volumes Completed</p>
+            <p class="mb-1 text-sm text-gray-400">Volumes Completed</p>
             <p class="text-2xl font-bold">{$totalCompletedVolumes}</p>
             <p class="text-xs text-gray-500">({$stats.volumesCompleted} tracked)</p>
           </div>
@@ -1115,11 +1115,11 @@
       <Card class="max-w-none">
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm text-gray-400 mb-1">Total Time</p>
+            <p class="mb-1 text-sm text-gray-400">Total Time</p>
             <p class="text-2xl font-bold">{formatDuration($stats.totalTimeMinutes)}</p>
             {#if $stats.speedTrend !== 0}
               {@const TrendIcon = getTrendIcon($stats.speedTrend)}
-              <div class="flex items-center gap-1 text-xs mt-1">
+              <div class="mt-1 flex items-center gap-1 text-xs">
                 {#if TrendIcon}
                   <TrendIcon
                     size="xs"
@@ -1139,7 +1139,7 @@
 
     <!-- Achievement Badges -->
     <Card class="mb-6 w-full max-w-none">
-      <div class="flex items-center justify-between mb-4">
+      <div class="mb-4 flex items-center justify-between">
         <div class="flex items-center gap-2">
           <AwardSolid size="md" class="text-yellow-500" />
           <span class="font-semibold">Achievements</span>
@@ -1152,7 +1152,7 @@
           {showAllAchievements ? 'Show My Achievements' : 'Show All Achievements'}
         </Button>
       </div>
-      <div class="flex items-center gap-2 flex-wrap w-full">
+      <div class="flex w-full flex-wrap items-center gap-2">
         {#each showAllAchievements ? ALL_ACHIEVEMENTS : $stats.badges as badge, index}
           {@const animation = getBadgeAnimation(badge)}
           {@const tierClass = getBadgeTierClass(badge)}
@@ -1163,7 +1163,7 @@
           {@const needsSeparator = index > 0 && currentCategory !== previousCategory}
 
           {#if needsSeparator}
-            <span class="text-gray-500 text-xl select-none">•</span>
+            <span class="text-xl text-gray-500 select-none">•</span>
           {/if}
 
           <span title={getBadgeTooltip(badge)}>
@@ -1181,9 +1181,9 @@
 
     <!-- Chart -->
     <Card class="mb-6 w-full max-w-none">
-      <h2 class="text-xl font-semibold mb-4">Reading Speed Over Time</h2>
+      <h2 class="mb-4 text-xl font-semibold">Reading Speed Over Time</h2>
       {#if $volumeSpeedData.length === 0}
-        <p class="text-sm text-gray-400 mb-4 italic">
+        <p class="mb-4 text-sm text-gray-400 italic">
           Example data shown below. Your actual progress will appear after completing your first
           volume or 30 minutes of tracked reading.
         </p>
@@ -1197,7 +1197,7 @@
     {@const displaySeriesInfo = $seriesInfo.length > 0 ? $seriesInfo : demoSeriesInfo}
     {@const isSeriesDemo = $seriesInfo.length === 0}
     <Card class="mb-6 w-full max-w-none">
-      <h2 class="text-xl font-semibold mb-4">Speed by Series</h2>
+      <h2 class="mb-4 text-xl font-semibold">Speed by Series</h2>
       <div class="overflow-x-auto">
         <Table>
           <TableHead>
@@ -1218,7 +1218,7 @@
                 <TableBodyCell>
                   <div class="flex items-center gap-2">
                     <div
-                      class="w-3 h-3 rounded-full flex-shrink-0"
+                      class="h-3 w-3 flex-shrink-0 rounded-full"
                       style="background-color: {isSeriesDemo
                         ? demoSeriesColors.get(series.seriesId) || 'rgba(107, 114, 128, 0.5)'
                         : seriesColors.get(series.seriesId) || generateSeriesColor(0, 1)};"
@@ -1261,7 +1261,7 @@
                         confirmDeleteOrphaned();
                       }}
                     >
-                      <TrashBinSolid class="w-3 h-3" />
+                      <TrashBinSolid class="h-3 w-3" />
                     </Button>
                   {/if}
                 </TableBodyCell>
@@ -1276,9 +1276,9 @@
     {@const displayVolumes = sortedVolumes.length > 0 ? sortedVolumes : demoVolumeData}
     {@const isVolumeDemo = sortedVolumes.length === 0}
     <Card class="w-full max-w-none">
-      <h2 class="text-xl font-semibold mb-4">Completed Volumes</h2>
+      <h2 class="mb-4 text-xl font-semibold">Completed Volumes</h2>
 
-      <div class="overflow-x-auto w-full">
+      <div class="w-full overflow-x-auto">
         <Table hoverable={true}>
           <TableHead>
             <TableHeadCell class="cursor-pointer" onclick={() => toggleSort('series')}>
@@ -1304,7 +1304,7 @@
                 <TableBodyCell>
                   <div class="flex items-center gap-2">
                     <div
-                      class="w-3 h-3 rounded-full flex-shrink-0"
+                      class="h-3 w-3 flex-shrink-0 rounded-full"
                       style="background-color: {isVolumeDemo
                         ? demoSeriesColors.get(volume.seriesId) || 'rgba(107, 114, 128, 0.5)'
                         : seriesColors.get(volume.seriesId) || generateSeriesColor(0, 1)};"
@@ -1339,7 +1339,7 @@
                 <TableBodyCell>
                   {#if !isVolumeDemo}
                     <Button size="xs" color="red" onclick={() => confirmDelete(volume)}>
-                      <TrashBinSolid class="w-3 h-3" />
+                      <TrashBinSolid class="h-3 w-3" />
                     </Button>
                   {/if}
                 </TableBodyCell>
@@ -1389,9 +1389,9 @@
       series information in your reading history.
     </p>
     {#if orphanedCounts.speedTracked > 0 || orphanedCounts.markedAsRead > 0 || orphanedCounts.other > 0}
-      <div class="mb-4 text-sm text-gray-400 text-left bg-gray-800 p-3 rounded">
+      <div class="mb-4 rounded bg-gray-800 p-3 text-left text-sm text-gray-400">
         <p class="mb-1">This includes:</p>
-        <ul class="list-disc list-inside ml-2">
+        <ul class="ml-2 list-inside list-disc">
           {#if orphanedCounts.speedTracked > 0}
             <li>
               Speed-tracked volumes: <span class="font-semibold">{orphanedCounts.speedTracked}</span
@@ -1411,11 +1411,11 @@
         </ul>
       </div>
     {/if}
-    <p class="mb-3 text-sm text-gray-400 text-left">
+    <p class="mb-3 text-left text-sm text-gray-400">
       This reading data lacks title and series information, making it difficult to identify.
     </p>
     <div
-      class="mb-5 text-sm text-gray-400 text-left bg-yellow-900/20 border border-yellow-600/30 p-3 rounded"
+      class="mb-5 rounded border border-yellow-600/30 bg-yellow-900/20 p-3 text-left text-sm text-gray-400"
     >
       <p class="mb-2 font-semibold text-yellow-400">⚠️ Important:</p>
       <p class="mb-2">

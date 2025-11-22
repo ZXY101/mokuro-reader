@@ -223,31 +223,31 @@
     <div
       class:text-green-400={isComplete}
       class:opacity-70={isPlaceholderOnly}
-      class="flex flex-col gap-[5px] text-center items-center bg-slate-900 pb-1 bg-opacity-50 border border-slate-950 relative"
+      class="bg-opacity-50 relative flex flex-col items-center gap-[5px] border border-slate-950 bg-slate-900 pb-1 text-center"
       class:cursor-pointer={isPlaceholderOnly}
     >
       {#if isPlaceholderOnly}
         <div
-          class="sm:w-[325px] sm:h-[385px] bg-black border-gray-900 border flex items-center justify-center"
+          class="flex items-center justify-center border border-gray-900 bg-black sm:h-[385px] sm:w-[325px]"
         >
-          <div class="w-24 h-24 flex items-center justify-center">
+          <div class="flex h-24 w-24 items-center justify-center">
             {#if isDownloading}
               <Spinner size="16" color="blue" />
             {:else}
-              <DownloadSolid class="w-24 h-24 text-blue-400" />
+              <DownloadSolid class="h-24 w-24 text-blue-400" />
             {/if}
           </div>
         </div>
       {:else if stackedVolumes.length > 0}
         <!-- Stacked diagonal layout: dynamic stepping based on image aspect ratios -->
-        <div class="relative sm:w-[325px] sm:h-[410px] sm:pt-4 sm:pb-6">
-          <div class="relative sm:w-full sm:h-[385px] overflow-hidden">
+        <div class="relative sm:h-[410px] sm:w-[325px] sm:pt-4 sm:pb-6">
+          <div class="relative overflow-hidden sm:h-[385px] sm:w-full">
             {#each stackedVolumes as vol, i (vol.volume_uuid)}
               {#if vol.thumbnail}
                 <img
                   src={URL.createObjectURL(vol.thumbnail)}
                   alt={vol.volume_title}
-                  class="absolute sm:max-w-[250px] sm:max-h-[360px] h-auto bg-black border-gray-900 border"
+                  class="absolute h-auto border border-gray-900 bg-black sm:max-h-[360px] sm:max-w-[250px]"
                   style="left: {i * stepSizes.horizontal}px; top: {stepSizes.topOffset +
                     i * stepSizes.vertical}px; z-index: {stackedVolumes.length -
                     i}; filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5));"
@@ -257,7 +257,7 @@
           </div>
         </div>
       {/if}
-      <p class="font-semibold sm:w-[325px] line-clamp-1">
+      <p class="line-clamp-1 font-semibold sm:w-[325px]">
         {volume.series_title}
       </p>
       {#if isPlaceholderOnly}

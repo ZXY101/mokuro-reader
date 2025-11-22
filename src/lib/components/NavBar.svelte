@@ -131,28 +131,28 @@
 <div class="relative z-10">
   <Navbar hidden={isReader}>
     <NavBrand href="/">
-      <div class="flex flex-row gap-2 items-center">
-        <img src={Icon} alt="icon" class="w-[32px] h-[32px]" />
+      <div class="flex flex-row items-center gap-2">
+        <img src={Icon} alt="icon" class="h-[32px] w-[32px]" />
         <span class="text-xl font-semibold dark:text-white">Mokuro</span>
       </div>
     </NavBrand>
-    <div class="flex md:order-2 gap-5">
+    <div class="flex gap-5 md:order-2">
       <button
         onclick={navigateToReadingSpeed}
-        class="flex items-center justify-center w-6 h-6"
+        class="flex h-6 w-6 items-center justify-center"
         title="Reading Speed Stats"
       >
-        <ChartLineUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+        <ChartLineUpOutline class="h-6 w-6 cursor-pointer hover:text-primary-700" />
       </button>
-      <button onclick={openSettings} class="flex items-center justify-center w-6 h-6">
-        <UserSettingsSolid class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+      <button onclick={openSettings} class="flex h-6 w-6 items-center justify-center">
+        <UserSettingsSolid class="h-6 w-6 cursor-pointer hover:text-primary-700" />
       </button>
-      <button onclick={openUploadModal} class="flex items-center justify-center w-6 h-6">
-        <UploadSolid class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+      <button onclick={openUploadModal} class="flex h-6 w-6 items-center justify-center">
+        <UploadSolid class="h-6 w-6 cursor-pointer hover:text-primary-700" />
       </button>
       <button
         onclick={navigateToCloud}
-        class="flex items-center justify-center w-6 h-6"
+        class="flex h-6 w-6 items-center justify-center"
         title={providerState.needsAttention
           ? `${providerDisplayName} - Action Required (click to sign in)`
           : providerState.isFullyConnected
@@ -164,33 +164,33 @@
                 : `${providerDisplayName} - Not connected`}
       >
         {#if providerState.needsAttention}
-          <CloudArrowUpOutline class="w-6 h-6 text-red-600 hover:text-red-700 cursor-pointer" />
+          <CloudArrowUpOutline class="h-6 w-6 cursor-pointer text-red-600 hover:text-red-700" />
         {:else if providerState.isCacheLoading && !providerState.isCacheLoaded}
           <Spinner size="4" />
         {:else if providerState.isFullyConnected}
-          <CloudArrowUpOutline class="w-6 h-6 text-green-600 hover:text-green-700 cursor-pointer" />
+          <CloudArrowUpOutline class="h-6 w-6 cursor-pointer text-green-600 hover:text-green-700" />
         {:else if providerState.isAuthenticated}
           <CloudArrowUpOutline
-            class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer"
+            class="h-6 w-6 cursor-pointer text-yellow-600 hover:text-yellow-700"
           />
         {:else if providerState.hasStoredCredentials}
           <CloudArrowUpOutline
-            class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer"
+            class="h-6 w-6 cursor-pointer text-yellow-600 hover:text-yellow-700"
           />
         {:else}
-          <CloudArrowUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
+          <CloudArrowUpOutline class="h-6 w-6 cursor-pointer hover:text-primary-700" />
         {/if}
       </button>
       {#if isGoogleDrive && providerState.isAuthenticated && tokenMinutesLeft !== null}
         {#key tokenMinutesLeft}
           <button
             onclick={handleTokenRefresh}
-            class="flex items-center justify-center px-2 py-1 rounded text-xs font-mono cursor-pointer transition-colors
+            class="flex cursor-pointer items-center justify-center rounded px-2 py-1 font-mono text-xs transition-colors
               {tokenMinutesLeft > 30
-              ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20'
+              ? 'text-green-600 hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-900/20'
               : tokenMinutesLeft > 10
-                ? 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
-                : 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20'}"
+                ? 'text-yellow-600 hover:bg-yellow-50 hover:text-yellow-700 dark:hover:bg-yellow-900/20'
+                : 'text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-900/20'}"
             title="Token expires in {tokenMinutesLeft} minutes. Click to refresh now."
           >
             {tokenMinutesLeft}m
@@ -200,12 +200,12 @@
       {#if hasAuthenticatedProviders}
         <button
           onclick={handleSync}
-          class="flex items-center justify-center w-6 h-6"
+          class="flex h-6 w-6 items-center justify-center"
           title={isSyncing ? 'Syncing...' : `Sync read progress with ${providerDisplayName}`}
           disabled={isSyncing}
         >
           <RefreshOutline
-            class="w-6 h-6 hover:text-primary-700 cursor-pointer {isSyncing ? 'animate-spin' : ''}"
+            class="h-6 w-6 cursor-pointer hover:text-primary-700 {isSyncing ? 'animate-spin' : ''}"
           />
         </button>
       {/if}

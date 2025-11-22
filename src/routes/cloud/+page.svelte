@@ -536,17 +536,17 @@
   <title>Cloud</title>
 </svelte:head>
 
-<div class="p-2 h-[90svh]">
+<div class="h-[90svh] p-2">
   {#if !hasAnyProvider}
     <!-- Provider Selection Screen (like sign-in options) -->
     <div class="flex justify-center pt-0 sm:pt-20">
       <div class="w-full max-w-md">
-        <h2 class="text-2xl font-semibold text-center mb-8">Choose a Cloud Storage Provider</h2>
+        <h2 class="mb-8 text-center text-2xl font-semibold">Choose a Cloud Storage Provider</h2>
 
         <div class="flex flex-col gap-3">
           <!-- Google Drive Option -->
           <button
-            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            class="border-opacity-50 w-full rounded-lg border border-slate-600 p-6 transition-colors hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
             onclick={handleGoogleDriveLogin}
             disabled={googleDriveLoading}
           >
@@ -556,8 +556,8 @@
               {:else}
                 <GoogleSolid size="xl" />
               {/if}
-              <div class="text-left flex-1">
-                <div class="font-semibold text-lg">Google Drive</div>
+              <div class="flex-1 text-left">
+                <div class="text-lg font-semibold">Google Drive</div>
                 <div class="text-sm text-gray-400">15GB free • Requires re-auth every hour</div>
               </div>
             </div>
@@ -565,7 +565,7 @@
 
           <!-- MEGA Option -->
           <button
-            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 hover:bg-slate-800 transition-colors"
+            class="border-opacity-50 w-full rounded-lg border border-slate-600 p-6 transition-colors hover:bg-slate-800"
             onclick={() => {
               // Show MEGA login form
               const megaForm = document.getElementById('mega-login-form');
@@ -573,15 +573,15 @@
             }}
           >
             <div class="flex items-center gap-4">
-              <div class="w-8 h-8 flex items-center justify-center text-2xl">M</div>
-              <div class="text-left flex-1">
-                <div class="font-semibold text-lg">MEGA</div>
+              <div class="flex h-8 w-8 items-center justify-center text-2xl">M</div>
+              <div class="flex-1 text-left">
+                <div class="text-lg font-semibold">MEGA</div>
                 <div class="text-sm text-gray-400">20GB free • Persistent login</div>
               </div>
             </div>
           </button>
 
-          <div id="mega-login-form" class="hidden pl-12 pr-4 pb-4">
+          <div id="mega-login-form" class="hidden pr-4 pb-4 pl-12">
             <form
               onsubmit={(e) => {
                 e.preventDefault();
@@ -594,14 +594,14 @@
                 bind:value={megaEmail}
                 placeholder="Email"
                 required
-                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+                class="rounded-lg border border-gray-600 bg-gray-700 p-2.5 text-sm text-white"
               />
               <input
                 type="password"
                 bind:value={megaPassword}
                 placeholder="Password"
                 required
-                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+                class="rounded-lg border border-gray-600 bg-gray-700 p-2.5 text-sm text-white"
               />
               <Button type="submit" disabled={megaLoading} color="blue" size="sm">
                 {megaLoading ? 'Connecting...' : 'Connect to MEGA'}
@@ -611,14 +611,14 @@
 
           <!-- WebDAV Option -->
           <button
-            class="w-full border rounded-lg border-slate-600 p-6 border-opacity-50 opacity-50 cursor-not-allowed"
+            class="border-opacity-50 w-full cursor-not-allowed rounded-lg border border-slate-600 p-6 opacity-50"
             disabled
           >
             <div class="flex items-center gap-4">
-              <div class="w-8 h-8 flex items-center justify-center text-2xl">W</div>
-              <div class="text-left flex-1">
+              <div class="flex h-8 w-8 items-center justify-center text-2xl">W</div>
+              <div class="flex-1 text-left">
                 <div class="flex items-center gap-2">
-                  <div class="font-semibold text-lg">WebDAV</div>
+                  <div class="text-lg font-semibold">WebDAV</div>
                   <Badge color="yellow">Under Development</Badge>
                 </div>
                 <div class="text-sm text-gray-400">Nextcloud, ownCloud, NAS • Persistent login</div>
@@ -626,7 +626,7 @@
             </div>
           </button>
 
-          <div id="webdav-login-form" class="hidden pl-12 pr-4 pb-4">
+          <div id="webdav-login-form" class="hidden pr-4 pb-4 pl-12">
             <form
               onsubmit={(e) => {
                 e.preventDefault();
@@ -639,21 +639,21 @@
                 bind:value={webdavUrl}
                 placeholder="Server URL (e.g., https://cloud.example.com/remote.php/dav)"
                 required
-                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+                class="rounded-lg border border-gray-600 bg-gray-700 p-2.5 text-sm text-white"
               />
               <input
                 type="text"
                 bind:value={webdavUsername}
                 placeholder="Username"
                 required
-                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+                class="rounded-lg border border-gray-600 bg-gray-700 p-2.5 text-sm text-white"
               />
               <input
                 type="password"
                 bind:value={webdavPassword}
                 placeholder="Password or App Token"
                 required
-                class="bg-gray-700 border border-gray-600 text-white rounded-lg p-2.5 text-sm"
+                class="rounded-lg border border-gray-600 bg-gray-700 p-2.5 text-sm text-white"
               />
               <Button type="submit" disabled={webdavLoading} color="blue" size="sm">
                 {webdavLoading ? 'Connecting...' : 'Connect to WebDAV'}
@@ -666,10 +666,10 @@
   {:else}
     <!-- Unified Connected Provider Interface -->
     {#if currentProvider}
-      <div class="flex justify-center items-center flex-col gap-6">
+      <div class="flex flex-col items-center justify-center gap-6">
         <div class="w-full max-w-3xl">
           <!-- Header with provider name and logout -->
-          <div class="flex justify-between items-center mb-6">
+          <div class="mb-6 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <h2 class="text-3xl font-semibold">{providerNames[currentProvider]}</h2>
               {#if $providerStatusStore.providers[currentProvider]?.needsAttention}
@@ -697,7 +697,7 @@
                 You can select multiple ZIP/CBZ files or entire folders at once.
               </p>
             {:else}
-              <p class="text-center text-gray-300 mb-2">
+              <p class="mb-2 text-center text-gray-300">
                 Your read progress is synced with {providerNames[currentProvider]}.
               </p>
             {/if}
@@ -723,7 +723,7 @@
               </p>
 
               {#if $miscSettings.turboMode}
-                <div class="flex flex-col gap-2 mt-2">
+                <div class="mt-2 flex flex-col gap-2">
                   <div class="text-sm font-medium">Device RAM Configuration</div>
                   <div class="flex gap-4">
                     <Radio
@@ -777,17 +777,17 @@
                 </p>
 
                 {#if $miscSettings.gdriveAutoReAuth}
-                  <div class="mt-2 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
-                    <h4 class="text-sm font-semibold text-yellow-200 mb-2">
+                  <div class="mt-2 rounded-lg border border-yellow-700/50 bg-yellow-900/30 p-3">
+                    <h4 class="mb-2 text-sm font-semibold text-yellow-200">
                       ⚠️ Popup Permission Required ({browserInfo.name})
                     </h4>
-                    <p class="text-xs text-gray-300 mb-3">
+                    <p class="mb-3 text-xs text-gray-300">
                       For auto re-authentication to work, you must allow popups for this site.
                       Otherwise, the browser will block automatic re-authentication attempts.
                     </p>
-                    <div class="text-xs text-gray-300 space-y-1 mb-3">
+                    <div class="mb-3 space-y-1 text-xs text-gray-300">
                       <p class="font-medium">To enable popups:</p>
-                      <ol class="list-decimal list-inside pl-2 space-y-1">
+                      <ol class="list-inside list-decimal space-y-1 pl-2">
                         {#each browserInfo.instructions as instruction}
                           <li>{instruction}</li>
                         {/each}
@@ -798,7 +798,7 @@
                             <span
                               role="button"
                               tabindex="0"
-                              class="text-yellow-400 underline cursor-pointer hover:text-yellow-300 font-mono"
+                              class="cursor-pointer font-mono text-yellow-400 underline hover:text-yellow-300"
                               onclick={() => {
                                 navigator.clipboard.writeText(browserInfo.settingsUrl);
                                 showSnackbar(`Copied! Paste this into your address bar`);
@@ -875,9 +875,9 @@
             </Button>
 
             <!-- Provider info box -->
-            <div class="mt-4 p-4 bg-gray-800 rounded-lg">
-              <h3 class="font-semibold mb-2">About {providerNames[currentProvider]}</h3>
-              <ul class="text-sm text-gray-300 space-y-1">
+            <div class="mt-4 rounded-lg bg-gray-800 p-4">
+              <h3 class="mb-2 font-semibold">About {providerNames[currentProvider]}</h3>
+              <ul class="space-y-1 text-sm text-gray-300">
                 {#each providerInfo[currentProvider].items as item}
                   <li>{item}</li>
                 {/each}

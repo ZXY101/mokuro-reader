@@ -141,11 +141,11 @@
 
 {#if variant === 'list'}
   <div
-    class="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-600"
+    class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-600 dark:border-gray-700"
   >
     <ListgroupItem class="py-4 opacity-70">
-      <DownloadSolid class="w-[50px] h-[70px] text-blue-400 mr-3" />
-      <div class="flex flex-row gap-5 items-center justify-between w-full">
+      <DownloadSolid class="mr-3 h-[70px] w-[50px] text-blue-400" />
+      <div class="flex w-full flex-row items-center justify-between gap-5">
         <div>
           <p class="font-semibold text-gray-400">{volName}</p>
           <div class="flex items-center gap-2">
@@ -153,7 +153,7 @@
             <Badge color={badgeColor} class="text-xs">{providerName}</Badge>
           </div>
         </div>
-        <div class="flex gap-2 items-center">
+        <div class="flex items-center gap-2">
           {#if isDownloading}
             <Button color="light" disabled={true}>
               <Spinner size="4" class="me-2" />
@@ -161,11 +161,11 @@
             </Button>
           {:else}
             <Button color="blue" onclick={onDownloadClicked}>
-              <DownloadSolid class="w-4 h-4 me-2" />
+              <DownloadSolid class="me-2 h-4 w-4" />
               Download
             </Button>
             <Button color="red" onclick={onDeleteClicked}>
-              <TrashBinSolid class="w-4 h-4 me-2" />
+              <TrashBinSolid class="me-2 h-4 w-4" />
               Delete
             </Button>
           {/if}
@@ -178,11 +178,11 @@
   <button
     onclick={onDownloadClicked}
     disabled={isDownloading}
-    class="flex flex-col gap-2 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors opacity-60 sm:w-[278px]"
+    class="flex flex-col gap-2 rounded-lg p-3 opacity-60 transition-colors hover:bg-gray-100 sm:w-[278px] dark:hover:bg-gray-800"
     class:cursor-not-allowed={isDownloading}
   >
     <div
-      class="sm:w-[250px] sm:h-[350px] bg-gray-200 dark:bg-gray-700 border border-dashed border-gray-400 dark:border-gray-600 flex items-center justify-center"
+      class="flex items-center justify-center border border-dashed border-gray-400 bg-gray-200 sm:h-[350px] sm:w-[250px] dark:border-gray-600 dark:bg-gray-700"
     >
       {#if isDownloading}
         <div class="flex flex-col items-center gap-2">
@@ -190,14 +190,14 @@
           <span class="text-xs text-blue-400">{Math.round(downloadProgress)}%</span>
         </div>
       {:else}
-        <DownloadSolid class="w-8 h-8 text-gray-400" />
+        <DownloadSolid class="h-8 w-8 text-gray-400" />
       {/if}
     </div>
-    <div class="text-sm font-medium truncate">{volName}</div>
-    <div class="text-xs text-gray-500 dark:text-gray-400 flex flex-col gap-0.5">
+    <div class="truncate text-sm font-medium">{volName}</div>
+    <div class="flex flex-col gap-0.5 text-xs text-gray-500 dark:text-gray-400">
       <div class="flex items-center gap-1">
         <span>In {providerName}</span>
-        <Badge color={badgeColor} class="text-xs px-1 py-0">{providerName}</Badge>
+        <Badge color={badgeColor} class="px-1 py-0 text-xs">{providerName}</Badge>
       </div>
       <span>{sizeDisplay}</span>
     </div>

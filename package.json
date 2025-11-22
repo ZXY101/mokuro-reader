@@ -17,6 +17,8 @@
     "@sveltejs/adapter-auto": "^4.0.0",
     "@sveltejs/kit": "^2.5.27",
     "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/typography": "^0.5.19",
     "@tailwindcss/vite": "^4.1.17",
     "@testing-library/svelte": "^5.2.7",
     "@types/gapi.client.drive-v3": "^0.0.5",
@@ -38,6 +40,7 @@
     "postcss-load-config": "^6.0.1",
     "prettier": "^3.1.0",
     "prettier-plugin-svelte": "^3.2.6",
+    "prettier-plugin-tailwindcss": "^0.7.1",
     "sass": "^1.64.2",
     "svelte": "^5.0.0",
     "svelte-check": "^4.3.4",
@@ -59,5 +62,11 @@
     "panzoom": "^9.4.3",
     "svelte-easy-crop": "^4.0.0",
     "webdav": "^5.8.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@tailwindcss/oxide"
+    ]
   }
 }

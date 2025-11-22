@@ -554,14 +554,14 @@
   <title>{manga?.[0]?.series_title || 'Manga'}</title>
 </svelte:head>
 {#if !$catalog || $catalog.length === 0}
-  <div class="flex justify-center items-center p-16">
+  <div class="flex items-center justify-center p-16">
     <Spinner size="12" />
   </div>
 {:else if manga && manga.length > 0 && mangaStats}
-  <div class="p-2 flex flex-col gap-5">
+  <div class="flex flex-col gap-5 p-2">
     <!-- Header Row: Title on left, Stats on right -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-      <h3 class="text-2xl font-bold px-2 min-w-0 flex-shrink-2">{manga[0].series_title}</h3>
+    <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+      <h3 class="min-w-0 flex-shrink-2 px-2 text-2xl font-bold">{manga[0].series_title}</h3>
       <div class="flex flex-row gap-2 px-2 text-base">
         <Badge color="gray" class="!min-w-0 break-words"
           >Volumes: {mangaStats.completed} / {manga.length}</Badge
@@ -579,11 +579,11 @@
     </div>
 
     <!-- Actions Row: All buttons -->
-    <div class="flex flex-row gap-2 items-stretch justify-end">
+    <div class="flex flex-row items-stretch justify-end gap-2">
       <!-- Cloud buttons -->
       {#if isCloudReady && !allBackedUp}
         <Button color="light" onclick={backupSeries} class="!min-w-0 self-stretch">
-          <CloudArrowUpOutline class="w-4 h-4 me-2 shrink-0" />
+          <CloudArrowUpOutline class="me-2 h-4 w-4 shrink-0" />
           <span class="break-words"
             >{anyBackedUp ? 'Backup remaining' : `Backup to ${providerDisplayName}`}</span
           >
@@ -592,30 +592,30 @@
 
       {#if isCloudReady && anyBackedUp}
         <Button color="red" onclick={onDeleteFromCloud} class="!min-w-0 self-stretch">
-          <TrashBinSolid class="w-4 h-4 me-2 shrink-0" />
+          <TrashBinSolid class="me-2 h-4 w-4 shrink-0" />
           <span class="break-words">Delete from {providerDisplayName}</span>
         </Button>
       {/if}
 
       <!-- Other action buttons -->
       <Button color="light" onclick={onExtract} disabled={loading} class="!min-w-0 self-stretch">
-        <DownloadSolid class="w-4 h-4 me-2 shrink-0" />
+        <DownloadSolid class="me-2 h-4 w-4 shrink-0" />
         <span class="break-words">{loading ? 'Extracting...' : 'Extract'}</span>
       </Button>
 
       <Button color="alternative" onclick={onDelete} class="!min-w-0 self-stretch">
-        <TrashBinSolid class="w-4 h-4 me-2 shrink-0" />
+        <TrashBinSolid class="me-2 h-4 w-4 shrink-0" />
         <span class="break-words">Remove manga</span>
       </Button>
 
       <!-- View buttons -->
       <Button color="alternative" onclick={goToSeriesText} class="!min-w-0 self-stretch">
-        <FileLinesOutline class="w-4 h-4 me-2 shrink-0" />
+        <FileLinesOutline class="me-2 h-4 w-4 shrink-0" />
         <span class="break-words">View Series Text</span>
       </Button>
 
       <Button color="alternative" onclick={toggleSortMode} class="!min-w-0 self-stretch">
-        <SortOutline class="w-5 h-5 me-2 shrink-0" />
+        <SortOutline class="me-2 h-5 w-5 shrink-0" />
         <span class="break-words">
           {#if sortMode === 'unread-first'}
             Unread first
@@ -627,26 +627,26 @@
 
       <Button color="alternative" onclick={toggleViewMode} class="!min-w-0 self-stretch">
         {#if viewMode === 'list'}
-          <GridOutline class="w-5 h-5 me-2 shrink-0" />
+          <GridOutline class="me-2 h-5 w-5 shrink-0" />
           <span class="break-words">Grid</span>
         {:else}
-          <ListOutline class="w-5 h-5 me-2 shrink-0" />
+          <ListOutline class="me-2 h-5 w-5 shrink-0" />
           <span class="break-words">List</span>
         {/if}
       </Button>
     </div>
 
     {#if viewMode === 'list'}
-      <Listgroup active class="flex-1 h-full w-full">
+      <Listgroup active class="h-full w-full flex-1">
         {#if hasDuplicates && hasAnyProvider}
           <div
-            class="mb-4 flex items-center justify-between px-4 py-2 bg-red-50 dark:bg-red-900/20 rounded"
+            class="mb-4 flex items-center justify-between rounded bg-red-50 px-4 py-2 dark:bg-red-900/20"
           >
             <h4 class="text-sm font-semibold text-red-600 dark:text-red-400">
               Duplicates found in {providerDisplayName} ({duplicateCloudFiles.length})
             </h4>
             <Button size="xs" color="red" onclick={cleanCloudDuplicates}>
-              <TrashBinSolid class="w-3 h-3 me-1" />
+              <TrashBinSolid class="me-1 h-3 w-3" />
               Clean Duplicates
             </Button>
           </div>
@@ -663,7 +663,7 @@
             </h4>
             {#if hasAnyProvider}
               <Button size="xs" color="blue" onclick={downloadAllPlaceholders}>
-                <DownloadSolid class="w-3 h-3 me-1" />
+                <DownloadSolid class="me-1 h-3 w-3" />
                 Download all
               </Button>
             {/if}
@@ -676,7 +676,7 @@
     {:else}
       <!-- Grid view -->
       <div class="flex flex-col gap-4">
-        <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
+        <div class="flex flex-col flex-wrap justify-center gap-5 sm:flex-row sm:justify-start">
           {#each manga as volume (volume.volume_uuid)}
             <VolumeItem {volume} variant="grid" />
           {/each}
@@ -688,11 +688,11 @@
               Available in {providerDisplayName} ({placeholders.length})
             </h4>
             <Button size="xs" color="blue" onclick={downloadAllPlaceholders}>
-              <DownloadSolid class="w-3 h-3 me-1" />
+              <DownloadSolid class="me-1 h-3 w-3" />
               Download all
             </Button>
           </div>
-          <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
+          <div class="flex flex-col flex-wrap justify-center gap-5 sm:flex-row sm:justify-start">
             {#each placeholders as placeholder (placeholder.volume_uuid)}
               <PlaceholderVolumeItem volume={placeholder} variant="grid" />
             {/each}

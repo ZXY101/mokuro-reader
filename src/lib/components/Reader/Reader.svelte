@@ -784,7 +784,7 @@
   <Cropper />
   <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
     <div class="flex flex-col gap-3">
-      <div class="flex flex-row items-center gap-5 z-10">
+      <div class="z-10 flex flex-row items-center gap-5">
         <button onclick={() => changePage(volumeSettings.rightToLeft ? pages.length : 1, true)}>
           <BackwardStepSolid class="hover:text-primary-600" size="sm" />
         </button>
@@ -819,7 +819,7 @@
       </div>
     </div>
   </Popover>
-  <button class="absolute opacity-50 left-5 top-5 z-10 mix-blend-difference" id="page-num">
+  <button class="absolute top-5 left-5 z-10 opacity-50 mix-blend-difference" id="page-num">
     {#key page}
       <p class="text-left" class:hidden={!$settings.charCount}>{charDisplay}</p>
       <p class="text-left" class:hidden={!$settings.pageNum}>{pageDisplay}</p>
@@ -828,7 +828,7 @@
   {#if notificationMessage}
     {#key notificationKey}
       <div
-        class="absolute left-1/2 top-5 z-20 -translate-x-1/2 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg transition-opacity"
+        class="absolute top-5 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-gray-900 px-4 py-2 text-white shadow-lg transition-opacity"
         style="backdrop-filter: blur(8px); background-color: rgba(17, 24, 39, 0.9);"
       >
         <p class="text-sm font-medium whitespace-nowrap">{notificationMessage}</p>
@@ -845,27 +845,27 @@
       <Panzoom>
         <button
           aria-label="Previous page (left edge)"
-          class="h-full fixed -left-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+          class="fixed -left-full z-10 h-full w-full opacity-[0.01] hover:bg-slate-400"
           style:margin-left={`${$settings.edgeButtonWidth}px`}
           onmousedown={mouseDown}
           onmouseup={left}
         ></button>
         <button
           aria-label="Next page (right edge)"
-          class="h-full fixed -right-full z-10 w-full hover:bg-slate-400 opacity-[0.01]"
+          class="fixed -right-full z-10 h-full w-full opacity-[0.01] hover:bg-slate-400"
           style:margin-right={`${$settings.edgeButtonWidth}px`}
           onmousedown={mouseDown}
           onmouseup={right}
         ></button>
         <button
           aria-label="Previous page (bottom left)"
-          class="h-screen fixed top-full -left-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
+          class="fixed top-full -left-full z-10 h-screen w-[150%] opacity-[0.01] hover:bg-slate-400"
           onmousedown={mouseDown}
           onmouseup={left}
         ></button>
         <button
           aria-label="Next page (bottom right)"
-          class="h-screen fixed top-full -right-full z-10 w-[150%] hover:bg-slate-400 opacity-[0.01]"
+          class="fixed top-full -right-full z-10 h-screen w-[150%] opacity-[0.01] hover:bg-slate-400"
           onmousedown={mouseDown}
           onmouseup={right}
         ></button>
@@ -878,7 +878,7 @@
         >
           {#key page}
             <div
-              class="flex flex-row col-start-1 row-start-1"
+              class="col-start-1 row-start-1 flex flex-row"
               class:flex-row-reverse={!volumeSettings.rightToLeft}
               in:pageIn={{ direction: pageDirection }}
               out:pageOut={{ direction: pageDirection }}
@@ -899,7 +899,7 @@
                   volumeUuid={volume.volume_uuid}
                 />
               {:else}
-                <div class="flex items-center justify-center w-screen h-screen">
+                <div class="flex h-screen w-screen items-center justify-center">
                   <Spinner size="12" />
                 </div>
               {/if}
@@ -914,19 +914,19 @@
       aria-label="Previous page (left edge)"
       onmousedown={mouseDown}
       onmouseup={left}
-      class="left-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
+      class="absolute top-0 left-0 h-full w-16 opacity-[0.01] hover:bg-slate-400"
       style:width={`${$settings.edgeButtonWidth}px`}
     ></button>
     <button
       aria-label="Next page (right edge)"
       onmousedown={mouseDown}
       onmouseup={right}
-      class="right-0 top-0 absolute h-full w-16 hover:bg-slate-400 opacity-[0.01]"
+      class="absolute top-0 right-0 h-full w-16 opacity-[0.01] hover:bg-slate-400"
       style:width={`${$settings.edgeButtonWidth}px`}
     ></button>
   {/if}
 {:else}
-  <div class="fixed z-50 left-1/2 top-1/2">
+  <div class="fixed top-1/2 left-1/2 z-50">
     <Spinner />
   </div>
 {/if}

@@ -11,7 +11,7 @@
 
 <button
   onclick={openSettings}
-  class="hover:text-primary-700 hover:mix-blend-normal mix-blend-difference z-10 fixed opacity-50 hover:opacity-100 right-10 top-5 p-10 m-[-2.5rem]"
+  class="fixed top-5 right-10 z-10 m-[-2.5rem] p-10 opacity-50 mix-blend-difference hover:text-primary-700 hover:opacity-100 hover:mix-blend-normal"
 >
   <UserSettingsSolid />
 </button>

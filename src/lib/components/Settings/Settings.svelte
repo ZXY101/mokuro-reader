@@ -53,8 +53,8 @@
   id="settings"
 >
   <div class="flex items-center">
-    <h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold">
-      <UserSettingsSolid class="w-4 h-4 mr-2.5" />Settings
+    <h5 id="drawer-label" class="mb-4 inline-flex items-center text-base font-semibold">
+      <UserSettingsSolid class="mr-2.5 h-4 w-4" />Settings
     </h5>
     <CloseButton onclick={onClose} class="mb-4 dark:text-white" />
   </div>

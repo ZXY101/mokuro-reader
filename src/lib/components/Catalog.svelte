@@ -153,7 +153,7 @@
   <Loader>Loading catalog...</Loader>
 {:else if $catalog.length > 0}
   <div class="flex flex-col gap-5">
-    <div class="flex gap-1 py-2 w-full">
+    <div class="flex w-full gap-1 py-2">
       <div class="flex-grow">
         <Search bind:value={search} class="w-full [&>div>input]:h-10" size="md" />
       </div>
@@ -161,21 +161,21 @@
         size="sm"
         color="alternative"
         onclick={onLayout}
-        class="min-w-10 h-10 flex items-center justify-center"
+        class="flex h-10 min-w-10 items-center justify-center"
       >
         {#if $miscSettings.galleryLayout === 'list'}
-          <GridOutline class="w-5 h-5" />
+          <GridOutline class="h-5 w-5" />
         {:else}
-          <ListOutline class="w-5 h-5" />
+          <ListOutline class="h-5 w-5" />
         {/if}
       </Button>
       <Button
         size="sm"
         color="alternative"
         onclick={onOrder}
-        class="min-w-10 h-10 flex items-center justify-center"
+        class="flex h-10 min-w-10 items-center justify-center"
       >
-        <SortOutline class="w-5 h-5" />
+        <SortOutline class="h-5 w-5" />
         <span class="ml-1 text-xs">
           {#if $miscSettings.gallerySorting === 'ASC'}
             A-Z
@@ -188,12 +188,12 @@
       </Button>
     </div>
     {#if search && sortedCatalog.length === 0}
-      <div class="text-center p-20">
+      <div class="p-20 text-center">
         <p>No results found.</p>
       </div>
     {:else}
       <!-- Local series -->
-      <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
+      <div class="flex flex-col flex-wrap justify-center gap-5 sm:flex-row sm:justify-start">
         {#if $miscSettings.galleryLayout === 'grid'}
           {#each localSeries as { series_uuid } (series_uuid)}
             <CatalogItem {series_uuid} />
@@ -210,23 +210,23 @@
       <!-- Placeholder series (Cloud providers) -->
       {#if placeholderSeries && placeholderSeries.length > 0}
         <div class="mt-8">
-          <div class="flex items-center justify-between px-4 mb-4">
+          <div class="mb-4 flex items-center justify-between px-4">
             <div>
               <h4 class="text-lg font-semibold text-gray-400">
                 Available in {providerDisplayName} ({placeholderSeries.length} series)
               </h4>
               {#if providerBreakdown}
-                <p class="text-sm text-gray-500 mt-1">{providerBreakdown}</p>
+                <p class="mt-1 text-sm text-gray-500">{providerBreakdown}</p>
               {/if}
             </div>
             {#if hasAuthenticatedProvider && allPlaceholderVolumes.length > 0}
               <Button size="sm" color="blue" onclick={downloadAllPlaceholders}>
-                <DownloadSolid class="w-3 h-3 me-1" />
+                <DownloadSolid class="me-1 h-3 w-3" />
                 Download all
               </Button>
             {/if}
           </div>
-          <div class="flex sm:flex-row flex-col gap-5 flex-wrap justify-center sm:justify-start">
+          <div class="flex flex-col flex-wrap justify-center gap-5 sm:flex-row sm:justify-start">
             {#if $miscSettings.galleryLayout === 'grid'}
               {#each placeholderSeries as { series_uuid } (series_uuid)}
                 <CatalogItem {series_uuid} />
@@ -244,7 +244,7 @@
     {/if}
   </div>
 {:else}
-  <div class="text-center p-20">
+  <div class="p-20 text-center">
     {#if $isUpgrading}
       <p>Upgrading and optimizing manga catalog... Please wait.</p>
     {:else}

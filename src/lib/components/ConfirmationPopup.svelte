@@ -64,12 +64,12 @@
 
 <Modal bind:open size="xs" autoclose outsideclose>
   <div class="text-center">
-    <ExclamationCircleOutline class="mx-auto mb-4 text-gray-400 w-12 h-12 dark:text-gray-200" />
+    <ExclamationCircleOutline class="mx-auto mb-4 h-12 w-12 text-gray-400 dark:text-gray-200" />
     <h3 class="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
       {$confirmationPopupStore?.message}
     </h3>
     {#if $confirmationPopupStore?.checkboxOption}
-      <div class="flex items-center justify-center mb-4">
+      <div class="mb-4 flex items-center justify-center">
         <Checkbox bind:checked={checkboxValue} id="confirmation-checkbox" />
         <label
           for="confirmation-checkbox"
@@ -80,7 +80,7 @@
       </div>
     {/if}
     {#if $confirmationPopupStore?.checkboxOption2}
-      <div class="flex items-center justify-center mb-4">
+      <div class="mb-4 flex items-center justify-center">
         <Checkbox bind:checked={checkboxValue2} id="confirmation-checkbox-2" />
         <label
           for="confirmation-checkbox-2"

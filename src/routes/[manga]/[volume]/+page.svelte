@@ -84,7 +84,7 @@
     <Reader volumeSettings={cachedVolumeSettings} />
   {/key}
 {:else}
-  <div class="flex items-center justify-center w-screen h-screen">
+  <div class="flex h-screen w-screen items-center justify-center">
     <Spinner size="12" />
   </div>
 {/if}

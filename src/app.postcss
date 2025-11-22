@@ -4,8 +4,8 @@
 @plugin 'flowbite/plugin';
 
 /* Flowbite component sources - point to /dist directories */
-@source "../node_modules/flowbite-svelte/dist";
-@source "../node_modules/flowbite-svelte-icons/dist";
+@source '../node_modules/flowbite-svelte/dist';
+@source '../node_modules/flowbite-svelte-icons/dist';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -32,14 +32,14 @@
 
   /* Custom styles for Range component */
   input[type='range'] {
-    @apply appearance-none bg-gray-200 rounded-lg cursor-pointer dark:bg-gray-700;
+    @apply cursor-pointer appearance-none rounded-lg bg-gray-200 dark:bg-gray-700;
   }
 
   input[type='range']::-webkit-slider-thumb {
-    @apply appearance-auto bg-blue-600 h-4 w-4 rounded-full;
+    @apply h-4 w-4 appearance-auto rounded-full bg-blue-600;
   }
 
   input[type='range']::-moz-range-thumb {
-    @apply bg-blue-600 h-4 w-4 rounded-full border-0;
+    @apply h-4 w-4 rounded-full border-0 bg-blue-600;
   }
 }

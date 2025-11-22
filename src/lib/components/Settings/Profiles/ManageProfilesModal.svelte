@@ -114,7 +114,7 @@
     {#snippet children(itemData)}
       {@const item = String(itemData)}
       <ListgroupItem class="flex flex-row justify-between gap-6">
-        <div class="flex-1 flex items-center gap-2">
+        <div class="flex flex-1 items-center gap-2">
           {#if profileToEdit === item}
             <form onsubmit={preventDefault(onEdit)}>
               <Input size="sm" bind:value={newName} autofocus onclick={onInputClick}>
@@ -126,11 +126,11 @@
           {:else}
             <p class="line-clamp-1">{item}</p>
             {#if isBuiltIn(item)}
-              <span class="text-xs px-2 py-0.5 bg-blue-500 text-white rounded-full">Built-in</span>
+              <span class="rounded-full bg-blue-500 px-2 py-0.5 text-xs text-white">Built-in</span>
             {/if}
           {/if}
         </div>
-        <div class="flex flex-row gap-2 items-center">
+        <div class="flex flex-row items-center gap-2">
           <FileCopySolid size="sm" class="hover:text-primary-700" onclick={() => onCopy(item)} />
           {#if !isBuiltIn(item)}
             <UserEditSolid

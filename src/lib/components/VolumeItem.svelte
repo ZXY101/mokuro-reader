@@ -269,7 +269,7 @@
 {#if $page.params.manga}
   {#if variant === 'list'}
     <div
-      class="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-600"
+      class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-600 dark:border-gray-700"
     >
       <ListgroupItem onclick={() => goto(`/${$page.params.manga}/${volume_uuid}`)} class="py-4">
         {#if volume.thumbnail}
@@ -277,41 +277,41 @@
             src={URL.createObjectURL(volume.thumbnail)}
             alt="img"
             style="margin-right:10px;"
-            class="object-contain w-[50px] h-[70px] bg-black border-gray-900 border"
+            class="h-[70px] w-[50px] border border-gray-900 bg-black object-contain"
           />
         {/if}
         <div
           class:text-green-400={isComplete}
-          class="flex flex-row gap-5 items-center justify-between w-full"
+          class="flex w-full flex-row items-center justify-between gap-5"
         >
           <div>
-            <div class="flex items-center gap-2 mb-1">
+            <div class="mb-1 flex items-center gap-2">
               <p class="font-semibold" class:text-white={!isComplete}>{volName}</p>
               {#if isImageOnly}
                 <Badge color="blue" class="text-xs">
-                  <ImageOutline class="w-3 h-3 me-1 inline" />
+                  <ImageOutline class="me-1 inline h-3 w-3" />
                   Image Only
                 </Badge>
               {/if}
             </div>
-            <div class="flex flex-wrap gap-x-3 items-center">
+            <div class="flex flex-wrap items-center gap-x-3">
               <p>{progressDisplay}</p>
               {#if statsDisplay}
                 <p class="text-sm opacity-80">{statsDisplay}</p>
               {/if}
             </div>
           </div>
-          <div class="flex gap-2 items-center">
+          <div class="flex items-center gap-2">
             <BackupButton {volume} class="mr-2" />
             <button
               onclick={onViewTextClicked}
               class="flex items-center justify-center"
               title="View text only"
             >
-              <FileLinesOutline class="text-blue-400 hover:text-blue-500 z-10" />
+              <FileLinesOutline class="z-10 text-blue-400 hover:text-blue-500" />
             </button>
             <button onclick={onDeleteClicked} class="flex items-center justify-center">
-              <TrashBinSolid class="text-red-400 hover:text-red-500 z-10 poin" />
+              <TrashBinSolid class="poin z-10 text-red-400 hover:text-red-500" />
             </button>
             {#if isComplete}
               <CheckCircleSolid />
@@ -323,53 +323,53 @@
   {:else}
     <!-- Grid view -->
     <div
-      class="relative flex flex-col gap-2 p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors border-2 border-transparent sm:w-[278px]"
+      class="relative flex flex-col gap-2 rounded-lg border-2 border-transparent p-3 transition-colors hover:bg-gray-100 sm:w-[278px] dark:hover:bg-gray-800"
       class:!border-green-400={isComplete}
     >
       <!-- Actions menu button -->
       <button
         id="volume-menu-{volume_uuid}"
-        class="absolute bottom-2 right-2 p-1 rounded-full bg-gray-800/80 hover:bg-gray-700/80 z-10"
+        class="absolute right-2 bottom-2 z-10 rounded-full bg-gray-800/80 p-1 hover:bg-gray-700/80"
         onclick={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
       >
-        <DotsVerticalOutline class="w-4 h-4 text-white" />
+        <DotsVerticalOutline class="h-4 w-4 text-white" />
       </button>
       <Dropdown triggeredBy="#volume-menu-{volume_uuid}" placement="bottom-end">
         <DropdownItem onclick={onViewTextClicked}>
-          <FileLinesOutline class="w-4 h-4 me-2 inline" />
+          <FileLinesOutline class="me-2 inline h-4 w-4" />
           View text
         </DropdownItem>
         {#if hasAuthenticatedProvider}
           <DropdownItem onclick={onBackupClicked}>
             {#if isBackedUp}
-              <TrashBinSolid class="w-4 h-4 me-2 inline text-red-500" />
+              <TrashBinSolid class="me-2 inline h-4 w-4 text-red-500" />
               <span class="text-red-500">Delete from cloud</span>
             {:else}
-              <CloudArrowUpOutline class="w-4 h-4 me-2 inline" />
+              <CloudArrowUpOutline class="me-2 inline h-4 w-4" />
               Backup to cloud
             {/if}
           </DropdownItem>
         {/if}
         <DropdownItem onclick={onDeleteClicked} class="text-red-500">
-          <TrashBinSolid class="w-4 h-4 me-2 inline" />
+          <TrashBinSolid class="me-2 inline h-4 w-4" />
           Delete
         </DropdownItem>
       </Dropdown>
 
       <a href="/{$page.params.manga}/{volume_uuid}" class="flex flex-col gap-2">
-        <div class="sm:w-[250px] sm:h-[350px] flex items-center justify-center">
+        <div class="flex items-center justify-center sm:h-[350px] sm:w-[250px]">
           {#if volume.thumbnail}
             <img
               src={URL.createObjectURL(volume.thumbnail)}
               alt={volName}
-              class="sm:max-w-[250px] sm:max-h-[350px] h-auto w-auto bg-black border-gray-900 border"
+              class="h-auto w-auto border border-gray-900 bg-black sm:max-h-[350px] sm:max-w-[250px]"
             />
           {:else}
             <div
-              class="w-full h-full bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-700 flex items-center justify-center"
+              class="flex h-full w-full items-center justify-center border border-gray-300 bg-gray-200 dark:border-gray-700 dark:bg-gray-700"
             >
               <span class="text-gray-400">No thumbnail</span>
             </div>
@@ -377,22 +377,22 @@
         </div>
         <div class="flex flex-col gap-1 sm:w-[250px]">
           <div class="flex items-center gap-1">
-            <div class="text-sm font-medium truncate flex-1" class:text-green-400={isComplete}>
+            <div class="flex-1 truncate text-sm font-medium" class:text-green-400={isComplete}>
               {volName}
             </div>
             {#if isComplete}
-              <CheckCircleSolid class="w-5 h-5 text-green-400 flex-shrink-0" />
+              <CheckCircleSolid class="h-5 w-5 flex-shrink-0 text-green-400" />
             {/if}
           </div>
           {#if isImageOnly}
-            <Badge color="blue" class="text-xs w-fit">
-              <ImageOutline class="w-3 h-3 me-1 inline" />
+            <Badge color="blue" class="w-fit text-xs">
+              <ImageOutline class="me-1 inline h-3 w-3" />
               Image Only
             </Badge>
           {/if}
         </div>
         <div
-          class="flex flex-wrap gap-x-2 items-center text-xs sm:w-[250px]"
+          class="flex flex-wrap items-center gap-x-2 text-xs sm:w-[250px]"
           class:text-green-400={isComplete}
           class:text-gray-500={!isComplete}
           class:dark:text-gray-400={!isComplete}

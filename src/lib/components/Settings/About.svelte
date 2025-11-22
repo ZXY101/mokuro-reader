@@ -30,7 +30,7 @@
         > which can be installed via:
       </p>
       <div role="none" onclick={toClipboard}>
-        <code class="text-primary-600 bg-slate-900"
+        <code class="bg-slate-900 text-primary-600"
           >pip3 install git+https://github.com/kha-white/mokuro.git@web-reader</code
         >
       </div>

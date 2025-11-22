@@ -20,21 +20,21 @@
   <div class="flex flex-col gap-4">
     <!-- Header -->
     <div class="text-center">
-      <InfoCircleSolid class="mx-auto mb-4 text-blue-500 w-12 h-12" />
+      <InfoCircleSolid class="mx-auto mb-4 h-12 w-12 text-blue-500" />
       <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Image-Only Import</h3>
     </div>
 
     <!-- Description -->
-    <p class="text-sm text-gray-600 dark:text-gray-400 text-center">
+    <p class="text-center text-sm text-gray-600 dark:text-gray-400">
       Found {$imageOnlyImportModalStore?.totalVolumes ?? 0} volume(s) in {$imageOnlyImportModalStore
         ?.seriesList?.length ?? 0} series without .mokuro files. These will be imported as image-only
       volumes (no OCR text).
     </p>
 
     <!-- Series List -->
-    <div class="border rounded-lg dark:border-gray-600 max-h-64 overflow-y-auto">
+    <div class="max-h-64 overflow-y-auto rounded-lg border dark:border-gray-600">
       <table class="w-full text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-700 sticky top-0">
+        <thead class="sticky top-0 bg-gray-50 dark:bg-gray-700">
           <tr>
             <th class="px-4 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Series</th>
             <th class="px-4 py-2 text-right font-medium text-gray-700 dark:text-gray-300"

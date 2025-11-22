@@ -50,7 +50,7 @@
 <div class="mt-4">
   <Label class="mb-2">
     Inactivity timeout: {$settings.inactivityTimeoutMinutes} minutes
-    <span class="text-xs text-gray-500 ml-2">(Auto-stop timer and sync after inactivity)</span>
+    <span class="ml-2 text-xs text-gray-500">(Auto-stop timer and sync after inactivity)</span>
   </Label>
   <Range
     min="1"

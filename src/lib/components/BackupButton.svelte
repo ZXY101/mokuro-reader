@@ -149,7 +149,7 @@
     onclick={handleDelete}
     title={`Delete from ${providerDisplayName}`}
   >
-    <TrashBinSolid class="w-4 h-4 me-2" />
+    <TrashBinSolid class="me-2 h-4 w-4" />
     Delete from {providerDisplayName}
   </Button>
 {:else if isQueued}
@@ -170,7 +170,7 @@
     onclick={handleBackup}
     title={`Backup to ${providerDisplayName}`}
   >
-    <CloudArrowUpOutline class="w-4 h-4 me-2" />
+    <CloudArrowUpOutline class="me-2 h-4 w-4" />
     Backup to {providerDisplayName}
   </Button>
 {/if}
