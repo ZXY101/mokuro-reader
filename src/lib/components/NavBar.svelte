@@ -129,7 +129,7 @@
 </script>
 
 <div class="relative z-10">
-  <Navbar hidden={isReader}>
+  <Navbar hidden={isReader} class="bg-white dark:bg-gray-800">
     <NavBrand href="/">
       <div class="flex flex-row items-center gap-2">
         <img src={Icon} alt="icon" class="h-[32px] w-[32px]" />
