@@ -3,9 +3,10 @@
 
 @plugin 'flowbite/plugin';
 
-/* Flowbite component sources - point to /dist directories */
-@source '../node_modules/flowbite-svelte/dist';
-@source '../node_modules/flowbite-svelte-icons/dist';
+/* Flowbite component sources - override .gitignore exclusion */
+@source not '../node_modules';
+@source '../node_modules/flowbite-svelte';
+@source '../node_modules/flowbite-svelte-icons';
 
 @custom-variant dark (&:where(.dark, .dark *));
 
