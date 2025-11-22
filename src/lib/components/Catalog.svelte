@@ -160,7 +160,7 @@
       <Button
         size="sm"
         color="alternative"
-        on:click={onLayout}
+        onclick={onLayout}
         class="min-w-10 h-10 flex items-center justify-center"
       >
         {#if $miscSettings.galleryLayout === 'list'}
@@ -172,7 +172,7 @@
       <Button
         size="sm"
         color="alternative"
-        on:click={onOrder}
+        onclick={onOrder}
         class="min-w-10 h-10 flex items-center justify-center"
       >
         <SortOutline class="w-5 h-5" />
@@ -220,7 +220,7 @@
               {/if}
             </div>
             {#if hasAuthenticatedProvider && allPlaceholderVolumes.length > 0}
-              <Button size="sm" color="blue" on:click={downloadAllPlaceholders}>
+              <Button size="sm" color="blue" onclick={downloadAllPlaceholders}>
                 <DownloadSolid class="w-3 h-3 me-1" />
                 Download all
               </Button>

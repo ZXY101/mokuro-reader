@@ -146,7 +146,7 @@
     color="red"
     size="xs"
     class={className}
-    on:click={handleDelete}
+    onclick={handleDelete}
     title={`Delete from ${providerDisplayName}`}
   >
     <TrashBinSolid class="w-4 h-4 me-2" />
@@ -167,7 +167,7 @@
     color="light"
     size="xs"
     class={className}
-    on:click={handleBackup}
+    onclick={handleBackup}
     title={`Backup to ${providerDisplayName}`}
   >
     <CloudArrowUpOutline class="w-4 h-4 me-2" />

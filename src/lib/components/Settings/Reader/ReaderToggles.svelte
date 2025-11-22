@@ -39,7 +39,7 @@
 </script>
 
 {#each toggles as { key, text, value, shortcut }}
-  <Toggle size="small" checked={value} on:change={() => updateSetting(key, !value)}>
+  <Toggle size="small" checked={value} onchange={() => updateSetting(key, !value)}>
     {text}
     {#if shortcut}
       <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">({shortcut})</span>
@@ -56,7 +56,7 @@
     min="1"
     max="30"
     value={$settings.inactivityTimeoutMinutes}
-    on:change={(e) =>
+    onchange={(e) =>
       updateSetting('inactivityTimeoutMinutes', Number((e.target as HTMLInputElement).value))}
   />
 </div>

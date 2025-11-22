@@ -143,15 +143,15 @@
       <div class="mb-8">
         <!-- Navigation Buttons -->
         <div class="flex flex-wrap gap-2 mb-4">
-          <Button size="sm" color="alternative" on:click={goBackToReader}>
+          <Button size="sm" color="alternative" onclick={goBackToReader}>
             <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
             Back to Reader
           </Button>
-          <Button size="sm" color="alternative" on:click={goBackToSeries}>
+          <Button size="sm" color="alternative" onclick={goBackToSeries}>
             <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
             Back to Series
           </Button>
-          <Button size="sm" color="primary" on:click={copyText}>
+          <Button size="sm" color="primary" onclick={copyText}>
             {#if copySuccess}
               <CheckOutline class="w-3.5 h-3.5 mr-2" />
               Copied!
@@ -268,7 +268,7 @@
   <div class="flex items-center justify-center w-screen h-screen">
     <div class="text-center">
       <p class="text-gray-600 dark:text-gray-400">No text data available for this volume.</p>
-      <Button class="mt-4" color="alternative" on:click={goBackToSeries}>
+      <Button class="mt-4" color="alternative" onclick={goBackToSeries}>
         <ArrowLeftOutline class="w-3.5 h-3.5 mr-2" />
         Back to Series
       </Button>

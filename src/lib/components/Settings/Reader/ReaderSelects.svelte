@@ -57,7 +57,7 @@
   <Select
     items={zoomModes}
     value={zoomModeValue}
-    on:change={(e) => onSelectChange(e, 'zoomDefault')}
+    onchange={(e) => onSelectChange(e, 'zoomDefault')}
   />
 </div>
 <div>
@@ -65,18 +65,14 @@
   <Select
     items={pageTransitions}
     value={pageTransitionValue}
-    on:change={(e) => onSelectChange(e, 'pageTransition')}
+    onchange={(e) => onSelectChange(e, 'pageTransition')}
   />
 </div>
 <div>
   <Label>Fontsize:</Label>
-  <Select
-    items={fontSizes}
-    value={fontSizeValue}
-    on:change={(e) => onSelectChange(e, 'fontSize')}
-  />
+  <Select items={fontSizes} value={fontSizeValue} onchange={(e) => onSelectChange(e, 'fontSize')} />
 </div>
 <div>
   <Label>Background color:</Label>
-  <Input type="color" on:change={onBackgroundColor} value={$settings.backgroundColor} />
+  <Input type="color" onchange={onBackgroundColor} value={$settings.backgroundColor} />
 </div>

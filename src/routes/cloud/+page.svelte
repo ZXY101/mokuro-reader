@@ -682,7 +682,7 @@
                 <Badge color="green">Connected</Badge>
               {/if}
             </div>
-            <Button color="red" on:click={handleLogout}>Log out</Button>
+            <Button color="red" onclick={handleLogout}>Log out</Button>
           </div>
 
           <div class="flex flex-col gap-4">
@@ -704,7 +704,7 @@
 
             <!-- Download Manga button (Google Drive only) -->
             {#if currentProvider === 'google-drive'}
-              <Button color="blue" on:click={createPicker}>Download Manga</Button>
+              <Button color="blue" onclick={createPicker}>Download Manga</Button>
             {/if}
 
             <!-- Turbo Mode toggle with RAM configuration -->
@@ -712,7 +712,7 @@
               <div class="flex items-center gap-3">
                 <Toggle
                   bind:checked={$miscSettings.turboMode}
-                  on:change={() => updateMiscSetting('turboMode', $miscSettings.turboMode)}
+                  onchange={() => updateMiscSetting('turboMode', $miscSettings.turboMode)}
                 >
                   Turbo Mode
                 </Toggle>
@@ -730,25 +730,25 @@
                       name="ram-config-{currentProvider}"
                       value={4}
                       bind:group={$miscSettings.deviceRamGB}
-                      on:change={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio
+                      onchange={() => updateMiscSetting('deviceRamGB', 4)}>4GB</Radio
                     >
                     <Radio
                       name="ram-config-{currentProvider}"
                       value={8}
                       bind:group={$miscSettings.deviceRamGB}
-                      on:change={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio
+                      onchange={() => updateMiscSetting('deviceRamGB', 8)}>8GB</Radio
                     >
                     <Radio
                       name="ram-config-{currentProvider}"
                       value={16}
                       bind:group={$miscSettings.deviceRamGB}
-                      on:change={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio
+                      onchange={() => updateMiscSetting('deviceRamGB', 16)}>16GB</Radio
                     >
                     <Radio
                       name="ram-config-{currentProvider}"
                       value={32}
                       bind:group={$miscSettings.deviceRamGB}
-                      on:change={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio
+                      onchange={() => updateMiscSetting('deviceRamGB', 32)}>32GB+</Radio
                     >
                   </div>
                   <p class="text-xs text-gray-500">
@@ -765,7 +765,7 @@
                 <div class="flex items-center gap-3">
                   <Toggle
                     bind:checked={$miscSettings.gdriveAutoReAuth}
-                    on:change={() =>
+                    onchange={() =>
                       updateMiscSetting('gdriveAutoReAuth', $miscSettings.gdriveAutoReAuth)}
                   >
                     Auto re-authenticate on token expiration
@@ -820,7 +820,7 @@
                     <Button
                       size="xs"
                       color="yellow"
-                      on:click={() => {
+                      onclick={() => {
                         showSnackbar(
                           'Testing in 5 seconds... Do NOT click or interact until the popup appears!'
                         );
@@ -850,7 +850,7 @@
             <!-- Sync read progress button -->
             <Button
               color="dark"
-              on:click={currentProvider === 'google-drive' ? performSync : handleProviderSync}
+              onclick={currentProvider === 'google-drive' ? performSync : handleProviderSync}
             >
               Sync read progress
             </Button>
@@ -858,14 +858,14 @@
             <!-- Backup all series button -->
             <Button
               color="purple"
-              on:click={() =>
+              onclick={() =>
                 promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
             >
               Backup all series to cloud
             </Button>
 
             <!-- Profile sync button -->
-            <Button color="blue" on:click={syncProfiles} disabled={isSyncingProfiles}>
+            <Button color="blue" onclick={syncProfiles} disabled={isSyncingProfiles}>
               {#if isSyncingProfiles}
                 <Spinner size="4" class="mr-2" />
                 Syncing profiles...

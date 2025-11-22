@@ -699,103 +699,103 @@
     return num.toString();
   }
 
-  function getBadgeColor(badge: string): 'dark' | 'yellow' | 'blue' | 'green' {
+  function getBadgeColor(badge: string): 'gray' | 'yellow' | 'blue' | 'green' {
     // 10-tier system: Grey -> Bronze -> Silver -> Gold -> Platinum -> Prestige Bronze -> Prestige Silver -> Prestige Gold -> Prestige Platinum -> Prismatic
     switch (badge) {
       // Speed-based badges (10 levels)
       case 'Beginner':
-        return 'dark'; // Tier 1: Grey
+        return 'gray'; // Tier 1: Grey
       case '¹⁄₁₆ Native':
-        return 'dark'; // Tier 2: Bronze
+        return 'gray'; // Tier 2: Bronze
       case '⅛ Native':
-        return 'dark'; // Tier 3: Silver
+        return 'gray'; // Tier 3: Silver
       case '¼ Native':
-        return 'dark'; // Tier 4: Gold
+        return 'gray'; // Tier 4: Gold
       case '⅜ Native':
         return 'blue'; // Tier 5: Platinum
       case '½ Native':
-        return 'dark'; // Tier 6: Prestige Bronze
+        return 'gray'; // Tier 6: Prestige Bronze
       case '⅝ Native':
-        return 'dark'; // Tier 7: Prestige Silver
+        return 'gray'; // Tier 7: Prestige Silver
       case '¾ Native':
-        return 'dark'; // Tier 8: Prestige Gold
+        return 'gray'; // Tier 8: Prestige Gold
       case '⅞ Native':
         return 'blue'; // Tier 9: Prestige Platinum
       case 'Native':
-        return 'dark'; // Tier 10: Prismatic
+        return 'gray'; // Tier 10: Prismatic
 
       // Volume count badges (10 levels)
       case 'First Volume':
-        return 'dark'; // Tier 1: Grey
+        return 'gray'; // Tier 1: Grey
       case 'First Steps':
-        return 'dark'; // Tier 2: Bronze
+        return 'gray'; // Tier 2: Bronze
       case 'Getting Started':
-        return 'dark'; // Tier 3: Silver
+        return 'gray'; // Tier 3: Silver
       case 'Consistent Reader':
-        return 'dark'; // Tier 4: Gold
+        return 'gray'; // Tier 4: Gold
       case 'Dedicated Reader':
         return 'blue'; // Tier 5: Platinum
       case 'Veteran Reader':
-        return 'dark'; // Tier 6: Prestige Bronze
+        return 'gray'; // Tier 6: Prestige Bronze
       case 'Century Club':
-        return 'dark'; // Tier 7: Prestige Silver
+        return 'gray'; // Tier 7: Prestige Silver
       case 'Master Reader':
-        return 'dark'; // Tier 8: Prestige Gold
+        return 'gray'; // Tier 8: Prestige Gold
       case 'Bookworm':
         return 'blue'; // Tier 9: Prestige Platinum
       case 'Librarian':
-        return 'dark'; // Tier 10: Prismatic
+        return 'gray'; // Tier 10: Prismatic
 
       // Character count badges (10 levels)
       case '10K Characters':
-        return 'dark'; // Tier 1: Grey
+        return 'gray'; // Tier 1: Grey
       case '50K Characters':
-        return 'dark'; // Tier 2: Bronze
+        return 'gray'; // Tier 2: Bronze
       case '100K Characters':
-        return 'dark'; // Tier 3: Silver
+        return 'gray'; // Tier 3: Silver
       case 'Quarter Million':
-        return 'dark'; // Tier 4: Gold
+        return 'gray'; // Tier 4: Gold
       case 'Half Million':
         return 'blue'; // Tier 5: Platinum
       case 'Million Club':
-        return 'dark'; // Tier 6: Prestige Bronze
+        return 'gray'; // Tier 6: Prestige Bronze
       case '2.5 Million Club':
-        return 'dark'; // Tier 7: Prestige Silver
+        return 'gray'; // Tier 7: Prestige Silver
       case '5 Million Club':
-        return 'dark'; // Tier 8: Prestige Gold
+        return 'gray'; // Tier 8: Prestige Gold
       case '7.5 Million Club':
         return 'blue'; // Tier 9: Prestige Platinum
       case '10 Million Club':
-        return 'dark'; // Tier 10: Prismatic
+        return 'gray'; // Tier 10: Prismatic
 
       // Time-based badges (10 levels)
       case '1 Hour Reader':
-        return 'dark'; // Tier 1: Grey
+        return 'gray'; // Tier 1: Grey
       case '5 Hour Reader':
-        return 'dark'; // Tier 2: Bronze
+        return 'gray'; // Tier 2: Bronze
       case '10 Hour Reader':
-        return 'dark'; // Tier 3: Silver
+        return 'gray'; // Tier 3: Silver
       case '25 Hour Reader':
-        return 'dark'; // Tier 4: Gold
+        return 'gray'; // Tier 4: Gold
       case '50 Hour Reader':
         return 'blue'; // Tier 5: Platinum
       case '100 Hour Reader':
-        return 'dark'; // Tier 6: Prestige Bronze
+        return 'gray'; // Tier 6: Prestige Bronze
       case '250 Hour Reader':
-        return 'dark'; // Tier 7: Prestige Silver
+        return 'gray'; // Tier 7: Prestige Silver
       case '500 Hour Reader':
-        return 'dark'; // Tier 8: Prestige Gold
+        return 'gray'; // Tier 8: Prestige Gold
       case '750 Hour Reader':
         return 'blue'; // Tier 9: Prestige Platinum
       case '1000 Hour Reader':
-        return 'dark'; // Tier 10: Prismatic
+        return 'gray'; // Tier 10: Prismatic
 
       // Special achievement
       case 'Improving Fast':
         return 'green';
 
       default:
-        return 'dark';
+        return 'gray';
     }
   }
 
@@ -1147,7 +1147,7 @@
         <Button
           size="xs"
           color="alternative"
-          on:click={() => (showAllAchievements = !showAllAchievements)}
+          onclick={() => (showAllAchievements = !showAllAchievements)}
         >
           {showAllAchievements ? 'Show My Achievements' : 'Show All Achievements'}
         </Button>
@@ -1213,7 +1213,7 @@
                 class="cursor-pointer hover:bg-gray-700 {selectedSeriesId === series.seriesId
                   ? 'bg-gray-700/50'
                   : ''} {isSeriesDemo ? 'opacity-50' : ''}"
-                on:click={() => toggleSeriesFilter(series.seriesId)}
+                onclick={() => toggleSeriesFilter(series.seriesId)}
               >
                 <TableBodyCell>
                   <div class="flex items-center gap-2">
@@ -1256,7 +1256,7 @@
                     <Button
                       size="xs"
                       color="red"
-                      on:click={(e) => {
+                      onclick={(e: MouseEvent) => {
                         e.stopPropagation();
                         confirmDeleteOrphaned();
                       }}
@@ -1281,19 +1281,19 @@
       <div class="overflow-x-auto w-full">
         <Table hoverable={true}>
           <TableHead>
-            <TableHeadCell class="cursor-pointer" on:click={() => toggleSort('series')}>
+            <TableHeadCell class="cursor-pointer" onclick={() => toggleSort('series')}>
               Series {sortBy === 'series' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
             </TableHeadCell>
-            <TableHeadCell class="cursor-pointer" on:click={() => toggleSort('volume')}>
+            <TableHeadCell class="cursor-pointer" onclick={() => toggleSort('volume')}>
               Volume {sortBy === 'volume' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
             </TableHeadCell>
-            <TableHeadCell class="cursor-pointer" on:click={() => toggleSort('speed')}>
+            <TableHeadCell class="cursor-pointer" onclick={() => toggleSort('speed')}>
               Speed {sortBy === 'speed' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
             </TableHeadCell>
-            <TableHeadCell class="cursor-pointer" on:click={() => toggleSort('duration')}>
+            <TableHeadCell class="cursor-pointer" onclick={() => toggleSort('duration')}>
               Duration {sortBy === 'duration' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
             </TableHeadCell>
-            <TableHeadCell class="cursor-pointer" on:click={() => toggleSort('dateFinished')}>
+            <TableHeadCell class="cursor-pointer" onclick={() => toggleSort('dateFinished')}>
               Date Finished {sortBy === 'dateFinished' ? (sortDirection === 'asc' ? '↑' : '↓') : ''}
             </TableHeadCell>
             <TableHeadCell>Actions</TableHeadCell>
@@ -1338,7 +1338,7 @@
                 </TableBodyCell>
                 <TableBodyCell>
                   {#if !isVolumeDemo}
-                    <Button size="xs" color="red" on:click={() => confirmDelete(volume)}>
+                    <Button size="xs" color="red" onclick={() => confirmDelete(volume)}>
                       <TrashBinSolid class="w-3 h-3" />
                     </Button>
                   {/if}
@@ -1365,10 +1365,10 @@
       cannot be undone.
     </p>
     <div class="flex justify-center gap-4">
-      <Button color="red" on:click={deleteVolumeData}>Yes, delete</Button>
+      <Button color="red" onclick={deleteVolumeData}>Yes, delete</Button>
       <Button
         color="alternative"
-        on:click={() => {
+        onclick={() => {
           deleteModalOpen = false;
           volumeToDelete = null;
         }}
@@ -1435,12 +1435,12 @@
       Are you sure you want to permanently remove this orphaned data?
     </p>
     <div class="flex justify-center gap-4">
-      <Button color="red" on:click={deleteOrphanedData}>
+      <Button color="red" onclick={deleteOrphanedData}>
         Yes, Remove {orphanedCounts.total} volume{orphanedCounts.total !== 1 ? 's' : ''}
       </Button>
       <Button
         color="alternative"
-        on:click={() => {
+        onclick={() => {
           orphanedDeleteModalOpen = false;
         }}
       >

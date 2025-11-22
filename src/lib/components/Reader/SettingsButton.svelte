@@ -2,10 +2,10 @@
   import Settings from '$lib/components/Settings/Settings.svelte';
   import { UserSettingsSolid } from 'flowbite-svelte-icons';
 
-  let settingsHidden = $state(true);
+  let settingsOpen = $state(false);
 
   function openSettings() {
-    settingsHidden = false;
+    settingsOpen = true;
   }
 </script>
 
@@ -16,4 +16,4 @@
   <UserSettingsSolid />
 </button>
 
-<Settings bind:hidden={settingsHidden} />
+<Settings bind:open={settingsOpen} />

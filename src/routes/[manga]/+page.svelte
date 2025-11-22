@@ -563,15 +563,15 @@
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
       <h3 class="text-2xl font-bold px-2 min-w-0 flex-shrink-2">{manga[0].series_title}</h3>
       <div class="flex flex-row gap-2 px-2 text-base">
-        <Badge color="dark" class="!min-w-0 break-words"
+        <Badge color="gray" class="!min-w-0 break-words"
           >Volumes: {mangaStats.completed} / {manga.length}</Badge
         >
-        <Badge color="dark" class="!min-w-0 break-words">Characters: {mangaStats.chars}</Badge>
-        <Badge color="dark" class="!min-w-0 break-words"
+        <Badge color="gray" class="!min-w-0 break-words">Characters: {mangaStats.chars}</Badge>
+        <Badge color="gray" class="!min-w-0 break-words"
           >Time Read: {formatTime(mangaStats.timeReadInMinutes)}</Badge
         >
         {#if estimatedMinutesLeft !== null}
-          <Badge color="dark" class="!min-w-0 break-words"
+          <Badge color="gray" class="!min-w-0 break-words"
             >Time Left: ~{formatTime(estimatedMinutesLeft)}</Badge
           >
         {/if}
@@ -582,7 +582,7 @@
     <div class="flex flex-row gap-2 items-stretch justify-end">
       <!-- Cloud buttons -->
       {#if isCloudReady && !allBackedUp}
-        <Button color="light" on:click={backupSeries} class="!min-w-0 self-stretch">
+        <Button color="light" onclick={backupSeries} class="!min-w-0 self-stretch">
           <CloudArrowUpOutline class="w-4 h-4 me-2 shrink-0" />
           <span class="break-words"
             >{anyBackedUp ? 'Backup remaining' : `Backup to ${providerDisplayName}`}</span
@@ -591,30 +591,30 @@
       {/if}
 
       {#if isCloudReady && anyBackedUp}
-        <Button color="red" on:click={onDeleteFromCloud} class="!min-w-0 self-stretch">
+        <Button color="red" onclick={onDeleteFromCloud} class="!min-w-0 self-stretch">
           <TrashBinSolid class="w-4 h-4 me-2 shrink-0" />
           <span class="break-words">Delete from {providerDisplayName}</span>
         </Button>
       {/if}
 
       <!-- Other action buttons -->
-      <Button color="light" on:click={onExtract} disabled={loading} class="!min-w-0 self-stretch">
+      <Button color="light" onclick={onExtract} disabled={loading} class="!min-w-0 self-stretch">
         <DownloadSolid class="w-4 h-4 me-2 shrink-0" />
         <span class="break-words">{loading ? 'Extracting...' : 'Extract'}</span>
       </Button>
 
-      <Button color="alternative" on:click={onDelete} class="!min-w-0 self-stretch">
+      <Button color="alternative" onclick={onDelete} class="!min-w-0 self-stretch">
         <TrashBinSolid class="w-4 h-4 me-2 shrink-0" />
         <span class="break-words">Remove manga</span>
       </Button>
 
       <!-- View buttons -->
-      <Button color="alternative" on:click={goToSeriesText} class="!min-w-0 self-stretch">
+      <Button color="alternative" onclick={goToSeriesText} class="!min-w-0 self-stretch">
         <FileLinesOutline class="w-4 h-4 me-2 shrink-0" />
         <span class="break-words">View Series Text</span>
       </Button>
 
-      <Button color="alternative" on:click={toggleSortMode} class="!min-w-0 self-stretch">
+      <Button color="alternative" onclick={toggleSortMode} class="!min-w-0 self-stretch">
         <SortOutline class="w-5 h-5 me-2 shrink-0" />
         <span class="break-words">
           {#if sortMode === 'unread-first'}
@@ -625,7 +625,7 @@
         </span>
       </Button>
 
-      <Button color="alternative" on:click={toggleViewMode} class="!min-w-0 self-stretch">
+      <Button color="alternative" onclick={toggleViewMode} class="!min-w-0 self-stretch">
         {#if viewMode === 'list'}
           <GridOutline class="w-5 h-5 me-2 shrink-0" />
           <span class="break-words">Grid</span>
@@ -645,7 +645,7 @@
             <h4 class="text-sm font-semibold text-red-600 dark:text-red-400">
               Duplicates found in {providerDisplayName} ({duplicateCloudFiles.length})
             </h4>
-            <Button size="xs" color="red" on:click={cleanCloudDuplicates}>
+            <Button size="xs" color="red" onclick={cleanCloudDuplicates}>
               <TrashBinSolid class="w-3 h-3 me-1" />
               Clean Duplicates
             </Button>
@@ -662,7 +662,7 @@
               Available in {providerDisplayName} ({placeholders.length})
             </h4>
             {#if hasAnyProvider}
-              <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
+              <Button size="xs" color="blue" onclick={downloadAllPlaceholders}>
                 <DownloadSolid class="w-3 h-3 me-1" />
                 Download all
               </Button>
@@ -687,7 +687,7 @@
             <h4 class="text-sm font-semibold text-gray-400">
               Available in {providerDisplayName} ({placeholders.length})
             </h4>
-            <Button size="xs" color="blue" on:click={downloadAllPlaceholders}>
+            <Button size="xs" color="blue" onclick={downloadAllPlaceholders}>
               <DownloadSolid class="w-3 h-3 me-1" />
               Download all
             </Button>

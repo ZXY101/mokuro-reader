@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { VolumeMetadata } from '$lib/types';
-  import { Frame, ListgroupItem, Button, Spinner, Badge } from 'flowbite-svelte';
+  import { ListgroupItem, Button, Spinner, Badge } from 'flowbite-svelte';
   import { DownloadSolid, TrashBinSolid } from 'flowbite-svelte-icons';
   import { downloadQueue } from '$lib/util/download-queue';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
@@ -53,13 +53,12 @@
     | 'blue'
     | 'purple'
     | 'green'
-    | 'dark'
+    | 'gray'
     | 'red'
     | 'yellow'
     | 'primary'
     | 'pink'
-    | 'indigo'
-    | 'none';
+    | 'indigo';
 
   function getProviderBadgeColor(provider: ProviderType): BadgeColor {
     switch (provider) {
@@ -70,12 +69,12 @@
       case 'webdav':
         return 'green';
       default:
-        return 'dark';
+        return 'gray';
     }
   }
 
   const providerName = cloudProvider ? getProviderDisplayName(cloudProvider) : 'Cloud';
-  const badgeColor = cloudProvider ? getProviderBadgeColor(cloudProvider) : 'dark';
+  const badgeColor = cloudProvider ? getProviderBadgeColor(cloudProvider) : 'gray';
 
   // Track queue state
   let queueState = $state($downloadQueue);
@@ -141,8 +140,10 @@
 </script>
 
 {#if variant === 'list'}
-  <Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
-    <ListgroupItem normalClass="py-4 opacity-70">
+  <div
+    class="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-600"
+  >
+    <ListgroupItem class="py-4 opacity-70">
       <DownloadSolid class="w-[50px] h-[70px] text-blue-400 mr-3" />
       <div class="flex flex-row gap-5 items-center justify-between w-full">
         <div>
@@ -171,7 +172,7 @@
         </div>
       </div>
     </ListgroupItem>
-  </Frame>
+  </div>
 {:else}
   <!-- Grid view -->
   <button

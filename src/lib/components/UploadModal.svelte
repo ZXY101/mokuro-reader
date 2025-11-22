@@ -108,14 +108,14 @@
   let activeStyle = $state(defaultStyle);
 </script>
 
-<Modal title="Upload" bind:open outsideclose on:close={reset}>
+<Modal title="Upload" bind:open outsideclose onclose={reset}>
   {#await promise}
     <h2 class="justify-center flex">Loading...</h2>
     <div class="text-center"><Spinner /></div>
   {:then}
     <Accordion flush>
       <AccordionItem>
-        <span slot="header">What to upload?</span>
+        {#snippet header()}What to upload?{/snippet}
         <div class="flex flex-col gap-5">
           <div>
             <p>
@@ -148,19 +148,19 @@
     </Accordion>
     <Dropzone
       id="dropzone"
-      on:drop={dropHandle}
-      on:dragover={(event) => {
+      ondrop={dropHandle}
+      ondragover={(event) => {
         event.preventDefault();
         activeStyle = highlightStyle;
       }}
-      on:dragleave={(event) => {
+      ondragleave={(event) => {
         event.preventDefault();
         activeStyle = defaultStyle;
       }}
-      on:click={(event) => {
+      onclick={(event) => {
         event.preventDefault();
       }}
-      defaultClass={activeStyle}
+      class={activeStyle}
     >
       <svg
         aria-hidden="true"
@@ -242,8 +242,8 @@
     </Dropzone>
     <p class=" text-sm text-gray-500 dark:text-gray-400 text-center">{storageSpace}</p>
     <div class="flex flex-1 flex-col gap-2">
-      <Button outline on:click={reset} {disabled} color="dark">Reset</Button>
-      <Button outline on:click={onUpload} {disabled}>Upload</Button>
+      <Button outline onclick={reset} {disabled} color="dark">Reset</Button>
+      <Button outline onclick={onUpload} {disabled}>Upload</Button>
     </div>
   {/await}
 </Modal>

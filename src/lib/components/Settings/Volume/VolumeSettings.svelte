@@ -45,7 +45,7 @@
 </script>
 
 <AccordionItem open>
-  <span slot="header">Volume settings</span>
+  {#snippet header()}Volume settings{/snippet}
   <div class="flex flex-col gap-5">
     <Helper>These settings only apply to this volume</Helper>
     <div>
@@ -58,11 +58,11 @@
         size="sm"
         items={pageViewModes}
         bind:value={settings.singlePageView}
-        on:change={onPageViewModeChange}
+        onchange={onPageViewModeChange}
       />
     </div>
     {#each toggles as { key, text, value, shortcut }}
-      <Toggle size="small" checked={value} on:change={() => onChange(key, value)}>
+      <Toggle size="small" checked={value} onchange={() => onChange(key, value)}>
         {text}
         {#if shortcut}
           <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">({shortcut})</span>

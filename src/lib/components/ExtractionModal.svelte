@@ -87,7 +87,7 @@
         >
         <Toggle
           checked={asCbz}
-          on:change={(e) => updateAsCbz((e.target as HTMLInputElement)?.checked ?? false)}
+          onchange={(e) => updateAsCbz((e.target as HTMLInputElement)?.checked ?? false)}
         />
       </div>
       <div class="flex items-center justify-between">
@@ -96,7 +96,7 @@
         >
         <Toggle
           checked={individualVolumes}
-          on:change={(e) =>
+          onchange={(e) =>
             updateIndividualVolumes((e.target as HTMLInputElement)?.checked ?? false)}
         />
       </div>
@@ -108,7 +108,7 @@
           >
           <Toggle
             checked={includeSeriesTitle}
-            on:change={(e) =>
+            onchange={(e) =>
               updateIncludeSeriesTitle((e.target as HTMLInputElement)?.checked ?? false)}
           />
         </div>
@@ -124,8 +124,8 @@
       </div>
     </div>
     <div class="flex justify-center gap-2">
-      <Button color="blue" on:click={handleExtract}>Extract</Button>
-      <Button color="alternative" on:click={handleCancel}>Cancel</Button>
+      <Button color="blue" onclick={handleExtract}>Extract</Button>
+      <Button color="alternative" onclick={handleCancel}>Cancel</Button>
     </div>
   </div>
 </Modal>

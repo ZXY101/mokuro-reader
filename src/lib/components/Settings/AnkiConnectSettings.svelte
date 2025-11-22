@@ -28,7 +28,7 @@
 </script>
 
 <AccordionItem>
-  <span slot="header">Anki Connect</span>
+  {#snippet header()}Anki Connect{/snippet}
   <div class="flex flex-col gap-5">
     <Helper
       >For anki connect integration to work, you must add the reader (<code class="text-primary-500"
@@ -40,7 +40,7 @@
       any text box.
     </Helper>
     <div>
-      <Toggle bind:checked={enabled} on:change={() => updateAnkiSetting('enabled', enabled)}
+      <Toggle bind:checked={enabled} onchange={() => updateAnkiSetting('enabled', enabled)}
         >AnkiConnect Integration Enabled</Toggle
       >
     </div>
@@ -50,7 +50,7 @@
         {disabled}
         type="text"
         bind:value={pictureField}
-        on:change={() => updateAnkiSetting('pictureField', pictureField)}
+        onchange={() => updateAnkiSetting('pictureField', pictureField)}
       />
     </div>
     <div>
@@ -59,36 +59,35 @@
         {disabled}
         type="text"
         bind:value={sentenceField}
-        on:change={() => updateAnkiSetting('sentenceField', sentenceField)}
+        onchange={() => updateAnkiSetting('sentenceField', sentenceField)}
       />
     </div>
     <div>
       <Toggle
         {disabled}
         bind:checked={cropImage}
-        on:change={() => updateAnkiSetting('cropImage', cropImage)}>Crop image</Toggle
+        onchange={() => updateAnkiSetting('cropImage', cropImage)}>Crop image</Toggle
       >
     </div>
     <div>
       <Toggle
         {disabled}
         bind:checked={overwriteImage}
-        on:change={() => updateAnkiSetting('overwriteImage', overwriteImage)}
-        >Overwrite image</Toggle
+        onchange={() => updateAnkiSetting('overwriteImage', overwriteImage)}>Overwrite image</Toggle
       >
     </div>
     <div>
       <Toggle
         {disabled}
         bind:checked={grabSentence}
-        on:change={() => updateAnkiSetting('grabSentence', grabSentence)}>Grab sentence</Toggle
+        onchange={() => updateAnkiSetting('grabSentence', grabSentence)}>Grab sentence</Toggle
       >
     </div>
     <div>
       <Label>
         Trigger method:
         <Select
-          on:change={() => updateAnkiSetting('triggerMethod', triggerMethod)}
+          onchange={() => updateAnkiSetting('triggerMethod', triggerMethod)}
           items={triggerOptions}
           bind:value={triggerMethod}
         />
@@ -103,7 +102,7 @@
         {disabled}
         type="number"
         bind:value={heightField}
-        on:change={() => {
+        onchange={() => {
           updateAnkiSetting('heightField', heightField);
           if (heightField < 0) heightField = 0;
         }}
@@ -116,7 +115,7 @@
         {disabled}
         type="number"
         bind:value={widthField}
-        on:change={() => {
+        onchange={() => {
           updateAnkiSetting('widthField', widthField);
           if (widthField < 0) widthField = 0;
         }}
@@ -129,7 +128,7 @@
         {disabled}
         type="number"
         bind:value={qualityField}
-        on:change={() => updateAnkiSetting('qualityField', qualityField)}
+        onchange={() => updateAnkiSetting('qualityField', qualityField)}
         min={0}
         max={1}
         step="0.1"

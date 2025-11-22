@@ -56,33 +56,27 @@
 </script>
 
 {#if $settings.quickActions}
-  <SpeedDial
-    tooltip="none"
-    trigger="click"
-    defaultClass="absolute end-3 bottom-3 z-50"
-    color="light"
-    bind:open
-  >
+  <SpeedDial tooltip="none" trigger="click" class="absolute end-3 bottom-3 z-50">
     {#if $settings.ankiConnectSettings.enabled}
-      <SpeedDialButton name={src2 ? '1' : undefined} on:click={() => onUpdateCard(src1)}>
+      <SpeedDialButton name={src2 ? '1' : undefined} onclick={() => onUpdateCard(src1)}>
         <ImageOutline />
       </SpeedDialButton>
     {/if}
     {#if $settings.ankiConnectSettings.enabled && src2}
-      <SpeedDialButton name="2" on:click={() => onUpdateCard(src2)}>
+      <SpeedDialButton name="2" onclick={() => onUpdateCard(src2)}>
         <ImageOutline />
       </SpeedDialButton>
     {/if}
-    <SpeedDialButton on:click={toggleFullScreen}>
+    <SpeedDialButton onclick={toggleFullScreen}>
       <CompressOutline />
     </SpeedDialButton>
-    <SpeedDialButton on:click={handleZoom}>
+    <SpeedDialButton onclick={handleZoom}>
       <ZoomOutOutline />
     </SpeedDialButton>
-    <SpeedDialButton on:click={handleRight}>
+    <SpeedDialButton onclick={handleRight}>
       <ArrowRightOutline />
     </SpeedDialButton>
-    <SpeedDialButton on:click={handleLeft}>
+    <SpeedDialButton onclick={handleLeft}>
       <ArrowLeftOutline />
     </SpeedDialButton>
   </SpeedDial>

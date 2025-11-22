@@ -90,7 +90,7 @@
         </label>
       </div>
     {/if}
-    <Button color="red" class="mr-2" on:click={handleConfirm}>Yes</Button>
-    <Button color="alternative" on:click={handleCancel}>No</Button>
+    <Button color="red" class="mr-2" onclick={handleConfirm}>Yes</Button>
+    <Button color="alternative" onclick={handleCancel}>No</Button>
   </div>
 </Modal>

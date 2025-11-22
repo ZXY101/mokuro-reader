@@ -795,9 +795,9 @@
           type="number"
           size="sm"
           bind:value={manualPage}
-          on:click={onInputClick}
-          on:change={onManualPageChange}
-          on:keydown={(e) => {
+          onclick={onInputClick}
+          onchange={onManualPageChange}
+          onkeydown={(e) => {
             if (e.key === 'Enter') {
               onManualPageChange();
               if (e.currentTarget && 'blur' in e.currentTarget) {
@@ -805,7 +805,7 @@
               }
             }
           }}
-          on:blur={onManualPageChange}
+          onblur={onManualPageChange}
         />
         <button onclick={(e) => right(e, true)}>
           <CaretRightSolid class="hover:text-primary-600" size="sm" />
@@ -815,7 +815,7 @@
         </button>
       </div>
       <div style:direction={volumeSettings.rightToLeft ? 'rtl' : 'ltr'}>
-        <Range min={1} max={pages.length} bind:value={manualPage} on:change={onManualPageChange} />
+        <Range min={1} max={pages.length} bind:value={manualPage} onchange={onManualPageChange} />
       </div>
     </div>
   </Popover>

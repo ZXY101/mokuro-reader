@@ -69,21 +69,21 @@
 <ManageProfilesModal bind:open={manageModalOpen} />
 
 <AccordionItem>
-  <span slot="header">Profile</span>
+  {#snippet header()}Profile{/snippet}
   <div class="flex flex-col gap-5">
     <div class="flex flex-col gap-2">
-      <Select {items} bind:value={profile} on:change={onChange} placeholder="Select profile ..." />
-      <Button size="sm" outline color="dark" on:click={() => (manageModalOpen = true)}
+      <Select {items} bind:value={profile} onchange={onChange} placeholder="Select profile ..." />
+      <Button size="sm" outline color="dark" onclick={() => (manageModalOpen = true)}
         >Manage profiles</Button
       >
     </div>
     <hr class="border-gray-100 opacity-10" />
     <div class="flex flex-col gap-2">
       <input class="border border-slate-700 rounded-lg" type="file" accept=".json" bind:files />
-      <Button on:click={importProfile} disabled={!files} size="sm" outline color="blue"
+      <Button onclick={importProfile} disabled={!files} size="sm" outline color="blue"
         >Import profiles</Button
       >
-      <Button on:click={exportProfiles} size="sm" color="light">Export profiles</Button>
+      <Button onclick={exportProfiles} size="sm" color="light">Export profiles</Button>
     </div>
   </div>
 </AccordionItem>

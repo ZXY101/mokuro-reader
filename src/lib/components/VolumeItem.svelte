@@ -5,7 +5,7 @@
   import type { VolumeMetadata, Page } from '$lib/types';
   import { promptConfirmation, showSnackbar } from '$lib/util';
   import { getCurrentPage, getProgressDisplay, isVolumeComplete } from '$lib/util/volume-helpers';
-  import { Frame, ListgroupItem, Dropdown, DropdownItem, Badge } from 'flowbite-svelte';
+  import { ListgroupItem, Dropdown, DropdownItem, Badge } from 'flowbite-svelte';
   import {
     CheckCircleSolid,
     TrashBinSolid,
@@ -268,11 +268,10 @@
 
 {#if $page.params.manga}
   {#if variant === 'list'}
-    <Frame rounded border class="divide-y divide-gray-200 dark:divide-gray-600">
-      <ListgroupItem
-        on:click={() => goto(`/${$page.params.manga}/${volume_uuid}`)}
-        normalClass="py-4"
-      >
+    <div
+      class="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-600"
+    >
+      <ListgroupItem onclick={() => goto(`/${$page.params.manga}/${volume_uuid}`)} class="py-4">
         {#if volume.thumbnail}
           <img
             src={URL.createObjectURL(volume.thumbnail)}
@@ -320,7 +319,7 @@
           </div>
         </div>
       </ListgroupItem>
-    </Frame>
+    </div>
   {:else}
     <!-- Grid view -->
     <div
@@ -339,12 +338,12 @@
         <DotsVerticalOutline class="w-4 h-4 text-white" />
       </button>
       <Dropdown triggeredBy="#volume-menu-{volume_uuid}" placement="bottom-end">
-        <DropdownItem on:click={onViewTextClicked}>
+        <DropdownItem onclick={onViewTextClicked}>
           <FileLinesOutline class="w-4 h-4 me-2 inline" />
           View text
         </DropdownItem>
         {#if hasAuthenticatedProvider}
-          <DropdownItem on:click={onBackupClicked}>
+          <DropdownItem onclick={onBackupClicked}>
             {#if isBackedUp}
               <TrashBinSolid class="w-4 h-4 me-2 inline text-red-500" />
               <span class="text-red-500">Delete from cloud</span>
@@ -354,7 +353,7 @@
             {/if}
           </DropdownItem>
         {/if}
-        <DropdownItem on:click={onDeleteClicked} class="text-red-500">
+        <DropdownItem onclick={onDeleteClicked} class="text-red-500">
           <TrashBinSolid class="w-4 h-4 me-2 inline" />
           Delete
         </DropdownItem>

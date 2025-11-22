@@ -27,7 +27,7 @@
 </script>
 
 <AccordionItem open>
-  <span slot="header">Volume defaults</span>
+  {#snippet header()}Volume defaults{/snippet}
   <div class="flex flex-col gap-5">
     <Helper>The default settings that are applied when you start a new volume</Helper>
     <div>
@@ -40,11 +40,11 @@
         size="sm"
         items={pageViewModes}
         bind:value={$settings.volumeDefaults.singlePageView}
-        on:change={onPageViewModeChange}
+        onchange={onPageViewModeChange}
       />
     </div>
     {#each toggles as { key, text, value }}
-      <Toggle size="small" checked={value} on:change={() => updateVolumeDefaults(key, !value)}
+      <Toggle size="small" checked={value} onchange={() => updateVolumeDefaults(key, !value)}
         >{text}</Toggle
       >
     {/each}

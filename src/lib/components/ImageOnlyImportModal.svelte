@@ -16,7 +16,7 @@
   }
 </script>
 
-<Modal bind:open size="md" outsideclose on:close={handleCancel}>
+<Modal bind:open size="md" outsideclose onclose={handleCancel}>
   <div class="flex flex-col gap-4">
     <!-- Header -->
     <div class="text-center">
@@ -57,8 +57,8 @@
 
     <!-- Actions -->
     <div class="flex justify-center gap-3 pt-2">
-      <Button color="blue" on:click={handleConfirm}>Import</Button>
-      <Button color="alternative" on:click={handleCancel}>Cancel</Button>
+      <Button color="blue" onclick={handleConfirm}>Import</Button>
+      <Button color="alternative" onclick={handleCancel}>Cancel</Button>
     </div>
   </div>
 </Modal>

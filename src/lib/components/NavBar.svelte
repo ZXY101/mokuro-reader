@@ -18,7 +18,7 @@
   import { unifiedProviderState } from '$lib/util/sync/unified-provider-state';
 
   // Use $state to make these reactive
-  let settingsHidden = $state(true);
+  let settingsOpen = $state(false);
   let uploadModalOpen = $state(false);
   let isReader = $state(false);
 
@@ -81,7 +81,7 @@
 
   // Define event handlers
   function openSettings() {
-    settingsHidden = false;
+    settingsOpen = true;
   }
 
   function openUploadModal() {
@@ -213,5 +213,5 @@
   </Navbar>
 </div>
 
-<Settings bind:hidden={settingsHidden} />
+<Settings bind:open={settingsOpen} />
 <UploadModal bind:open={uploadModalOpen} />
