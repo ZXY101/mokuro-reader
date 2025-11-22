@@ -1118,10 +1118,10 @@
             <p class="text-sm text-gray-400 mb-1">Total Time</p>
             <p class="text-2xl font-bold">{formatDuration($stats.totalTimeMinutes)}</p>
             {#if $stats.speedTrend !== 0}
+              {@const TrendIcon = getTrendIcon($stats.speedTrend)}
               <div class="flex items-center gap-1 text-xs mt-1">
-                {#if getTrendIcon($stats.speedTrend)}
-                  <svelte:component
-                    this={getTrendIcon($stats.speedTrend)}
+                {#if TrendIcon}
+                  <TrendIcon
                     size="xs"
                     class={$stats.speedTrend > 0 ? 'text-green-500' : 'text-red-500'}
                   />

@@ -67,5 +67,5 @@ class MockWorker {
   }
 }
 
-// @ts-ignore - Worker type mismatch is expected for mock
+// @ts-expect-error - Worker type mismatch is expected for mock
 globalThis.Worker = MockWorker;

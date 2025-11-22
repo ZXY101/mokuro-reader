@@ -84,7 +84,6 @@
             const file = item.getAsFile();
             if (file) {
               draggedFiles.push(file);
-              draggedFiles = draggedFiles;
             }
           }
         }
@@ -115,6 +114,7 @@
     <div class="text-center"><Spinner /></div>
   {:then}
     <Accordion flush>
+      <!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
       <AccordionItem>
         {#snippet header()}
           <span>What to upload?</span>

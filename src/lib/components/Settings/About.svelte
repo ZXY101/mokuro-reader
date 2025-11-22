@@ -5,6 +5,7 @@
   import { GithubSolid } from 'flowbite-svelte-icons';
 </script>
 
+<!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
 <AccordionItem>
   {#snippet header()}
     <span>About</span>

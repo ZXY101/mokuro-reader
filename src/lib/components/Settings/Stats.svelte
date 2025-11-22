@@ -3,6 +3,7 @@
   import { AccordionItem } from 'flowbite-svelte';
 </script>
 
+<!-- @ts-expect-error flowbite-svelte snippet types not fully supported -->
 <AccordionItem>
   {#snippet header()}
     <span>Stats</span>

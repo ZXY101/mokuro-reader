@@ -70,7 +70,7 @@ describe('zipManga', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // @ts-ignore
+    // @ts-expect-error - Mock type mismatch
     db.volumes_data.get.mockResolvedValue(mockVolumeData);
   });
 
