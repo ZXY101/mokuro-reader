@@ -25,12 +25,12 @@ async function migratePageTurnData(
   turns: PageTurn[]
 ): Promise<PageTurn[] | null> {
   // Check if already migrated (all turns are 3-tuple)
-  if (turns.every(turn => turn.length === 3)) {
+  if (turns.every((turn) => turn.length === 3)) {
     return null; // No migration needed
   }
 
   // Check if any are 2-tuple format (runtime check - type says 3 but old data may be 2)
-  const has2Tuple = turns.some(turn => (turn as number[]).length === 2);
+  const has2Tuple = turns.some((turn) => (turn as number[]).length === 2);
   if (!has2Tuple) {
     return null; // No migration needed
   }
@@ -119,33 +119,37 @@ export const personalizedReadingSpeed = derived<
         return migrated ? { volumeId, migrated } : null;
       });
 
-    Promise.all(migrationPromises).then(results => {
-      // Update volumes with migrated data
-      const validMigrations = results.filter((r): r is { volumeId: string; migrated: PageTurn[] } => r !== null);
-      if (validMigrations.length > 0) {
-        volumesWithTrash.update(vols => {
-          const updated = { ...vols };
-          for (const { volumeId, migrated } of validMigrations) {
-            if (updated[volumeId]) {
-              updated[volumeId] = new VolumeData({
-                ...updated[volumeId],
-                recentPageTurns: migrated
-              });
+    Promise.all(migrationPromises)
+      .then((results) => {
+        // Update volumes with migrated data
+        const validMigrations = results.filter(
+          (r): r is { volumeId: string; migrated: PageTurn[] } => r !== null
+        );
+        if (validMigrations.length > 0) {
+          volumesWithTrash.update((vols) => {
+            const updated = { ...vols };
+            for (const { volumeId, migrated } of validMigrations) {
+              if (updated[volumeId]) {
+                updated[volumeId] = new VolumeData({
+                  ...updated[volumeId],
+                  recentPageTurns: migrated
+                });
+              }
             }
-          }
-          return updated;
-        });
-      }
+            return updated;
+          });
+        }
 
-      // Calculate with current data (will include migrated data on next call)
-      const result = calculateReadingSpeed($volumes, idleTimeoutMinutes);
-      set(result);
-    }).catch(error => {
-      console.error('[Migration] Error during migration:', error);
-      // Fall back to calculating without migration
-      const result = calculateReadingSpeed($volumes, idleTimeoutMinutes);
-      set(result);
-    });
+        // Calculate with current data (will include migrated data on next call)
+        const result = calculateReadingSpeed($volumes, idleTimeoutMinutes);
+        set(result);
+      })
+      .catch((error) => {
+        console.error('[Migration] Error during migration:', error);
+        // Fall back to calculating without migration
+        const result = calculateReadingSpeed($volumes, idleTimeoutMinutes);
+        set(result);
+      });
   },
   // Initial value
   {

@@ -97,7 +97,7 @@
         />
       </Label>
     </div>
-    <hr>
+    <hr />
     <h4>Quality Settings</h4>
     <Helper>Allows you to customize the file size stored on your devices</Helper>
     <div>
@@ -106,7 +106,10 @@
         {disabled}
         type="number"
         bind:value={heightField}
-        on:change={() => {updateAnkiSetting('heightField', heightField); if (heightField < 0) heightField = 0;}}
+        on:change={() => {
+          updateAnkiSetting('heightField', heightField);
+          if (heightField < 0) heightField = 0;
+        }}
         min={0}
       />
     </div>
@@ -116,7 +119,10 @@
         {disabled}
         type="number"
         bind:value={widthField}
-        on:change={() => {updateAnkiSetting('widthField', widthField); if (widthField < 0) widthField = 0;}}
+        on:change={() => {
+          updateAnkiSetting('widthField', widthField);
+          if (widthField < 0) widthField = 0;
+        }}
         min={0}
       />
     </div>
@@ -128,7 +134,7 @@
         bind:value={qualityField}
         on:change={() => updateAnkiSetting('qualityField', qualityField)}
         min={0}
-        max={1} 
+        max={1}
         step="0.1"
       />
     </div>

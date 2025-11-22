@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { changeProfile, currentProfile, profiles, profilesWithTrash, migrateProfiles } from '$lib/settings';
+  import {
+    changeProfile,
+    currentProfile,
+    profiles,
+    profilesWithTrash,
+    migrateProfiles
+  } from '$lib/settings';
   import { AccordionItem, Button, Select } from 'flowbite-svelte';
   import ManageProfilesModal from './ManageProfilesModal.svelte';
   import { showSnackbar } from '$lib/util';

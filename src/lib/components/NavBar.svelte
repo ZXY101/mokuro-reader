@@ -1,6 +1,12 @@
 <script lang="ts">
   import { Navbar, NavBrand, Spinner } from 'flowbite-svelte';
-  import { CloudArrowUpOutline, UploadSolid, UserSettingsSolid, RefreshOutline, ChartLineUpOutline } from 'flowbite-svelte-icons';
+  import {
+    CloudArrowUpOutline,
+    UploadSolid,
+    UserSettingsSolid,
+    RefreshOutline,
+    ChartLineUpOutline
+  } from 'flowbite-svelte-icons';
   import { afterNavigate, goto } from '$app/navigation';
   import { page } from '$app/stores';
   import Settings from './Settings/Settings.svelte';
@@ -37,7 +43,7 @@
 
   // Subscribe to global sync state
   $effect(() => {
-    const unsubscribe = unifiedCloudManager.isSyncing.subscribe(value => {
+    const unsubscribe = unifiedCloudManager.isSyncing.subscribe((value) => {
       isSyncing = value;
     });
     return unsubscribe;
@@ -89,7 +95,7 @@
   function navigateToReadingSpeed() {
     goto('/reading-speed');
   }
-  
+
   async function handleSync() {
     if (isSyncing) return; // Prevent multiple simultaneous syncs
 
@@ -131,7 +137,11 @@
       </div>
     </NavBrand>
     <div class="flex md:order-2 gap-5">
-      <button onclick={navigateToReadingSpeed} class="flex items-center justify-center w-6 h-6" title="Reading Speed Stats">
+      <button
+        onclick={navigateToReadingSpeed}
+        class="flex items-center justify-center w-6 h-6"
+        title="Reading Speed Stats"
+      >
         <ChartLineUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
       </button>
       <button onclick={openSettings} class="flex items-center justify-center w-6 h-6">
@@ -143,7 +153,15 @@
       <button
         onclick={navigateToCloud}
         class="flex items-center justify-center w-6 h-6"
-        title={providerState.needsAttention ? `${providerDisplayName} - Action Required (click to sign in)` : providerState.isFullyConnected ? `${providerDisplayName} - Connected` : providerState.isAuthenticated ? `${providerDisplayName} - Loading...` : providerState.hasStoredCredentials ? `${providerDisplayName} - Initializing...` : `${providerDisplayName} - Not connected`}
+        title={providerState.needsAttention
+          ? `${providerDisplayName} - Action Required (click to sign in)`
+          : providerState.isFullyConnected
+            ? `${providerDisplayName} - Connected`
+            : providerState.isAuthenticated
+              ? `${providerDisplayName} - Loading...`
+              : providerState.hasStoredCredentials
+                ? `${providerDisplayName} - Initializing...`
+                : `${providerDisplayName} - Not connected`}
       >
         {#if providerState.needsAttention}
           <CloudArrowUpOutline class="w-6 h-6 text-red-600 hover:text-red-700 cursor-pointer" />
@@ -152,9 +170,13 @@
         {:else if providerState.isFullyConnected}
           <CloudArrowUpOutline class="w-6 h-6 text-green-600 hover:text-green-700 cursor-pointer" />
         {:else if providerState.isAuthenticated}
-          <CloudArrowUpOutline class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer" />
+          <CloudArrowUpOutline
+            class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer"
+          />
         {:else if providerState.hasStoredCredentials}
-          <CloudArrowUpOutline class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer" />
+          <CloudArrowUpOutline
+            class="w-6 h-6 text-yellow-600 hover:text-yellow-700 cursor-pointer"
+          />
         {:else}
           <CloudArrowUpOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer" />
         {/if}
@@ -164,9 +186,11 @@
           <button
             onclick={handleTokenRefresh}
             class="flex items-center justify-center px-2 py-1 rounded text-xs font-mono cursor-pointer transition-colors
-              {tokenMinutesLeft > 30 ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20' :
-               tokenMinutesLeft > 10 ? 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20' :
-               'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20'}"
+              {tokenMinutesLeft > 30
+              ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-900/20'
+              : tokenMinutesLeft > 10
+                ? 'text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:hover:bg-yellow-900/20'
+                : 'text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20'}"
             title="Token expires in {tokenMinutesLeft} minutes. Click to refresh now."
           >
             {tokenMinutesLeft}m
@@ -180,7 +204,9 @@
           title={isSyncing ? 'Syncing...' : `Sync read progress with ${providerDisplayName}`}
           disabled={isSyncing}
         >
-          <RefreshOutline class="w-6 h-6 hover:text-primary-700 cursor-pointer {isSyncing ? 'animate-spin' : ''}" />
+          <RefreshOutline
+            class="w-6 h-6 hover:text-primary-700 cursor-pointer {isSyncing ? 'animate-spin' : ''}"
+          />
         </button>
       {/if}
     </div>

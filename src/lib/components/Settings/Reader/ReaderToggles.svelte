@@ -18,8 +18,18 @@
     { key: 'mobile', text: 'Mobile', value: $settings.mobile },
     { key: 'showTimer', text: 'Show timer', value: $settings.showTimer },
     { key: 'quickActions', text: 'Show quick actions', value: $settings.quickActions },
-    { key: 'invertColors', text: 'Invert colors of the images', value: $settings.invertColors, shortcut: 'I' },
-    { key: 'nightMode', text: 'Night mode (strong red filter)', value: $settings.nightMode, shortcut: 'N' }
+    {
+      key: 'invertColors',
+      text: 'Invert colors of the images',
+      value: $settings.invertColors,
+      shortcut: 'I'
+    },
+    {
+      key: 'nightMode',
+      text: 'Night mode (strong red filter)',
+      value: $settings.nightMode,
+      shortcut: 'N'
+    }
   ] as { key: SettingsKey; text: string; value: any; shortcut?: string }[]);
 </script>
 
@@ -41,6 +51,7 @@
     min="1"
     max="30"
     value={$settings.inactivityTimeoutMinutes}
-    on:change={(e) => updateSetting('inactivityTimeoutMinutes', Number((e.target as HTMLInputElement).value))}
+    on:change={(e) =>
+      updateSetting('inactivityTimeoutMinutes', Number((e.target as HTMLInputElement).value))}
   />
 </div>
