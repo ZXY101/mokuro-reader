@@ -116,12 +116,7 @@
         {#if profileToEdit === item}
           <form onsubmit={preventDefault(onEdit)}>
             <Input size="sm" bind:value={newName} autofocus onclick={onInputClick}>
-              <EditOutline
-                slot="right"
-                size="sm"
-                onclick={onEdit}
-                class="hover:text-primary-700"
-              />
+              <EditOutline slot="right" size="sm" onclick={onEdit} class="hover:text-primary-700" />
             </Input>
           </form>
         {:else}
@@ -139,11 +134,7 @@
             class="hover:text-primary-700"
             onclick={() => onEditClicked(item)}
           />
-          <TrashBinSolid
-            size="sm"
-            class="hover:text-primary-700"
-            onclick={() => onDelete(item)}
-          />
+          <TrashBinSolid size="sm" class="hover:text-primary-700" onclick={() => onDelete(item)} />
         {/if}
       </div>
     </ListgroupItem>
