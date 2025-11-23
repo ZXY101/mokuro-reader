@@ -4,7 +4,7 @@
   import VolumeItem from '$lib/components/VolumeItem.svelte';
   import PlaceholderVolumeItem from '$lib/components/PlaceholderVolumeItem.svelte';
   import BackupButton from '$lib/components/BackupButton.svelte';
-  import { Button, Listgroup, Spinner, Badge } from 'flowbite-svelte';
+  import { Button, Listgroup, Spinner, Badge, Dropdown, DropdownItem, Checkbox } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga, showSnackbar } from '$lib/util';
   import { promptExtraction } from '$lib/util/modals';
@@ -20,7 +20,8 @@
     FileLinesOutline,
     SortOutline,
     GridOutline,
-    ListOutline
+    ListOutline,
+    DotsVerticalOutline
   } from 'flowbite-svelte-icons';
   import { backupQueue } from '$lib/util/backup-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
@@ -592,39 +593,9 @@
         </Button>
       {/if}
 
-      {#if isCloudReady && anyBackedUp}
-        <Button color="red" onclick={onDeleteFromCloud} class="!min-w-0 self-stretch">
-          <TrashBinSolid class="me-2 h-4 w-4 shrink-0" />
-          <span class="break-words">Delete from {providerDisplayName}</span>
-        </Button>
-      {/if}
-
-      <!-- Other action buttons -->
-      <Button color="light" onclick={onExtract} disabled={loading} class="!min-w-0 self-stretch">
-        <DownloadSolid class="me-2 h-4 w-4 shrink-0" />
-        <span class="break-words">{loading ? 'Extracting...' : 'Extract'}</span>
-      </Button>
-
       <Button color="light" onclick={onDelete} class="!min-w-0 self-stretch">
         <TrashBinSolid class="me-2 h-4 w-4 shrink-0" />
         <span class="break-words">Remove manga</span>
-      </Button>
-
-      <!-- View buttons -->
-      <Button color="light" onclick={goToSeriesText} class="!min-w-0 self-stretch">
-        <FileLinesOutline class="me-2 h-4 w-4 shrink-0" />
-        <span class="break-words">View Series Text</span>
-      </Button>
-
-      <Button color="light" onclick={toggleSortMode} class="!min-w-0 self-stretch">
-        <SortOutline class="me-2 h-5 w-5 shrink-0" />
-        <span class="break-words">
-          {#if sortMode === 'unread-first'}
-            Unread first
-          {:else}
-            A-Z
-          {/if}
-        </span>
       </Button>
 
       <Button color="light" onclick={toggleViewMode} class="!min-w-0 self-stretch">
@@ -636,6 +607,31 @@
           <span class="break-words">List</span>
         {/if}
       </Button>
+
+      <!-- More options menu -->
+      <Button id="series-menu" color="light" class="!min-w-0 !p-2.5">
+        <DotsVerticalOutline class="h-5 w-5" />
+      </Button>
+      <Dropdown triggeredBy="#series-menu" placement="bottom-end">
+        {#if isCloudReady && anyBackedUp}
+          <DropdownItem onclick={onDeleteFromCloud} class="flex w-full items-center text-red-500 hover:!text-red-500 dark:hover:!text-red-500">
+            <TrashBinSolid class="me-2 h-5 w-5 flex-shrink-0" />
+            <span class="flex-1 text-left">Delete from {providerDisplayName}</span>
+          </DropdownItem>
+        {/if}
+        <DropdownItem onclick={onExtract} disabled={loading} class="flex w-full items-center text-gray-700 dark:text-gray-200">
+          <DownloadSolid class="me-2 h-5 w-5 flex-shrink-0" />
+          <span class="flex-1 text-left">{loading ? 'Extracting...' : 'Extract'}</span>
+        </DropdownItem>
+        <DropdownItem onclick={goToSeriesText} class="flex w-full items-center text-gray-700 dark:text-gray-200">
+          <FileLinesOutline class="me-2 h-5 w-5 flex-shrink-0" />
+          <span class="flex-1 text-left">View Series Text</span>
+        </DropdownItem>
+        <DropdownItem onclick={toggleSortMode} class="flex w-full items-center text-gray-700 dark:text-gray-200">
+          <Checkbox checked={sortMode === 'unread-first'} class="me-2" />
+          <span class="flex-1 text-left">Unread first</span>
+        </DropdownItem>
+      </Dropdown>
     </div>
 
     {#if viewMode === 'list'}
