@@ -41,8 +41,6 @@
   import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
   import { ImageCache } from '$lib/reader/image-cache';
   import '$lib/styles/page-transitions.css';
-  // TODO: FlipBook component not yet implemented
-  // import FlipBook from './FlipBook.svelte';
 
   // TODO: Refactor this whole mess
   interface Props {
@@ -679,11 +677,6 @@
     }
   });
 
-  // Determine if we should use 3D flip book mode
-  // TODO: FlipBook component not yet implemented
-  let use3DFlip = $derived($settings.pageTransition === 'pageTurn');
-  let flipBookRef: unknown = null;
-
   // Generic notification system for setting changes
   let notificationMessage = $state<string>('');
   let notificationKey = $state<string>('');
@@ -836,13 +829,7 @@
     {/key}
   {/if}
   <div class="flex" style:background-color={$settings.backgroundColor}>
-    {#if use3DFlip && volumeData?.files && volume}
-      <!-- TODO: 3D Flip Book Mode - FlipBook component not yet implemented -->
-      <div class="flex items-center justify-center p-4 text-yellow-500">
-        3D flip book mode not yet available
-      </div>
-    {:else}
-      <Panzoom>
+    <Panzoom>
         <button
           aria-label="Previous page (left edge)"
           class="fixed -left-full z-10 h-full w-full opacity-[0.01] hover:bg-slate-400"
@@ -907,9 +894,8 @@
           {/key}
         </div>
       </Panzoom>
-    {/if}
   </div>
-  {#if !$settings.mobile && !use3DFlip}
+  {#if !$settings.mobile}
     <button
       aria-label="Previous page (left edge)"
       onmousedown={mouseDown}

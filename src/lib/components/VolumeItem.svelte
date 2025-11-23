@@ -329,7 +329,7 @@
       <!-- Actions menu button -->
       <button
         id="volume-menu-{volume_uuid}"
-        class="absolute right-2 bottom-2 z-10 rounded-full bg-gray-800/80 p-1 hover:bg-gray-700/80"
+        class="absolute right-2 bottom-2 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-gray-800/80 hover:bg-gray-700/80"
         onclick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -338,24 +338,27 @@
         <DotsVerticalOutline class="h-4 w-4 text-white" />
       </button>
       <Dropdown triggeredBy="#volume-menu-{volume_uuid}" placement="bottom-end">
-        <DropdownItem onclick={onViewTextClicked}>
-          <FileLinesOutline class="me-2 inline h-4 w-4" />
-          View text
+        <DropdownItem onclick={onViewTextClicked} class="flex w-full items-center text-gray-700 dark:text-gray-200">
+          <FileLinesOutline class="me-2 h-5 w-5 flex-shrink-0" />
+          <span class="flex-1 text-left">View text</span>
         </DropdownItem>
         {#if hasAuthenticatedProvider}
-          <DropdownItem onclick={onBackupClicked}>
+          <DropdownItem onclick={onBackupClicked} class="flex w-full items-center">
             {#if isBackedUp}
-              <TrashBinSolid class="me-2 inline h-4 w-4 text-red-500" />
-              <span class="text-red-500">Delete from cloud</span>
+              <TrashBinSolid class="me-2 h-5 w-5 flex-shrink-0 text-red-500" />
+              <span class="flex-1 text-left text-red-500">Delete from cloud</span>
             {:else}
-              <CloudArrowUpOutline class="me-2 inline h-4 w-4" />
-              Backup to cloud
+              <CloudArrowUpOutline class="me-2 h-5 w-5 flex-shrink-0 text-gray-700 dark:text-gray-200" />
+              <span class="flex-1 text-left text-gray-700 dark:text-gray-200">Backup to cloud</span>
             {/if}
           </DropdownItem>
         {/if}
-        <DropdownItem onclick={onDeleteClicked} class="text-red-500">
-          <TrashBinSolid class="me-2 inline h-4 w-4" />
-          Delete
+        <DropdownItem
+          onclick={onDeleteClicked}
+          class="flex w-full items-center text-red-500 hover:!text-red-500 dark:hover:!text-red-500"
+        >
+          <TrashBinSolid class="me-2 h-5 w-5 flex-shrink-0" />
+          <span class="flex-1 text-left">Delete</span>
         </DropdownItem>
       </Dropdown>
 

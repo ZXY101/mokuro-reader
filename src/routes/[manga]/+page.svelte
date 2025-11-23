@@ -605,18 +605,18 @@
         <span class="break-words">{loading ? 'Extracting...' : 'Extract'}</span>
       </Button>
 
-      <Button color="alternative" onclick={onDelete} class="!min-w-0 self-stretch">
+      <Button color="light" onclick={onDelete} class="!min-w-0 self-stretch">
         <TrashBinSolid class="me-2 h-4 w-4 shrink-0" />
         <span class="break-words">Remove manga</span>
       </Button>
 
       <!-- View buttons -->
-      <Button color="alternative" onclick={goToSeriesText} class="!min-w-0 self-stretch">
+      <Button color="light" onclick={goToSeriesText} class="!min-w-0 self-stretch">
         <FileLinesOutline class="me-2 h-4 w-4 shrink-0" />
         <span class="break-words">View Series Text</span>
       </Button>
 
-      <Button color="alternative" onclick={toggleSortMode} class="!min-w-0 self-stretch">
+      <Button color="light" onclick={toggleSortMode} class="!min-w-0 self-stretch">
         <SortOutline class="me-2 h-5 w-5 shrink-0" />
         <span class="break-words">
           {#if sortMode === 'unread-first'}
@@ -627,7 +627,7 @@
         </span>
       </Button>
 
-      <Button color="alternative" onclick={toggleViewMode} class="!min-w-0 self-stretch">
+      <Button color="light" onclick={toggleViewMode} class="!min-w-0 self-stretch">
         {#if viewMode === 'list'}
           <GridOutline class="me-2 h-5 w-5 shrink-0" />
           <span class="break-words">Grid</span>
