@@ -51,6 +51,7 @@
   {transitionParams}
   bind:open
   id="settings"
+  activateClickOutside={false}
 >
   <div class="flex items-center">
     <h5
@@ -59,7 +60,7 @@
     >
       <UserSettingsSolid class="mr-2.5 h-4 w-4" />Settings
     </h5>
-    <CloseButton onclick={onClose} class="mb-4 dark:text-white" />
+    <CloseButton onclick={onClose} class="mb-4 text-gray-500 dark:text-gray-400" />
   </div>
   <div class="flex flex-col gap-5">
     <Accordion flush>
