@@ -4,7 +4,7 @@
   import VolumeItem from '$lib/components/VolumeItem.svelte';
   import PlaceholderVolumeItem from '$lib/components/PlaceholderVolumeItem.svelte';
   import BackupButton from '$lib/components/BackupButton.svelte';
-  import { Button, Listgroup, Spinner, Badge, Dropdown, DropdownItem, Checkbox } from 'flowbite-svelte';
+  import { Button, Listgroup, Spinner, Badge, Dropdown, DropdownItem } from 'flowbite-svelte';
   import { db } from '$lib/catalog/db';
   import { promptConfirmation, zipManga, showSnackbar } from '$lib/util';
   import { promptExtraction } from '$lib/util/modals';
@@ -598,6 +598,11 @@
         <span class="break-words">Remove manga</span>
       </Button>
 
+      <Button color="light" onclick={toggleSortMode} class="!min-w-0 self-stretch">
+        <SortOutline class="me-2 h-5 w-5 shrink-0" />
+        <span class="break-words">{sortMode === 'unread-first' ? 'Unread first' : 'Default'}</span>
+      </Button>
+
       <Button color="light" onclick={toggleViewMode} class="!min-w-0 self-stretch">
         {#if viewMode === 'list'}
           <GridOutline class="me-2 h-5 w-5 shrink-0" />
@@ -626,10 +631,6 @@
         <DropdownItem onclick={goToSeriesText} class="flex w-full items-center text-gray-700 dark:text-gray-200">
           <FileLinesOutline class="me-2 h-5 w-5 flex-shrink-0" />
           <span class="flex-1 text-left">View Series Text</span>
-        </DropdownItem>
-        <DropdownItem onclick={toggleSortMode} class="flex w-full items-center text-gray-700 dark:text-gray-200">
-          <Checkbox checked={sortMode === 'unread-first'} class="me-2" />
-          <span class="flex-1 text-left">Unread first</span>
         </DropdownItem>
       </Dropdown>
     </div>
