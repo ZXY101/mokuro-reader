@@ -45,7 +45,7 @@
       >
     </div>
     <div>
-      <Label>Picture field:</Label>
+      <Label class="text-gray-900 dark:text-white">Picture field:</Label>
       <Input
         {disabled}
         type="text"
@@ -54,7 +54,7 @@
       />
     </div>
     <div>
-      <Label>Sentence field:</Label>
+      <Label class="text-gray-900 dark:text-white">Sentence field:</Label>
       <Input
         {disabled}
         type="text"
@@ -84,7 +84,7 @@
       >
     </div>
     <div>
-      <Label>
+      <Label class="text-gray-900 dark:text-white">
         Trigger method:
         <Select
           onchange={() => updateAnkiSetting('triggerMethod', triggerMethod)}
@@ -94,10 +94,10 @@
       </Label>
     </div>
     <hr />
-    <h4>Quality Settings</h4>
+    <h4 class="text-gray-900 dark:text-white">Quality Settings</h4>
     <Helper>Allows you to customize the file size stored on your devices</Helper>
     <div>
-      <Label>Max Height (0 = Ignore; 200 Recommended):</Label>
+      <Label class="text-gray-900 dark:text-white">Max Height (0 = Ignore; 200 Recommended):</Label>
       <Input
         {disabled}
         type="number"
@@ -110,7 +110,7 @@
       />
     </div>
     <div>
-      <Label>Max Width (0 = Ignore; 200 Recommended):</Label>
+      <Label class="text-gray-900 dark:text-white">Max Width (0 = Ignore; 200 Recommended):</Label>
       <Input
         {disabled}
         type="number"
@@ -123,7 +123,7 @@
       />
     </div>
     <div>
-      <Label>Quality (Between 0 and 1; 0.5 Recommended):</Label>
+      <Label class="text-gray-900 dark:text-white">Quality (Between 0 and 1; 0.5 Recommended):</Label>
       <Input
         {disabled}
         type="number"

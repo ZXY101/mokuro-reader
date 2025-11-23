@@ -49,7 +49,7 @@
   <div class="flex flex-col gap-5">
     <Helper>These settings only apply to this volume</Helper>
     <div>
-      <Label for="page-view-mode" class="mb-2">
+      <Label for="page-view-mode" class="mb-2 text-gray-900 dark:text-white">
         Page view mode
         <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(P)</span>
       </Label>

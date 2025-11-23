@@ -50,7 +50,7 @@
 </script>
 
 <div>
-  <Label>
+  <Label class="text-gray-900 dark:text-white">
     On page zoom:
     <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(Z)</span>
   </Label>
@@ -61,7 +61,7 @@
   />
 </div>
 <div>
-  <Label>Page transition:</Label>
+  <Label class="text-gray-900 dark:text-white">Page transition:</Label>
   <Select
     items={pageTransitions}
     value={pageTransitionValue}
@@ -69,10 +69,10 @@
   />
 </div>
 <div>
-  <Label>Fontsize:</Label>
+  <Label class="text-gray-900 dark:text-white">Fontsize:</Label>
   <Select items={fontSizes} value={fontSizeValue} onchange={(e) => onSelectChange(e, 'fontSize')} />
 </div>
 <div>
-  <Label>Background color:</Label>
+  <Label class="text-gray-900 dark:text-white">Background color:</Label>
   <Input type="color" onchange={onBackgroundColor} value={$settings.backgroundColor} />
 </div>
