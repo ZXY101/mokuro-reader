@@ -338,7 +338,10 @@
         <DotsVerticalOutline class="h-4 w-4 text-white" />
       </button>
       <Dropdown triggeredBy="#volume-menu-{volume_uuid}" placement="bottom-end">
-        <DropdownItem onclick={onViewTextClicked} class="flex w-full items-center text-gray-700 dark:text-gray-200">
+        <DropdownItem
+          onclick={onViewTextClicked}
+          class="flex w-full items-center text-gray-700 dark:text-gray-200"
+        >
           <FileLinesOutline class="me-2 h-5 w-5 flex-shrink-0" />
           <span class="flex-1 text-left">View text</span>
         </DropdownItem>
@@ -348,7 +351,9 @@
               <TrashBinSolid class="me-2 h-5 w-5 flex-shrink-0 text-red-500" />
               <span class="flex-1 text-left text-red-500">Delete from cloud</span>
             {:else}
-              <CloudArrowUpOutline class="me-2 h-5 w-5 flex-shrink-0 text-gray-700 dark:text-gray-200" />
+              <CloudArrowUpOutline
+                class="me-2 h-5 w-5 flex-shrink-0 text-gray-700 dark:text-gray-200"
+              />
               <span class="flex-1 text-left text-gray-700 dark:text-gray-200">Backup to cloud</span>
             {/if}
           </DropdownItem>

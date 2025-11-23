@@ -619,16 +619,26 @@
       </Button>
       <Dropdown triggeredBy="#series-menu" placement="bottom-end">
         {#if isCloudReady && anyBackedUp}
-          <DropdownItem onclick={onDeleteFromCloud} class="flex w-full items-center text-red-500 hover:!text-red-500 dark:hover:!text-red-500">
+          <DropdownItem
+            onclick={onDeleteFromCloud}
+            class="flex w-full items-center text-red-500 hover:!text-red-500 dark:hover:!text-red-500"
+          >
             <TrashBinSolid class="me-2 h-5 w-5 flex-shrink-0" />
             <span class="flex-1 text-left">Delete from {providerDisplayName}</span>
           </DropdownItem>
         {/if}
-        <DropdownItem onclick={onExtract} disabled={loading} class="flex w-full items-center text-gray-700 dark:text-gray-200">
+        <DropdownItem
+          onclick={onExtract}
+          disabled={loading}
+          class="flex w-full items-center text-gray-700 dark:text-gray-200"
+        >
           <DownloadSolid class="me-2 h-5 w-5 flex-shrink-0" />
           <span class="flex-1 text-left">{loading ? 'Extracting...' : 'Extract'}</span>
         </DropdownItem>
-        <DropdownItem onclick={goToSeriesText} class="flex w-full items-center text-gray-700 dark:text-gray-200">
+        <DropdownItem
+          onclick={goToSeriesText}
+          class="flex w-full items-center text-gray-700 dark:text-gray-200"
+        >
           <FileLinesOutline class="me-2 h-5 w-5 flex-shrink-0" />
           <span class="flex-1 text-left">View Series Text</span>
         </DropdownItem>

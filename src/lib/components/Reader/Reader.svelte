@@ -830,70 +830,70 @@
   {/if}
   <div class="flex" style:background-color={$settings.backgroundColor}>
     <Panzoom>
-        <button
-          aria-label="Previous page (left edge)"
-          class="fixed -left-full z-10 h-full w-full opacity-[0.01] hover:bg-slate-400"
-          style:margin-left={`${$settings.edgeButtonWidth}px`}
-          onmousedown={mouseDown}
-          onmouseup={left}
-        ></button>
-        <button
-          aria-label="Next page (right edge)"
-          class="fixed -right-full z-10 h-full w-full opacity-[0.01] hover:bg-slate-400"
-          style:margin-right={`${$settings.edgeButtonWidth}px`}
-          onmousedown={mouseDown}
-          onmouseup={right}
-        ></button>
-        <button
-          aria-label="Previous page (bottom left)"
-          class="fixed top-full -left-full z-10 h-screen w-[150%] opacity-[0.01] hover:bg-slate-400"
-          onmousedown={mouseDown}
-          onmouseup={left}
-        ></button>
-        <button
-          aria-label="Next page (bottom right)"
-          class="fixed top-full -right-full z-10 h-screen w-[150%] opacity-[0.01] hover:bg-slate-400"
-          onmousedown={mouseDown}
-          onmouseup={right}
-        ></button>
-        <div
-          class="grid"
-          style:filter={`invert(${$settings.invertColors ? 1 : 0})`}
-          ondblclick={onDoubleTap}
-          role="none"
-          id="manga-panel"
-        >
-          {#key page}
-            <div
-              class="col-start-1 row-start-1 flex flex-row"
-              class:flex-row-reverse={!volumeSettings.rightToLeft}
-              in:pageIn={{ direction: pageDirection }}
-              out:pageOut={{ direction: pageDirection }}
-            >
-              {#if volumeData && volumeData.files}
-                {#if showSecondPage()}
-                  <MangaPage
-                    page={pages[index + 1]}
-                    src={Object.values(volumeData.files)[index + 1]}
-                    cachedUrl={cachedImageUrl2}
-                    volumeUuid={volume.volume_uuid}
-                  />
-                {/if}
+      <button
+        aria-label="Previous page (left edge)"
+        class="fixed -left-full z-10 h-full w-full opacity-[0.01] hover:bg-slate-400"
+        style:margin-left={`${$settings.edgeButtonWidth}px`}
+        onmousedown={mouseDown}
+        onmouseup={left}
+      ></button>
+      <button
+        aria-label="Next page (right edge)"
+        class="fixed -right-full z-10 h-full w-full opacity-[0.01] hover:bg-slate-400"
+        style:margin-right={`${$settings.edgeButtonWidth}px`}
+        onmousedown={mouseDown}
+        onmouseup={right}
+      ></button>
+      <button
+        aria-label="Previous page (bottom left)"
+        class="fixed top-full -left-full z-10 h-screen w-[150%] opacity-[0.01] hover:bg-slate-400"
+        onmousedown={mouseDown}
+        onmouseup={left}
+      ></button>
+      <button
+        aria-label="Next page (bottom right)"
+        class="fixed top-full -right-full z-10 h-screen w-[150%] opacity-[0.01] hover:bg-slate-400"
+        onmousedown={mouseDown}
+        onmouseup={right}
+      ></button>
+      <div
+        class="grid"
+        style:filter={`invert(${$settings.invertColors ? 1 : 0})`}
+        ondblclick={onDoubleTap}
+        role="none"
+        id="manga-panel"
+      >
+        {#key page}
+          <div
+            class="col-start-1 row-start-1 flex flex-row"
+            class:flex-row-reverse={!volumeSettings.rightToLeft}
+            in:pageIn={{ direction: pageDirection }}
+            out:pageOut={{ direction: pageDirection }}
+          >
+            {#if volumeData && volumeData.files}
+              {#if showSecondPage()}
                 <MangaPage
-                  page={pages[index]}
-                  src={Object.values(volumeData.files)[index]}
-                  cachedUrl={cachedImageUrl1}
+                  page={pages[index + 1]}
+                  src={Object.values(volumeData.files)[index + 1]}
+                  cachedUrl={cachedImageUrl2}
                   volumeUuid={volume.volume_uuid}
                 />
-              {:else}
-                <div class="flex h-screen w-screen items-center justify-center">
-                  <Spinner size="12" />
-                </div>
               {/if}
-            </div>
-          {/key}
-        </div>
-      </Panzoom>
+              <MangaPage
+                page={pages[index]}
+                src={Object.values(volumeData.files)[index]}
+                cachedUrl={cachedImageUrl1}
+                volumeUuid={volume.volume_uuid}
+              />
+            {:else}
+              <div class="flex h-screen w-screen items-center justify-center">
+                <Spinner size="12" />
+              </div>
+            {/if}
+          </div>
+        {/key}
+      </div>
+    </Panzoom>
   </div>
   {#if !$settings.mobile}
     <button

@@ -9,7 +9,10 @@
   {#snippet header()}About{/snippet}
   <div class="flex flex-col gap-5">
     <div class="flex flex-row justify-between">
-      <p class="font-semibold text-gray-900 dark:text-white">Mokuro reader {READER_VERSION} <Badge>BETA</Badge></p>
+      <p class="font-semibold text-gray-900 dark:text-white">
+        Mokuro reader {READER_VERSION}
+        <Badge>BETA</Badge>
+      </p>
       <a
         class="text-gray-900 hover:text-primary-600 dark:text-white"
         href="https://github.com/ZXY101/mokuro-reader"

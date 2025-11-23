@@ -123,7 +123,9 @@
       />
     </div>
     <div>
-      <Label class="text-gray-900 dark:text-white">Quality (Between 0 and 1; 0.5 Recommended):</Label>
+      <Label class="text-gray-900 dark:text-white"
+        >Quality (Between 0 and 1; 0.5 Recommended):</Label
+      >
       <Input
         {disabled}
         type="number"
