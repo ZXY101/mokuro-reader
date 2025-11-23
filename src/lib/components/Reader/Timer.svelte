@@ -95,7 +95,7 @@
 
 <button
   class:text-primary-700={!active}
-  class="fixed top-5 right-20 z-10 m-[-2.5rem] p-10 opacity-50 mix-blend-difference"
+  class="fixed top-5 right-20 z-10 p-2 opacity-50 mix-blend-difference"
   onclick={onClick}
 >
   {#key `${active}-${$volumeStats?.timeReadInMinutes}`}
