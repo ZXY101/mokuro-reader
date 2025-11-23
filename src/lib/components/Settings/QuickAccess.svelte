@@ -21,11 +21,11 @@
 
 {#if isReader()}
   <div class="flex flex-col gap-2">
-    <Button color="alternative" onclick={toggleFullScreen}
+    <Button color="light" onclick={toggleFullScreen}
       >Toggle fullscreen <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(F)</span
       ></Button
     >
-    <Button color="alternative" onclick={onClose}
+    <Button color="light" onclick={onClose}
       >Close reader <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(Esc)</span></Button
     >
   </div>
