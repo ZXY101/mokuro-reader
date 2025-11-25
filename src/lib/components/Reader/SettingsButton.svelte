@@ -11,7 +11,7 @@
 
 <button
   onclick={openSettings}
-  class="fixed top-5 right-10 z-10 p-2 opacity-50 mix-blend-difference hover:text-primary-700 hover:opacity-100 hover:mix-blend-normal"
+  class="fixed top-3 right-3 z-10 p-2 opacity-50 mix-blend-difference hover:text-primary-700 hover:opacity-100 hover:mix-blend-normal"
 >
   <UserSettingsSolid size="xl" />
 </button>
