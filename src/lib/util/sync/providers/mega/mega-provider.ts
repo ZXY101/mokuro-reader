@@ -3,7 +3,8 @@ import type {
   SyncProvider,
   ProviderCredentials,
   ProviderStatus,
-  CloudFileMetadata
+  CloudFileMetadata,
+  StorageQuota
 } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import { megaCache } from './mega-cache';
@@ -894,6 +895,38 @@ export class MegaProvider implements SyncProvider {
         `Failed to delete series folder: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'mega',
         'DELETE_FAILED',
+        false,
+        true
+      );
+    }
+  }
+
+  /**
+   * Get storage quota information from MEGA
+   * Returns used, total, and available storage in bytes
+   */
+  async getStorageQuota(): Promise<StorageQuota> {
+    if (!this.isAuthenticated()) {
+      throw new ProviderError('Not authenticated', 'mega', 'NOT_AUTHENTICATED', true);
+    }
+
+    try {
+      // Use getAccountInfo() for accurate quota information
+      const info = await this.storage.getAccountInfo();
+
+      const used = info.spaceUsed || 0;
+      const total = info.spaceTotal || null;
+
+      return {
+        used,
+        total,
+        available: total !== null ? total - used : null
+      };
+    } catch (error) {
+      throw new ProviderError(
+        `Failed to get storage quota: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'mega',
+        'QUOTA_FETCH_FAILED',
         false,
         true
       );

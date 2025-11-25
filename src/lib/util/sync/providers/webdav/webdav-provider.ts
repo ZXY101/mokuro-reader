@@ -1,5 +1,10 @@
 import { browser } from '$app/environment';
-import type { SyncProvider, ProviderCredentials, ProviderStatus } from '../../provider-interface';
+import type {
+  SyncProvider,
+  ProviderCredentials,
+  ProviderStatus,
+  StorageQuota
+} from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import type { WebDAVClient } from 'webdav';
 
@@ -293,6 +298,52 @@ export class WebDAVProvider implements SyncProvider {
         false,
         true
       );
+    }
+  }
+
+  /**
+   * Get storage quota information from WebDAV server
+   * Returns used, total, and available storage in bytes
+   * Note: Not all WebDAV servers support quota reporting (RFC 4331)
+   */
+  async getStorageQuota(): Promise<StorageQuota> {
+    if (!this.isAuthenticated() || !this.client) {
+      throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
+    }
+
+    try {
+      // WebDAV library's getQuota() returns DiskQuota | ResponseDataDetailed<DiskQuota | null>
+      const response = await this.client.getQuota();
+
+      // Handle ResponseDataDetailed wrapper (when details option is used)
+      const quota =
+        response && typeof response === 'object' && 'data' in response ? response.data : response;
+
+      if (quota && typeof quota === 'object' && 'used' in quota) {
+        const used = (quota as { used?: number; available?: number }).used || 0;
+        const available = (quota as { used?: number; available?: number }).available ?? null;
+        const total = available !== null ? used + available : null;
+
+        return {
+          used,
+          total,
+          available
+        };
+      }
+
+      // Server doesn't provide quota info
+      return {
+        used: 0,
+        total: null,
+        available: null
+      };
+    } catch {
+      // Many WebDAV servers don't support quota - return unknown
+      return {
+        used: 0,
+        total: null,
+        available: null
+      };
     }
   }
 }

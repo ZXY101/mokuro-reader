@@ -17,7 +17,7 @@
     API_KEY
   } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
-  import type { ProviderType } from '$lib/util/sync/provider-interface';
+  import type { ProviderType, StorageQuota } from '$lib/util/sync/provider-interface';
   import { backupQueue } from '$lib/util/backup-queue';
   import { driveState, tokenManager } from '$lib/util/sync/providers/google-drive';
   import type { DriveState } from '$lib/util/sync/providers/google-drive';
@@ -137,6 +137,51 @@
   let webdavPassword = $state('');
   let webdavLoading = $state(false);
 
+  // Storage quota state
+  let storageQuota = $state<StorageQuota | null>(null);
+  let quotaLoading = $state(false);
+
+  /**
+   * Format bytes to human-readable string
+   */
+  function formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * Fetch storage quota from the active provider
+   */
+  async function fetchStorageQuota() {
+    const provider = providerManager.getActiveProvider();
+    if (!provider) return;
+
+    quotaLoading = true;
+    try {
+      storageQuota = await provider.getStorageQuota();
+    } catch (error) {
+      console.error('Failed to fetch storage quota:', error);
+      storageQuota = null;
+    } finally {
+      quotaLoading = false;
+    }
+  }
+
+  // Reactively fetch storage quota when provider auth state changes
+  $effect(() => {
+    // Track auth state for any provider
+    const isAuthenticated = googleDriveAuth || megaAuth || webdavAuth;
+
+    if (isAuthenticated) {
+      fetchStorageQuota();
+    } else {
+      storageQuota = null;
+    }
+  });
+
   // Use constants from the google-drive utility
   const type = 'application/json';
 
@@ -246,6 +291,7 @@
   /**
    * Common post-login handler for all providers
    * Automatically syncs progress after successful login
+   * (Storage quota is fetched reactively via $effect when auth state changes)
    */
   async function handlePostLogin() {
     try {
@@ -260,6 +306,7 @@
     // Clear service worker cache for Google Drive downloads
     // This is cloud-page-specific and not part of global init
     clearServiceWorkerCache();
+    // Storage quota is fetched reactively via $effect when auth state changes
   });
 
   // Google Drive handlers
@@ -346,6 +393,7 @@
   }
 
   // Unified logout handler
+  // (Storage quota is cleared reactively via $effect when auth state changes)
   async function handleLogout() {
     if (currentProvider === 'google-drive') {
       await logout();
@@ -873,6 +921,48 @@
                 Sync profiles
               {/if}
             </Button>
+
+            <!-- Storage quota section -->
+            <div class="mt-4 rounded-lg bg-gray-800 p-4">
+              <h3 class="mb-2 font-semibold">Storage</h3>
+              {#if quotaLoading}
+                <div class="flex items-center gap-2 text-sm text-gray-400">
+                  <Spinner size="4" />
+                  Loading storage info...
+                </div>
+              {:else if storageQuota && storageQuota.total !== null}
+                <div class="space-y-2">
+                  <div class="flex justify-between text-sm">
+                    <span class="text-gray-300">{formatBytes(storageQuota.used)} used</span>
+                    <span class="text-gray-300"
+                      >{formatBytes(storageQuota.available ?? 0)} available</span
+                    >
+                  </div>
+                  <div class="h-2.5 w-full rounded-full bg-gray-700">
+                    <div
+                      class="h-2.5 rounded-full transition-all duration-300"
+                      class:bg-blue-500={(storageQuota.used / storageQuota.total) * 100 < 80}
+                      class:bg-yellow-500={(storageQuota.used / storageQuota.total) * 100 >= 80 &&
+                        (storageQuota.used / storageQuota.total) * 100 < 95}
+                      class:bg-red-500={(storageQuota.used / storageQuota.total) * 100 >= 95}
+                      style="width: {Math.min(
+                        (storageQuota.used / storageQuota.total) * 100,
+                        100
+                      )}%"
+                    ></div>
+                  </div>
+                  <div class="text-center text-xs text-gray-500">
+                    {formatBytes(storageQuota.total)} total ({Math.round(
+                      (storageQuota.used / storageQuota.total) * 100
+                    )}% used)
+                  </div>
+                </div>
+              {:else if storageQuota && storageQuota.used > 0}
+                <p class="text-sm text-gray-300">{formatBytes(storageQuota.used)} used</p>
+              {:else}
+                <p class="text-sm text-gray-500">Storage information unavailable</p>
+              {/if}
+            </div>
 
             <!-- Provider info box -->
             <div class="mt-4 rounded-lg bg-gray-800 p-4">
