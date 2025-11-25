@@ -175,9 +175,9 @@
         {#snippet header()}Mobile tips{/snippet}
         <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
           <p>
-            Importing on mobile works best with smaller files. Use individual volumes rather than
-            entire series — folder selection usually doesn't work, and large archives may crash due
-            to RAM limits.
+            Importing on mobile works best with smaller files. ZIP or CBZ individual volumes rather
+            than entire series — folder selection usually doesn't work, and large archives may crash
+            due to RAM limits.
           </p>
           <p>
             <b>Export for mobile:</b> On a computer, use the export button on the series page to download
