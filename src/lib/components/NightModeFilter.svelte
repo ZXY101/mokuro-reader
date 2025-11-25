@@ -1,29 +1,20 @@
 <script lang="ts">
-  import { settings } from '$lib/settings';
+  import { nightModeActive } from '$lib/settings';
   import { browser } from '$app/environment';
-  import { onMount, onDestroy } from 'svelte';
+  import { onDestroy } from 'svelte';
 
   // Elements for Firefox overlay approach
   let grayscaleLayer: HTMLDivElement | null = null;
   let redOverlay: HTMLDivElement | null = null;
-  let isFirefox = false;
-
-  // Function to detect Firefox
-  function detectFirefox() {
-    if (!browser) return false;
-    return navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-  }
+  let isFirefox = browser && navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
 
   // Function to apply the night mode filter
-  function applyNightModeFilter() {
+  function applyNightModeFilter(active: boolean) {
     if (!browser) return;
-
-    // Detect Firefox
-    isFirefox = detectFirefox();
 
     if (isFirefox) {
       // Firefox approach: Use overlays with blend modes
-      if ($settings.nightMode) {
+      if (active) {
         // Create grayscale layer if it doesn't exist
         if (!grayscaleLayer) {
           grayscaleLayer = document.createElement('div');
@@ -72,7 +63,7 @@
       // Non-Firefox approach: Use CSS variables with SVG filter
       const rootElement = document.documentElement;
 
-      if ($settings.nightMode) {
+      if (active) {
         rootElement.style.setProperty('--night-mode-filter', 'url(#night-mode-filter)');
       } else {
         rootElement.style.setProperty('--night-mode-filter', 'none');
@@ -80,15 +71,10 @@
     }
   }
 
-  // Watch for changes to the night mode setting
-  $: if (browser && $settings) {
-    applyNightModeFilter();
+  // React to nightModeActive store changes (includes schedule-based activation)
+  $: if (browser) {
+    applyNightModeFilter($nightModeActive);
   }
-
-  // Set up
-  onMount(() => {
-    applyNightModeFilter();
-  });
 
   // Clean up
   onDestroy(() => {
