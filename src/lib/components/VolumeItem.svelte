@@ -45,6 +45,7 @@
   // Cloud backup state (for grid view menu)
   let cloudFiles = $state<Map<string, CloudVolumeWithProvider[]>>(new Map());
   let hasAuthenticatedProvider = $state(false);
+  let isFetchingCloud = $state(false);
 
   // Subscribe to cloud state for grid view
   $effect(() => {
@@ -52,12 +53,27 @@
       unifiedCloudManager.cloudFiles.subscribe((value) => {
         cloudFiles = value;
       }),
+      unifiedCloudManager.isFetching.subscribe((value) => {
+        isFetchingCloud = value;
+      }),
       providerManager.status.subscribe((value) => {
         hasAuthenticatedProvider = value.hasAnyAuthenticated;
       })
     ];
     return () => unsubscribers.forEach((unsub) => unsub());
   });
+
+  // Count total files in the Map for loading check
+  let totalCloudFiles = $derived.by(() => {
+    let count = 0;
+    for (const files of cloudFiles.values()) {
+      count += files.length;
+    }
+    return count;
+  });
+
+  // Check if cloud cache is still loading (fetching with no files yet)
+  let isCloudLoading = $derived(isFetchingCloud && totalCloudFiles === 0);
 
   // Check if this volume is backed up to cloud
   let cloudFile = $derived.by(() => {
@@ -351,17 +367,24 @@
           <span class="flex-1 text-left">View text</span>
         </DropdownItem>
         {#if hasAuthenticatedProvider}
-          <DropdownItem onclick={onBackupClicked} class="flex w-full items-center">
-            {#if isBackedUp}
+          {#if isCloudLoading}
+            <DropdownItem class="flex w-full items-center opacity-50" disabled>
+              <span class="me-2 h-5 w-5 flex-shrink-0 animate-spin">⏳</span>
+              <span class="flex-1 text-left text-gray-500">Loading cloud status...</span>
+            </DropdownItem>
+          {:else if isBackedUp}
+            <DropdownItem onclick={onBackupClicked} class="flex w-full items-center">
               <TrashBinSolid class="me-2 h-5 w-5 flex-shrink-0 text-red-500" />
               <span class="flex-1 text-left text-red-500">Delete from cloud</span>
-            {:else}
+            </DropdownItem>
+          {:else}
+            <DropdownItem onclick={onBackupClicked} class="flex w-full items-center">
               <CloudArrowUpOutline
                 class="me-2 h-5 w-5 flex-shrink-0 text-gray-700 dark:text-gray-200"
               />
               <span class="flex-1 text-left text-gray-700 dark:text-gray-200">Backup to cloud</span>
-            {/if}
-          </DropdownItem>
+            </DropdownItem>
+          {/if}
         {/if}
         <DropdownItem
           onclick={onDeleteClicked}

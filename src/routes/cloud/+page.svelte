@@ -30,12 +30,8 @@
   import type { VolumeMetadata } from '$lib/types';
 
   // Import multi-provider sync
-  import {
-    providerManager,
-    megaProvider,
-    webdavProvider,
-    googleDriveProvider
-  } from '$lib/util/sync';
+  // Note: Provider instances are lazy-loaded via providerManager.getOrLoadProvider()
+  import { providerManager } from '$lib/util/sync';
   import { queueVolumesFromCloudFiles } from '$lib/util/download-queue';
   import { unifiedSyncService } from '$lib/util/sync/unified-sync-service';
   import { cacheManager } from '$lib/util/sync/cache-manager';
@@ -235,15 +231,23 @@
 
   async function createPicker() {
     try {
+      // Lazy-load Google Drive provider for file picker functionality
+      const provider = await providerManager.getOrLoadProvider('google-drive');
+      // Cast to access Drive-specific methods
+      const driveProvider = provider as typeof provider & {
+        showFilePicker: () => Promise<Array<{ id: string; name: string | undefined; mimeType: string | undefined }>>;
+        getCloudFileMetadata: (files: Array<{ id: string; name: string | undefined; mimeType: string | undefined }>) => Promise<import('$lib/util/sync/provider-interface').CloudFileMetadata[]>;
+      };
+
       // Use provider's file picker - it handles all the Drive-specific logic
-      const pickedFiles = await googleDriveProvider.showFilePicker();
+      const pickedFiles = await driveProvider.showFilePicker();
 
       if (pickedFiles.length === 0) {
         return; // User cancelled or no files selected
       }
 
       // Fetch full metadata from Drive API
-      const cloudFiles = await googleDriveProvider.getCloudFileMetadata(pickedFiles);
+      const cloudFiles = await driveProvider.getCloudFileMetadata(pickedFiles);
 
       // Queue volumes for download via the unified queue system
       queueVolumesFromCloudFiles(cloudFiles);
@@ -338,10 +342,9 @@
       });
 
       // Set as current provider (auto-logs out any other provider)
-      const provider = providerManager.getProviderInstance('google-drive');
-      if (provider) {
-        await providerManager.setCurrentProvider(provider);
-      }
+      // Use getOrLoadProvider to ensure the provider is loaded (lazy-loading)
+      const provider = await providerManager.getOrLoadProvider('google-drive');
+      await providerManager.setCurrentProvider(provider);
 
       // After successful login, populate unified cache for placeholders
       showSnackbar('Connected to Google Drive - loading cloud data...');
@@ -365,6 +368,8 @@
   async function handleMegaLogin() {
     megaLoading = true;
     try {
+      // Lazy-load MEGA provider
+      const megaProvider = await providerManager.getOrLoadProvider('mega');
       await megaProvider.login({ email: megaEmail, password: megaPassword });
 
       // Set as current provider (auto-logs out any other provider)
@@ -405,11 +410,10 @@
   }
 
   async function handleMegaLogout() {
-    await megaProvider.logout();
+    // Use providerManager.logout() which handles provider logout and cache clearing
+    await providerManager.logout();
     megaEmail = '';
     megaPassword = '';
-    unifiedCloudManager.clearCache();
-    providerManager.updateStatus();
     showSnackbar('Logged out of MEGA');
   }
 
@@ -428,6 +432,8 @@
   async function handleWebDAVLogin() {
     webdavLoading = true;
     try {
+      // Lazy-load WebDAV provider
+      const webdavProvider = await providerManager.getOrLoadProvider('webdav');
       await webdavProvider.login({
         serverUrl: webdavUrl,
         username: webdavUsername,
@@ -458,12 +464,11 @@
   }
 
   async function handleWebDAVLogout() {
-    await webdavProvider.logout();
+    // Use providerManager.logout() which handles provider logout and cache clearing
+    await providerManager.logout();
     webdavUrl = '';
     webdavUsername = '';
     webdavPassword = '';
-    unifiedCloudManager.clearCache();
-    providerManager.updateStatus();
     showSnackbar('Logged out of WebDAV');
   }
 
