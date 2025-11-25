@@ -266,8 +266,21 @@ export class WebDAVProvider implements SyncProvider {
         format: 'binary'
       });
 
+      // Handle all possible response types (ArrayBuffer, typed arrays, etc.)
+      let arrayBuffer: ArrayBuffer;
+      if (content instanceof ArrayBuffer) {
+        arrayBuffer = content;
+      } else if (ArrayBuffer.isView(content)) {
+        // Handle typed arrays (Uint8Array, etc.)
+        // Create a new ArrayBuffer copy to avoid SharedArrayBuffer issues
+        const view = content as Uint8Array;
+        arrayBuffer = new Uint8Array(view).buffer as ArrayBuffer;
+      } else {
+        arrayBuffer = content as ArrayBuffer;
+      }
+
       // Convert to Blob
-      const blob = new Blob([content as ArrayBuffer]);
+      const blob = new Blob([arrayBuffer], { type: 'application/zip' });
       console.log(`✅ Downloaded ${file.path} from WebDAV`);
       return blob;
     } catch (error) {
