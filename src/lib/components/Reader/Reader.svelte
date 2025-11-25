@@ -14,6 +14,7 @@
   } from '$lib/panzoom';
   import {
     effectiveVolumeSettings,
+    invertColorsActive,
     progress,
     settings,
     updateProgress,
@@ -230,10 +231,23 @@
         toggleFullScreen();
         return;
       case 'KeyI':
-        updateSetting('invertColors', !$settings.invertColors);
+        if ($settings.invertColorsSchedule.enabled) {
+          showNotification('Invert is on automatic schedule', 'invert-scheduled');
+        } else {
+          updateSetting('invertColors', !$settings.invertColors);
+          showNotification($settings.invertColors ? 'Invert Off' : 'Invert On', 'invert-toggle');
+        }
         return;
       case 'KeyN':
-        updateSetting('nightMode', !$settings.nightMode);
+        if ($settings.nightModeSchedule.enabled) {
+          showNotification('Night mode is on automatic schedule', 'nightmode-scheduled');
+        } else {
+          updateSetting('nightMode', !$settings.nightMode);
+          showNotification(
+            $settings.nightMode ? 'Night Mode Off' : 'Night Mode On',
+            'nightmode-toggle'
+          );
+        }
         return;
       case 'KeyC':
         if (volume) {
@@ -857,7 +871,7 @@
       ></button>
       <div
         class="grid"
-        style:filter={`invert(${$settings.invertColors ? 1 : 0})`}
+        style:filter={`invert(${$invertColorsActive ? 1 : 0})`}
         ondblclick={onDoubleTap}
         role="none"
         id="manga-panel"
