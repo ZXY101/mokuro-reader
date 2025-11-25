@@ -3,7 +3,8 @@ import type {
   SyncProvider,
   ProviderStatus,
   CloudFileMetadata,
-  DriveFileMetadata
+  DriveFileMetadata,
+  StorageQuota
 } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import { tokenManager } from '$lib/util/sync/providers/google-drive/token-manager';
@@ -617,6 +618,46 @@ export class GoogleDriveProvider implements SyncProvider {
         'METADATA_FETCH_FAILED',
         false,
         false
+      );
+    }
+  }
+
+  /**
+   * Get storage quota information from Google Drive
+   * Returns used, total, and available storage in bytes
+   */
+  async getStorageQuota(): Promise<StorageQuota> {
+    if (!this.isAuthenticated()) {
+      throw new ProviderError('Not authenticated', 'google-drive', 'NOT_AUTHENTICATED', true);
+    }
+
+    await this.ensureInitialized();
+
+    try {
+      const response = await gapi.client.drive.about.get({
+        fields: 'storageQuota'
+      });
+
+      const quota = response.result.storageQuota;
+      if (!quota) {
+        throw new Error('No storage quota information available');
+      }
+
+      const used = parseInt(quota.usage || '0', 10);
+      const total = quota.limit ? parseInt(quota.limit, 10) : null;
+
+      return {
+        used,
+        total,
+        available: total !== null ? total - used : null
+      };
+    } catch (error) {
+      throw new ProviderError(
+        `Failed to get storage quota: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'google-drive',
+        'QUOTA_FETCH_FAILED',
+        false,
+        true
       );
     }
   }

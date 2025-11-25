@@ -1,5 +1,10 @@
 import { browser } from '$app/environment';
-import type { SyncProvider, ProviderCredentials, ProviderStatus } from '../../provider-interface';
+import type {
+  SyncProvider,
+  ProviderCredentials,
+  ProviderStatus,
+  StorageQuota
+} from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import type { WebDAVClient } from 'webdav';
 
@@ -261,8 +266,21 @@ export class WebDAVProvider implements SyncProvider {
         format: 'binary'
       });
 
+      // Handle all possible response types (ArrayBuffer, typed arrays, etc.)
+      let arrayBuffer: ArrayBuffer;
+      if (content instanceof ArrayBuffer) {
+        arrayBuffer = content;
+      } else if (ArrayBuffer.isView(content)) {
+        // Handle typed arrays (Uint8Array, etc.)
+        // Create a new ArrayBuffer copy to avoid SharedArrayBuffer issues
+        const view = content as Uint8Array;
+        arrayBuffer = new Uint8Array(view).buffer as ArrayBuffer;
+      } else {
+        arrayBuffer = content as ArrayBuffer;
+      }
+
       // Convert to Blob
-      const blob = new Blob([content as ArrayBuffer]);
+      const blob = new Blob([arrayBuffer], { type: 'application/zip' });
       console.log(`✅ Downloaded ${file.path} from WebDAV`);
       return blob;
     } catch (error) {
@@ -293,6 +311,52 @@ export class WebDAVProvider implements SyncProvider {
         false,
         true
       );
+    }
+  }
+
+  /**
+   * Get storage quota information from WebDAV server
+   * Returns used, total, and available storage in bytes
+   * Note: Not all WebDAV servers support quota reporting (RFC 4331)
+   */
+  async getStorageQuota(): Promise<StorageQuota> {
+    if (!this.isAuthenticated() || !this.client) {
+      throw new ProviderError('Not authenticated', 'webdav', 'NOT_AUTHENTICATED', true);
+    }
+
+    try {
+      // WebDAV library's getQuota() returns DiskQuota | ResponseDataDetailed<DiskQuota | null>
+      const response = await this.client.getQuota();
+
+      // Handle ResponseDataDetailed wrapper (when details option is used)
+      const quota =
+        response && typeof response === 'object' && 'data' in response ? response.data : response;
+
+      if (quota && typeof quota === 'object' && 'used' in quota) {
+        const used = (quota as { used?: number; available?: number }).used || 0;
+        const available = (quota as { used?: number; available?: number }).available ?? null;
+        const total = available !== null ? used + available : null;
+
+        return {
+          used,
+          total,
+          available
+        };
+      }
+
+      // Server doesn't provide quota info
+      return {
+        used: 0,
+        total: null,
+        available: null
+      };
+    } catch {
+      // Many WebDAV servers don't support quota - return unknown
+      return {
+        used: 0,
+        total: null,
+        available: null
+      };
     }
   }
 }
