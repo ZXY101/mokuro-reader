@@ -12,6 +12,8 @@ import { driveApiClient } from '$lib/util/sync/providers/google-drive/api-client
 import { driveFilesCache } from '$lib/util/sync/providers/google-drive/drive-files-cache';
 import { GOOGLE_DRIVE_CONFIG } from '$lib/util/sync/providers/google-drive/constants';
 import { getOrCreateFolder, findFile } from '$lib/util/backup';
+import { cacheManager } from '../../cache-manager';
+import { setActiveProviderKey, clearActiveProviderKey } from '../../provider-detection';
 
 /**
  * Metadata for a file selected from the Google Drive file picker
@@ -140,6 +142,8 @@ export class GoogleDriveProvider implements SyncProvider {
         });
       });
 
+      // Set the active provider key for lazy loading on next startup
+      setActiveProviderKey('google-drive');
       console.log('✅ Google Drive login successful');
     } catch (error) {
       throw new ProviderError(
@@ -156,6 +160,8 @@ export class GoogleDriveProvider implements SyncProvider {
     await tokenManager.logout();
     this.readerFolderId = null;
     this.initializePromise = null; // Reset initialization state
+    // Clear the active provider key
+    clearActiveProviderKey();
     console.log('Google Drive logged out');
   }
 
@@ -695,3 +701,6 @@ export class GoogleDriveProvider implements SyncProvider {
 }
 
 export const googleDriveProvider = new GoogleDriveProvider();
+
+// Self-register cache when module is loaded
+cacheManager.registerCache('google-drive', driveFilesCache);

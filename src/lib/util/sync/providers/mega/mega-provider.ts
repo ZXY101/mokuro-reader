@@ -8,6 +8,8 @@ import type {
 } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
 import { megaCache } from './mega-cache';
+import { cacheManager } from '../../cache-manager';
+import { setActiveProviderKey, clearActiveProviderKey } from '../../provider-detection';
 
 interface MegaCredentials {
   email: string;
@@ -215,6 +217,8 @@ export class MegaProvider implements SyncProvider {
         localStorage.setItem(STORAGE_KEYS.PASSWORD, password);
       }
 
+      // Set the active provider key for lazy loading on next startup
+      setActiveProviderKey('mega');
       console.log('✅ MEGA login successful');
     } catch (error) {
       this.storage = null;
@@ -239,6 +243,8 @@ export class MegaProvider implements SyncProvider {
       localStorage.removeItem(STORAGE_KEYS.FOLDER_PATH);
     }
 
+    // Clear the active provider key
+    clearActiveProviderKey();
     console.log('MEGA logged out');
   }
 
@@ -964,3 +970,6 @@ export class MegaProvider implements SyncProvider {
 }
 
 export const megaProvider = new MegaProvider();
+
+// Self-register cache when module is loaded
+cacheManager.registerCache('mega', megaCache);

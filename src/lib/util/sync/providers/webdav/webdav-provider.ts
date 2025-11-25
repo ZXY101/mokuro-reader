@@ -6,6 +6,7 @@ import type {
   StorageQuota
 } from '../../provider-interface';
 import { ProviderError } from '../../provider-interface';
+import { setActiveProviderKey, clearActiveProviderKey } from '../../provider-detection';
 import type { WebDAVClient } from 'webdav';
 
 interface WebDAVCredentials {
@@ -112,6 +113,8 @@ export class WebDAVProvider implements SyncProvider {
         localStorage.setItem(STORAGE_KEYS.PASSWORD, password);
       }
 
+      // Set the active provider key for lazy loading on next startup
+      setActiveProviderKey('webdav');
       console.log('✅ WebDAV login successful');
     } catch (error) {
       this.client = null;
@@ -141,6 +144,8 @@ export class WebDAVProvider implements SyncProvider {
       localStorage.removeItem(STORAGE_KEYS.PASSWORD);
     }
 
+    // Clear the active provider key
+    clearActiveProviderKey();
     console.log('WebDAV logged out');
   }
 
