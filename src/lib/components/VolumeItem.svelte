@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { page } from '$app/stores';
   import { deleteVolume, progress, volumes } from '$lib/settings';
   import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
   import type { VolumeMetadata, Page } from '$lib/types';
@@ -14,8 +13,9 @@
     CloudArrowUpOutline,
     ImageOutline
   } from 'flowbite-svelte-icons';
-  import { goto } from '$app/navigation';
   import { db } from '$lib/catalog/db';
+  import { nav, routeParams } from '$lib/util/navigation';
+  import { isPWA } from '$lib/util/pwa';
   import BackupButton from './BackupButton.svelte';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
@@ -211,10 +211,10 @@
           .equals(volume.series_uuid)
           .count();
 
-        if (remainingVolumes > 0) {
-          goto(`/${$page.params.manga}`);
+        if (remainingVolumes > 0 && $routeParams.manga) {
+          nav.toSeries($routeParams.manga);
         } else {
-          goto('/');
+          nav.toCatalog();
         }
       },
       undefined,
@@ -235,7 +235,8 @@
 
   function onViewTextClicked(e: Event) {
     e.stopPropagation();
-    goto(`/${$page.params.manga}/${volume_uuid}/text`);
+    const seriesId = $routeParams.manga;
+    if (seriesId) nav.toVolumeText(seriesId, volume_uuid);
   }
 
   async function onBackupClicked(e: Event) {
@@ -267,12 +268,15 @@
   }
 </script>
 
-{#if $page.params.manga}
+{#if $routeParams.manga}
   {#if variant === 'list'}
     <div
       class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-gray-600 dark:border-gray-700"
     >
-      <ListgroupItem onclick={() => goto(`/${$page.params.manga}/${volume_uuid}`)} class="py-4">
+      <ListgroupItem
+        onclick={() => $routeParams.manga && nav.toReader($routeParams.manga, volume_uuid)}
+        class="py-4"
+      >
         {#if volume.thumbnail}
           <img
             src={URL.createObjectURL(volume.thumbnail)}
@@ -368,7 +372,14 @@
         </DropdownItem>
       </Dropdown>
 
-      <a href="/{$page.params.manga}/{volume_uuid}" class="flex flex-col gap-2">
+      <a
+        href={$isPWA ? undefined : `/${$routeParams.manga}/${volume_uuid}`}
+        onclick={(e) => {
+          if ($isPWA) e.preventDefault();
+          if ($routeParams.manga) nav.toReader($routeParams.manga, volume_uuid);
+        }}
+        class="flex flex-col gap-2"
+      >
         <div class="flex items-center justify-center sm:h-[350px] sm:w-[250px]">
           {#if volume.thumbnail}
             <img

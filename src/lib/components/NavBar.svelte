@@ -7,8 +7,7 @@
     RefreshOutline,
     ChartLineUpOutline
   } from 'flowbite-svelte-icons';
-  import { afterNavigate, goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { nav, isOnReader } from '$lib/util/navigation';
   import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
@@ -89,11 +88,11 @@
   }
 
   function navigateToCloud() {
-    goto('/cloud');
+    nav.toCloud();
   }
 
   function navigateToReadingSpeed() {
-    goto('/reading-speed');
+    nav.toReadingSpeed();
   }
 
   async function handleSync() {
@@ -117,8 +116,10 @@
     }
   }
 
-  afterNavigate(() => {
-    isReader = $page.route.id === '/[manga]/[volume]';
+  // Reactively update reader state - works for both browser mode (URL-based)
+  // and PWA mode (view state-based)
+  $effect(() => {
+    isReader = $isOnReader;
 
     if (isReader) {
       window.document.body.classList.add('reader');
