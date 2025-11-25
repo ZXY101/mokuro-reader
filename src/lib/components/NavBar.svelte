@@ -7,7 +7,6 @@
     RefreshOutline,
     ChartLineUpOutline
   } from 'flowbite-svelte-icons';
-  import { afterNavigate } from '$app/navigation';
   import { nav, isOnReader } from '$lib/util/navigation';
   import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
@@ -117,7 +116,9 @@
     }
   }
 
-  afterNavigate(() => {
+  // Reactively update reader state - works for both browser mode (URL-based)
+  // and PWA mode (view state-based)
+  $effect(() => {
     isReader = $isOnReader;
 
     if (isReader) {

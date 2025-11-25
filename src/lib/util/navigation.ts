@@ -110,6 +110,29 @@ export const nav = {
 };
 
 /**
+ * Convert URL params and pathname to a View object
+ */
+export function urlToView(params: { manga?: string; volume?: string }, pathname: string): View {
+  if (pathname === '/cloud') {
+    return { type: 'cloud' };
+  } else if (pathname === '/upload') {
+    return { type: 'upload' };
+  } else if (pathname === '/reading-speed') {
+    return { type: 'reading-speed' };
+  } else if (params.volume && pathname.endsWith('/text')) {
+    return { type: 'volume-text', seriesId: params.manga!, volumeId: params.volume };
+  } else if (params.manga && pathname.endsWith('/text')) {
+    return { type: 'series-text', seriesId: params.manga };
+  } else if (params.volume) {
+    return { type: 'reader', seriesId: params.manga!, volumeId: params.volume };
+  } else if (params.manga) {
+    return { type: 'series', seriesId: params.manga };
+  } else {
+    return { type: 'catalog' };
+  }
+}
+
+/**
  * Initialize view state from current URL (for browser mode page loads)
  * Call this on app initialization to sync URL -> view state
  */
@@ -120,23 +143,7 @@ export function initViewFromUrl(
   // Don't override if already in PWA mode
   if (get(isPWA)) return;
 
-  if (pathname === '/cloud') {
-    currentView.set({ type: 'cloud' });
-  } else if (pathname === '/upload') {
-    currentView.set({ type: 'upload' });
-  } else if (pathname === '/reading-speed') {
-    currentView.set({ type: 'reading-speed' });
-  } else if (params.volume && pathname.endsWith('/text')) {
-    currentView.set({ type: 'volume-text', seriesId: params.manga!, volumeId: params.volume });
-  } else if (params.manga && pathname.endsWith('/text')) {
-    currentView.set({ type: 'series-text', seriesId: params.manga });
-  } else if (params.volume) {
-    currentView.set({ type: 'reader', seriesId: params.manga!, volumeId: params.volume });
-  } else if (params.manga) {
-    currentView.set({ type: 'series', seriesId: params.manga });
-  } else {
-    currentView.set({ type: 'catalog' });
-  }
+  currentView.set(urlToView(params, pathname));
 }
 
 /**

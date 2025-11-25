@@ -17,6 +17,7 @@
     'volume-text': () => import('../../routes/[manga]/[volume]/text/+page.svelte'),
     'series-text': () => import('../../routes/[manga]/text/+page.svelte'),
     cloud: () => import('../../routes/cloud/+page.svelte'),
+    upload: () => import('../../routes/upload/+page.svelte'),
     'reading-speed': () => import('../../routes/reading-speed/+page.svelte')
   };
 
