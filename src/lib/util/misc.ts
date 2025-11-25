@@ -27,9 +27,7 @@ export function debounce(func: () => void, timeout = 50) {
 }
 
 export function toClipboard() {
-  navigator.clipboard.writeText(
-    'pip3 install git+https://github.com/kha-white/mokuro.git@web-reader'
-  );
+  navigator.clipboard.writeText('pip install mokuro');
   showSnackbar('Copied to clipboard');
 }
 

@@ -119,13 +119,11 @@
         <div class="flex flex-col gap-5">
           <div>
             <p>
-              Firstly, ensure that you process your manga with the <b>0.2.0-beta.6</b> of mokuro, you
-              can install it by running the following command:
+              Firstly, ensure that you process your manga with mokuro <b>0.2.0</b> or later, which you
+              can install by running the following command:
             </p>
             <div role="none" onclick={toClipboard}>
-              <code class="bg-slate-900 text-primary-600"
-                >pip3 install git+https://github.com/kha-white/mokuro.git@web-reader</code
-              >
+              <code class="bg-slate-900 text-primary-600">pip install mokuro</code>
             </div>
           </div>
           <p>
