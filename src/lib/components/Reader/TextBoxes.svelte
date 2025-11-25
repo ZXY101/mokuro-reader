@@ -98,7 +98,8 @@
   // Track which textboxes have been processed
   let processedTextBoxes = $state<Set<number>>(new Set());
 
-  // Calculate optimal font size for a textbox
+  // Calculate optimal font size for a textbox using binary search
+  // Two-phase approach: scale up until overflow, then find the goldilocks size
   function calculateOptimalFontSize(element: HTMLDivElement, initialFontSize: string) {
     // Parse the initial font size to get numeric value
     const match = initialFontSize.match(/(\d+(?:\.\d+)?)(px|pt)/);
@@ -107,58 +108,87 @@
     const originalSize = parseFloat(match[1]);
     const unit = match[2];
     const minFontSize = 8; // Minimum font size in px
+    const maxFontSize = 200; // Maximum font size to try when scaling up
 
     // Convert to px for consistent handling
-    let originalInPx = unit === 'pt' ? originalSize * 1.333 : originalSize;
+    const originalInPx = unit === 'pt' ? originalSize * 1.333 : originalSize;
 
-    // Check if content overflows
-    const isOverflowing = () => {
+    // Check if content overflows at a given font size
+    const isOverflowingAt = (size: number) => {
+      element.style.fontSize = `${size}px`;
       return (
         element.scrollHeight > element.clientHeight || element.scrollWidth > element.clientWidth
       );
     };
 
-    // Test nowrap mode: reduce font size until it fits
+    // Binary search to find the largest font size that fits
+    // Searches between low (fits) and high (overflows or max)
+    const findOptimalSize = () => {
+      // Phase 1: Find upper bound by scaling up until overflow
+      let low = minFontSize;
+      let high = originalInPx;
+
+      // If original fits, try scaling up to find the true max
+      if (!isOverflowingAt(originalInPx)) {
+        // Double until we overflow or hit max
+        high = originalInPx;
+        while (!isOverflowingAt(high) && high < maxFontSize) {
+          low = high;
+          high = Math.min(high * 2, maxFontSize);
+        }
+        // If we're at max and still not overflowing, use max
+        if (!isOverflowingAt(high)) {
+          return high;
+        }
+      } else {
+        // Original overflows, check if min fits
+        if (isOverflowingAt(minFontSize)) {
+          return minFontSize;
+        }
+        low = minFontSize;
+        high = originalInPx;
+      }
+
+      // Phase 2: Binary search between low (fits) and high (overflows)
+      while (high - low > 1) {
+        const mid = Math.floor((low + high) / 2);
+        if (isOverflowingAt(mid)) {
+          high = mid;
+        } else {
+          low = mid;
+        }
+      }
+
+      return low;
+    };
+
+    // Step 1: Find optimal size without wrapping
     element.style.whiteSpace = 'nowrap';
     element.style.wordWrap = 'normal';
     element.style.overflowWrap = 'normal';
-    element.style.fontSize = `${originalInPx}px`;
+    const noWrapSize = findOptimalSize();
 
-    let noWrapSize = originalInPx;
-    while (isOverflowing() && noWrapSize > minFontSize) {
-      noWrapSize -= 1;
-      element.style.fontSize = `${noWrapSize}px`;
-    }
-
-    // Test wrap mode: reduce font size until it fits
+    // Step 2: Only try wrapping if it could give us 1.3x the font size
+    // Quick check: would 1.3x the noWrapSize overflow with wrapping?
     element.style.whiteSpace = 'normal';
     element.style.wordWrap = 'break-word';
     element.style.overflowWrap = 'break-word';
-    element.style.fontSize = `${originalInPx}px`;
 
-    let wrapSize = originalInPx;
-    while (isOverflowing() && wrapSize > minFontSize) {
-      wrapSize -= 1;
-      element.style.fontSize = `${wrapSize}px`;
+    const thresholdSize = noWrapSize * 1.3;
+    if (!isOverflowingAt(thresholdSize)) {
+      // Wrapping allows at least 1.3x - search for the actual optimal wrap size
+      const wrapSize = findOptimalSize();
+      return {
+        finalSize: wrapSize,
+        useWrapping: true,
+        originalInPx
+      };
     }
 
-    // Choose the mode that allows larger font size (prefer wrapping if 1.2x better)
-    let finalSize: number;
-    let useWrapping: boolean;
-
-    if (wrapSize >= noWrapSize * 1.2) {
-      // Wrapping allows significantly larger font
-      finalSize = wrapSize;
-      useWrapping = true;
-    } else {
-      // Nowrap is better or wrapping doesn't help enough
-      finalSize = noWrapSize;
-      useWrapping = false;
-    }
-
+    // Wrapping doesn't help enough, use nowrap
     return {
-      finalSize,
-      useWrapping,
+      finalSize: noWrapSize,
+      useWrapping: false,
       originalInPx
     };
   }
