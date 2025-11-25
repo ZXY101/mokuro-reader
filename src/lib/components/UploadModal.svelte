@@ -115,35 +115,45 @@
   {:then}
     <Accordion flush>
       <AccordionItem>
-        {#snippet header()}What to upload?{/snippet}
-        <div class="flex flex-col gap-5">
-          <div>
-            <p>
-              Firstly, ensure that you process your manga with mokuro <b>0.2.0</b> or later, which you
-              can install by running the following command:
-            </p>
-            <div role="none" onclick={toClipboard}>
-              <code class="bg-slate-900 text-primary-600">pip install mokuro</code>
-            </div>
-          </div>
+        {#snippet header()}Supported formats{/snippet}
+        <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
+          <p>Upload manga as <b>ZIP</b>, <b>CBZ</b>, folders, or loose files.</p>
           <p>
-            This will generate a <code>.mokuro</code> file for each volume processed, upload your
-            manga along with the <code>.mokuro</code> files.
+            For selectable text overlays, include the <code>.mokuro</code> file with your images. Without
+            it, volumes are imported as image-only comics — useful for reference copies in other languages.
           </p>
           <p>
-            {#if isMobileDevice}
-              <b>Note:</b> On mobile devices, directory upload is not supported. Please zip your
-              manga first and then upload it via
-              <code class="bg-slate-900 text-primary-600">choose files</code>.
-            {:else}
-              On mobile devices, directory upload is not supported. If you're using a mobile device,
-              you will need to zip your manga first and then upload it via
-              <code class="bg-slate-900 text-primary-600">choose files</code>.
-            {/if}
+            The reader handles nested archives, mixed folders, and special characters in filenames
+            automatically.
+          </p>
+        </div>
+      </AccordionItem>
+      <AccordionItem>
+        {#snippet header()}Creating mokuro files{/snippet}
+        <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
+          <p>
+            Process your manga with <b>mokuro 0.2.0</b> or later to generate
+            <code>.mokuro</code> files with OCR text:
+          </p>
+          <div role="none" onclick={toClipboard}>
+            <code class="bg-slate-900 text-primary-600">pip install mokuro</code>
+          </div>
+          <p class="text-sm">
+            See the <a
+              href="https://github.com/kha-white/mokuro"
+              target="_blank"
+              class="text-primary-600 hover:underline dark:text-primary-500">mokuro documentation</a
+            > for usage instructions.
           </p>
         </div>
       </AccordionItem>
     </Accordion>
+    {#if isMobileDevice}
+      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
+        <b>Tip:</b> Mobile uploads can be tricky. For the easiest experience, upload on your computer
+        and use cloud sync to access your library here.
+      </p>
+    {/if}
     <Dropzone
       id="dropzone"
       ondrop={dropHandle}
@@ -181,7 +191,7 @@
         </p>
       {:else if draggedFiles && draggedFiles.length > 0}
         <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-          Upload {draggedFiles.length} hih
+          Upload {draggedFiles.length}
           {draggedFiles.length > 1 ? 'files' : 'file'}?
         </p>
       {:else if loading}
