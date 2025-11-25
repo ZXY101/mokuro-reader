@@ -10,7 +10,9 @@
   import ImageOnlyImportModal from '$lib/components/ImageOnlyImportModal.svelte';
   import ProgressTracker from '$lib/components/ProgressTracker.svelte';
   import NightModeFilter from '$lib/components/NightModeFilter.svelte';
+  import GlobalDropZone from '$lib/components/GlobalDropZone.svelte';
   import { initializeProviders } from '$lib/util/sync/init-providers';
+  import { initFileHandler } from '$lib/util/file-handler';
 
   interface Props {
     children?: import('svelte').Snippet;
@@ -26,6 +28,9 @@
     initializeProviders().catch((error) => {
       console.error('Failed to initialize providers:', error);
     });
+
+    // Initialize file handler for PWA file associations
+    initFileHandler();
   });
 </script>
 
@@ -38,4 +43,5 @@
   <ImageOnlyImportModal />
   <ProgressTracker />
   <NightModeFilter />
+  <GlobalDropZone />
 </div>

@@ -12,6 +12,8 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 - Cloud sync support (Google Drive and MEGA) for syncing read progress and volumes across devices
 - Automatic dual-page mode
 - Installation and offline support
+- Drag-and-drop import anywhere in the app
+- PWA file association for `.cbz` files (double-click to open)
 
 ## 🚀 Usage:
 
