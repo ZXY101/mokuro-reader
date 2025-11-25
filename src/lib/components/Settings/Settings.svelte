@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Accordion, Button, CloseButton, Drawer } from 'flowbite-svelte';
+  import { Accordion, Button, Drawer } from 'flowbite-svelte';
   import { UserSettingsSolid } from 'flowbite-svelte-icons';
   import { sineIn } from 'svelte/easing';
   import { resetSettings } from '$lib/settings';
@@ -52,15 +52,12 @@
   bind:open
   id="settings"
 >
-  <div class="flex items-center">
-    <h5
-      id="drawer-label"
-      class="mb-4 inline-flex items-center text-base font-semibold text-gray-900 dark:text-white"
-    >
-      <UserSettingsSolid class="mr-2.5 h-4 w-4" />Settings
-    </h5>
-    <CloseButton onclick={onClose} class="mb-4 dark:text-white" />
-  </div>
+  <h5
+    id="drawer-label"
+    class="mb-4 inline-flex items-center text-base font-semibold text-gray-900 dark:text-white"
+  >
+    <UserSettingsSolid class="mr-2.5 h-4 w-4" />Settings
+  </h5>
   <div class="flex flex-col gap-5">
     <Accordion flush>
       <QuickAccess bind:open />
