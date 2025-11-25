@@ -49,6 +49,7 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 - **Text Analysis Tools** - Dedicated text pages for both volumes and series for analysis by browser extensions
 - **Advanced Sorting** - Multiple sorting modes for catalog and series pages
 - **Robust Import System** - Handles complex arrangements of ZIPs, CBZs, files, folders, and mokuro files
+- **Drag-and-Drop Import** - Import files by dropping them anywhere in the app
 - **Flexible File Handling** - Much more robust handling of special characters in file and folder names
 - **Batch Operations** - Efficient handling of large volume collections
 
@@ -60,6 +61,7 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 - **Optimized Database** - Restructured to prevent out-of-memory errors on long series
 - **Image Caching** - Intelligent caching system for faster page loads
 - **Service Worker Support** - PWA capabilities with offline functionality
+- **PWA File Association** - Double-click `.cbz` files to open directly in the reader
 
 ## ⌨️ Keyboard Shortcuts
 
