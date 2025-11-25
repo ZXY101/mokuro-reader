@@ -2,7 +2,7 @@
   import { READER_VERSION } from '$lib/consts';
   import { toClipboard } from '$lib/util';
   import { A, AccordionItem, Helper } from 'flowbite-svelte';
-  import { GithubSolid } from 'flowbite-svelte-icons';
+  import { DiscordSolid, GithubSolid } from 'flowbite-svelte-icons';
 </script>
 
 <AccordionItem>
@@ -10,13 +10,22 @@
   <div class="flex flex-col gap-5">
     <div class="flex flex-row justify-between">
       <p class="font-semibold text-gray-900 dark:text-white">Mokuro reader {READER_VERSION}</p>
-      <a
-        class="text-gray-900 hover:text-primary-600 dark:text-white"
-        href="https://github.com/ZXY101/mokuro-reader"
-        target="_blank"
-      >
-        <GithubSolid />
-      </a>
+      <div class="flex gap-3">
+        <a
+          class="text-gray-900 hover:text-primary-600 dark:text-white"
+          href="https://discord.gg/AU5pjjSQBw"
+          target="_blank"
+        >
+          <DiscordSolid />
+        </a>
+        <a
+          class="text-gray-900 hover:text-primary-600 dark:text-white"
+          href="https://github.com/ZXY101/mokuro-reader"
+          target="_blank"
+        >
+          <GithubSolid />
+        </a>
+      </div>
     </div>
     <p class="text-gray-900 dark:text-white">
       An online reader, gallery and stat tracker for <A href="https://github.com/kha-white/mokuro"
