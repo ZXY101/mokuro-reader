@@ -235,8 +235,12 @@
       const provider = await providerManager.getOrLoadProvider('google-drive');
       // Cast to access Drive-specific methods
       const driveProvider = provider as typeof provider & {
-        showFilePicker: () => Promise<Array<{ id: string; name: string | undefined; mimeType: string | undefined }>>;
-        getCloudFileMetadata: (files: Array<{ id: string; name: string | undefined; mimeType: string | undefined }>) => Promise<import('$lib/util/sync/provider-interface').CloudFileMetadata[]>;
+        showFilePicker: () => Promise<
+          Array<{ id: string; name: string | undefined; mimeType: string | undefined }>
+        >;
+        getCloudFileMetadata: (
+          files: Array<{ id: string; name: string | undefined; mimeType: string | undefined }>
+        ) => Promise<import('$lib/util/sync/provider-interface').CloudFileMetadata[]>;
       };
 
       // Use provider's file picker - it handles all the Drive-specific logic
