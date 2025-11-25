@@ -22,7 +22,10 @@
     <hr class="border-gray-100 opacity-10" />
     <ReaderToggles />
     <div>
-      <Label>Swipe threshold</Label>
+      <Label>
+        Swipe threshold
+        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(Mobile only)</span>
+      </Label>
       <Range
         onchange={onSwipeChange}
         min={20}
