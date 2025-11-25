@@ -172,16 +172,16 @@
         </div>
       </AccordionItem>
       <AccordionItem>
-        {#snippet header()}Mobile limitations{/snippet}
+        {#snippet header()}Mobile tips{/snippet}
         <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
           <p>
-            Mobile browsers have limited file pickers and folder selection often doesn't work.
-            Devices may also lack the RAM to extract large ZIP files, causing crashes during import.
+            Importing on mobile works best with smaller files. ZIP or CBZ individual volumes rather
+            than entire series — folder selection usually doesn't work, and large archives may crash
+            due to RAM limits.
           </p>
           <p>
-            <b>Recommended:</b> Import on a computer and back up to Google Drive or MEGA (free). On mobile,
-            download individual volumes from the cloud — bypasses the file picker and extracts smaller
-            files without crashing.
+            <b>Easiest method:</b> Import on a computer and back up to Google Drive or MEGA (free). Then
+            on mobile, grab volumes from the cloud with a tap — works reliably where direct imports don't.
           </p>
         </div>
       </AccordionItem>
