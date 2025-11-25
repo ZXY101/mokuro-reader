@@ -6,6 +6,8 @@
  * @see https://developer.chrome.com/docs/capabilities/web-apis/file-handling
  */
 
+/* eslint-disable no-undef */
+
 import { processFiles } from '$lib/upload';
 import { showSnackbar } from '$lib/util/snackbar';
 

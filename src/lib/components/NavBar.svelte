@@ -7,8 +7,8 @@
     RefreshOutline,
     ChartLineUpOutline
   } from 'flowbite-svelte-icons';
-  import { afterNavigate, goto } from '$app/navigation';
-  import { page } from '$app/stores';
+  import { afterNavigate } from '$app/navigation';
+  import { nav, isOnReader } from '$lib/util/navigation';
   import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
@@ -89,11 +89,11 @@
   }
 
   function navigateToCloud() {
-    goto('/cloud');
+    nav.toCloud();
   }
 
   function navigateToReadingSpeed() {
-    goto('/reading-speed');
+    nav.toReadingSpeed();
   }
 
   async function handleSync() {
@@ -118,7 +118,7 @@
   }
 
   afterNavigate(() => {
-    isReader = $page.route.id === '/[manga]/[volume]';
+    isReader = $isOnReader;
 
     if (isReader) {
       window.document.body.classList.add('reader');
