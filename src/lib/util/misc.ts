@@ -26,9 +26,13 @@ export function debounce(func: () => void, timeout = 50) {
   }
 }
 
-export function toClipboard() {
-  navigator.clipboard.writeText('pip install mokuro');
-  showSnackbar('Copied to clipboard');
+export function toClipboard(event: MouseEvent) {
+  const target = event.currentTarget as HTMLElement;
+  const text = target.textContent?.trim() || '';
+  if (text) {
+    navigator.clipboard.writeText(text);
+    showSnackbar('Copied to clipboard');
+  }
 }
 
 type ExtaticPayload = {

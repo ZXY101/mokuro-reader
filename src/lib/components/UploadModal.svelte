@@ -32,7 +32,7 @@
     );
   }
 
-  async function onUpload() {
+  async function onImport() {
     if (files) {
       promise = processFiles([...files]).then(() => {
         open = false;
@@ -57,7 +57,7 @@
 
     navigator?.storage?.estimate().then(({ usage, quota }) => {
       if (usage && quota) {
-        storageSpace = `Storage: ${formatBytes(usage)} / ${formatBytes(quota)}`;
+        storageSpace = `Browser storage: ${formatBytes(usage)} / ${formatBytes(quota)}`;
       }
     });
   });
@@ -108,21 +108,34 @@
   let activeStyle = $state(defaultStyle);
 </script>
 
-<Modal title="Upload" bind:open outsideclose onclose={reset}>
+<Modal title="Import" bind:open outsideclose onclose={reset}>
   {#await promise}
-    <h2 class="flex justify-center">Loading...</h2>
+    <h2 class="flex justify-center">Importing...</h2>
     <div class="text-center"><Spinner /></div>
   {:then}
     <Accordion flush>
       <AccordionItem>
-        {#snippet header()}Supported formats{/snippet}
+        {#snippet header()}What can I add?{/snippet}
         <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
-          <p>Upload manga as <b>ZIP</b>, <b>CBZ</b>, folders, or loose files.</p>
           <p>
-            For selectable text overlays, include the <code>.mokuro</code> file with your images. Without
-            it, volumes are imported as image-only comics — useful for reference copies in other languages.
+            This reader is designed for manga processed with <a
+              href="https://github.com/kha-white/mokuro"
+              target="_blank"
+              class="text-primary-600 hover:underline dark:text-primary-500">mokuro</a
+            >, which extracts Japanese text from manga pages for use with popup dictionaries like
+            Yomitan.
           </p>
           <p>
+            To add a volume, provide your manga images (as a <b>ZIP</b>, <b>CBZ</b>, or folder)
+            along with the <code>.mokuro</code> file that contains the OCR text data. The reader pairs
+            them automatically — whether the mokuro file is inside the archive, alongside it, or in a
+            parent folder.
+          </p>
+          <p>
+            <b>Image-only comics:</b> You can also add comics without a <code>.mokuro</code> file. These
+            won't have text overlays, but are useful for reference copies in other languages.
+          </p>
+          <p class="text-sm text-gray-500 dark:text-gray-400">
             The reader handles nested archives, mixed folders, and special characters in filenames
             automatically.
           </p>
@@ -132,28 +145,48 @@
         {#snippet header()}Creating mokuro files{/snippet}
         <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
           <p>
-            Process your manga with <b>mokuro 0.2.0</b> or later to generate
-            <code>.mokuro</code> files with OCR text:
+            <a
+              href="https://github.com/kha-white/mokuro"
+              target="_blank"
+              class="text-primary-600 hover:underline dark:text-primary-500">Mokuro</a
+            >
+            is an OCR tool that analyzes manga pages and extracts Japanese text. It generates a
+            <code>.mokuro</code> file for each volume, which this reader uses to display selectable text
+            overlays on top of your manga images.
           </p>
+          <p>Install mokuro (<b>0.2.0</b> or later required):</p>
           <div role="none" onclick={toClipboard}>
             <code class="bg-slate-900 text-primary-600">pip install mokuro</code>
+          </div>
+          <p>Then run it on your manga folder:</p>
+          <div role="none" onclick={toClipboard}>
+            <code class="bg-slate-900 text-primary-600">mokuro /path/to/manga/volume</code>
           </div>
           <p class="text-sm">
             See the <a
               href="https://github.com/kha-white/mokuro"
               target="_blank"
               class="text-primary-600 hover:underline dark:text-primary-500">mokuro documentation</a
-            > for usage instructions.
+            > for detailed usage and options.
+          </p>
+        </div>
+      </AccordionItem>
+      <AccordionItem>
+        {#snippet header()}Mobile limitations{/snippet}
+        <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
+          <p>
+            Mobile browsers have restrictions that make importing files more difficult: folder
+            selection usually doesn't work, file pickers can be unreliable, and browser storage may
+            be limited.
+          </p>
+          <p>
+            <b>Recommended approach:</b> Import your manga on a computer, then back it up to the cloud
+            using Google Drive or MEGA (both free). On your mobile device, just sign into your cloud
+            account and download volumes with one tap — they'll appear in your library instantly.
           </p>
         </div>
       </AccordionItem>
     </Accordion>
-    {#if isMobileDevice}
-      <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
-        <b>Tip:</b> Mobile uploads can be tricky. For the easiest experience, upload on your computer
-        and use cloud sync to access your library here.
-      </p>
-    {/if}
     <Dropzone
       id="dropzone"
       ondrop={dropHandle}
@@ -186,12 +219,12 @@
       >
       {#if files}
         <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-          Upload {files.length}
+          Import {files.length}
           {files.length > 1 ? 'files' : 'file'}?
         </p>
       {:else if draggedFiles && draggedFiles.length > 0}
         <p class="mb-2 text-sm text-gray-500 dark:text-gray-400">
-          Upload {draggedFiles.length}
+          Import {draggedFiles.length}
           {draggedFiles.length > 1 ? 'files' : 'file'}?
         </p>
       {:else if loading}
@@ -236,22 +269,16 @@
                 input.click();
               }}
             >
-              choose directory
+              choose folder
             </button>
-          {/if}
-
-          {#if isMobileDevice}
-            <span class="ml-1 text-xs text-gray-500 italic dark:text-gray-400">
-              (directory upload not available on mobile)
-            </span>
           {/if}
         </p>
       {/if}
     </Dropzone>
-    <p class=" text-center text-sm text-gray-500 dark:text-gray-400">{storageSpace}</p>
+    <p class="text-center text-sm text-gray-500 dark:text-gray-400">{storageSpace}</p>
     <div class="flex flex-1 flex-col gap-2">
       <Button outline onclick={reset} {disabled} color="dark">Reset</Button>
-      <Button outline onclick={onUpload} {disabled}>Upload</Button>
+      <Button outline onclick={onImport} {disabled}>Import</Button>
     </div>
   {/await}
 </Modal>
