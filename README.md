@@ -1,5 +1,7 @@
 # Mokuro Reader
 
+[![Discord](https://img.shields.io/discord/1437608126122557450?color=7289da&logo=discord&logoColor=white&label=Discord)](https://discord.gg/AU5pjjSQBw)
+
 A powerful web-based manga reader with advanced analytics, cloud sync, and intelligent features for [mokuro](https://github.com/kha-white/mokuro) processed manga.
 
 https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-25b17dea3060
@@ -235,6 +237,10 @@ This release represents a major overhaul of Mokuro Reader with significant impro
 - Fixed upload issues on weaker devices
 - Resolved memory issues with long series
 - Improved stability across all operations
+
+## 💬 Community
+
+Wanna chat with the devs? Share your hopes, dreams, and issues (with Mokuro Reader specifically)? Come join the [Mokuro Reader Discord](https://discord.gg/AU5pjjSQBw)!
 
 ## 🙏 Credits
 
