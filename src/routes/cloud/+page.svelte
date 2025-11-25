@@ -689,16 +689,16 @@
             <!-- Provider-specific instructions -->
             {#if currentProvider === 'google-drive'}
               <p class="text-center text-gray-300">
-                Back up volumes from the series page, then download them on any device using the
-                placeholder system in your catalog.
+                Back up volumes from any series page, then tap placeholders in your catalog to
+                download on other devices.
               </p>
               <p class="text-center text-sm text-gray-500">
                 Or use the picker below to download files you've added to Drive manually.
               </p>
             {:else}
               <p class="text-center text-gray-300">
-                Back up volumes from the series page, then download them on any device using the
-                placeholder system in your catalog.
+                Back up volumes from any series page, then tap placeholders in your catalog to
+                download on other devices.
               </p>
             {/if}
 
