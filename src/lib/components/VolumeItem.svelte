@@ -324,7 +324,7 @@
   {:else}
     <!-- Grid view -->
     <div
-      class="relative flex flex-col gap-2 rounded-lg border-2 border-transparent p-3 transition-colors hover:bg-gray-100 sm:w-[278px] dark:hover:bg-gray-800"
+      class="relative flex flex-col gap-2 rounded-lg border-2 border-transparent p-3 transition-colors hover:bg-gray-100 sm:w-[278px] dark:hover:bg-gray-700"
       class:!border-green-400={isComplete}
     >
       <!-- Actions menu button -->

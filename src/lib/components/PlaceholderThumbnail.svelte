@@ -30,7 +30,7 @@
 >
   {#each Array(stackCount) as _, i}
     <div
-      class="flex items-center justify-center border border-gray-300 bg-gray-200 sm:h-[350px] sm:w-[250px] dark:border-gray-700 dark:bg-gray-700"
+      class="flex items-center justify-center border border-gray-300 bg-gray-200 sm:h-[350px] sm:w-[250px] dark:border-gray-600 dark:bg-gray-800"
       class:absolute={stackCount > 1}
       style={stackCount > 1
         ? `left: ${i * stepH}px; top: ${i * stepV}px; z-index: ${stackCount - i}; filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5));`
@@ -41,14 +41,14 @@
           <div class="flex flex-col items-center gap-3">
             {#if isDownloading}
               <Spinner size="16" color="blue" />
-              <span class="text-sm text-gray-400">Downloading...</span>
+              <span class="text-sm text-gray-300">Downloading...</span>
             {:else}
               <DownloadSolid class="h-16 w-16 text-blue-400" />
-              <span class="text-sm text-gray-400">{message || 'Click to download'}</span>
+              <span class="text-sm text-gray-300">{message || 'Click to download'}</span>
             {/if}
           </div>
         {:else}
-          <span class="text-gray-400">{message || 'No thumbnail'}</span>
+          <span class="text-gray-300">{message || 'No thumbnail'}</span>
         {/if}
       {/if}
     </div>

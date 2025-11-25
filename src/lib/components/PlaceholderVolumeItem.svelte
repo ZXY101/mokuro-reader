@@ -179,7 +179,7 @@
   <button
     onclick={onDownloadClicked}
     disabled={isDownloading}
-    class="relative flex flex-col items-center gap-[5px] rounded-lg border-2 border-transparent p-3 text-center opacity-70 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+    class="relative flex flex-col items-center gap-[5px] rounded-lg border-2 border-transparent p-3 text-center opacity-70 transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
     class:cursor-not-allowed={isDownloading}
   >
     <PlaceholderThumbnail {isDownloading} showDownloadUI={true} />

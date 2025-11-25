@@ -222,7 +222,7 @@
     <div
       class:text-green-400={isComplete}
       class:opacity-70={isPlaceholderOnly}
-      class="relative flex flex-col items-center gap-[5px] rounded-lg border-2 border-transparent p-3 text-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+      class="relative flex flex-col items-center gap-[5px] rounded-lg border-2 border-transparent p-3 text-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-700"
       class:cursor-pointer={isPlaceholderOnly}
     >
       {#if isPlaceholderOnly}
