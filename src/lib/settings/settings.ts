@@ -4,6 +4,7 @@ import { isMobilePlatform } from '$lib/util/platform';
 
 export type FontSize =
   | 'auto'
+  | 'original'
   | '9'
   | '10'
   | '11'

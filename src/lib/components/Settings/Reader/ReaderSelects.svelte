@@ -25,6 +25,7 @@
 
   let fontSizes = [
     { value: 'auto', name: 'auto' },
+    { value: 'original', name: 'original' },
     { value: '9', name: '9' },
     { value: '10', name: '10' },
     { value: '11', name: '11' },

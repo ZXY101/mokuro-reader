@@ -22,6 +22,7 @@
     lines: string[];
     area: number;
     useMinDimensions: boolean;
+    isOriginalMode: boolean;
   }
 
   let textBoxes = $derived(
@@ -65,16 +66,27 @@
           line.replace(/\.\.\./g, '…').replace(/．．．/g, '…')
         );
 
+        // Determine font size based on setting
+        let fontSize: string;
+        if ($settings.fontSize === 'auto' || $settings.fontSize === 'original') {
+          fontSize = `${font_size}px`;
+        } else {
+          fontSize = `${$settings.fontSize}pt`;
+        }
+
+        const isOriginalMode = $settings.fontSize === 'original';
+
         const textBox: TextBoxData = {
           left: `${xmin}px`,
           top: `${ymin}px`,
           width: `${width}px`,
           height: `${height}px`,
-          fontSize: $settings.fontSize === 'auto' ? `${font_size}px` : `${$settings.fontSize}pt`,
+          fontSize,
           writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
           lines: processedLines,
           area,
-          useMinDimensions: $settings.fontSize !== 'auto'
+          useMinDimensions: $settings.fontSize !== 'auto' && !isOriginalMode,
+          isOriginalMode
         };
 
         return textBox;
@@ -271,14 +283,15 @@
   }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions }, index (`${volumeUuid}-textBox-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions, isOriginalMode }, index (`${volumeUuid}-textBox-${index}`)}
   <div
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
-    style:width={useMinDimensions ? undefined : width}
-    style:height={useMinDimensions ? undefined : height}
-    style:min-width={useMinDimensions ? width : undefined}
-    style:min-height={useMinDimensions ? height : undefined}
+    class:originalMode={isOriginalMode}
+    style:width={isOriginalMode ? undefined : useMinDimensions ? undefined : width}
+    style:height={isOriginalMode ? undefined : useMinDimensions ? undefined : height}
+    style:min-width={isOriginalMode ? undefined : useMinDimensions ? width : undefined}
+    style:min-height={isOriginalMode ? undefined : useMinDimensions ? height : undefined}
     style:left
     style:top
     style:font-size={adjustedFontSizes.get(index) || fontSize}
@@ -344,5 +357,15 @@
   .textBox:focus p,
   .textBox:hover p {
     visibility: visible;
+  }
+
+  /* Original mode: no size constraints, allow overflow */
+  .textBox.originalMode {
+    overflow: visible;
+    white-space: nowrap;
+  }
+
+  .textBox.originalMode p {
+    white-space: nowrap;
   }
 </style>
