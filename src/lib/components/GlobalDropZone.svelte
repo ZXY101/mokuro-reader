@@ -40,8 +40,10 @@
       return;
     }
 
-    const files: File[] = [];
-    const filePromises: Promise<File | undefined>[] = [];
+    // Collect all entries synchronously - DataTransfer is only valid during the event
+    // Once we await, subsequent items may become inaccessible
+    const directoryEntries: FileSystemEntry[] = [];
+    const directFiles: File[] = [];
 
     for (const item of [...event.dataTransfer.items]) {
       if (item.kind !== 'file') continue;
@@ -50,16 +52,23 @@
       if (!entry) continue;
 
       if (entry.isDirectory) {
-        await scanFiles(entry, filePromises);
+        directoryEntries.push(entry);
       } else {
         const file = item.getAsFile();
         if (file) {
-          files.push(file);
+          directFiles.push(file);
         }
       }
     }
 
-    // Wait for directory scanning to complete
+    // Now process directories asynchronously (safe since we already have the entries)
+    const filePromises: Promise<File | undefined>[] = [];
+    for (const entry of directoryEntries) {
+      await scanFiles(entry, filePromises);
+    }
+
+    // Combine direct files with scanned files
+    const files: File[] = [...directFiles];
     if (filePromises.length > 0) {
       const scannedFiles = await Promise.all(filePromises);
       for (const file of scannedFiles) {
