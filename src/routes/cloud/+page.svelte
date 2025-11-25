@@ -693,7 +693,9 @@
                 download on other devices.
               </p>
               <p class="text-center text-sm text-gray-500">
-                Or use the picker below to download files you've added to Drive manually.
+                Or use the picker to download ZIP/CBZ files you've added to the <span
+                  class="text-primary-600">{READER_FOLDER}</span
+                > folder in Drive.
               </p>
             {:else}
               <p class="text-center text-gray-300">
