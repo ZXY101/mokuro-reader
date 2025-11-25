@@ -103,7 +103,7 @@
       items: [
         '15GB free storage',
         'Seamless Google account integration',
-        'File picker for easy selection',
+        'Back up from app, download on any device',
         'Auto re-authentication support'
       ]
     },
@@ -689,22 +689,22 @@
             <!-- Provider-specific instructions -->
             {#if currentProvider === 'google-drive'}
               <p class="text-center text-gray-300">
-                Add your zipped manga files (ZIP or CBZ) to the <span class="text-primary-700"
-                  >{READER_FOLDER}</span
-                > folder in your Google Drive.
+                Back up volumes from the series page, then download them on any device using the
+                placeholder system in your catalog.
               </p>
               <p class="text-center text-sm text-gray-500">
-                You can select multiple ZIP/CBZ files or entire folders at once.
+                Or use the picker below to download files you've added to Drive manually.
               </p>
             {:else}
-              <p class="mb-2 text-center text-gray-300">
-                Your read progress is synced with {providerNames[currentProvider]}.
+              <p class="text-center text-gray-300">
+                Back up volumes from the series page, then download them on any device using the
+                placeholder system in your catalog.
               </p>
             {/if}
 
-            <!-- Download Manga button (Google Drive only) -->
+            <!-- File picker button (Google Drive only) -->
             {#if currentProvider === 'google-drive'}
-              <Button color="blue" onclick={createPicker}>Download Manga</Button>
+              <Button color="dark" onclick={createPicker}>Open file picker</Button>
             {/if}
 
             <!-- Turbo Mode toggle with RAM configuration -->
