@@ -1,11 +1,10 @@
 <script lang="ts">
   import { volumesWithPlaceholders } from '$lib/catalog';
   import { progress } from '$lib/settings';
-  import { DownloadSolid } from 'flowbite-svelte-icons';
-  import { Spinner } from 'flowbite-svelte';
   import { showSnackbar } from '$lib/util';
   import { downloadQueue, queueSeriesVolumes } from '$lib/util/download-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
+  import PlaceholderThumbnail from './PlaceholderThumbnail.svelte';
 
   interface Props {
     series_uuid: string;
@@ -223,20 +222,17 @@
     <div
       class:text-green-400={isComplete}
       class:opacity-70={isPlaceholderOnly}
-      class="bg-opacity-50 relative flex flex-col items-center gap-[5px] border border-slate-950 bg-slate-900 pb-1 text-center"
+      class="relative flex flex-col items-center gap-[5px] rounded-lg border-2 border-transparent p-3 text-center transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
       class:cursor-pointer={isPlaceholderOnly}
     >
       {#if isPlaceholderOnly}
-        <div
-          class="flex items-center justify-center border border-gray-900 bg-black sm:h-[385px] sm:w-[325px]"
-        >
-          <div class="flex h-24 w-24 items-center justify-center">
-            {#if isDownloading}
-              <Spinner size="16" color="blue" />
-            {:else}
-              <DownloadSolid class="h-24 w-24 text-blue-400" />
-            {/if}
-          </div>
+        <!-- Stacked placeholder layout to show volume count -->
+        <div class="relative sm:h-[410px] sm:w-[325px] sm:pt-4 sm:pb-6">
+          <PlaceholderThumbnail
+            count={seriesVolumes.length}
+            {isDownloading}
+            showDownloadUI={true}
+          />
         </div>
       {:else if stackedVolumes.length > 0}
         <!-- Stacked diagonal layout: dynamic stepping based on image aspect ratios -->
@@ -257,11 +253,13 @@
           </div>
         </div>
       {/if}
-      <p class="line-clamp-1 font-semibold sm:w-[325px]">
+      <p class="line-clamp-2 font-semibold sm:w-[325px]">
         {volume.series_title}
       </p>
       {#if isPlaceholderOnly}
-        <p class="text-xs text-blue-400">In {providerDisplayName}</p>
+        <p class="text-xs text-blue-400">
+          {seriesVolumes.length} volume{seriesVolumes.length !== 1 ? 's' : ''} in {providerDisplayName}
+        </p>
       {/if}
     </div>
   </a>

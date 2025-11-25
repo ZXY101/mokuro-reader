@@ -22,6 +22,7 @@
   import { backupQueue } from '$lib/util/backup-queue';
   import type { CloudVolumeWithProvider } from '$lib/util/sync/unified-cloud-manager';
   import { getCharCount } from '$lib/util/count-chars';
+  import PlaceholderThumbnail from './PlaceholderThumbnail.svelte';
 
   interface Props {
     volume: VolumeMetadata;
@@ -376,11 +377,7 @@
               class="h-auto w-auto border border-gray-900 bg-black sm:max-h-[350px] sm:max-w-[250px]"
             />
           {:else}
-            <div
-              class="flex h-full w-full items-center justify-center border border-gray-300 bg-gray-200 dark:border-gray-700 dark:bg-gray-700"
-            >
-              <span class="text-gray-400">No thumbnail</span>
-            </div>
+            <PlaceholderThumbnail />
           {/if}
         </div>
         <div class="flex flex-col gap-1 sm:w-[250px]">

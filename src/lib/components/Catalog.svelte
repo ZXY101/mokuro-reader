@@ -193,7 +193,7 @@
       </div>
     {:else}
       <!-- Local series -->
-      <div class="flex flex-col flex-wrap justify-center gap-5 sm:flex-row sm:justify-start">
+      <div class="flex flex-col flex-wrap justify-center gap-[3px] sm:flex-row sm:justify-start">
         {#if $miscSettings.galleryLayout === 'grid'}
           {#each localSeries as { series_uuid } (series_uuid)}
             <CatalogItem {series_uuid} />
@@ -226,7 +226,9 @@
               </Button>
             {/if}
           </div>
-          <div class="flex flex-col flex-wrap justify-center gap-5 sm:flex-row sm:justify-start">
+          <div
+            class="flex flex-col flex-wrap justify-center gap-[3px] sm:flex-row sm:justify-start"
+          >
             {#if $miscSettings.galleryLayout === 'grid'}
               {#each placeholderSeries as { series_uuid } (series_uuid)}
                 <CatalogItem {series_uuid} />

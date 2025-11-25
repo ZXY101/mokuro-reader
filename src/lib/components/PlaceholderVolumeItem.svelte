@@ -13,6 +13,7 @@
     getCloudModifiedTime
   } from '$lib/util/cloud-fields';
   import type { ProviderType, CloudFileMetadata } from '$lib/util/sync/provider-interface';
+  import PlaceholderThumbnail from './PlaceholderThumbnail.svelte';
 
   interface Props {
     volume: VolumeMetadata;
@@ -178,27 +179,15 @@
   <button
     onclick={onDownloadClicked}
     disabled={isDownloading}
-    class="flex flex-col gap-2 rounded-lg p-3 opacity-60 transition-colors hover:bg-gray-100 sm:w-[278px] dark:hover:bg-gray-800"
+    class="relative flex flex-col items-center gap-[5px] rounded-lg border-2 border-transparent p-3 text-center opacity-70 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
     class:cursor-not-allowed={isDownloading}
   >
+    <PlaceholderThumbnail {isDownloading} showDownloadUI={true} />
+    <p class="line-clamp-2 font-semibold sm:w-[250px]">{volName}</p>
     <div
-      class="flex items-center justify-center border border-dashed border-gray-400 bg-gray-200 sm:h-[350px] sm:w-[250px] dark:border-gray-600 dark:bg-gray-700"
+      class="flex flex-wrap items-center justify-center gap-x-2 text-xs text-gray-500 dark:text-gray-400"
     >
-      {#if isDownloading}
-        <div class="flex flex-col items-center gap-2">
-          <Spinner size="8" color="blue" />
-          <span class="text-xs text-blue-400">{Math.round(downloadProgress)}%</span>
-        </div>
-      {:else}
-        <DownloadSolid class="h-8 w-8 text-gray-400" />
-      {/if}
-    </div>
-    <div class="truncate text-sm font-medium">{volName}</div>
-    <div class="flex flex-col gap-0.5 text-xs text-gray-500 dark:text-gray-400">
-      <div class="flex items-center gap-1">
-        <span>In {providerName}</span>
-        <Badge color={badgeColor} class="px-1 py-0 text-xs">{providerName}</Badge>
-      </div>
+      <Badge color={badgeColor} class="text-xs">{providerName}</Badge>
       <span>{sizeDisplay}</span>
     </div>
   </button>
