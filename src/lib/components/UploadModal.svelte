@@ -175,14 +175,12 @@
         {#snippet header()}Mobile limitations{/snippet}
         <div class="flex flex-col gap-3 text-gray-700 dark:text-gray-300">
           <p>
-            Mobile browsers have restrictions that make importing files more difficult: folder
-            selection usually doesn't work, file pickers can be unreliable, and browser storage may
-            be limited.
+            Mobile devices often lack the RAM to extract large ZIP files, which can cause the
+            browser to crash during import — especially with multi-volume archives.
           </p>
           <p>
-            <b>Recommended approach:</b> Import your manga on a computer, then back it up to the cloud
-            using Google Drive or MEGA (both free). On your mobile device, just sign into your cloud
-            account and download volumes with one tap — they'll appear in your library instantly.
+            <b>Recommended:</b> Import on a computer and back up to Google Drive or MEGA (free). On mobile,
+            download individual volumes from the cloud — smaller files extract quickly without crashing.
           </p>
         </div>
       </AccordionItem>
