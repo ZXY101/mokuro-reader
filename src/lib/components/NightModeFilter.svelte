@@ -1,4 +1,5 @@
 <script lang="ts">
+  /* eslint-disable no-undef */
   import { nightModeActive } from '$lib/settings';
   import { browser } from '$app/environment';
   import { onDestroy } from 'svelte';
