@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import { browser } from '$app/environment';
 import type {
   SyncProvider,
@@ -186,7 +187,7 @@ export class WebDAVProvider implements SyncProvider {
   }
 
   private async loadPersistedCredentials(): Promise<void> {
-    if (!browser) return;
+    if (!browser || typeof localStorage === 'undefined') return;
 
     const serverUrl = localStorage.getItem(STORAGE_KEYS.SERVER_URL);
     const username = localStorage.getItem(STORAGE_KEYS.USERNAME);
