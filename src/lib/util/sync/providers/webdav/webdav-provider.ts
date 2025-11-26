@@ -11,8 +11,8 @@ import type { WebDAVClient } from 'webdav';
 
 interface WebDAVCredentials {
   serverUrl: string;
-  username: string;
-  password: string;
+  username?: string;
+  password?: string;
 }
 
 const STORAGE_KEYS = {
@@ -29,8 +29,8 @@ export class WebDAVProvider implements SyncProvider {
   readonly type = 'webdav' as const;
   readonly name = 'WebDAV';
   readonly supportsWorkerDownload = true; // Workers can download directly with Basic Auth
-  readonly uploadConcurrencyLimit = 2; // Conservative, depends on server capacity
-  readonly downloadConcurrencyLimit = 2;
+  readonly uploadConcurrencyLimit = 8; // WebDAV servers can typically handle more concurrent connections
+  readonly downloadConcurrencyLimit = 8;
 
   private client: WebDAVClient | null = null;
   private initPromise: Promise<void>;
@@ -56,12 +56,8 @@ export class WebDAVProvider implements SyncProvider {
   }
 
   getStatus(): ProviderStatus {
-    const hasCredentials = !!(
-      browser &&
-      localStorage.getItem(STORAGE_KEYS.SERVER_URL) &&
-      localStorage.getItem(STORAGE_KEYS.USERNAME) &&
-      localStorage.getItem(STORAGE_KEYS.PASSWORD)
-    );
+    // Only serverUrl is required - username/password are optional for some servers
+    const hasCredentials = !!(browser && localStorage.getItem(STORAGE_KEYS.SERVER_URL));
     const isConnected = this.isAuthenticated();
 
     return {
@@ -77,12 +73,9 @@ export class WebDAVProvider implements SyncProvider {
   }
 
   async login(credentials?: ProviderCredentials): Promise<void> {
-    if (!credentials || !credentials.serverUrl || !credentials.username || !credentials.password) {
-      throw new ProviderError(
-        'Server URL, username, and password are required',
-        'webdav',
-        'INVALID_CREDENTIALS'
-      );
+    // Only serverUrl is required - some servers support password-only auth (e.g., copyparty)
+    if (!credentials || !credentials.serverUrl) {
+      throw new ProviderError('Server URL is required', 'webdav', 'INVALID_CREDENTIALS');
     }
 
     const { serverUrl, username, password } = credentials as WebDAVCredentials;
@@ -94,23 +87,39 @@ export class WebDAVProvider implements SyncProvider {
       // Dynamically import webdav to reduce initial bundle size
       const { createClient } = await import('webdav');
 
-      // Create WebDAV client
-      this.client = createClient(normalizedUrl, {
-        username,
-        password
-      });
+      // Create WebDAV client with optional credentials
+      const clientOptions: { username?: string; password?: string } = {};
+      if (username || password) {
+        clientOptions.username = username || '';
+        clientOptions.password = password || '';
+      }
+      this.client = createClient(normalizedUrl, clientOptions);
 
-      // Test connection by getting server info
-      await this.client.getDirectoryContents('/');
+      // Test connection with timeout (Issue #206 Lesson #3)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      try {
+        await this.client.getDirectoryContents('/', { signal: controller.signal });
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       // Ensure mokuro folder exists
       await this.ensureMokuroFolder();
 
-      // Store credentials in localStorage
+      // Store credentials in localStorage (username/password are optional)
       if (browser) {
         localStorage.setItem(STORAGE_KEYS.SERVER_URL, normalizedUrl);
-        localStorage.setItem(STORAGE_KEYS.USERNAME, username);
-        localStorage.setItem(STORAGE_KEYS.PASSWORD, password);
+        if (username) {
+          localStorage.setItem(STORAGE_KEYS.USERNAME, username);
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.USERNAME);
+        }
+        if (password) {
+          localStorage.setItem(STORAGE_KEYS.PASSWORD, password);
+        } else {
+          localStorage.removeItem(STORAGE_KEYS.PASSWORD);
+        }
       }
 
       // Set the active provider key for lazy loading on next startup
@@ -129,6 +138,8 @@ export class WebDAVProvider implements SyncProvider {
         userMessage = 'Server not found. Check the server URL';
       } else if (errorMessage.includes('CORS')) {
         userMessage = 'CORS error. Your WebDAV server may need CORS configuration';
+      } else if (errorMessage.includes('abort') || errorMessage.includes('timeout')) {
+        userMessage = 'Connection timed out. Server may be unresponsive';
       }
 
       throw new ProviderError(userMessage, 'webdav', 'LOGIN_FAILED', true);
@@ -139,14 +150,39 @@ export class WebDAVProvider implements SyncProvider {
     this.client = null;
 
     if (browser) {
-      localStorage.removeItem(STORAGE_KEYS.SERVER_URL);
-      localStorage.removeItem(STORAGE_KEYS.USERNAME);
+      // Keep URL and username for convenience (Issue #206 Lesson #10)
+      // Only clear the password for security
       localStorage.removeItem(STORAGE_KEYS.PASSWORD);
     }
 
     // Clear the active provider key
     clearActiveProviderKey();
     console.log('WebDAV logged out');
+  }
+
+  /**
+   * Get the last used server URL (for pre-filling login form)
+   */
+  getLastServerUrl(): string | null {
+    return browser ? localStorage.getItem(STORAGE_KEYS.SERVER_URL) : null;
+  }
+
+  /**
+   * Get the last used username (for pre-filling login form)
+   */
+  getLastUsername(): string | null {
+    return browser ? localStorage.getItem(STORAGE_KEYS.USERNAME) : null;
+  }
+
+  /**
+   * Clear all stored credentials (for full logout)
+   */
+  clearAllCredentials(): void {
+    if (browser) {
+      localStorage.removeItem(STORAGE_KEYS.SERVER_URL);
+      localStorage.removeItem(STORAGE_KEYS.USERNAME);
+      localStorage.removeItem(STORAGE_KEYS.PASSWORD);
+    }
   }
 
   private async loadPersistedCredentials(): Promise<void> {
@@ -156,9 +192,18 @@ export class WebDAVProvider implements SyncProvider {
     const username = localStorage.getItem(STORAGE_KEYS.USERNAME);
     const password = localStorage.getItem(STORAGE_KEYS.PASSWORD);
 
-    if (serverUrl && username && password) {
+    // Use active_cloud_provider to determine if we should restore
+    // This properly handles anonymous connections (no password) vs logged out state
+    const activeProvider = localStorage.getItem('active_cloud_provider');
+    const shouldRestore = activeProvider === 'webdav' && serverUrl;
+
+    if (shouldRestore) {
       try {
-        await this.login({ serverUrl, username, password });
+        await this.login({
+          serverUrl,
+          username: username || undefined,
+          password: password || undefined
+        });
         console.log('Restored WebDAV session from stored credentials');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -174,7 +219,8 @@ export class WebDAVProvider implements SyncProvider {
 
         if (isAuthError) {
           console.error('WebDAV credentials invalid, clearing stored credentials');
-          this.logout();
+          this.clearAllCredentials();
+          clearActiveProviderKey();
         } else {
           // Temporary error - keep credentials for retry later
           console.warn(
@@ -213,9 +259,54 @@ export class WebDAVProvider implements SyncProvider {
     }
 
     try {
-      // TODO: Implement WebDAV listCloudVolumes
-      console.warn('WebDAV listCloudVolumes not yet implemented');
-      return [];
+      // Ensure mokuro folder exists first
+      await this.ensureMokuroFolder();
+
+      const allFiles: import('../../provider-interface').CloudFileMetadata[] = [];
+      const client = this.client;
+
+      // Manual recursive folder traversal (Issue #206 Lesson #2)
+      // Avoid Depth: infinity which some servers reject
+      const processFolder = async (folderPath: string): Promise<void> => {
+        const contents = (await client.getDirectoryContents(folderPath)) as Array<{
+          type: string;
+          filename: string;
+          basename: string;
+          lastmod: string;
+          size: number;
+        }>;
+
+        for (const item of contents) {
+          if (item.type === 'directory') {
+            // Recurse into subdirectories
+            await processFolder(item.filename);
+          } else {
+            const name = item.basename.toLowerCase();
+            // Include CBZ files and JSON config files
+            if (
+              name.endsWith('.cbz') ||
+              item.basename === 'volume-data.json' ||
+              item.basename === 'profiles.json'
+            ) {
+              // Build relative path from mokuro folder
+              const relativePath = item.filename.replace(MOKURO_FOLDER + '/', '');
+
+              allFiles.push({
+                provider: 'webdav',
+                fileId: item.filename, // Full WebDAV path as fileId
+                path: relativePath,
+                modifiedTime: item.lastmod || new Date().toISOString(),
+                size: item.size || 0
+              });
+            }
+          }
+        }
+      };
+
+      await processFolder(MOKURO_FOLDER);
+
+      console.log(`✅ Listed ${allFiles.length} files from WebDAV`);
+      return allFiles;
     } catch (error) {
       throw new ProviderError(
         `Failed to list cloud volumes: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -235,14 +326,30 @@ export class WebDAVProvider implements SyncProvider {
     try {
       await this.ensureMokuroFolder();
 
-      // Convert Blob to ArrayBuffer
-      const arrayBuffer = await blob.arrayBuffer();
       const fullPath = `${MOKURO_FOLDER}/${path}`;
 
-      // Upload file
-      await this.client.putFileContents(fullPath, arrayBuffer, {
-        overwrite: true
-      });
+      // Ensure parent directory exists for nested paths (e.g., "SeriesTitle/Volume.cbz")
+      const pathParts = path.split('/');
+      if (pathParts.length > 1) {
+        const seriesFolder = pathParts.slice(0, -1).join('/');
+        await this.ensureSeriesFolder(seriesFolder);
+      }
+
+      // Delete-before-upload pattern (Issue #206 Lesson #1 - CRITICAL)
+      // Some servers (copyparty) don't overwrite on PUT, they rename and create duplicates
+      try {
+        const exists = await this.client.exists(fullPath);
+        if (exists) {
+          await this.client.deleteFile(fullPath);
+        }
+      } catch {
+        // Ignore errors - file may not exist
+      }
+
+      // Convert Blob to ArrayBuffer and upload
+      // Don't pass { overwrite: true } - it doesn't work reliably across servers
+      const arrayBuffer = await blob.arrayBuffer();
+      await this.client.putFileContents(fullPath, arrayBuffer);
 
       console.log(`✅ Uploaded ${path} to WebDAV`);
       return fullPath;
@@ -254,6 +361,28 @@ export class WebDAVProvider implements SyncProvider {
         false,
         true
       );
+    }
+  }
+
+  /**
+   * Ensure a series folder exists under mokuro-reader
+   */
+  private async ensureSeriesFolder(folderPath: string): Promise<void> {
+    if (!this.client) return;
+
+    const fullPath = `${MOKURO_FOLDER}/${folderPath}`;
+    try {
+      const exists = await this.client.exists(fullPath);
+      if (!exists) {
+        await this.client.createDirectory(fullPath, { recursive: true });
+        console.log(`Created series folder: ${folderPath}`);
+      }
+    } catch (error) {
+      // Some servers throw if directory already exists, ignore that
+      const errorMessage = error instanceof Error ? error.message : '';
+      if (!errorMessage.includes('405') && !errorMessage.includes('already exists')) {
+        throw error;
+      }
     }
   }
 
@@ -367,3 +496,8 @@ export class WebDAVProvider implements SyncProvider {
 }
 
 export const webdavProvider = new WebDAVProvider();
+
+// Self-register cache when module is loaded (same pattern as MEGA provider)
+import { cacheManager } from '../../cache-manager';
+import { webdavCache } from './webdav-cache';
+cacheManager.registerCache('webdav', webdavCache);
