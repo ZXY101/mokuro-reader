@@ -214,10 +214,9 @@ async function downloadFromWebDAV(
   const chunks: Uint8Array[] = [];
   let receivedLength = 0;
 
-  // Throttle progress updates to ~10/second (less than XHR's ~15/sec)
-  // WebDAV supports faster downloads with more threads, so we throttle more aggressively
+  // Throttle progress updates to ~15/second (matches XHR behavior)
   let lastProgressUpdate = 0;
-  const PROGRESS_THROTTLE_MS = 100; // ~10 updates per second
+  const PROGRESS_THROTTLE_MS = 67; // ~15 updates per second
 
   while (true) {
     const { done, value } = await reader.read();
