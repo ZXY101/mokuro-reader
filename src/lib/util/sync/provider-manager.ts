@@ -183,8 +183,7 @@ class ProviderManager {
   updateStatus(): void {
     // Use current provider type if set, otherwise check localStorage
     // This ensures UI shows the configured provider even before it finishes loading
-    const currentProviderType =
-      this.currentProvider?.type ?? getConfiguredProviderType();
+    const currentProviderType = this.currentProvider?.type ?? getConfiguredProviderType();
 
     const status: MultiProviderStatus = {
       providers: {
