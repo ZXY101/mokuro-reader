@@ -1,3 +1,4 @@
+/* global indexedDB, IDBDatabase */
 import Dexie from 'dexie';
 
 /**

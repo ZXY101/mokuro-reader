@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { volumesWithPlaceholders } from '$lib/catalog';
+  import { volumesWithPlaceholders, getThumbnail } from '$lib/catalog';
   import { ListgroupItem, Spinner } from 'flowbite-svelte';
   import { progress } from '$lib/settings';
   import { DownloadSolid } from 'flowbite-svelte-icons';
@@ -62,6 +62,22 @@
     return status.hasQueued || status.hasDownloading;
   });
 
+  // Load thumbnail from database
+  let thumbnailUrl = $state<string | undefined>(undefined);
+  $effect(() => {
+    if (!volume) return;
+    let url: string | undefined;
+    getThumbnail(volume.volume_uuid).then((thumbnail) => {
+      if (thumbnail) {
+        url = URL.createObjectURL(thumbnail);
+        thumbnailUrl = url;
+      }
+    });
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  });
+
   async function handleClick(e: MouseEvent) {
     if (isPlaceholderOnly) {
       e.preventDefault();
@@ -107,9 +123,9 @@
                 <DownloadSolid class="h-[70px] w-[50px] text-blue-400" />
               {/if}
             </div>
-          {:else if volume.thumbnail}
+          {:else if thumbnailUrl}
             <img
-              src={URL.createObjectURL(volume.thumbnail)}
+              src={thumbnailUrl}
               alt="img"
               class="h-[70px] w-[50px] border border-gray-900 bg-black object-contain"
             />

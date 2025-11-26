@@ -89,42 +89,49 @@ interface VolumeDataForMigration {
   files?: Record<string, File>;
 }
 
-/**
- * Write a single volume to the new v3 database.
- */
-async function writeVolumeToV3(
-  newDb: CatalogDexieV3,
-  volumeData: VolumeDataForMigration
-): Promise<void> {
-  const uuid = volumeData.metadata.volume_uuid;
-  const pageCharCounts = calculateCumulativeCharCounts(volumeData.pages);
+interface PreparedVolumeData {
+  volumeData: VolumeDataForMigration;
+  pageCharCounts: number[];
+}
 
+/**
+ * Write multiple volumes to the new v3 database in a single transaction.
+ * Char counts must be pre-calculated to avoid CPU work inside the transaction.
+ */
+async function writeVolumeBatchToV3(
+  newDb: CatalogDexieV3,
+  batch: PreparedVolumeData[]
+): Promise<void> {
   await newDb.transaction(
     'rw',
     [newDb.volumes, newDb.volume_thumbnails, newDb.volume_ocr, newDb.volume_files],
     async () => {
-      await newDb.volumes.add({
-        ...volumeData.metadata,
-        page_char_counts: pageCharCounts
-      });
+      for (const { volumeData, pageCharCounts } of batch) {
+        const uuid = volumeData.metadata.volume_uuid;
 
-      if (volumeData.thumbnail) {
-        await newDb.volume_thumbnails.add({
-          volume_uuid: uuid,
-          thumbnail: volumeData.thumbnail
+        await newDb.volumes.add({
+          ...volumeData.metadata,
+          page_char_counts: pageCharCounts
         });
-      }
 
-      await newDb.volume_ocr.add({
-        volume_uuid: uuid,
-        pages: volumeData.pages
-      });
+        if (volumeData.thumbnail) {
+          await newDb.volume_thumbnails.add({
+            volume_uuid: uuid,
+            thumbnail: volumeData.thumbnail
+          });
+        }
 
-      if (volumeData.files && Object.keys(volumeData.files).length > 0) {
-        await newDb.volume_files.add({
+        await newDb.volume_ocr.add({
           volume_uuid: uuid,
-          files: volumeData.files
+          pages: volumeData.pages
         });
+
+        if (volumeData.files && Object.keys(volumeData.files).length > 0) {
+          await newDb.volume_files.add({
+            volume_uuid: uuid,
+            files: volumeData.files
+          });
+        }
       }
     }
   );
@@ -235,6 +242,9 @@ async function migrateFromV1(
         files: volume.files
       };
 
+      // Pre-calculate char counts outside the transaction
+      const pageCharCounts = calculateCumulativeCharCounts(volumeData.pages);
+
       // Report writing volume
       onProgress({
         phase: 'writing_volume',
@@ -246,7 +256,7 @@ async function migrateFromV1(
         seriesTotal: totalSeries
       });
 
-      await writeVolumeToV3(newDb, volumeData);
+      await writeVolumeBatchToV3(newDb, [{ volumeData, pageCharCounts }]);
       migratedSet.add(uuid);
       migratedCount++;
 
@@ -274,7 +284,7 @@ async function migrateFromV1(
 
 /**
  * Migrate from v2 database - processes one volume at a time.
- * Deletes each volume after migration to free space and track progress.
+ * Loads all metadata first and sorts by series/volume for nicer display.
  */
 async function migrateFromV2(
   newDb: CatalogDexieV3,
@@ -291,9 +301,18 @@ async function migrateFromV2(
       volumesTotal: 0
     });
 
-    // Get all volume UUIDs efficiently
-    const allUuids = (await oldDb.volumes.toCollection().primaryKeys()) as string[];
-    const totalVolumes = allUuids.length;
+    // Load all metadata (small enough to fit in memory) and sort by series/volume
+    const allMetadata = await oldDb.volumes.toArray();
+    allMetadata.sort((a, b) => {
+      const seriesCompare = (a.series_title || '').localeCompare(b.series_title || '');
+      if (seriesCompare !== 0) return seriesCompare;
+      return (a.volume_title || '').localeCompare(b.volume_title || '');
+    });
+
+    // Filter to only volumes that need migration
+    const toMigrate = allMetadata.filter((m) => !migratedSet.has(m.volume_uuid));
+    const totalVolumes = allMetadata.length;
+    migratedCount = totalVolumes - toMigrate.length;
 
     onProgress({
       phase: 'counting',
@@ -301,22 +320,24 @@ async function migrateFromV2(
       volumesTotal: totalVolumes
     });
 
-    // Process each volume
-    for (let i = 0; i < allUuids.length; i++) {
-      const uuid = allUuids[i];
+    // Collect UUIDs to delete in batches
+    const DELETE_BATCH_SIZE = 50;
+    const pendingDeletes: string[] = [];
 
-      // Skip if already in v3 (from a previous partial run)
-      if (migratedSet.has(uuid)) {
-        migratedCount++;
-        continue;
-      }
+    // Process one volume at a time
+    for (const metadata of toMigrate) {
+      const uuid = metadata.volume_uuid;
 
-      const metadata = await oldDb.volumes.get(uuid);
-      if (!metadata) {
-        migratedCount++;
-        continue;
-      }
+      // Report progress
+      onProgress({
+        phase: 'writing_volume',
+        volumesCurrent: migratedCount,
+        volumesTotal: totalVolumes,
+        volumeTitle: metadata.volume_title,
+        seriesTitle: metadata.series_title
+      });
 
+      // Load this volume's data
       const data = await oldDb.volumes_data.get(uuid);
       const { thumbnail, ...metadataWithoutThumbnail } = metadata;
 
@@ -327,33 +348,29 @@ async function migrateFromV2(
         files: data?.files
       };
 
-      // Report writing volume
-      onProgress({
-        phase: 'writing_volume',
-        volumesCurrent: migratedCount,
-        volumesTotal: totalVolumes,
-        volumeTitle: volumeData.metadata.volume_title,
-        seriesTitle: volumeData.metadata.series_title
-      });
+      // Pre-calculate char counts outside the transaction
+      const pageCharCounts = calculateCumulativeCharCounts(volumeData.pages);
 
-      await writeVolumeToV3(newDb, volumeData);
+      // Write single volume
+      await writeVolumeBatchToV3(newDb, [{ volumeData, pageCharCounts }]);
       migratedSet.add(uuid);
       migratedCount++;
 
-      // Report deleting source
-      onProgress({
-        phase: 'deleting_source',
-        volumesCurrent: migratedCount,
-        volumesTotal: totalVolumes,
-        volumeTitle: volumeData.metadata.volume_title
-      });
+      // Queue for deletion
+      pendingDeletes.push(uuid);
 
-      // Delete from old database to free space and mark progress
-      await oldDb.volumes.delete(uuid);
-      await oldDb.volumes_data.delete(uuid);
+      // Bulk delete every DELETE_BATCH_SIZE volumes (fire-and-forget)
+      if (pendingDeletes.length >= DELETE_BATCH_SIZE) {
+        const toDelete = pendingDeletes.splice(0, DELETE_BATCH_SIZE);
+        oldDb.volumes.bulkDelete(toDelete);
+        oldDb.volumes_data.bulkDelete(toDelete);
+      }
+    }
 
-      // Yield to event loop for GC
-      await new Promise((r) => setTimeout(r, 0));
+    // Delete any remaining volumes (fire-and-forget)
+    if (pendingDeletes.length > 0) {
+      oldDb.volumes.bulkDelete(pendingDeletes);
+      oldDb.volumes_data.bulkDelete(pendingDeletes);
     }
 
     return totalVolumes;

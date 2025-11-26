@@ -28,8 +28,8 @@
   const phaseLabels: Record<MigrationPhase, string> = {
     counting: 'Counting volumes...',
     loading_series: 'Loading series...',
-    writing_volume: 'Writing volume...',
-    deleting_source: 'Freeing space...',
+    writing_volume: 'Migrating...',
+    deleting_source: 'Migrating...',
     complete: 'Complete!'
   };
 
@@ -111,7 +111,7 @@
         <Progressbar {progress} size="h-4" labelInside />
       </div>
 
-      <div class="mb-4 text-center text-gray-400">
+      <div class="mb-4 h-32 text-center text-gray-400">
         {#if progressData}
           <!-- Phase indicator -->
           <p class="mb-2 flex items-center justify-center gap-2 text-sm text-blue-400">
@@ -124,26 +124,22 @@
             {progressData.volumesCurrent} / {progressData.volumesTotal} volumes
           </p>
 
-          <!-- Series progress (v1 only) -->
-          {#if progressData.seriesTotal && progressData.seriesCurrent}
-            <p class="mt-1 text-sm text-gray-500">
+          <!-- Series progress (v1 only) - always reserve space -->
+          <p class="mt-1 h-5 text-sm text-gray-500">
+            {#if progressData.seriesTotal && progressData.seriesCurrent}
               Series {progressData.seriesCurrent} / {progressData.seriesTotal}
-            </p>
-          {/if}
+            {/if}
+          </p>
 
-          <!-- Current series name -->
-          {#if progressData.seriesTitle}
-            <p class="mt-2 truncate text-sm text-gray-400">
-              {progressData.seriesTitle}
-            </p>
-          {/if}
+          <!-- Current series name - always reserve space -->
+          <p class="mt-2 h-5 truncate text-sm text-gray-400">
+            {progressData.seriesTitle || '\u00A0'}
+          </p>
 
-          <!-- Current volume name -->
-          {#if progressData.volumeTitle}
-            <p class="truncate text-xs text-gray-500">
-              {progressData.volumeTitle}
-            </p>
-          {/if}
+          <!-- Current volume name - always reserve space -->
+          <p class="h-4 truncate text-xs text-gray-500">
+            {progressData.volumeTitle || '\u00A0'}
+          </p>
         {:else}
           <p class="flex items-center justify-center gap-2">
             <Spinner size="4" />

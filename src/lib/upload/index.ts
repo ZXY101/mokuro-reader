@@ -5,6 +5,7 @@ import { promptImageOnlyImport, type SeriesImportInfo } from '$lib/util/modals';
 import { requestPersistentStorage } from '$lib/util/upload';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
+import { calculateCumulativeCharCounts } from '$lib/catalog/migration';
 import {
   generateFallbackVolumeData,
   extractSeriesName,
@@ -195,7 +196,7 @@ async function uploadVolumeData(
       // Sort files by name case-insensitively
       if (uploadData.files) {
         uploadData.files = Object.fromEntries(
-          Object.entries(uploadData.files).sort(([aKey, aFile], [bKey, bFile]) =>
+          Object.entries(uploadData.files).sort(([aKey], [bKey]) =>
             aKey.localeCompare(bKey, undefined, {
               numeric: true,
               sensitivity: 'base'
@@ -204,17 +205,58 @@ async function uploadVolumeData(
         );
       }
 
+      // Generate thumbnail from first file
+      let thumbnail: File | undefined;
       const firstFileKey = uploadData.files ? Object.keys(uploadData.files)[0] : undefined;
       const firstFile = firstFileKey ? uploadData.files?.[firstFileKey] : undefined;
       if (firstFile) {
-        uploadMetadata.thumbnail = await generateThumbnail(firstFile);
+        thumbnail = await generateThumbnail(firstFile);
       }
-      await db.transaction('rw', db.volumes, async () => {
-        await db.volumes.add(uploadMetadata as VolumeMetadata, uploadMetadata.volume_uuid);
-      });
-      await db.transaction('rw', db.volumes_data, async () => {
-        await db.volumes_data.add(uploadData as VolumeData, uploadMetadata.volume_uuid);
-      });
+
+      // Calculate cumulative character counts from pages
+      const pageCharCounts = uploadData.pages
+        ? calculateCumulativeCharCounts(uploadData.pages)
+        : [];
+
+      // Write to all 4 tables in a single transaction
+      await db.transaction(
+        'rw',
+        [db.volumes, db.volume_thumbnails, db.volume_ocr, db.volume_files],
+        async () => {
+          // Write metadata with page_char_counts
+          await db.volumes.add(
+            {
+              ...uploadMetadata,
+              page_char_counts: pageCharCounts
+            } as VolumeMetadata,
+            uploadMetadata.volume_uuid
+          );
+
+          // Write thumbnail if generated
+          if (thumbnail) {
+            await db.volume_thumbnails.add({
+              volume_uuid: uploadMetadata.volume_uuid!,
+              thumbnail
+            });
+          }
+
+          // Write OCR data
+          if (uploadData.pages) {
+            await db.volume_ocr.add({
+              volume_uuid: uploadMetadata.volume_uuid!,
+              pages: uploadData.pages
+            });
+          }
+
+          // Write files
+          if (uploadData.files && Object.keys(uploadData.files).length > 0) {
+            await db.volume_files.add({
+              volume_uuid: uploadMetadata.volume_uuid!,
+              files: uploadData.files
+            });
+          }
+        }
+      );
     }
   }
 }

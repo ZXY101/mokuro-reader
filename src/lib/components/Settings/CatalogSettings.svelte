@@ -7,8 +7,11 @@
 
   function onConfirm() {
     clearVolumes();
-    db.volumes_data.clear();
+    // Clear all 4 tables in the v3 schema
     db.volumes.clear();
+    db.volume_thumbnails.clear();
+    db.volume_ocr.clear();
+    db.volume_files.clear();
   }
 
   function onClear() {

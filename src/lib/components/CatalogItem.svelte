@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { volumesWithPlaceholders } from '$lib/catalog';
+  import { volumesWithPlaceholders, getThumbnail } from '$lib/catalog';
   import { progress } from '$lib/settings';
   import { showSnackbar } from '$lib/util';
   import { downloadQueue, queueSeriesVolumes } from '$lib/util/download-queue';
@@ -81,19 +81,25 @@
 
   // Store thumbnail dimensions
   let thumbnailDimensions = $state<Map<string, { width: number; height: number }>>(new Map());
+  // Store loaded thumbnail URLs
+  let thumbnailUrls = $state<Map<string, string>>(new Map());
 
-  // Load thumbnail dimensions
+  // Load thumbnails from database and calculate dimensions
   $effect(() => {
     const newDimensions = new Map<string, { width: number; height: number }>();
+    const newUrls = new Map<string, string>();
     const urlsToRevoke: string[] = [];
 
-    const promises = stackedVolumes.map((vol) => {
-      if (!vol.thumbnail) return Promise.resolve();
+    const promises = stackedVolumes.map(async (vol) => {
+      // Load thumbnail from database
+      const thumbnail = await getThumbnail(vol.volume_uuid);
+      if (!thumbnail) return;
 
       return new Promise<void>((resolve) => {
         const img = new Image();
-        const url = URL.createObjectURL(vol.thumbnail!);
+        const url = URL.createObjectURL(thumbnail);
         urlsToRevoke.push(url);
+        newUrls.set(vol.volume_uuid, url);
 
         img.onload = () => {
           newDimensions.set(vol.volume_uuid, {
@@ -109,6 +115,7 @@
 
     Promise.all(promises).then(() => {
       thumbnailDimensions = newDimensions;
+      thumbnailUrls = newUrls;
     });
 
     // Cleanup: revoke all blob URLs when effect is destroyed
@@ -245,9 +252,9 @@
         <div class="relative sm:h-[410px] sm:w-[325px] sm:pt-4 sm:pb-6">
           <div class="relative overflow-hidden sm:h-[385px] sm:w-full">
             {#each stackedVolumes as vol, i (vol.volume_uuid)}
-              {#if vol.thumbnail}
+              {#if thumbnailUrls.get(vol.volume_uuid)}
                 <img
-                  src={URL.createObjectURL(vol.thumbnail)}
+                  src={thumbnailUrls.get(vol.volume_uuid)}
                   alt={vol.volume_title}
                   class="absolute h-auto border border-gray-900 bg-black sm:max-h-[360px] sm:max-w-[250px]"
                   style="left: {i * stepSizes.horizontal}px; top: {stepSizes.topOffset +
