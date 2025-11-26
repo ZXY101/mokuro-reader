@@ -24,8 +24,8 @@
   // Read unified provider state synchronously
   let providerState = $derived($unifiedProviderState);
 
-  // Track if any cloud providers are authenticated (derived from state)
-  let hasAuthenticatedProviders = $derived(providerState?.hasStoredCredentials ?? false);
+  // Track if any cloud providers are configured (derived from active_cloud_provider key)
+  let hasActiveProvider = $derived(providerState?.hasActiveProvider ?? false);
 
   // Google Drive specific: Track token expiry for debug display
   let tokenMinutesLeft = $state<number | null>(null);
@@ -160,7 +160,7 @@
             ? `${providerDisplayName} - Connected`
             : providerState.isAuthenticated
               ? `${providerDisplayName} - Loading...`
-              : providerState.hasStoredCredentials
+              : providerState.hasActiveProvider
                 ? `${providerDisplayName} - Initializing...`
                 : `${providerDisplayName} - Not connected`}
       >
@@ -174,7 +174,7 @@
           <CloudArrowUpOutline
             class="h-6 w-6 cursor-pointer text-yellow-600 hover:text-yellow-700"
           />
-        {:else if providerState.hasStoredCredentials}
+        {:else if providerState.hasActiveProvider}
           <CloudArrowUpOutline
             class="h-6 w-6 cursor-pointer text-yellow-600 hover:text-yellow-700"
           />
@@ -198,7 +198,7 @@
           </button>
         {/key}
       {/if}
-      {#if hasAuthenticatedProviders}
+      {#if hasActiveProvider}
         <button
           onclick={handleSync}
           class="flex h-6 w-6 items-center justify-center"

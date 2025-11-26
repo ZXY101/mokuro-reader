@@ -9,8 +9,6 @@
     showSnackbar,
     accessTokenStore,
     tokenClientStore,
-    signIn,
-    logout,
     syncReadProgress,
     READER_FOLDER,
     CLIENT_ID,
@@ -55,36 +53,12 @@
   let megaAuth = $derived($providerStatusStore.providers['mega']?.isAuthenticated || false);
   let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
 
-  // Check if any provider is configured (not just authenticated)
-  // This allows UI to show the provider page immediately while initializing
-  let hasAnyProvider = $derived(
-    $providerStatusStore.providers['google-drive']?.hasStoredCredentials ||
-      $providerStatusStore.providers['mega']?.hasStoredCredentials ||
-      $providerStatusStore.providers['webdav']?.hasStoredCredentials ||
-      false
-  );
+  // Use active_cloud_provider key (via currentProviderType) for UI state
+  // This properly clears on logout unlike hasStoredCredentials
+  let currentProvider = $derived<ProviderType | null>($providerStatusStore.currentProviderType);
 
-  // Check if providers are configured (even if not currently connected)
-  let googleDriveConfigured = $derived(
-    $providerStatusStore.providers['google-drive']?.hasStoredCredentials || false
-  );
-  let megaConfigured = $derived(
-    $providerStatusStore.providers['mega']?.hasStoredCredentials || false
-  );
-  let webdavConfigured = $derived(
-    $providerStatusStore.providers['webdav']?.hasStoredCredentials || false
-  );
-
-  // Determine current configured provider (show UI even if still initializing)
-  let currentProvider = $derived<ProviderType | null>(
-    googleDriveConfigured
-      ? 'google-drive'
-      : megaConfigured
-        ? 'mega'
-        : webdavConfigured
-          ? 'webdav'
-          : null
-  );
+  // Show provider UI if there's an active provider
+  let hasAnyProvider = $derived(currentProvider !== null);
 
   // Provider display names
   const providerNames: Record<ProviderType, string> = {
@@ -310,47 +284,36 @@
     }
   }
 
-  onMount(() => {
+  onMount(async () => {
     // Clear service worker cache for Google Drive downloads
     // This is cloud-page-specific and not part of global init
     clearServiceWorkerCache();
     // Storage quota is fetched reactively via $effect when auth state changes
+
+    // Pre-fill WebDAV form fields from last session (Issue #206 Lesson #10)
+    try {
+      const webdavProviderInstance = await providerManager.getOrLoadProvider('webdav');
+      const lastUrl = (webdavProviderInstance as any).getLastServerUrl?.();
+      const lastUsername = (webdavProviderInstance as any).getLastUsername?.();
+      if (lastUrl) webdavUrl = lastUrl;
+      if (lastUsername) webdavUsername = lastUsername;
+    } catch {
+      // Provider not loadable, ignore
+    }
   });
 
   // Google Drive handlers
   async function handleGoogleDriveLogin() {
     googleDriveLoading = true;
     try {
-      // Trigger OAuth flow (initialize and show OAuth popup)
-      await signIn();
-
-      // Hide spinner once popup appears - user is now interacting with Google's dialog
-      googleDriveLoading = false;
-
-      // Wait for authentication to complete by watching the accessToken store
-      await new Promise<void>((resolve, reject) => {
-        let unsubscribe: (() => void) | undefined;
-
-        const timeout = setTimeout(() => {
-          unsubscribe?.(); // Clean up subscription on timeout
-          reject(new Error('Login timeout'));
-        }, 90000); // 90 second timeout for OAuth popup
-
-        unsubscribe = accessTokenStore.subscribe((token) => {
-          if (token) {
-            clearTimeout(timeout);
-            unsubscribe?.(); // Use optional chaining in case callback fires immediately
-            resolve();
-          }
-        });
-      });
+      // Lazy-load Google Drive provider and login (handles OAuth popup + waiting + key setting)
+      const googleDriveProvider = await providerManager.getOrLoadProvider('google-drive');
+      await googleDriveProvider.login();
 
       // Set as current provider (auto-logs out any other provider)
-      // Use getOrLoadProvider to ensure the provider is loaded (lazy-loading)
-      const provider = await providerManager.getOrLoadProvider('google-drive');
-      await providerManager.setCurrentProvider(provider);
+      await providerManager.setCurrentProvider(googleDriveProvider);
 
-      // After successful login, populate unified cache for placeholders
+      // Populate unified cache for rest of app to use
       showSnackbar('Connected to Google Drive - loading cloud data...');
       await unifiedCloudManager.fetchAllCloudVolumes();
 
@@ -401,24 +364,26 @@
     }
   }
 
-  // Unified logout handler
+  // Unified logout handler - all providers use providerManager.logout()
   // (Storage quota is cleared reactively via $effect when auth state changes)
   async function handleLogout() {
-    if (currentProvider === 'google-drive') {
-      await logout();
-    } else if (currentProvider === 'mega') {
-      await handleMegaLogout();
-    } else if (currentProvider === 'webdav') {
-      await handleWebDAVLogout();
-    }
-  }
+    const provider = currentProvider;
 
-  async function handleMegaLogout() {
-    // Use providerManager.logout() which handles provider logout and cache clearing
+    // Use providerManager.logout() for all providers
+    // This properly clears currentProvider, active_cloud_provider key, and updates status
     await providerManager.logout();
-    megaEmail = '';
-    megaPassword = '';
-    showSnackbar('Logged out of MEGA');
+
+    // Provider-specific cleanup
+    if (provider === 'mega') {
+      megaEmail = '';
+      megaPassword = '';
+      showSnackbar('Logged out of MEGA');
+    } else if (provider === 'webdav') {
+      webdavPassword = '';
+      showSnackbar('Logged out of WebDAV');
+    } else if (provider === 'google-drive') {
+      showSnackbar('Logged out of Google Drive');
+    }
   }
 
   async function handleProviderSync() {
@@ -465,15 +430,6 @@
     } finally {
       webdavLoading = false;
     }
-  }
-
-  async function handleWebDAVLogout() {
-    // Use providerManager.logout() which handles provider logout and cache clearing
-    await providerManager.logout();
-    webdavUrl = '';
-    webdavUsername = '';
-    webdavPassword = '';
-    showSnackbar('Logged out of WebDAV');
   }
 
   // Browser detection and settings URL generation
@@ -668,16 +624,16 @@
 
           <!-- WebDAV Option -->
           <button
-            class="border-opacity-50 w-full cursor-not-allowed rounded-lg border border-slate-600 p-6 opacity-50"
-            disabled
+            class="border-opacity-50 w-full rounded-lg border border-slate-600 p-6 transition-colors hover:bg-slate-800"
+            onclick={() => {
+              const webdavForm = document.getElementById('webdav-login-form');
+              if (webdavForm) webdavForm.classList.toggle('hidden');
+            }}
           >
             <div class="flex items-center gap-4">
               <div class="flex h-8 w-8 items-center justify-center text-2xl">W</div>
               <div class="flex-1 text-left">
-                <div class="flex items-center gap-2">
-                  <div class="text-lg font-semibold">WebDAV</div>
-                  <Badge color="yellow">Under Development</Badge>
-                </div>
+                <div class="text-lg font-semibold">WebDAV</div>
                 <div class="text-sm text-gray-400">Nextcloud, ownCloud, NAS • Persistent login</div>
               </div>
             </div>
@@ -701,15 +657,13 @@
               <input
                 type="text"
                 bind:value={webdavUsername}
-                placeholder="Username"
-                required
+                placeholder="Username (optional for some servers)"
                 class="rounded-lg border border-gray-600 bg-gray-700 p-2.5 text-sm text-white"
               />
               <input
                 type="password"
                 bind:value={webdavPassword}
                 placeholder="Password or App Token"
-                required
                 class="rounded-lg border border-gray-600 bg-gray-700 p-2.5 text-sm text-white"
               />
               <Button type="submit" disabled={webdavLoading} color="blue" size="sm">

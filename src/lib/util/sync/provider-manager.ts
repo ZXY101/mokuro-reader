@@ -181,6 +181,11 @@ class ProviderManager {
    * Update the status store with current provider state
    */
   updateStatus(): void {
+    // Use current provider type if set, otherwise check localStorage
+    // This ensures UI shows the configured provider even before it finishes loading
+    const currentProviderType =
+      this.currentProvider?.type ?? getConfiguredProviderType();
+
     const status: MultiProviderStatus = {
       providers: {
         'google-drive': null,
@@ -189,7 +194,7 @@ class ProviderManager {
       },
       hasAnyAuthenticated: false,
       needsAttention: false,
-      currentProviderType: this.currentProvider?.type ?? null
+      currentProviderType
     };
 
     // Update status for all registered providers (shows their individual states)
