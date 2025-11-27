@@ -1,18 +1,18 @@
-import { page } from '$app/stores';
 import { get } from 'svelte/store';
 import { showSnackbar } from './snackbar';
 import { browser } from '$app/environment';
+import { currentView } from './hash-router';
 
 export function clamp(num: number, min: number, max: number) {
   return Math.min(Math.max(num, min), max);
 }
 
 export function isReader() {
-  return get(page).route.id === '/[manga]/[volume]';
+  return get(currentView).type === 'reader';
 }
 
 export function isCatalog() {
-  return get(page).route.id === '/';
+  return get(currentView).type === 'catalog';
 }
 
 let timer: any;
