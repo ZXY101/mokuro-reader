@@ -7,7 +7,7 @@
     RefreshOutline,
     ChartLineUpOutline
   } from 'flowbite-svelte-icons';
-  import { nav, isOnReader } from '$lib/util/navigation';
+  import { nav, isOnReader } from '$lib/util/hash-router';
   import Settings from './Settings/Settings.svelte';
   import UploadModal from './UploadModal.svelte';
   import Icon from '$lib/assets/icon.webp';
@@ -131,7 +131,7 @@
 
 <div class="relative z-10">
   <Navbar hidden={isReader} class="bg-white dark:bg-gray-800">
-    <NavBrand href="/">
+    <NavBrand href="#/catalog">
       <div class="flex flex-row items-center gap-2">
         <img src={Icon} alt="icon" class="h-[32px] w-[32px]" />
         <span class="text-xl font-semibold dark:text-white">Mokuro</span>

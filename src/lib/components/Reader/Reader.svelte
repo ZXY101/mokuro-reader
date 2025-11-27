@@ -36,8 +36,7 @@
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
-  import { beforeNavigate } from '$app/navigation';
-  import { nav, navigateBack } from '$lib/util/navigation';
+  import { nav, navigateBack } from '$lib/util/hash-router';
   import { onMount, onDestroy, tick } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
@@ -374,7 +373,8 @@
     }
   });
 
-  beforeNavigate(() => {
+  // Fire reader closed event when component is destroyed (navigating away)
+  onDestroy(() => {
     if (volume) {
       const { charCount, lineCount } = getCharCount(pages, page);
 
