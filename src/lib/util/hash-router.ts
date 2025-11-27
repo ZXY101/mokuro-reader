@@ -90,9 +90,9 @@ interface NavigateOptions {
 export function navigate(view: View, options?: NavigateOptions): void {
   const hash = viewToHash(view);
   if (options?.replaceState) {
-    history.replaceState(null, '', hash);
+    window.history.replaceState(null, '', hash);
   } else {
-    history.pushState(null, '', hash);
+    window.history.pushState(null, '', hash);
   }
   currentView.set(view);
 }
@@ -206,7 +206,7 @@ export function initRouter(): () => void {
 
   // Ensure hash exists (default to catalog)
   if (!window.location.hash || window.location.hash === '#' || window.location.hash === '#/') {
-    history.replaceState(null, '', '#/catalog');
+    window.history.replaceState(null, '', '#/catalog');
   }
 
   // Listen for hash changes (back/forward buttons)
