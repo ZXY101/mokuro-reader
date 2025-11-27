@@ -8,7 +8,6 @@
   import ReaderSettings from './Reader/ReaderSettings.svelte';
   import Profiles from './Profiles/Profiles.svelte';
   import CatalogSettings from './CatalogSettings.svelte';
-  import CatalogLayoutSettings from './CatalogLayoutSettings.svelte';
   import Stats from './Stats.svelte';
   import VolumeDefaults from './Volume/VolumeDefaults.svelte';
   import VolumeSettings from './Volume/VolumeSettings.svelte';
@@ -71,7 +70,6 @@
       <ReaderSettings />
       <AnkiConnectSettings />
       <CatalogSettings />
-      <CatalogLayoutSettings />
       <Stats />
       <About />
     </Accordion>

@@ -44,7 +44,8 @@
     const stackCount = $miscSettings.catalogStackCount;
     // If hiding read volumes and there are unread ones, show those; otherwise show all local
     const sourceVolumes = hideRead && unreadVolumes.length > 0 ? unreadVolumes : localVolumes;
-    return sourceVolumes.slice(0, stackCount);
+    // stackCount of 0 means show all volumes
+    return stackCount === 0 ? sourceVolumes : sourceVolumes.slice(0, stackCount);
   });
 
   // Keep allSeriesVolumes for handleClick function
@@ -106,13 +107,17 @@
 
   // Calculate container dimensions based on settings
   let containerDimensions = $derived.by(() => {
-    const stackCount = $miscSettings.catalogStackCount;
+    const stackCountSetting = $miscSettings.catalogStackCount;
     const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
-    const vOffsetPercent = $miscSettings.catalogVerticalStep / 100;
+    // Force vertical offset to 0 when stack count is 0 (all volumes / spine mode)
+    const vOffsetPercent = stackCountSetting === 0 ? 0 : $miscSettings.catalogVerticalStep / 100;
 
-    // Extra space needed for stacking: offset% × base × (stackCount - 1)
-    const extraWidth = BASE_WIDTH * hOffsetPercent * (stackCount - 1);
-    const extraHeight = BASE_HEIGHT * vOffsetPercent * (stackCount - 1);
+    // Use actual volume count when stackCount is 0 (all volumes)
+    const effectiveStackCount = stackCountSetting === 0 ? stackedVolumes.length : stackCountSetting;
+
+    // Extra space needed for stacking: offset% × base × (count - 1)
+    const extraWidth = BASE_WIDTH * hOffsetPercent * (effectiveStackCount - 1);
+    const extraHeight = BASE_HEIGHT * vOffsetPercent * (effectiveStackCount - 1);
 
     // Inner container (thumbnail area)
     const innerWidth = Math.round(BASE_WIDTH + extraWidth);
@@ -141,29 +146,63 @@
     };
   }
 
-  // Calculate step sizes and centering offsets
-  let stepSizes = $derived.by(() => {
-    const stackCount = $miscSettings.catalogStackCount;
-    const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
-    const vOffsetPercent = $miscSettings.catalogVerticalStep / 100;
+  // Calculate uniform height when vertical offset is 0 or stack count is 0 (spine mode)
+  let uniformHeight = $derived.by(() => {
+    const vOffsetPercent = $miscSettings.catalogVerticalStep;
+    const stackCountSetting = $miscSettings.catalogStackCount;
+    // Force uniform height when stack count is 0 (all volumes) or v.offset is 0
+    if ((vOffsetPercent !== 0 && stackCountSetting !== 0) || thumbnailDimensions.size === 0)
+      return null;
 
-    // Step in pixels based on base thumbnail size
-    const horizontalStep = BASE_WIDTH * hOffsetPercent;
-    const verticalStep = BASE_HEIGHT * vOffsetPercent;
+    // Calculate average rendered height
+    let totalHeight = 0;
+    let count = 0;
+    for (const vol of stackedVolumes) {
+      const dims = thumbnailDimensions.get(vol.volume_uuid);
+      if (dims) {
+        const rendered = getRenderedDimensions(dims.width, dims.height);
+        totalHeight += rendered.height;
+        count++;
+      }
+    }
+
+    return count > 0 ? totalHeight / count : BASE_HEIGHT;
+  });
+
+  // Calculate step sizes and centering/spreading offsets
+  let stepSizes = $derived.by(() => {
+    const stackCountSetting = $miscSettings.catalogStackCount;
+    const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
+    // Force vertical offset to 0 when stack count is 0 (all volumes / spine mode)
+    const vOffsetPercent = stackCountSetting === 0 ? 0 : $miscSettings.catalogVerticalStep / 100;
+    const centerHorizontal = $miscSettings.catalogCenterHorizontal;
+    const centerVertical = $miscSettings.catalogCenterVertical;
+
+    // Default step in pixels based on base thumbnail size
+    let horizontalStep = BASE_WIDTH * hOffsetPercent;
+    let verticalStep = BASE_HEIGHT * vOffsetPercent;
 
     const actualCount = stackedVolumes.length;
+    // Use actual count when stackCount is 0 (all volumes)
+    const effectiveStackCount = stackCountSetting === 0 ? actualCount : stackCountSetting;
+    const { innerWidth, innerHeight } = containerDimensions;
 
-    // Calculate horizontal centering for fewer volumes
-    // Container is sized for stackCount, but we may have fewer
-    const expectedStackWidth = BASE_WIDTH + horizontalStep * (stackCount - 1);
-    const actualStackWidth = BASE_WIDTH + horizontalStep * (actualCount - 1);
-    const leftOffset = (expectedStackWidth - actualStackWidth) / 2;
+    // Calculate horizontal layout
+    let leftOffset = 0;
+    if (actualCount < effectiveStackCount && actualCount > 1) {
+      if (centerHorizontal) {
+        // Center: keep step size, add offset
+        const actualStackWidth = BASE_WIDTH + horizontalStep * (actualCount - 1);
+        leftOffset = (innerWidth - actualStackWidth) / 2;
+      } else {
+        // Spread: recalculate step to fill width evenly
+        horizontalStep = (innerWidth - BASE_WIDTH) / (actualCount - 1);
+      }
+    }
 
-    // Calculate vertical centering based on actual thumbnail heights
-    let topOffset = 0;
-    if (thumbnailDimensions.size > 0) {
-      // Get max rendered height from actual thumbnails
-      let maxRenderedHeight = 0;
+    // Get max rendered height from actual thumbnails (or uniform height if in spine mode)
+    let maxRenderedHeight = uniformHeight ?? BASE_HEIGHT;
+    if (uniformHeight === null && thumbnailDimensions.size > 0) {
       for (const vol of stackedVolumes) {
         const dims = thumbnailDimensions.get(vol.volume_uuid);
         if (dims) {
@@ -171,14 +210,20 @@
           maxRenderedHeight = Math.max(maxRenderedHeight, rendered.height);
         }
       }
+    }
 
-      // Calculate actual stack height
-      const expectedStackHeight = BASE_HEIGHT + verticalStep * (stackCount - 1);
-      const actualStackHeight = maxRenderedHeight + verticalStep * (actualCount - 1);
+    // Calculate vertical layout
+    let topOffset = 0;
+    const actualStackHeight = maxRenderedHeight + verticalStep * (actualCount - 1);
 
-      // Center vertically if actual stack is shorter
-      if (actualStackHeight < expectedStackHeight) {
-        topOffset = (expectedStackHeight - actualStackHeight) / 2;
+    if (actualStackHeight < innerHeight && actualCount > 0) {
+      // When v.offset is 0, always center (spreading doesn't apply)
+      if (centerVertical || vOffsetPercent === 0) {
+        // Center: keep step size, add offset
+        topOffset = (innerHeight - actualStackHeight) / 2;
+      } else if (actualCount > 1) {
+        // Spread: recalculate step to fill height evenly
+        verticalStep = (innerHeight - maxRenderedHeight) / (actualCount - 1);
       }
     }
 
@@ -251,8 +296,10 @@
                 <img
                   src={thumbnailUrls.get(vol.volume_uuid)}
                   alt={vol.volume_title}
-                  class="absolute h-auto border border-gray-900 bg-black"
-                  style="max-width: {BASE_WIDTH}px; max-height: {BASE_HEIGHT}px; left: {stepSizes.leftOffset +
+                  class="absolute border border-gray-900 bg-black"
+                  style="max-width: {BASE_WIDTH}px; {uniformHeight !== null
+                    ? `height: ${uniformHeight}px; width: auto;`
+                    : `max-height: ${BASE_HEIGHT}px; height: auto;`} left: {stepSizes.leftOffset +
                     i * stepSizes.horizontal}px; top: {stepSizes.topOffset +
                     i * stepSizes.vertical}px; z-index: {stackedVolumes.length -
                     i}; filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5));"
