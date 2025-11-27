@@ -8,7 +8,7 @@
     updateCatalogSetting,
     type CatalogStackingPreset
   } from '$lib/settings/settings';
-  import { nav } from '$lib/util/navigation';
+  import { nav } from '$lib/util/hash-router';
   import { isCatalog } from '$lib/util';
 
   const presetOptions = [

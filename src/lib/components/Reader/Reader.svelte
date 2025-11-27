@@ -36,8 +36,7 @@
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
-  import { beforeNavigate } from '$app/navigation';
-  import { nav, navigateBack } from '$lib/util/navigation';
+  import { nav, navigateBack } from '$lib/util/hash-router';
   import { onMount, onDestroy, tick } from 'svelte';
   import { activityTracker } from '$lib/util/activity-tracker';
   import { shouldShowSinglePage } from '$lib/reader/page-mode-detection';
@@ -149,8 +148,7 @@
           (v) => v.volume_uuid === volume.volume_uuid
         );
         const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-        if (previousVolume)
-          nav.toReader(volume.series_uuid, previousVolume.volume_uuid, { invalidateAll: true });
+        if (previousVolume) nav.toReader(volume.series_uuid, previousVolume.volume_uuid);
         else nav.toSeries(volume.series_uuid);
         return;
       } else if (newPage > pages.length && page === pages.length) {
@@ -160,8 +158,7 @@
           (v) => v.volume_uuid === volume.volume_uuid
         );
         const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-        if (nextVolume)
-          nav.toReader(volume.series_uuid, nextVolume.volume_uuid, { invalidateAll: true });
+        if (nextVolume) nav.toReader(volume.series_uuid, nextVolume.volume_uuid);
         else nav.toSeries(volume.series_uuid);
         return;
       }
@@ -374,7 +371,8 @@
     }
   });
 
-  beforeNavigate(() => {
+  // Fire reader closed event when component is destroyed (navigating away)
+  onDestroy(() => {
     if (volume) {
       const { charCount, lineCount } = getCharCount(pages, page);
 

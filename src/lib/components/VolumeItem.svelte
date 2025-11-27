@@ -14,8 +14,7 @@
     ImageOutline
   } from 'flowbite-svelte-icons';
   import { db } from '$lib/catalog/db';
-  import { nav, routeParams } from '$lib/util/navigation';
-  import { isPWA } from '$lib/util/pwa';
+  import { nav, routeParams } from '$lib/util/hash-router';
   import BackupButton from './BackupButton.svelte';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import { providerManager } from '$lib/util/sync';
@@ -412,9 +411,9 @@
       </Dropdown>
 
       <a
-        href={$isPWA ? undefined : `/${$routeParams.manga}/${volume_uuid}`}
+        href="#/reader/{$routeParams.manga}/{volume_uuid}"
         onclick={(e) => {
-          if ($isPWA) e.preventDefault();
+          e.preventDefault();
           if ($routeParams.manga) nav.toReader($routeParams.manga, volume_uuid);
         }}
         class="flex flex-col gap-2"

@@ -4,8 +4,7 @@
   import { showSnackbar } from '$lib/util';
   import { downloadQueue, queueSeriesVolumes } from '$lib/util/download-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
-  import { nav } from '$lib/util/navigation';
-  import { isPWA } from '$lib/util/pwa';
+  import { nav } from '$lib/util/hash-router';
   import { Spinner } from 'flowbite-svelte';
   import { DownloadSolid } from 'flowbite-svelte-icons';
 
@@ -347,8 +346,8 @@
 
       // Queue all series volumes for download
       queueSeriesVolumes(allSeriesVolumes);
-    } else if ($isPWA) {
-      // In PWA mode, use navigation system instead of href
+    } else {
+      // Use hash-based navigation
       e.preventDefault();
       nav.toSeries(series_uuid);
     }
@@ -356,7 +355,7 @@
 </script>
 
 {#if volume}
-  <a href={series_uuid} onclick={handleClick}>
+  <a href="#/series/{series_uuid}" onclick={handleClick}>
     <div
       class:text-green-400={isComplete}
       class:opacity-70={isPlaceholderOnly}
