@@ -37,6 +37,7 @@ export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
   return () => subscription.unsubscribe();
 });
 
+
 // Merge local volumes with cloud placeholders
 export const volumesWithPlaceholders = derived(
   [volumes, unifiedCloudManager.cloudFiles],
@@ -119,15 +120,6 @@ export const currentVolumeData: Readable<VolumeData | undefined> = derived(
 
 // Track last volume UUID to prevent unnecessary data clears
 let currentVolumeDataLastUuid: string | undefined;
-
-/**
- * Get thumbnail for a volume by UUID.
- * Returns a promise that resolves to the thumbnail File or undefined.
- */
-export async function getThumbnail(volumeUuid: string): Promise<File | undefined> {
-  const thumbnailRecord = await db.volume_thumbnails.get(volumeUuid);
-  return thumbnailRecord?.thumbnail;
-}
 
 /**
  * Japanese character count for current volume.

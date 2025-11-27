@@ -288,9 +288,8 @@
     if (seriesUuid) {
       manga?.forEach((vol) => {
         const volId = vol.volume_uuid;
-        // Delete from all 4 tables in v3 schema
+        // Delete from all 3 tables in v3 schema
         db.volumes.where('volume_uuid').equals(vol.volume_uuid).delete();
-        db.volume_thumbnails.delete(vol.volume_uuid);
         db.volume_ocr.delete(vol.volume_uuid);
         db.volume_files.delete(vol.volume_uuid);
 

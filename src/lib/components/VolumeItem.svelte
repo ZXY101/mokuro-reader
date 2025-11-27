@@ -100,19 +100,16 @@
     });
   });
 
-  // Load thumbnail from separate table
+  // Create blob URL from inline thumbnail
   let thumbnailUrl = $state<string | undefined>(undefined);
   $effect(() => {
-    let url: string | undefined;
-    db.volume_thumbnails.get(volume.volume_uuid).then((record) => {
-      if (record?.thumbnail) {
-        url = URL.createObjectURL(record.thumbnail);
-        thumbnailUrl = url;
-      }
-    });
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
+    if (!volume.thumbnail) {
+      thumbnailUrl = undefined;
+      return;
+    }
+    const url = URL.createObjectURL(volume.thumbnail);
+    thumbnailUrl = url;
+    return () => URL.revokeObjectURL(url);
   });
 
   // Get current reading speed
@@ -217,10 +214,9 @@
     promptConfirmation(
       `Delete ${volName}?`,
       async (deleteStats = false, deleteCloud = false) => {
-        // Delete from all 4 tables
+        // Delete from all 3 tables
         await Promise.all([
           db.volumes.where('volume_uuid').equals(volume.volume_uuid).delete(),
-          db.volume_thumbnails.delete(volume.volume_uuid),
           db.volume_ocr.delete(volume.volume_uuid),
           db.volume_files.delete(volume.volume_uuid)
         ]);

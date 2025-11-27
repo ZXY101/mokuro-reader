@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { volumesWithPlaceholders, getThumbnail } from '$lib/catalog';
+  import type { VolumeMetadata } from '$lib/types';
   import { progress } from '$lib/settings';
   import { showSnackbar } from '$lib/util';
   import { downloadQueue, queueSeriesVolumes } from '$lib/util/download-queue';
@@ -10,23 +10,15 @@
 
   interface Props {
     series_uuid: string;
+    volumes: VolumeMetadata[]; // Pre-computed by parent - avoids O(N) re-filtering
+    providerName?: string; // Shared across all items - avoids repeated lookups
   }
 
-  let { series_uuid }: Props = $props();
+  let { series_uuid, volumes, providerName = 'Cloud' }: Props = $props();
 
-  // Get active provider's display name
-  let providerDisplayName = $derived.by(() => {
-    const provider = unifiedCloudManager.getActiveProvider();
-    return provider?.name || 'Cloud';
-  });
-
-  // ========================================
-  // OPTIMIZED: Single source - filter to this series once, sort once
-  // ========================================
+  // Volumes are already filtered by parent, just need to sort once
   let seriesVolumes = $derived(
-    Object.values($volumesWithPlaceholders)
-      .filter((v) => v.series_uuid === series_uuid)
-      .sort((a, b) => a.volume_title.localeCompare(b.volume_title))
+    [...volumes].sort((a, b) => a.volume_title.localeCompare(b.volume_title))
   );
 
   // Split into local vs cloud placeholders
@@ -79,25 +71,22 @@
     };
   }
 
-  // Store thumbnail dimensions
+  // Store thumbnail dimensions and blob URLs
   let thumbnailDimensions = $state<Map<string, { width: number; height: number }>>(new Map());
-  // Store loaded thumbnail URLs
   let thumbnailUrls = $state<Map<string, string>>(new Map());
 
-  // Load thumbnails from database and calculate dimensions
+  // Load thumbnail dimensions and create blob URLs
   $effect(() => {
     const newDimensions = new Map<string, { width: number; height: number }>();
     const newUrls = new Map<string, string>();
     const urlsToRevoke: string[] = [];
 
-    const promises = stackedVolumes.map(async (vol) => {
-      // Load thumbnail from database
-      const thumbnail = await getThumbnail(vol.volume_uuid);
-      if (!thumbnail) return;
+    const promises = stackedVolumes.map((vol) => {
+      if (!vol.thumbnail) return Promise.resolve();
 
       return new Promise<void>((resolve) => {
         const img = new Image();
-        const url = URL.createObjectURL(thumbnail);
+        const url = URL.createObjectURL(vol.thumbnail!);
         urlsToRevoke.push(url);
         newUrls.set(vol.volume_uuid, url);
 
@@ -271,7 +260,7 @@
       </p>
       {#if isPlaceholderOnly}
         <p class="text-xs text-blue-400">
-          {seriesVolumes.length} volume{seriesVolumes.length !== 1 ? 's' : ''} in {providerDisplayName}
+          {seriesVolumes.length} volume{seriesVolumes.length !== 1 ? 's' : ''} in {providerName}
         </p>
       {/if}
     </div>

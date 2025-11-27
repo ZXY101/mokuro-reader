@@ -1,4 +1,4 @@
-import type { VolumeMetadata, VolumeThumbnail, VolumeOCR, VolumeFiles } from '$lib/types';
+import type { VolumeMetadata, VolumeOCR, VolumeFiles } from '$lib/types';
 import Dexie, { type Table } from 'dexie';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
 import { browser } from '$app/environment';
@@ -9,32 +9,26 @@ function naturalSort(a: string, b: string): number {
 
 export class CatalogDexieV3 extends Dexie {
   volumes!: Table<VolumeMetadata>;
-  volume_thumbnails!: Table<VolumeThumbnail>;
   volume_ocr!: Table<VolumeOCR>;
   volume_files!: Table<VolumeFiles>;
 
   constructor(dbName: string = 'mokuro_v3') {
     super(dbName);
 
-    // v3 schema: 4 separate tables
+    // v3 schema: 3 tables (thumbnails are inlined in volumes)
     this.version(1).stores({
       volumes: 'volume_uuid, series_uuid, series_title',
-      volume_thumbnails: 'volume_uuid',
       volume_ocr: 'volume_uuid',
       volume_files: 'volume_uuid'
     });
   }
 
   async processThumbnails(batchSize: number = 5): Promise<void> {
-    // Get volume UUIDs that don't have thumbnails yet
-    const allVolumeUuids = await this.volumes.toCollection().primaryKeys();
-    const existingThumbnailUuids = new Set(
-      await this.volume_thumbnails.toCollection().primaryKeys()
-    );
-
-    const volumesNeedingThumbnails = allVolumeUuids.filter(
-      (uuid) => !existingThumbnailUuids.has(uuid as string)
-    );
+    // Get volumes that need thumbnail generation/regeneration
+    // Missing any of thumbnail, width, or height indicates need for (re)generation
+    const volumesNeedingThumbnails = await this.volumes
+      .filter((vol) => !vol.thumbnail || !vol.thumbnail_width || !vol.thumbnail_height)
+      .primaryKeys();
 
     if (volumesNeedingThumbnails.length === 0) return;
 
@@ -51,10 +45,12 @@ export class CatalogDexieV3 extends Dexie {
             const firstImageFile = fileNames.length > 0 ? files.files[fileNames[0]] : null;
 
             if (firstImageFile) {
-              const thumbnail = await generateThumbnail(firstImageFile);
-              await this.volume_thumbnails.add({
-                volume_uuid: volumeUuid as string,
-                thumbnail
+              const thumbnailResult = await generateThumbnail(firstImageFile);
+              // Store thumbnail and dimensions directly in volumes table
+              await this.volumes.update(volumeUuid as string, {
+                thumbnail: thumbnailResult.file,
+                thumbnail_width: thumbnailResult.width,
+                thumbnail_height: thumbnailResult.height
               });
             }
           }

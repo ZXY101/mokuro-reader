@@ -365,39 +365,33 @@ async function processVolumeData(
   const fileNames = Object.keys(files).sort((a, b) =>
     a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
   );
-  let thumbnail: File | undefined;
+  let thumbnailResult: { file: File; width: number; height: number } | undefined;
   if (fileNames.length > 0) {
-    thumbnail = await generateThumbnail(files[fileNames[0]]);
+    thumbnailResult = await generateThumbnail(files[fileNames[0]]);
   }
 
-  // Save to IndexedDB (4 tables: volumes, volume_thumbnails, volume_ocr, volume_files)
+  // Save to IndexedDB (3 tables: volumes, volume_ocr, volume_files)
   const existingVolume = await db.volumes.where('volume_uuid').equals(metadata.volume_uuid).first();
 
   if (!existingVolume) {
-    await db.transaction(
-      'rw',
-      db.volumes,
-      db.volume_thumbnails,
-      db.volume_ocr,
-      db.volume_files,
-      async () => {
-        await db.volumes.add(metadata);
-        if (thumbnail) {
-          await db.volume_thumbnails.add({
-            volume_uuid: mokuroData.volume_uuid,
-            thumbnail
-          });
-        }
-        await db.volume_ocr.add({
-          volume_uuid: mokuroData.volume_uuid,
-          pages: mokuroData.pages
-        });
-        await db.volume_files.add({
-          volume_uuid: mokuroData.volume_uuid,
-          files
-        });
-      }
-    );
+    await db.transaction('rw', db.volumes, db.volume_ocr, db.volume_files, async () => {
+      // Add thumbnail and dimensions to metadata
+      const metadataWithThumbnail: VolumeMetadata = {
+        ...metadata,
+        thumbnail: thumbnailResult?.file,
+        thumbnail_width: thumbnailResult?.width,
+        thumbnail_height: thumbnailResult?.height
+      };
+      await db.volumes.add(metadataWithThumbnail);
+      await db.volume_ocr.add({
+        volume_uuid: mokuroData.volume_uuid,
+        pages: mokuroData.pages
+      });
+      await db.volume_files.add({
+        volume_uuid: mokuroData.volume_uuid,
+        files
+      });
+    });
   }
 
   // Update cloud file description if folder name doesn't match series title

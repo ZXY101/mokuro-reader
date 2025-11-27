@@ -24,6 +24,11 @@ export interface VolumeMetadata {
   // Cumulative character counts per page: [50, 120, 200] means page 3 has 200 total chars through it
   page_char_counts: number[];
 
+  // Thumbnail (small ~10-20KB file) and dimensions for synchronous layout
+  thumbnail?: File;
+  thumbnail_width?: number;
+  thumbnail_height?: number;
+
   // Placeholder fields for cloud-only volumes (not yet downloaded locally)
   isPlaceholder?: boolean;
 
@@ -38,12 +43,6 @@ export interface VolumeMetadata {
   driveFileId?: string;
   driveModifiedTime?: string;
   driveSize?: number;
-}
-
-// v3 table: volume_thumbnails
-export interface VolumeThumbnail {
-  volume_uuid: string;
-  thumbnail: File;
 }
 
 // v3 table: volume_ocr

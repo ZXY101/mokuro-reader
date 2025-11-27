@@ -102,39 +102,29 @@ async function writeVolumeBatchToV3(
   newDb: CatalogDexieV3,
   batch: PreparedVolumeData[]
 ): Promise<void> {
-  await newDb.transaction(
-    'rw',
-    [newDb.volumes, newDb.volume_thumbnails, newDb.volume_ocr, newDb.volume_files],
-    async () => {
-      for (const { volumeData, pageCharCounts } of batch) {
-        const uuid = volumeData.metadata.volume_uuid;
+  await newDb.transaction('rw', [newDb.volumes, newDb.volume_ocr, newDb.volume_files], async () => {
+    for (const { volumeData, pageCharCounts } of batch) {
+      const uuid = volumeData.metadata.volume_uuid;
 
-        await newDb.volumes.add({
-          ...volumeData.metadata,
-          page_char_counts: pageCharCounts
-        });
+      await newDb.volumes.add({
+        ...volumeData.metadata,
+        page_char_counts: pageCharCounts,
+        thumbnail: volumeData.thumbnail
+      });
 
-        if (volumeData.thumbnail) {
-          await newDb.volume_thumbnails.add({
-            volume_uuid: uuid,
-            thumbnail: volumeData.thumbnail
-          });
-        }
+      await newDb.volume_ocr.add({
+        volume_uuid: uuid,
+        pages: volumeData.pages
+      });
 
-        await newDb.volume_ocr.add({
+      if (volumeData.files && Object.keys(volumeData.files).length > 0) {
+        await newDb.volume_files.add({
           volume_uuid: uuid,
-          pages: volumeData.pages
+          files: volumeData.files
         });
-
-        if (volumeData.files && Object.keys(volumeData.files).length > 0) {
-          await newDb.volume_files.add({
-            volume_uuid: uuid,
-            files: volumeData.files
-          });
-        }
       }
     }
-  );
+  });
 }
 
 /**
