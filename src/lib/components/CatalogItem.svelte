@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { VolumeMetadata } from '$lib/types';
   import { progress } from '$lib/settings';
+  import { miscSettings } from '$lib/settings/misc';
   import { showSnackbar } from '$lib/util';
   import { downloadQueue, queueSeriesVolumes } from '$lib/util/download-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
@@ -37,10 +38,14 @@
   let isComplete = $derived(unreadVolumes.length === 0 && hasLocalVolumes);
   let isPlaceholderOnly = $derived(!hasLocalVolumes);
 
-  // Get up to 3 volumes for stacked thumbnail (unread if any, otherwise all local)
-  let stackedVolumes = $derived(
-    (unreadVolumes.length > 0 ? unreadVolumes : localVolumes).slice(0, 3)
-  );
+  // Get volumes for stacked thumbnail based on settings
+  let stackedVolumes = $derived.by(() => {
+    const hideRead = $miscSettings.catalogHideReadVolumes;
+    const stackCount = $miscSettings.catalogStackCount;
+    // If hiding read volumes and there are unread ones, show those; otherwise show all local
+    const sourceVolumes = hideRead && unreadVolumes.length > 0 ? unreadVolumes : localVolumes;
+    return sourceVolumes.slice(0, stackCount);
+  });
 
   // Keep allSeriesVolumes for handleClick function
   let allSeriesVolumes = $derived(seriesVolumes);
@@ -52,60 +57,23 @@
       : false
   );
 
-  // Calculate rendered dimensions for an image given max constraints
-  function calculateRenderedDimensions(naturalWidth: number, naturalHeight: number) {
-    const maxW = 250;
-    const maxH = 360;
-
-    // Calculate scale factors needed to fit within constraints
-    const scaleW = maxW / naturalWidth;
-    const scaleH = maxH / naturalHeight;
-
-    // Use the smaller scale factor (more restrictive constraint)
-    // Don't scale up (max scale = 1)
-    const scale = Math.min(scaleW, scaleH, 1);
-
-    return {
-      width: naturalWidth * scale,
-      height: naturalHeight * scale
-    };
-  }
-
-  // Store thumbnail dimensions and blob URLs
-  let thumbnailDimensions = $state<Map<string, { width: number; height: number }>>(new Map());
+  // Store blob URLs for thumbnails
   let thumbnailUrls = $state<Map<string, string>>(new Map());
 
-  // Load thumbnail dimensions and create blob URLs
+  // Create blob URLs for stacked volumes
   $effect(() => {
-    const newDimensions = new Map<string, { width: number; height: number }>();
     const newUrls = new Map<string, string>();
     const urlsToRevoke: string[] = [];
 
-    const promises = stackedVolumes.map((vol) => {
-      if (!vol.thumbnail) return Promise.resolve();
-
-      return new Promise<void>((resolve) => {
-        const img = new Image();
-        const url = URL.createObjectURL(vol.thumbnail!);
+    for (const vol of stackedVolumes) {
+      if (vol.thumbnail) {
+        const url = URL.createObjectURL(vol.thumbnail);
         urlsToRevoke.push(url);
         newUrls.set(vol.volume_uuid, url);
+      }
+    }
 
-        img.onload = () => {
-          newDimensions.set(vol.volume_uuid, {
-            width: img.naturalWidth,
-            height: img.naturalHeight
-          });
-          resolve();
-        };
-        img.onerror = () => resolve(); // Skip on error
-        img.src = url;
-      });
-    });
-
-    Promise.all(promises).then(() => {
-      thumbnailDimensions = newDimensions;
-      thumbnailUrls = newUrls;
-    });
+    thumbnailUrls = newUrls;
 
     // Cleanup: revoke all blob URLs when effect is destroyed
     return () => {
@@ -113,83 +81,51 @@
     };
   });
 
-  // Calculate dynamic step sizes based on actual image dimensions
+  // Base thumbnail dimensions
+  const BASE_WIDTH = 250;
+  const BASE_HEIGHT = 360;
+  const OUTER_PADDING = 25; // pt-4 pb-6 ≈ 25px
+
+  // Calculate container dimensions based on settings
+  let containerDimensions = $derived.by(() => {
+    const stackCount = $miscSettings.catalogStackCount;
+    const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
+    const vOffsetPercent = $miscSettings.catalogVerticalStep / 100;
+
+    // Extra space needed for stacking: offset% × base × (stackCount - 1)
+    const extraWidth = BASE_WIDTH * hOffsetPercent * (stackCount - 1);
+    const extraHeight = BASE_HEIGHT * vOffsetPercent * (stackCount - 1);
+
+    // Inner container (thumbnail area)
+    const innerWidth = Math.round(BASE_WIDTH + extraWidth);
+    const innerHeight = Math.round(BASE_HEIGHT + extraHeight);
+
+    // Outer container (with padding)
+    const outerWidth = innerWidth;
+    const outerHeight = innerHeight + OUTER_PADDING;
+
+    return {
+      innerWidth,
+      innerHeight,
+      outerWidth,
+      outerHeight
+    };
+  });
+
+  // Calculate step sizes in pixels
   let stepSizes = $derived.by(() => {
-    const containerWidth = 325;
-    const containerHeight = 385;
+    const stackCount = $miscSettings.catalogStackCount;
+    const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
+    const vOffsetPercent = $miscSettings.catalogVerticalStep / 100;
 
-    // Default horizontal step (11% of width)
-    const horizontalStep = containerWidth * 0.11;
-
-    // Calculate vertical step to fill height exactly
-    if (stackedVolumes.length === 0 || thumbnailDimensions.size === 0) {
-      // Fallback to default 11%
-      return {
-        horizontal: horizontalStep,
-        vertical: containerHeight * 0.11,
-        topOffset: 0
-      };
-    }
-
-    // Calculate rendered dimensions and aspect ratios for all volumes
-    const renderedData = stackedVolumes
-      .map((vol) => {
-        const dims = thumbnailDimensions.get(vol.volume_uuid);
-        if (!dims) return null;
-
-        const rendered = calculateRenderedDimensions(dims.width, dims.height);
-        return {
-          height: rendered.height,
-          width: rendered.width,
-          aspectRatio: rendered.width / rendered.height
-        };
-      })
-      .filter((d) => d !== null);
-
-    if (renderedData.length === 0) {
-      return {
-        horizontal: horizontalStep,
-        vertical: containerHeight * 0.11,
-        topOffset: 0
-      };
-    }
-
-    // Use the tallest rendered height
-    const maxRenderedHeight = Math.max(...renderedData.map((d) => d.height));
-
-    // Calculate average aspect ratio
-    const avgAspectRatio =
-      renderedData.reduce((sum, d) => sum + d.aspectRatio, 0) / renderedData.length;
-
-    // Preferred aspect ratio for manga (250:350)
-    const preferredAspect = 250 / 350; // 0.714
-
-    // Apply height penalty for squat images
-    let effectiveHeight = containerHeight;
-    if (avgAspectRatio > preferredAspect) {
-      // How much squatter than preferred (0 = perfect, higher = more squat)
-      const excessAspect = avgAspectRatio - preferredAspect;
-
-      // Gentle penalty: ~100px per 1.0 excess aspect (so square gets ~28.6px penalty)
-      // Capped at 60px to still favor filling
-      const penalty = Math.min(excessAspect * 100, 60);
-
-      effectiveHeight = containerHeight - penalty;
-    }
-
-    // Calculate step size using effective height: (effectiveHeight - maxHeight) / (numVolumes - 1)
-    const numVolumes = stackedVolumes.length;
-    const verticalStep =
-      numVolumes > 1 ? Math.max(0, (effectiveHeight - maxRenderedHeight) / (numVolumes - 1)) : 0;
-
-    // Center the stack: unused space is split equally top/bottom
-    const unusedSpace = containerHeight - effectiveHeight;
-    const topOffset = unusedSpace / 2;
+    // Step in pixels based on base thumbnail size
+    const horizontalStep = BASE_WIDTH * hOffsetPercent;
+    const verticalStep = BASE_HEIGHT * vOffsetPercent;
 
     return {
       horizontal: horizontalStep,
       vertical: verticalStep,
-      topOffset
+      topOffset: 0
     };
   });
 
@@ -229,7 +165,10 @@
     >
       {#if isPlaceholderOnly}
         <!-- Stacked placeholder layout to show volume count -->
-        <div class="relative sm:h-[410px] sm:w-[325px] sm:pt-4 sm:pb-6">
+        <div
+          class="relative pt-4 pb-6"
+          style="width: {containerDimensions.outerWidth}px; height: {containerDimensions.outerHeight}px;"
+        >
           <PlaceholderThumbnail
             count={seriesVolumes.length}
             {isDownloading}
@@ -237,16 +176,23 @@
           />
         </div>
       {:else if stackedVolumes.length > 0}
-        <!-- Stacked diagonal layout: dynamic stepping based on image aspect ratios -->
-        <div class="relative sm:h-[410px] sm:w-[325px] sm:pt-4 sm:pb-6">
-          <div class="relative overflow-hidden sm:h-[385px] sm:w-full">
+        <!-- Stacked diagonal layout: dynamic stepping based on settings -->
+        <div
+          class="relative pt-4 pb-6"
+          style="width: {containerDimensions.outerWidth}px; height: {containerDimensions.outerHeight}px;"
+        >
+          <div
+            class="relative overflow-hidden"
+            style="width: {containerDimensions.innerWidth}px; height: {containerDimensions.innerHeight}px;"
+          >
             {#each stackedVolumes as vol, i (vol.volume_uuid)}
               {#if thumbnailUrls.get(vol.volume_uuid)}
                 <img
                   src={thumbnailUrls.get(vol.volume_uuid)}
                   alt={vol.volume_title}
-                  class="absolute h-auto border border-gray-900 bg-black sm:max-h-[360px] sm:max-w-[250px]"
-                  style="left: {i * stepSizes.horizontal}px; top: {stepSizes.topOffset +
+                  class="absolute h-auto border border-gray-900 bg-black"
+                  style="max-width: {BASE_WIDTH}px; max-height: {BASE_HEIGHT}px; left: {i *
+                    stepSizes.horizontal}px; top: {stepSizes.topOffset +
                     i * stepSizes.vertical}px; z-index: {stackedVolumes.length -
                     i}; filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5));"
                 />
@@ -255,7 +201,7 @@
           </div>
         </div>
       {/if}
-      <p class="line-clamp-2 font-semibold sm:w-[325px]">
+      <p class="line-clamp-2 font-semibold" style="width: {containerDimensions.outerWidth}px;">
         {volume.series_title}
       </p>
       {#if isPlaceholderOnly}

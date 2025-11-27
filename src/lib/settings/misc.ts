@@ -7,6 +7,11 @@ export type MiscSettings = {
   deviceRamGB: 4 | 8 | 16 | 32;
   turboMode: boolean;
   gdriveAutoReAuth: boolean;
+  // Catalog layout settings
+  catalogHorizontalStep: number; // Horizontal offset percentage (default 11)
+  catalogVerticalStep: number; // Vertical offset percentage (default 11)
+  catalogStackCount: number; // Number of volumes to show (1-50, default 3)
+  catalogHideReadVolumes: boolean; // Hide read volumes from in-progress series stack
 };
 
 export type MiscSettingsKey = keyof MiscSettings;
@@ -30,7 +35,12 @@ const defaultSettings: MiscSettings = {
   gallerySorting: 'SMART',
   deviceRamGB: getDefaultRamSetting(),
   turboMode: false, // Default to single-operation mode (patient users)
-  gdriveAutoReAuth: true // Keep users synced during long reading sessions
+  gdriveAutoReAuth: true, // Keep users synced during long reading sessions
+  // Catalog layout defaults
+  catalogHorizontalStep: 11,
+  catalogVerticalStep: 11,
+  catalogStackCount: 3,
+  catalogHideReadVolumes: true
 };
 
 const stored = browser ? window.localStorage.getItem('miscSettings') : undefined;
