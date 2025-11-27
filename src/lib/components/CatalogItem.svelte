@@ -57,23 +57,41 @@
       : false
   );
 
-  // Store blob URLs for thumbnails
+  // Store blob URLs and dimensions for thumbnails
   let thumbnailUrls = $state<Map<string, string>>(new Map());
+  let thumbnailDimensions = $state<Map<string, { width: number; height: number }>>(new Map());
 
-  // Create blob URLs for stacked volumes
+  // Create blob URLs and load dimensions for stacked volumes
   $effect(() => {
     const newUrls = new Map<string, string>();
+    const newDimensions = new Map<string, { width: number; height: number }>();
     const urlsToRevoke: string[] = [];
 
-    for (const vol of stackedVolumes) {
-      if (vol.thumbnail) {
-        const url = URL.createObjectURL(vol.thumbnail);
+    const promises = stackedVolumes.map((vol) => {
+      if (!vol.thumbnail) return Promise.resolve();
+
+      return new Promise<void>((resolve) => {
+        const url = URL.createObjectURL(vol.thumbnail!);
         urlsToRevoke.push(url);
         newUrls.set(vol.volume_uuid, url);
-      }
-    }
 
-    thumbnailUrls = newUrls;
+        const img = new Image();
+        img.onload = () => {
+          newDimensions.set(vol.volume_uuid, {
+            width: img.naturalWidth,
+            height: img.naturalHeight
+          });
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = url;
+      });
+    });
+
+    Promise.all(promises).then(() => {
+      thumbnailUrls = newUrls;
+      thumbnailDimensions = newDimensions;
+    });
 
     // Cleanup: revoke all blob URLs when effect is destroyed
     return () => {
@@ -112,7 +130,18 @@
     };
   });
 
-  // Calculate step sizes in pixels
+  // Calculate rendered dimensions for an image given max constraints
+  function getRenderedDimensions(naturalWidth: number, naturalHeight: number) {
+    const scaleW = BASE_WIDTH / naturalWidth;
+    const scaleH = BASE_HEIGHT / naturalHeight;
+    const scale = Math.min(scaleW, scaleH, 1);
+    return {
+      width: naturalWidth * scale,
+      height: naturalHeight * scale
+    };
+  }
+
+  // Calculate step sizes and centering offsets
   let stepSizes = $derived.by(() => {
     const stackCount = $miscSettings.catalogStackCount;
     const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
@@ -122,10 +151,42 @@
     const horizontalStep = BASE_WIDTH * hOffsetPercent;
     const verticalStep = BASE_HEIGHT * vOffsetPercent;
 
+    const actualCount = stackedVolumes.length;
+
+    // Calculate horizontal centering for fewer volumes
+    // Container is sized for stackCount, but we may have fewer
+    const expectedStackWidth = BASE_WIDTH + horizontalStep * (stackCount - 1);
+    const actualStackWidth = BASE_WIDTH + horizontalStep * (actualCount - 1);
+    const leftOffset = (expectedStackWidth - actualStackWidth) / 2;
+
+    // Calculate vertical centering based on actual thumbnail heights
+    let topOffset = 0;
+    if (thumbnailDimensions.size > 0) {
+      // Get max rendered height from actual thumbnails
+      let maxRenderedHeight = 0;
+      for (const vol of stackedVolumes) {
+        const dims = thumbnailDimensions.get(vol.volume_uuid);
+        if (dims) {
+          const rendered = getRenderedDimensions(dims.width, dims.height);
+          maxRenderedHeight = Math.max(maxRenderedHeight, rendered.height);
+        }
+      }
+
+      // Calculate actual stack height
+      const expectedStackHeight = BASE_HEIGHT + verticalStep * (stackCount - 1);
+      const actualStackHeight = maxRenderedHeight + verticalStep * (actualCount - 1);
+
+      // Center vertically if actual stack is shorter
+      if (actualStackHeight < expectedStackHeight) {
+        topOffset = (expectedStackHeight - actualStackHeight) / 2;
+      }
+    }
+
     return {
       horizontal: horizontalStep,
       vertical: verticalStep,
-      topOffset: 0
+      leftOffset,
+      topOffset
     };
   });
 
@@ -191,8 +252,8 @@
                   src={thumbnailUrls.get(vol.volume_uuid)}
                   alt={vol.volume_title}
                   class="absolute h-auto border border-gray-900 bg-black"
-                  style="max-width: {BASE_WIDTH}px; max-height: {BASE_HEIGHT}px; left: {i *
-                    stepSizes.horizontal}px; top: {stepSizes.topOffset +
+                  style="max-width: {BASE_WIDTH}px; max-height: {BASE_HEIGHT}px; left: {stepSizes.leftOffset +
+                    i * stepSizes.horizontal}px; top: {stepSizes.topOffset +
                     i * stepSizes.vertical}px; z-index: {stackedVolumes.length -
                     i}; filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5));"
                 />
