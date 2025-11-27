@@ -206,42 +206,48 @@ export function keepInBounds() {
   const width = container.offsetWidth * scale;
   const height = container.offsetHeight * scale;
 
-  const marginX = innerWidth * 0.001;
-  const marginY = innerHeight * 0.01;
-
-  let minX = innerWidth - width - marginX;
-  let maxX = marginX;
-  let minY = innerHeight - height - marginY;
-  let maxY = marginY;
-
+  let minX: number;
+  let maxX: number;
+  let minY: number;
+  let maxY: number;
+  let forceCenterX = false;
   let forceCenterY = false;
 
-  if (width + 2 * marginX <= innerWidth) {
-    minX = marginX;
-    maxX = innerWidth - width - marginX;
+  // Content fits horizontally - center it and prevent panning
+  if (width <= innerWidth) {
+    forceCenterX = true;
+    minX = 0;
+    maxX = 0;
   } else {
-    minX = innerWidth - width - marginX;
-    maxX = marginX;
+    // Content is wider than viewport - allow panning edge to edge
+    minX = innerWidth - width;
+    maxX = 0;
   }
 
-  if (height + 2 * marginY <= innerHeight) {
-    minY = marginY;
-    maxY = innerHeight - height - marginY;
+  // Content fits vertically - center it and prevent panning
+  if (height <= innerHeight) {
     forceCenterY = true;
+    minY = 0;
+    maxY = 0;
   } else {
-    minY = innerHeight - height - marginY;
-    maxY = marginY;
+    // Content is taller than viewport - allow panning edge to edge
+    minY = innerHeight - height;
+    maxY = 0;
   }
 
-  if (x < minX) {
-    transform.x = minX;
-  }
-  if (x > maxX) {
-    transform.x = maxX;
+  if (forceCenterX) {
+    transform.x = (innerWidth - width) / 2;
+  } else {
+    if (x < minX) {
+      transform.x = minX;
+    }
+    if (x > maxX) {
+      transform.x = maxX;
+    }
   }
 
   if (forceCenterY) {
-    transform.y = innerHeight / 2 - height / 2;
+    transform.y = (innerHeight - height) / 2;
   } else {
     if (y < minY) {
       transform.y = minY;
