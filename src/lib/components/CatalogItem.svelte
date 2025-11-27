@@ -203,27 +203,36 @@
     // Get max rendered height from actual thumbnails (or uniform height if in spine mode)
     let maxRenderedHeight = uniformHeight ?? BASE_HEIGHT;
     if (uniformHeight === null && thumbnailDimensions.size > 0) {
+      // Start at 0 to find actual max, not clamped to BASE_HEIGHT
+      let actualMaxHeight = 0;
       for (const vol of stackedVolumes) {
         const dims = thumbnailDimensions.get(vol.volume_uuid);
         if (dims) {
           const rendered = getRenderedDimensions(dims.width, dims.height);
-          maxRenderedHeight = Math.max(maxRenderedHeight, rendered.height);
+          actualMaxHeight = Math.max(actualMaxHeight, rendered.height);
         }
+      }
+      // Use actual max if we found dimensions, otherwise keep BASE_HEIGHT default
+      if (actualMaxHeight > 0) {
+        maxRenderedHeight = actualMaxHeight;
       }
     }
 
     // Calculate vertical layout
     let topOffset = 0;
     const actualStackHeight = maxRenderedHeight + verticalStep * (actualCount - 1);
+    const extraVerticalSpace = innerHeight - actualStackHeight;
 
-    if (actualStackHeight < innerHeight && actualCount > 0) {
-      // When v.offset is 0, always center (spreading doesn't apply)
-      if (centerVertical || vOffsetPercent === 0) {
-        // Center: keep step size, add offset
-        topOffset = (innerHeight - actualStackHeight) / 2;
-      } else if (actualCount > 1) {
+    if (actualCount > 0 && extraVerticalSpace > 0) {
+      // Spreading only works with 2+ volumes and v.offset > 0
+      const canSpread = !centerVertical && vOffsetPercent > 0 && actualCount > 1;
+
+      if (canSpread) {
         // Spread: recalculate step to fill height evenly
         verticalStep = (innerHeight - maxRenderedHeight) / (actualCount - 1);
+      } else {
+        // Center: for single volumes, v.offset = 0, or when centering enabled
+        topOffset = extraVerticalSpace / 2;
       }
     }
 
