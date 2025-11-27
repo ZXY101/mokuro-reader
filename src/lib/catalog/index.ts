@@ -37,7 +37,6 @@ export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
   return () => subscription.unsubscribe();
 });
 
-
 // Merge local volumes with cloud placeholders
 export const volumesWithPlaceholders = derived(
   [volumes, unifiedCloudManager.cloudFiles],

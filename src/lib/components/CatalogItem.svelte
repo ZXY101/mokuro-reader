@@ -5,9 +5,10 @@
   import { showSnackbar } from '$lib/util';
   import { downloadQueue, queueSeriesVolumes } from '$lib/util/download-queue';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
-  import PlaceholderThumbnail from './PlaceholderThumbnail.svelte';
   import { nav } from '$lib/util/navigation';
   import { isPWA } from '$lib/util/pwa';
+  import { Spinner } from 'flowbite-svelte';
+  import { DownloadSolid } from 'flowbite-svelte-icons';
 
   interface Props {
     series_uuid: string;
@@ -105,15 +106,30 @@
   const BASE_HEIGHT = 360;
   const OUTER_PADDING = 25; // pt-4 pb-6 ≈ 25px
 
+  // Check if cloud series should use compact layout
+  let useCompactForCloud = $derived(isPlaceholderOnly && $miscSettings.catalogCompactCloudSeries);
+
   // Calculate container dimensions based on settings
   let containerDimensions = $derived.by(() => {
+    // Use compact settings for cloud series if enabled
+    if (useCompactForCloud) {
+      return {
+        innerWidth: BASE_WIDTH,
+        innerHeight: BASE_HEIGHT,
+        outerWidth: BASE_WIDTH,
+        outerHeight: BASE_HEIGHT + OUTER_PADDING
+      };
+    }
+
     const stackCountSetting = $miscSettings.catalogStackCount;
     const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
     // Force vertical offset to 0 when stack count is 0 (all volumes / spine mode)
     const vOffsetPercent = stackCountSetting === 0 ? 0 : $miscSettings.catalogVerticalStep / 100;
 
     // Use actual volume count when stackCount is 0 (all volumes)
-    const effectiveStackCount = stackCountSetting === 0 ? stackedVolumes.length : stackCountSetting;
+    // For placeholders, use seriesVolumes; for real thumbnails, use stackedVolumes
+    const volumeCount = isPlaceholderOnly ? seriesVolumes.length : stackedVolumes.length;
+    const effectiveStackCount = stackCountSetting === 0 ? volumeCount : stackCountSetting;
 
     // Extra space needed for stacking: offset% × base × (count - 1)
     const extraWidth = BASE_WIDTH * hOffsetPercent * (effectiveStackCount - 1);
@@ -244,6 +260,71 @@
     };
   });
 
+  // Calculate step sizes for placeholder thumbnails (same logic but uses all series volumes)
+  let placeholderStepSizes = $derived.by(() => {
+    // Use compact settings for cloud series if enabled
+    if (useCompactForCloud) {
+      return {
+        count: 1,
+        horizontal: 0,
+        vertical: 0,
+        leftOffset: 0,
+        topOffset: 0
+      };
+    }
+
+    const stackCountSetting = $miscSettings.catalogStackCount;
+    const hOffsetPercent = $miscSettings.catalogHorizontalStep / 100;
+    const vOffsetPercent = stackCountSetting === 0 ? 0 : $miscSettings.catalogVerticalStep / 100;
+    const centerHorizontal = $miscSettings.catalogCenterHorizontal;
+    const centerVertical = $miscSettings.catalogCenterVertical;
+
+    let horizontalStep = BASE_WIDTH * hOffsetPercent;
+    let verticalStep = BASE_HEIGHT * vOffsetPercent;
+
+    // For placeholders, use seriesVolumes.length as actual count
+    const actualCount =
+      stackCountSetting === 0
+        ? seriesVolumes.length
+        : Math.min(seriesVolumes.length, stackCountSetting);
+    const effectiveStackCount = stackCountSetting === 0 ? seriesVolumes.length : stackCountSetting;
+    const { innerWidth, innerHeight } = containerDimensions;
+
+    // Calculate horizontal layout
+    let leftOffset = 0;
+    if (actualCount < effectiveStackCount && actualCount > 1) {
+      if (centerHorizontal) {
+        const actualStackWidth = BASE_WIDTH + horizontalStep * (actualCount - 1);
+        leftOffset = (innerWidth - actualStackWidth) / 2;
+      } else {
+        horizontalStep = (innerWidth - BASE_WIDTH) / (actualCount - 1);
+      }
+    }
+
+    // For placeholders, height is always BASE_HEIGHT (uniform boxes)
+    const maxRenderedHeight = BASE_HEIGHT;
+    let topOffset = 0;
+    const actualStackHeight = maxRenderedHeight + verticalStep * (actualCount - 1);
+    const extraVerticalSpace = innerHeight - actualStackHeight;
+
+    if (actualCount > 0 && extraVerticalSpace > 0) {
+      const canSpread = !centerVertical && vOffsetPercent > 0 && actualCount > 1;
+      if (canSpread) {
+        verticalStep = (innerHeight - maxRenderedHeight) / (actualCount - 1);
+      } else {
+        topOffset = extraVerticalSpace / 2;
+      }
+    }
+
+    return {
+      count: actualCount,
+      horizontal: horizontalStep,
+      vertical: verticalStep,
+      leftOffset,
+      topOffset
+    };
+  });
+
   async function handleClick(e: MouseEvent) {
     if (isPlaceholderOnly) {
       e.preventDefault();
@@ -279,16 +360,37 @@
       class:cursor-pointer={isPlaceholderOnly}
     >
       {#if isPlaceholderOnly}
-        <!-- Stacked placeholder layout to show volume count -->
+        <!-- Stacked placeholder layout using same positioning as real thumbnails -->
         <div
           class="relative pt-4 pb-6"
           style="width: {containerDimensions.outerWidth}px; height: {containerDimensions.outerHeight}px;"
         >
-          <PlaceholderThumbnail
-            count={seriesVolumes.length}
-            {isDownloading}
-            showDownloadUI={true}
-          />
+          <div
+            class="relative overflow-hidden"
+            style="width: {containerDimensions.innerWidth}px; height: {containerDimensions.innerHeight}px;"
+          >
+            {#each Array(placeholderStepSizes.count) as _, i}
+              <div
+                class="absolute flex items-center justify-center border border-gray-300 bg-gray-200 dark:border-gray-600 dark:bg-gray-800"
+                style="width: {BASE_WIDTH}px; height: {BASE_HEIGHT}px; left: {placeholderStepSizes.leftOffset +
+                  i * placeholderStepSizes.horizontal}px; top: {placeholderStepSizes.topOffset +
+                  i * placeholderStepSizes.vertical}px; z-index: {placeholderStepSizes.count -
+                  i}; filter: drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5));"
+              >
+                {#if i === 0}
+                  <div class="flex flex-col items-center gap-3">
+                    {#if isDownloading}
+                      <Spinner size="16" color="blue" />
+                      <span class="text-sm text-gray-300">Downloading...</span>
+                    {:else}
+                      <DownloadSolid class="h-16 w-16 text-blue-400" />
+                      <span class="text-sm text-gray-300">Click to download</span>
+                    {/if}
+                  </div>
+                {/if}
+              </div>
+            {/each}
+          </div>
         </div>
       {:else if stackedVolumes.length > 0}
         <!-- Stacked diagonal layout: dynamic stepping based on settings -->

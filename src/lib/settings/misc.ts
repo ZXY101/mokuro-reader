@@ -17,6 +17,7 @@ export type MiscSettings = {
   catalogHideReadVolumes: boolean; // Hide read volumes from in-progress series stack
   catalogCenterHorizontal: boolean; // Center horizontally when fewer volumes than stack count
   catalogCenterVertical: boolean; // Center vertically when thumbnails don't fill height
+  catalogCompactCloudSeries: boolean; // Show cloud-only series as compact (single thumbnail)
 };
 
 export type MiscSettingsKey = keyof MiscSettings;
@@ -48,7 +49,8 @@ const defaultSettings: MiscSettings = {
   catalogStackCount: 3,
   catalogHideReadVolumes: true,
   catalogCenterHorizontal: true,
-  catalogCenterVertical: false // spread vertically
+  catalogCenterVertical: false, // spread vertically
+  catalogCompactCloudSeries: false // cloud-only series show as single thumbnail
 };
 
 const stored = browser ? window.localStorage.getItem('miscSettings') : undefined;

@@ -3,11 +3,7 @@
   import { db } from '$lib/catalog/db';
   import { promptConfirmation } from '$lib/util';
   import { clearVolumes } from '$lib/settings';
-  import {
-    miscSettings,
-    updateMiscSetting,
-    type CatalogStackingPreset
-  } from '$lib/settings/misc';
+  import { miscSettings, updateMiscSetting, type CatalogStackingPreset } from '$lib/settings/misc';
   import { nav } from '$lib/util/navigation';
   import { isCatalog } from '$lib/util';
 
@@ -28,6 +24,7 @@
       hideReadVolumes: boolean;
       centerHorizontal: boolean;
       centerVertical: boolean;
+      compactCloudSeries: boolean;
     }
   > = {
     compact: {
@@ -36,7 +33,8 @@
       verticalStep: 0,
       hideReadVolumes: true,
       centerHorizontal: true,
-      centerVertical: true
+      centerVertical: true,
+      compactCloudSeries: false
     },
     default: {
       stackCount: 3,
@@ -44,7 +42,8 @@
       verticalStep: 5,
       hideReadVolumes: true,
       centerHorizontal: true,
-      centerVertical: false
+      centerVertical: false,
+      compactCloudSeries: false
     },
     spine: {
       stackCount: 0, // 0 = all volumes in series
@@ -52,7 +51,8 @@
       verticalStep: 0,
       hideReadVolumes: false,
       centerHorizontal: true,
-      centerVertical: true
+      centerVertical: true,
+      compactCloudSeries: true
     }
   };
 
@@ -66,6 +66,7 @@
       updateMiscSetting('catalogHideReadVolumes', config.hideReadVolumes);
       updateMiscSetting('catalogCenterHorizontal', config.centerHorizontal);
       updateMiscSetting('catalogCenterVertical', config.centerVertical);
+      updateMiscSetting('catalogCompactCloudSeries', config.compactCloudSeries);
     }
   }
 
@@ -142,7 +143,7 @@
 
           <!-- Horizontal axis group -->
           <div class="mb-4 rounded-lg bg-gray-50 p-3 dark:bg-gray-800">
-            <Label class="mb-2 text-xs uppercase text-gray-500">Horizontal</Label>
+            <Label class="mb-2 text-xs text-gray-500 uppercase">Horizontal</Label>
             <div class="mb-2">
               <Label class="mb-1">Offset: {$miscSettings.catalogHorizontalStep}%</Label>
               <Range
@@ -171,9 +172,11 @@
 
           <!-- Vertical axis group -->
           <div class="rounded-lg bg-gray-50 p-3 dark:bg-gray-800" class:opacity-50={isAllVolumes}>
-            <Label class="mb-2 text-xs uppercase text-gray-500">Vertical</Label>
+            <Label class="mb-2 text-xs text-gray-500 uppercase">Vertical</Label>
             <div class="mb-2">
-              <Label class="mb-1">Offset: {isAllVolumes ? 0 : $miscSettings.catalogVerticalStep}%</Label>
+              <Label class="mb-1"
+                >Offset: {isAllVolumes ? 0 : $miscSettings.catalogVerticalStep}%</Label
+              >
               <Range
                 min={0}
                 max={30}
@@ -195,6 +198,22 @@
             >
               {$miscSettings.catalogCenterVertical ? 'Center' : 'Spread'}
             </Toggle>
+          </div>
+
+          <!-- Cloud series display -->
+          <div class="mt-4">
+            <Toggle
+              checked={$miscSettings.catalogCompactCloudSeries}
+              onchange={(e) => {
+                updateMiscSetting('catalogCompactCloudSeries', e.currentTarget.checked);
+                handleSettingChange();
+              }}
+            >
+              Compact cloud-only series
+            </Toggle>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Show cloud-only series as single thumbnails
+            </p>
           </div>
         {/if}
       </div>
