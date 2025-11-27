@@ -148,8 +148,7 @@
           (v) => v.volume_uuid === volume.volume_uuid
         );
         const previousVolume = seriesVolumes[currentVolumeIndex - 1];
-        if (previousVolume)
-          nav.toReader(volume.series_uuid, previousVolume.volume_uuid, { invalidateAll: true });
+        if (previousVolume) nav.toReader(volume.series_uuid, previousVolume.volume_uuid);
         else nav.toSeries(volume.series_uuid);
         return;
       } else if (newPage > pages.length && page === pages.length) {
@@ -159,8 +158,7 @@
           (v) => v.volume_uuid === volume.volume_uuid
         );
         const nextVolume = seriesVolumes[currentVolumeIndex + 1];
-        if (nextVolume)
-          nav.toReader(volume.series_uuid, nextVolume.volume_uuid, { invalidateAll: true });
+        if (nextVolume) nav.toReader(volume.series_uuid, nextVolume.volume_uuid);
         else nav.toSeries(volume.series_uuid);
         return;
       }
