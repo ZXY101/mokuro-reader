@@ -7,7 +7,7 @@
   import { onMount } from 'svelte';
 
   // Use window.location.search for query params (works alongside hash routing)
-  const searchParams = new URLSearchParams(window.location.search);
+  const searchParams = new window.URLSearchParams(window.location.search);
   const BASE_URL = searchParams.get('source') || 'https://mokuro.moe/manga';
   const manga = searchParams.get('manga');
   const volume = searchParams.get('volume');
