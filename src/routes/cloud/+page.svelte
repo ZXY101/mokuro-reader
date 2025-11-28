@@ -5,7 +5,7 @@
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import type { ProviderType, StorageQuota } from '$lib/util/sync/provider-interface';
   import { backupQueue } from '$lib/util/backup-queue';
-  import { driveState, tokenManager } from '$lib/util/sync/providers/google-drive';
+  import { tokenManager } from '$lib/util/sync/providers/google-drive';
   import { Badge, Button, Radio, Toggle, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
