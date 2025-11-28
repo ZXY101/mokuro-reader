@@ -196,6 +196,23 @@
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
     const action = event.code || event.key;
 
+    // Keys that should prevent default browser scrolling behavior
+    const scrollKeys = [
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowUp',
+      'ArrowDown',
+      'PageUp',
+      'PageDown',
+      'Home',
+      'End',
+      'Space'
+    ];
+
+    if (scrollKeys.includes(action)) {
+      event.preventDefault();
+    }
+
     switch (action) {
       case 'ArrowLeft':
         left(event, true);
@@ -768,7 +785,7 @@
     windowHeight = window.innerHeight;
     zoomDefaultWithLayoutWait();
   }}
-  onkeyup={handleShortcuts}
+  onkeydown={handleShortcuts}
   ontouchstart={handleTouchStart}
   ontouchend={handlePointerUp}
 />
@@ -823,7 +840,7 @@
       </div>
     </div>
   </Popover>
-  <button class="absolute top-5 left-5 z-10 opacity-50 mix-blend-difference" id="page-num">
+  <button class="fixed top-5 left-5 z-10 opacity-50 mix-blend-difference" id="page-num">
     {#key page}
       <p class="text-left" class:hidden={!$settings.charCount}>{charDisplay}</p>
       <p class="text-left" class:hidden={!$settings.pageNum}>{pageDisplay}</p>
@@ -832,7 +849,7 @@
   {#if notificationMessage}
     {#key notificationKey}
       <div
-        class="absolute top-5 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-gray-900 px-4 py-2 text-white shadow-lg transition-opacity"
+        class="fixed top-5 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-gray-900 px-4 py-2 text-white shadow-lg transition-opacity"
         style="backdrop-filter: blur(8px); background-color: rgba(17, 24, 39, 0.9);"
       >
         <p class="text-sm font-medium whitespace-nowrap">{notificationMessage}</p>
