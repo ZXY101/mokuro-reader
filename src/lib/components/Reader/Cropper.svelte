@@ -13,11 +13,11 @@
   let zoom = $state(1);
 
   // Close modal on navigation (hash route change)
-  let previousView = $state($currentView);
+  let previousViewType = $state($currentView.type);
   $effect(() => {
-    const view = $currentView;
-    if (view !== previousView) {
-      previousView = view;
+    const viewType = $currentView.type;
+    if (viewType !== previousViewType) {
+      previousViewType = viewType;
       if (open) {
         close();
       }
