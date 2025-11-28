@@ -57,3 +57,23 @@ export function fireExstaticEvent(event: ExtaticEvent, payload: ExtaticPayload) 
     document.dispatchEvent(new CustomEvent(event, { detail: payload }));
   }
 }
+
+/**
+ * Reset document scroll position back to origin.
+ * This is needed because scrolling in overlays (like settings menu) can
+ * affect the underlying document scroll position, which cannot be scrolled
+ * back manually due to input overrides.
+ */
+export function resetScrollPosition() {
+  if (window.scrollX !== 0 || window.scrollY !== 0) {
+    window.scrollTo(0, 0);
+  }
+  if (document.documentElement.scrollLeft !== 0 || document.documentElement.scrollTop !== 0) {
+    document.documentElement.scrollLeft = 0;
+    document.documentElement.scrollTop = 0;
+  }
+  if (document.body.scrollLeft !== 0 || document.body.scrollTop !== 0) {
+    document.body.scrollLeft = 0;
+    document.body.scrollTop = 0;
+  }
+}

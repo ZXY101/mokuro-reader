@@ -23,7 +23,7 @@
     volumes,
     type VolumeSettings
   } from '$lib/settings';
-  import { clamp, debounce, fireExstaticEvent } from '$lib/util';
+  import { clamp, debounce, fireExstaticEvent, resetScrollPosition } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
   import {
@@ -788,6 +788,13 @@
   onkeydown={handleShortcuts}
   ontouchstart={handleTouchStart}
   ontouchend={handlePointerUp}
+  onscroll={() => {
+    // Detect and fix scroll position drift caused by scrolling in overlays
+    // (e.g., settings menu) that affects the underlying document
+    if (window.scrollX !== 0 || window.scrollY !== 0) {
+      resetScrollPosition();
+    }
+  }}
 />
 <svelte:head>
   <title>{volume?.volume_title || 'Volume'}</title>
