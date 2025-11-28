@@ -1,26 +1,11 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
-  import { profiles } from '$lib/settings';
   import { miscSettings, updateMiscSetting } from '$lib/settings/misc';
 
-  import {
-    promptConfirmation,
-    showSnackbar,
-    accessTokenStore,
-    tokenClientStore,
-    syncReadProgress,
-    READER_FOLDER,
-    CLIENT_ID,
-    API_KEY
-  } from '$lib/util';
+  import { promptConfirmation, showSnackbar, syncReadProgress, READER_FOLDER } from '$lib/util';
   import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
   import type { ProviderType, StorageQuota } from '$lib/util/sync/provider-interface';
   import { backupQueue } from '$lib/util/backup-queue';
   import { driveState, tokenManager } from '$lib/util/sync/providers/google-drive';
-  import type { DriveState } from '$lib/util/sync/providers/google-drive';
-  import { progressTrackerStore } from '$lib/util/progress-tracker';
-  import { get } from 'svelte/store';
   import { Badge, Button, Radio, Toggle, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import { GoogleSolid } from 'flowbite-svelte-icons';
@@ -39,10 +24,6 @@
   const cacheIsFetchingStore = cacheManager.isFetchingState;
 
   // Use Svelte's derived runes for automatic store subscriptions
-  let accessToken = $derived($accessTokenStore);
-  // Note: readerFolderId, volumeDataId, profilesId removed - legacy Drive-specific stores (now use unified provider system)
-  let tokenClient = $derived($tokenClientStore);
-  let driveStateValue = $derived($driveState);
   let cacheIsFetching = $derived($cacheIsFetchingStore);
 
   // Reactive provider authentication checks - now using provider manager for all providers
