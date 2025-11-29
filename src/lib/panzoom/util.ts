@@ -35,10 +35,34 @@ export function initPanzoom(node: HTMLElement) {
     // Panzoom typing is wrong here
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
-    filterKey: (e: any) => {
+    filterKey: (e: KeyboardEvent) => {
+      // Filter (ignore) keys that shouldn't be handled by panzoom
+      const target = e.target as HTMLElement;
+
+      // Always filter left/right arrows (page navigation)
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         return true;
       }
+
+      // Filter all keys when in text inputs, settings, popovers, or textboxes
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable ||
+        target.closest('#settings') ||
+        target.closest('[data-popover]') ||
+        target.closest('.textBox')
+      ) {
+        return true;
+      }
+
+      // Filter nav keys when modifier keys are pressed (for text selection, etc.)
+      const isNavKey = ['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key);
+      if (isNavKey && (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey)) {
+        return true;
+      }
+
+      return false;
     }
   });
 
