@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { AccordionItem, Button, Label, Range } from 'flowbite-svelte';
+  import { AccordionItem, Label, Range } from 'flowbite-svelte';
   import ReaderSelects from './ReaderSelects.svelte';
   import ReaderToggles from './ReaderToggles.svelte';
   import { settings, updateSetting } from '$lib/settings';
 
-  let swipeThresholdValue = $settings.swipeThreshold;
-  let edgeButtonWidthValue = $settings.edgeButtonWidth;
+  let swipeThresholdValue = $state($settings.swipeThreshold);
+  let edgeButtonWidthValue = $state($settings.edgeButtonWidth);
   function onSwipeChange() {
     updateSetting('swipeThreshold', swipeThresholdValue);
   }
@@ -16,15 +16,18 @@
 </script>
 
 <AccordionItem>
-  <span slot="header">Reader</span>
+  {#snippet header()}Reader{/snippet}
   <div class="flex flex-col gap-5">
     <ReaderSelects />
     <hr class="border-gray-100 opacity-10" />
     <ReaderToggles />
     <div>
-      <Label>Swipe threshold</Label>
+      <Label>
+        Swipe threshold
+        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(Mobile only)</span>
+      </Label>
       <Range
-        on:change={onSwipeChange}
+        onchange={onSwipeChange}
         min={20}
         max={90}
         disabled={!$settings.mobile}
@@ -33,7 +36,7 @@
     </div>
     <div>
       <Label>Edge button width</Label>
-      <Range on:change={onWidthChange} min={1} max={100} bind:value={edgeButtonWidthValue} />
+      <Range onchange={onWidthChange} min={1} max={100} bind:value={edgeButtonWidthValue} />
     </div>
   </div>
 </AccordionItem>

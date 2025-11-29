@@ -1,35 +1,40 @@
 <script lang="ts">
   import type { Page } from '$lib/types';
-  import { afterUpdate, onMount, onDestroy } from 'svelte';
   import TextBoxes from './TextBoxes.svelte';
-  import { zoomDefault } from '$lib/panzoom';
 
-  export let page: Page;
-  export let src: File;
-
-  $: url = src ? `url(${URL.createObjectURL(src)})` : '';
-
-  let legacy: HTMLElement | null;
-
-  onMount(() => {
-    legacy = document.getElementById('popupAbout');
-    zoomDefault();
-
-    return () => {
-      setTimeout(() => {
-        zoomDefault();
-      }, 10);
-    };
-  });
-
-  $: {
-    if (legacy) {
-      legacy.style.backgroundImage = url;
-    }
+  interface Props {
+    page: Page;
+    src: File;
+    cachedUrl?: string | null;
+    volumeUuid: string;
   }
 
-  afterUpdate(() => {
-    zoomDefault();
+  let { page, src, cachedUrl, volumeUuid }: Props = $props();
+
+  let url = $state('');
+
+  // Use cached URL if available, otherwise create blob URL
+  $effect(() => {
+    let currentBlobUrl: string | null = null;
+
+    if (cachedUrl) {
+      // Use pre-decoded cached URL (no cleanup needed, managed by cache)
+      url = `url(${cachedUrl})`;
+    } else if (src) {
+      // Fallback: create new blob URL
+      currentBlobUrl = URL.createObjectURL(src);
+      url = `url(${currentBlobUrl})`;
+    } else {
+      url = '';
+    }
+
+    // Cleanup function runs on effect re-run or component unmount
+    return () => {
+      // Only revoke if we created it (not from cache)
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl);
+      }
+    };
   });
 </script>
 
@@ -38,7 +43,10 @@
   style:width={`${page.img_width}px`}
   style:height={`${page.img_height}px`}
   style:background-image={url}
+  style:background-size="contain"
+  style:background-repeat="no-repeat"
+  style:background-position="center"
   class="relative"
 >
-  <TextBoxes {page} {src} />
+  <TextBoxes {page} {src} {volumeUuid} />
 </div>

@@ -1,23 +1,26 @@
 <script lang="ts">
-  import { afterNavigate, beforeNavigate } from '$app/navigation';
-  import { cropperStore, getCroppedImg, updateLastCard, type Pixels } from '$lib/anki-connect';
+  import { currentView } from '$lib/util/hash-router';
+  import { cropperStore, getCroppedImg, type Pixels, updateLastCard } from '$lib/anki-connect';
   import { settings } from '$lib/settings';
   import { Button, Modal, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
   import Cropper from 'svelte-easy-crop';
 
-  let open = false;
-  let pixels: Pixels;
-  let loading = false;
+  let open = $state(false);
+  let pixels: Pixels | undefined = undefined;
+  let loading = $state(false);
+  let crop = $state({ x: 0, y: 0 });
+  let zoom = $state(1);
 
-  afterNavigate(() => {
-    close();
-  });
-
-  beforeNavigate((nav) => {
-    if (open) {
-      nav.cancel();
-      close();
+  // Close modal on navigation (hash route change)
+  let previousViewType = $state($currentView.type);
+  $effect(() => {
+    const viewType = $currentView.type;
+    if (viewType !== previousViewType) {
+      previousViewType = viewType;
+      if (open) {
+        close();
+      }
     }
   });
 
@@ -35,28 +38,45 @@
   }
 
   async function onCrop() {
+    console.log('[Cropper] onCrop called');
+    console.log('[Cropper] $cropperStore?.image:', $cropperStore?.image);
+    console.log('[Cropper] pixels:', pixels);
+
     if ($cropperStore?.image && pixels) {
+      console.log('[Cropper] Starting crop operation');
       loading = true;
-      const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
-      updateLastCard(imageData, $cropperStore.sentence);
-      close();
+      try {
+        const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
+        console.log('[Cropper] Got cropped image, updating card');
+        updateLastCard(imageData, $cropperStore.sentence);
+        close();
+      } catch (error) {
+        console.error('[Cropper] Error during crop:', error);
+        loading = false;
+      }
+    } else {
+      console.warn('[Cropper] Cannot crop - missing image or pixels');
     }
   }
 
-  function onCropComplete(e: any) {
-    pixels = e.detail.pixels;
+  function onCropComplete(detail: any) {
+    // In v4, the callback receives the detail directly (not as e.detail)
+    // This fires continuously as the user adjusts the crop area
+    pixels = detail.pixels;
   }
 </script>
 
-<Modal title="Crop image" bind:open on:{close}>
+<Modal title="Crop image" bind:open onclose={close}>
   {#if $cropperStore?.image && !loading}
     <div class=" flex flex-col gap-2">
-      <div class="relative w-full h-[55svh] sm:h-[65svh]">
+      <div class="relative h-[55svh] w-full sm:h-[65svh]">
         <Cropper
           zoomSpeed={0.5}
           maxZoom={10}
           image={$cropperStore?.image}
-          on:cropcomplete={onCropComplete}
+          bind:crop
+          bind:zoom
+          oncropcomplete={onCropComplete}
         />
       </div>
       {#if $settings.ankiConnectSettings.grabSentence && $cropperStore?.sentence}
@@ -65,8 +85,8 @@
           {$cropperStore?.sentence}
         </p>
       {/if}
-      <Button on:click={onCrop}>Crop</Button>
-      <Button on:click={close} outline color="light">Close</Button>
+      <Button onclick={onCrop}>Crop</Button>
+      <Button onclick={close} outline color="light">Close</Button>
     </div>
   {:else}
     <div class="text-center"><Spinner /></div>

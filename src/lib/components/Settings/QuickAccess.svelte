@@ -1,20 +1,30 @@
 <script lang="ts">
   import { toggleFullScreen } from '$lib/panzoom';
   import { isReader } from '$lib/util';
+  import { navigateBack } from '$lib/util/hash-router';
 
   import { Button } from 'flowbite-svelte';
 
-  export let hidden = false;
+  interface Props {
+    open?: boolean;
+  }
+
+  let { open = $bindable(false) }: Props = $props();
 
   function onClose() {
-    hidden = true;
-    history.back();
+    open = false;
+    navigateBack();
   }
 </script>
 
 {#if isReader()}
   <div class="flex flex-col gap-2">
-    <Button color="alternative" on:click={toggleFullScreen}>Toggle fullscreen</Button>
-    <Button color="alternative" on:click={onClose}>Close reader</Button>
+    <Button color="alternative" onclick={toggleFullScreen}
+      >Toggle fullscreen <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(F)</span
+      ></Button
+    >
+    <Button color="alternative" onclick={onClose}
+      >Close reader <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(Esc)</span></Button
+    >
   </div>
 {/if}

@@ -4,11 +4,17 @@ type FileInfo = {
   fileId?: string;
   localStorageId: string;
   type: string;
-}
+};
 
 const FILES_API_URL = 'https://www.googleapis.com/upload/drive/v3/files';
 
-export async function uploadFile({ accessToken, fileId, localStorageId, metadata, type }: FileInfo) {
+export async function uploadFile({
+  accessToken,
+  fileId,
+  localStorageId,
+  metadata,
+  type
+}: FileInfo) {
   const json = localStorage.getItem(localStorageId) || '';
   const blob = new Blob([json], { type });
 
@@ -17,16 +23,11 @@ export async function uploadFile({ accessToken, fileId, localStorageId, metadata
   form.append('resource', new Blob([JSON.stringify(metadata)], { type }));
   form.append('file', blob);
 
+  const res = await fetch(`${FILES_API_URL}${fileId ? `/${fileId}` : ''}?uploadType=multipart`, {
+    method: fileId ? 'PATCH' : 'POST',
+    headers: new Headers({ Authorization: 'Bearer ' + accessToken }),
+    body: form
+  });
 
-  const res = await fetch(
-    `${FILES_API_URL}${fileId ? `/${fileId}` : ''}?uploadType=multipart`,
-    {
-      method: fileId ? 'PATCH' : 'POST',
-      headers: new Headers({ Authorization: 'Bearer ' + accessToken }),
-      body: form
-    }
-  );
-
-  return await res.json()
+  return await res.json();
 }
-

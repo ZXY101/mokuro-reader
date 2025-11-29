@@ -1,9 +1,10 @@
 <script lang="ts">
-  import { Drawer, CloseButton, Button, Accordion } from 'flowbite-svelte';
+  import { Accordion, Button, Drawer } from 'flowbite-svelte';
   import { UserSettingsSolid } from 'flowbite-svelte-icons';
   import { sineIn } from 'svelte/easing';
   import { resetSettings } from '$lib/settings';
   import { isReader, promptConfirmation } from '$lib/util';
+  import { currentView } from '$lib/util/hash-router';
   import AnkiConnectSettings from './AnkiConnectSettings.svelte';
   import ReaderSettings from './Reader/ReaderSettings.svelte';
   import Profiles from './Profiles/Profiles.svelte';
@@ -13,7 +14,6 @@
   import VolumeSettings from './Volume/VolumeSettings.svelte';
   import About from './About.svelte';
   import QuickAccess from './QuickAccess.svelte';
-  import { beforeNavigate } from '$app/navigation';
 
   let transitionParams = {
     x: 320,
@@ -21,42 +21,51 @@
     easing: sineIn
   };
 
-  export let hidden = true;
+  interface Props {
+    open?: boolean;
+  }
+
+  // In Svelte 5, we need to make sure the open prop is properly bindable
+  let { open = $bindable(false) }: Props = $props();
 
   function onReset() {
-    hidden = true;
+    open = false;
     promptConfirmation('Restore default settings?', resetSettings);
   }
 
   function onClose() {
-    hidden = true;
+    open = false;
   }
 
-  beforeNavigate((nav) => {
-    if (!hidden) {
-      nav.cancel();
-      hidden = true;
+  // Close drawer on navigation (hash route change)
+  let previousViewType = $state($currentView.type);
+  $effect(() => {
+    const viewType = $currentView.type;
+    if (viewType !== previousViewType) {
+      previousViewType = viewType;
+      if (open) {
+        open = false;
+      }
     }
   });
 </script>
 
 <Drawer
   placement="right"
-  transitionType="fly"
-  width="lg:w-1/4 md:w-1/2 w-full"
+  class="w-full md:w-1/2 lg:w-1/4"
   {transitionParams}
-  bind:hidden
+  bind:open
   id="settings"
 >
-  <div class="flex items-center">
-    <h5 id="drawer-label" class="inline-flex items-center mb-4 text-base font-semibold">
-      <UserSettingsSolid class="w-4 h-4 mr-2.5" />Settings
-    </h5>
-    <CloseButton on:click={onClose} class="mb-4 dark:text-white" />
-  </div>
+  <h5
+    id="drawer-label"
+    class="mb-4 inline-flex items-center text-base font-semibold text-gray-900 dark:text-white"
+  >
+    <UserSettingsSolid class="mr-2.5 h-4 w-4" />Settings
+  </h5>
   <div class="flex flex-col gap-5">
     <Accordion flush>
-      <QuickAccess bind:hidden />
+      <QuickAccess bind:open />
       {#if isReader()}
         <VolumeSettings />
       {:else}
@@ -70,8 +79,8 @@
       <About />
     </Accordion>
     <div class="flex flex-col gap-2">
-      <Button outline on:click={onReset}>Reset</Button>
-      <Button outline on:click={onClose} color="light">Close</Button>
+      <Button outline onclick={onReset}>Reset</Button>
+      <Button outline onclick={onClose} color="light">Close</Button>
     </div>
   </div>
 </Drawer>

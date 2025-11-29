@@ -1,30 +1,90 @@
 <script lang="ts">
-  import { page } from '$app/stores';
   import Reader from '$lib/components/Reader/Reader.svelte';
   import Timer from '$lib/components/Reader/Timer.svelte';
-  import { initializeVolume, settings, startCount, volumeSettings, volumes } from '$lib/settings';
+  import { effectiveVolumeSettings, initializeVolume, settings, volumes } from '$lib/settings';
   import { onMount } from 'svelte';
+  import { activityTracker } from '$lib/util/activity-tracker';
+  import { Spinner } from 'flowbite-svelte';
+  import type { PageViewMode } from '$lib/settings/settings';
+  import { routeParams } from '$lib/util/navigation';
 
-  const volumeId = $page.params.volume;
-  let count: undefined | number = undefined;
+  let volumeId = $derived($routeParams.volume || '');
+  let count: undefined | number = $state(undefined);
 
-  onMount(() => {
-    if (!$volumes?.[volumeId]) {
-      initializeVolume(volumeId);
+  // Cache volume settings to prevent flash when unrelated volumes are added.
+  // The effectiveVolumeSettings store emits a new object whenever ANY volume changes,
+  // which would cause this component to re-render. By caching the specific volume's
+  // settings and only updating when those values actually change, we prevent
+  // unnecessary unmount/remount cycles that cause visual flashing.
+  let cachedVolumeSettings = $state<
+    | {
+        rightToLeft: boolean;
+        singlePageView: PageViewMode;
+        hasCover: boolean;
+      }
+    | undefined
+  >(undefined);
+
+  // Track last volumeId to reset cache on navigation
+  let lastVolumeId = '';
+
+  // Update cached settings only when the specific volume's settings actually change
+  $effect(() => {
+    // Reset cache when navigating to a different volume
+    if (volumeId !== lastVolumeId) {
+      lastVolumeId = volumeId;
+      cachedVolumeSettings = undefined;
     }
 
-    count = startCount(volumeId);
+    const newSettings = $effectiveVolumeSettings[volumeId];
+    if (newSettings) {
+      if (
+        !cachedVolumeSettings ||
+        cachedVolumeSettings.rightToLeft !== newSettings.rightToLeft ||
+        cachedVolumeSettings.singlePageView !== newSettings.singlePageView ||
+        cachedVolumeSettings.hasCover !== newSettings.hasCover
+      ) {
+        cachedVolumeSettings = newSettings;
+      }
+    }
+  });
+
+  // Initialize volume when volumeId changes (reactive to navigation)
+  $effect(() => {
+    if (volumeId && !$volumes?.[volumeId]) {
+      initializeVolume(volumeId);
+    }
+  });
+
+  // Record activity when volumeId changes to trigger timer via activity tracker
+  $effect(() => {
+    if (!volumeId) return;
+
+    // Record activity when volume changes - this will trigger the timer
+    // via the activity tracker in the Timer component
+    activityTracker.recordActivity();
+  });
+
+  onMount(() => {
+    // Set up activity tracker timeout
+    activityTracker.setTimeoutDuration($settings.inactivityTimeoutMinutes);
 
     return () => {
-      clearInterval(count);
-      count = undefined;
+      // Stop activity tracker when component unmounts
+      activityTracker.stop();
     };
   });
 </script>
 
-{#if $volumeSettings[volumeId]}
+{#if cachedVolumeSettings}
   {#if $settings.showTimer}
     <Timer bind:count {volumeId} />
   {/if}
-  <Reader volumeSettings={$volumeSettings[volumeId]} />
+  {#key volumeId}
+    <Reader volumeSettings={cachedVolumeSettings} />
+  {/key}
+{:else}
+  <div class="flex h-screen w-screen items-center justify-center">
+    <Spinner size="12" />
+  </div>
 {/if}

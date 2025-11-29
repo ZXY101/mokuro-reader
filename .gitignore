@@ -8,3 +8,12 @@ node_modules
 !.env.example
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Claude Code local settings
+.claude/settings.local.json
+# IDE directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { Select, Input, Label } from 'flowbite-svelte';
-  import { settings, updateSetting } from '$lib/settings';
+  import { Input, Label, Select } from 'flowbite-svelte';
   import type { SettingsKey } from '$lib/settings';
+  import { settings, updateSetting } from '$lib/settings';
 
-  $: zoomModeValue = $settings.zoomDefault;
-  $: fontSizeValue = $settings.fontSize;
+  let zoomModeValue = $derived($settings.zoomDefault);
+  let fontSizeValue = $derived($settings.fontSize);
+  let pageTransitionValue = $derived($settings.pageTransition);
 
   let zoomModes = [
     { value: 'zoomFitToScreen', name: 'Fit to screen' },
@@ -14,8 +15,17 @@
     { value: 'keepZoomStart', name: 'Keep zoom, pan to top' }
   ];
 
+  let pageTransitions = [
+    { value: 'none', name: 'None' },
+    { value: 'crossfade', name: 'Crossfade' },
+    { value: 'vertical', name: 'Vertical' },
+    { value: 'pageTurn', name: 'Page Turn' },
+    { value: 'swipe', name: 'Swipe' }
+  ];
+
   let fontSizes = [
     { value: 'auto', name: 'auto' },
+    { value: 'original', name: 'original' },
     { value: '9', name: '9' },
     { value: '10', name: '10' },
     { value: '11', name: '11' },
@@ -41,22 +51,29 @@
 </script>
 
 <div>
-  <Label>On page zoom:</Label>
+  <Label class="text-gray-900 dark:text-white">
+    On page zoom:
+    <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(Z)</span>
+  </Label>
   <Select
     items={zoomModes}
     value={zoomModeValue}
-    on:change={(e) => onSelectChange(e, 'zoomDefault')}
+    onchange={(e) => onSelectChange(e, 'zoomDefault')}
   />
 </div>
 <div>
-  <Label>Fontsize:</Label>
+  <Label class="text-gray-900 dark:text-white">Page transition:</Label>
   <Select
-    items={fontSizes}
-    value={fontSizeValue}
-    on:change={(e) => onSelectChange(e, 'fontSize')}
+    items={pageTransitions}
+    value={pageTransitionValue}
+    onchange={(e) => onSelectChange(e, 'pageTransition')}
   />
 </div>
 <div>
-  <Label>Background color:</Label>
-  <Input type="color" on:change={onBackgroundColor} value={$settings.backgroundColor} />
+  <Label class="text-gray-900 dark:text-white">Fontsize:</Label>
+  <Select items={fontSizes} value={fontSizeValue} onchange={(e) => onSelectChange(e, 'fontSize')} />
+</div>
+<div>
+  <Label class="text-gray-900 dark:text-white">Background color:</Label>
+  <Input type="color" onchange={onBackgroundColor} value={$settings.backgroundColor} />
 </div>

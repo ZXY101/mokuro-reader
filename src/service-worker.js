@@ -6,7 +6,7 @@ const CACHE = `cache-${version}`;
 
 const ASSETS = [
   ...build, // the app itself
-  ...files  // everything in `static`
+  ...files // everything in `static`
 ];
 
 self.addEventListener('install', (event) => {
@@ -17,6 +17,17 @@ self.addEventListener('install', (event) => {
   }
 
   event.waitUntil(addFilesToCache());
+
+  // Don't call skipWaiting() here - we want to show an "Update Available" banner
+  // and let the user choose when to update. skipWaiting will be triggered via
+  // a message from the client when the user clicks "Update".
+});
+
+// Listen for messages from the client
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
@@ -28,6 +39,9 @@ self.addEventListener('activate', (event) => {
   }
 
   event.waitUntil(deleteOldCaches());
+
+  // Take control of all clients immediately (don't wait for reload)
+  self.clients.claim();
 });
 
 self.addEventListener('fetch', (event) => {
@@ -48,8 +62,23 @@ self.addEventListener('fetch', (event) => {
     try {
       const response = await fetch(event.request);
 
-      if (response.status === 200) {
-        cache.put(event.request, response.clone());
+      // Only cache if:
+      // 1. Response is successful (status 200)
+      // 2. It's not a Google Drive API request
+      // 3. It's not a large file (>10MB)
+      if (
+        response.status === 200 &&
+        !event.request.url.includes('googleapis.com/drive') &&
+        !event.request.url.includes('alt=media')
+      ) {
+        // Check response size before caching
+        const contentLength = response.headers.get('content-length');
+        const sizeInMB = contentLength ? parseInt(contentLength) / (1024 * 1024) : 0;
+
+        // Only cache if smaller than 10MB
+        if (sizeInMB < 10) {
+          cache.put(event.request, response.clone());
+        }
       }
 
       return response;
