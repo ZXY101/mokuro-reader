@@ -7,6 +7,7 @@
  */
 
 import type { Page } from '$lib/types';
+import { normalizeFilename } from '$lib/util/misc';
 
 export interface CachedImage {
   image: HTMLImageElement; // Image element holds decoded bitmap and blob URL (in img.src)
@@ -19,19 +20,6 @@ export interface CachedImage {
  */
 function getBasename(path: string): string {
   return path.split(/[/\\]/).pop() || path;
-}
-
-/**
- * Normalize a path/filename for comparison
- * Handles URL-encoded Unicode characters (e.g., %E3%82%A2 -> ア)
- */
-function normalizePath(path: string): string {
-  try {
-    return decodeURIComponent(path);
-  } catch {
-    // If decoding fails (invalid encoding), return as-is
-    return path;
-  }
 }
 
 /**
@@ -57,14 +45,14 @@ function matchFilesToPages(files: Record<string, File>, pages: Page[]): File[] {
   // Build a normalized path -> original key mapping for lookups
   const normalizedToKey = new Map<string, string>();
   for (const key of fileKeys) {
-    normalizedToKey.set(normalizePath(key), key);
+    normalizedToKey.set(normalizeFilename(key), key);
   }
 
   // Strategy 1: Try exact path matching (with normalization)
   let allExactMatches = true;
   for (let i = 0; i < pages.length; i++) {
     const imgPath = pages[i].img_path;
-    const normalizedImgPath = normalizePath(imgPath);
+    const normalizedImgPath = normalizeFilename(imgPath);
 
     // Try direct match first, then normalized match
     if (files[imgPath]) {
@@ -87,7 +75,7 @@ function matchFilesToPages(files: Record<string, File>, pages: Page[]): File[] {
   const basenameConflicts = new Set<string>();
 
   for (const key of fileKeys) {
-    const basename = normalizePath(getBasename(key));
+    const basename = normalizeFilename(getBasename(key));
     if (basenameToFile.has(basename)) {
       basenameConflicts.add(basename);
     } else {
@@ -98,7 +86,7 @@ function matchFilesToPages(files: Record<string, File>, pages: Page[]): File[] {
   let allBasenameMatches = true;
   for (let i = 0; i < pages.length; i++) {
     const imgPath = pages[i].img_path;
-    const basename = normalizePath(getBasename(imgPath));
+    const basename = normalizeFilename(getBasename(imgPath));
 
     if (basenameConflicts.has(basename)) {
       allBasenameMatches = false;
