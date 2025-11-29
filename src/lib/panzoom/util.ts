@@ -63,7 +63,7 @@ export function initPanzoom(node: HTMLElement) {
     if (shouldZoom) {
       // Normalize wheel delta to pixels across browsers (based on Facebook's normalize-wheel)
       // https://github.com/basilfx/normalize-wheel
-      const LINE_HEIGHT = 40; // Approximate pixels per line
+      const LINE_HEIGHT = 25; // Tuned to match Chrome's zoom steps
       const PAGE_HEIGHT = 800; // Approximate pixels per page
       let pixelDelta: number;
       if (e.deltaMode === 1) {
@@ -79,7 +79,7 @@ export function initPanzoom(node: HTMLElement) {
 
       // Calculate zoom multiplier (based on anvaka/panzoom approach)
       // speed * delta / 128, capped at 0.25 (25% max per event)
-      const zoomSpeed = 0.065;
+      const zoomSpeed = 0.2;
       const sign = Math.sign(pixelDelta);
       const deltaAdjustedSpeed = Math.min(0.25, Math.abs((zoomSpeed * pixelDelta) / 128));
       let scaleMultiplier = 1 - sign * deltaAdjustedSpeed;
