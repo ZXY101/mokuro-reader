@@ -337,9 +337,14 @@
       });
     }
 
+    // Prevent scrollbars from appearing when in reader mode
+    document.documentElement.style.overflow = 'hidden';
+
     return () => {
       // Stop activity tracker when component unmounts
       activityTracker.stop();
+      // Restore overflow when leaving reader
+      document.documentElement.style.overflow = '';
     };
   });
 
