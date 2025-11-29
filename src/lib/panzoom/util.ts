@@ -61,12 +61,28 @@ export function initPanzoom(node: HTMLElement) {
     e.preventDefault();
 
     if (shouldZoom) {
-      // Symmetric zoom using exponential scaling
-      // Using base 1.002 gives smooth, small steps
-      // Math.pow(1.002, 100) ≈ 1.22 for a typical wheel delta
-      const zoomBase = 1.002;
-      const delta = e.deltaMode > 0 ? e.deltaY * 100 : e.deltaY;
-      let scaleMultiplier = Math.pow(zoomBase, -delta);
+      // Normalize wheel delta to pixels across browsers (based on Facebook's normalize-wheel)
+      // https://github.com/basilfx/normalize-wheel
+      const LINE_HEIGHT = 40; // Approximate pixels per line
+      const PAGE_HEIGHT = 800; // Approximate pixels per page
+      let pixelDelta: number;
+      if (e.deltaMode === 1) {
+        // Lines (Firefox) - convert to pixels
+        pixelDelta = e.deltaY * LINE_HEIGHT;
+      } else if (e.deltaMode === 2) {
+        // Pages - convert to pixels
+        pixelDelta = e.deltaY * PAGE_HEIGHT;
+      } else {
+        // Already in pixels (Chrome, Edge, Safari)
+        pixelDelta = e.deltaY;
+      }
+
+      // Calculate zoom multiplier (based on anvaka/panzoom approach)
+      // speed * delta / 128, capped at 0.25 (25% max per event)
+      const zoomSpeed = 0.065;
+      const sign = Math.sign(pixelDelta);
+      const deltaAdjustedSpeed = Math.min(0.25, Math.abs((zoomSpeed * pixelDelta) / 128));
+      let scaleMultiplier = 1 - sign * deltaAdjustedSpeed;
 
       // In bounds mode, limit zoom out to the smaller of:
       // 1. Fit-to-screen scale (so large content can fill viewport)
