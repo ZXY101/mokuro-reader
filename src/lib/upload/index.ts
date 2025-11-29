@@ -3,6 +3,7 @@ import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
 import { promptImageOnlyImport, type SeriesImportInfo } from '$lib/util/modals';
 import { requestPersistentStorage } from '$lib/util/upload';
+import { normalizeFilename } from '$lib/util/misc';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
 import { calculateCumulativeCharCounts } from '$lib/catalog/migration';
@@ -409,11 +410,12 @@ async function processStandaloneImage(
   volumesByPath: Record<string, Partial<VolumeMetadata>>,
   pendingImagesByPath: Record<string, Record<string, File>>
 ): Promise<void> {
-  const path = file.path;
+  const path = normalizeFilename(file.path);
 
   if (!path) return;
 
-  const relativePath = file.file.name;
+  // Normalize filename to handle URL-encoded Unicode characters
+  const relativePath = normalizeFilename(file.file.name);
   const vol = Object.keys(volumesDataByPath).find((key) => path.startsWith(key));
 
   if (!vol) {

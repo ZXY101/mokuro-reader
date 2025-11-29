@@ -24,6 +24,7 @@ import {
   incrementPoolUsers,
   decrementPoolUsers
 } from './file-processing-pool';
+import { normalizeFilename } from './misc';
 
 export interface QueueItem {
   volumeUuid: string;
@@ -341,6 +342,7 @@ async function processVolumeData(
 
   // Convert image entries to File objects
   // Create File objects directly from ArrayBuffers with proper MIME types
+  // Normalize filenames to decode URL-encoded Unicode characters
   const files: Record<string, File> = {};
   for (const entry of entries) {
     if (!entry.filename.endsWith('.mokuro') && !entry.filename.includes('__MACOSX')) {
@@ -356,8 +358,11 @@ async function processVolumeData(
       };
       const mimeType = mimeTypes[extension] || 'application/octet-stream';
 
+      // Normalize filename to handle URL-encoded Unicode characters
+      const normalizedFilename = normalizeFilename(entry.filename);
+
       // Create File directly from ArrayBuffer with proper MIME type
-      files[entry.filename] = new File([entry.data], entry.filename, { type: mimeType });
+      files[normalizedFilename] = new File([entry.data], normalizedFilename, { type: mimeType });
     }
   }
 

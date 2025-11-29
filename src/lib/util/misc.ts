@@ -77,3 +77,17 @@ export function resetScrollPosition() {
     document.body.scrollTop = 0;
   }
 }
+
+/**
+ * Normalize a filename/path by decoding URL-encoded characters.
+ * ZIP libraries may encode Unicode filenames (e.g., %E3%82%A2 -> ア).
+ * This ensures consistent keys when storing/looking up files.
+ */
+export function normalizeFilename(filename: string): string {
+  try {
+    return decodeURIComponent(filename);
+  } catch {
+    // If decoding fails (invalid encoding), return as-is
+    return filename;
+  }
+}
