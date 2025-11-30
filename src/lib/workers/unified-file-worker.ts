@@ -446,7 +446,7 @@ async function uploadToWebDAV(
   await createWebDAVFolderRecursive(seriesFolderPath, serverUrl, username, password);
 
   // Upload file
-  const filePath = `${seriesFolderPath}/${filename}`;
+  const filePath = `/${seriesFolderPath}/${filename}`;
   const fileUrl = `${serverUrl}${filePath}`;
   const authHeader = 'Basic ' + btoa(`${username}:${password}`);
 
