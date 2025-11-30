@@ -200,3 +200,94 @@ export function remapPagePaths<T extends { img_path: string }>(
     return page;
   });
 }
+
+/**
+ * Result of comparing mokuro pages to actual files
+ */
+export interface FileMatchResult {
+  matched: number;
+  missingFiles: string[]; // Pages in mokuro that couldn't be matched to any file
+  extraFiles: string[]; // Files that don't match any mokuro page
+}
+
+/**
+ * Compare mokuro page paths against actual file names.
+ * Uses the same matching strategies as remapPagePaths.
+ *
+ * @param pagePaths - Array of img_path values from mokuro pages
+ * @param fileNames - Array of actual downloaded file names
+ * @returns Object with matched count, missing files, and extra files
+ */
+export function comparePagePathsToFiles(pagePaths: string[], fileNames: string[]): FileMatchResult {
+  // Build lookup maps for matching strategies (same as remapPagePaths)
+  const normalizedToActual = new Map<string, string>();
+  const pathNoExtToActual = new Map<string, string>();
+  const basenameToActual = new Map<string, string>();
+  const basenameNoExtToActual = new Map<string, string>();
+
+  const unmatchedFiles = new Set<string>(fileNames);
+
+  for (const fileName of fileNames) {
+    const normalized = normalizeFilename(fileName);
+    normalizedToActual.set(normalized, fileName);
+
+    const pathNoExt = normalizeFilename(removeExtension(fileName));
+    pathNoExtToActual.set(pathNoExt, fileName);
+
+    const basename = normalizeFilename(getBasename(fileName));
+    basenameToActual.set(basename, fileName);
+
+    const basenameNoExt = normalizeFilename(removeExtension(getBasename(fileName)));
+    basenameNoExtToActual.set(basenameNoExt, fileName);
+  }
+
+  const missingFiles: string[] = [];
+  let matched = 0;
+
+  for (const imgPath of pagePaths) {
+    let matchedFile: string | undefined;
+
+    // Strategy 1: Exact match (with normalization)
+    const normalized = normalizeFilename(imgPath);
+    if (normalizedToActual.has(normalized)) {
+      matchedFile = normalizedToActual.get(normalized)!;
+    }
+
+    // Strategy 2: Basename match
+    if (!matchedFile) {
+      const basename = normalizeFilename(getBasename(imgPath));
+      if (basenameToActual.has(basename)) {
+        matchedFile = basenameToActual.get(basename)!;
+      }
+    }
+
+    // Strategy 3: Path without extension
+    if (!matchedFile) {
+      const pathNoExt = normalizeFilename(removeExtension(imgPath));
+      if (pathNoExtToActual.has(pathNoExt)) {
+        matchedFile = pathNoExtToActual.get(pathNoExt)!;
+      }
+    }
+
+    // Strategy 4: Basename without extension
+    if (!matchedFile) {
+      const basenameNoExt = normalizeFilename(removeExtension(getBasename(imgPath)));
+      if (basenameNoExtToActual.has(basenameNoExt)) {
+        matchedFile = basenameNoExtToActual.get(basenameNoExt)!;
+      }
+    }
+
+    if (matchedFile) {
+      matched++;
+      unmatchedFiles.delete(matchedFile);
+    } else {
+      missingFiles.push(imgPath);
+    }
+  }
+
+  return {
+    matched,
+    missingFiles,
+    extraFiles: Array.from(unmatchedFiles)
+  };
+}
