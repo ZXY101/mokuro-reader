@@ -3,7 +3,7 @@ import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
 import { promptImageOnlyImport, type SeriesImportInfo } from '$lib/util/modals';
 import { requestPersistentStorage } from '$lib/util/upload';
-import { normalizeFilename } from '$lib/util/misc';
+import { normalizeFilename, remapPagePaths } from '$lib/util/misc';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
 import { calculateCumulativeCharCounts } from '$lib/catalog/migration';
@@ -80,7 +80,7 @@ function groupOrphanedImagesBySeries(
 export * from './web-import';
 
 const zipTypes = ['zip', 'cbz'];
-const imageTypes = ['image/jpeg', 'image/png', 'image/webp'];
+const imageExtensions = ['jpg', 'jpeg', 'png', 'webp', 'avif', 'tif', 'tiff', 'gif', 'bmp'];
 
 function getDetails(file: File) {
   const { webkitRelativePath, name } = file;
@@ -137,7 +137,9 @@ function isMokuro(fileName: string) {
 }
 
 function isImage(fileName: string) {
-  return getMimeType(fileName).startsWith('image/') || imageTypes.includes(getExtension(fileName));
+  return (
+    getMimeType(fileName).startsWith('image/') || imageExtensions.includes(getExtension(fileName))
+  );
 }
 
 function isZip(fileName: string) {
@@ -204,6 +206,11 @@ async function uploadVolumeData(
             })
           )
         );
+      }
+
+      // Remap page img_path values if image formats have changed (e.g., png->webp)
+      if (uploadData.pages && uploadData.files) {
+        uploadData.pages = remapPagePaths(uploadData.pages, uploadData.files);
       }
 
       // Generate thumbnail from first file

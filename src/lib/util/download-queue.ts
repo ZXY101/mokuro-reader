@@ -24,7 +24,7 @@ import {
   incrementPoolUsers,
   decrementPoolUsers
 } from './file-processing-pool';
-import { normalizeFilename } from './misc';
+import { normalizeFilename, remapPagePaths } from './misc';
 
 export interface QueueItem {
   volumeUuid: string;
@@ -354,7 +354,10 @@ async function processVolumeData(
         png: 'image/png',
         gif: 'image/gif',
         webp: 'image/webp',
-        bmp: 'image/bmp'
+        bmp: 'image/bmp',
+        avif: 'image/avif',
+        tif: 'image/tiff',
+        tiff: 'image/tiff'
       };
       const mimeType = mimeTypes[extension] || 'application/octet-stream';
 
@@ -365,6 +368,9 @@ async function processVolumeData(
       files[normalizedFilename] = new File([entry.data], normalizedFilename, { type: mimeType });
     }
   }
+
+  // Remap page img_path values if image formats have changed (e.g., png->webp)
+  const remappedPages = remapPagePaths(mokuroData.pages, files);
 
   // Generate thumbnail from first image
   const fileNames = Object.keys(files).sort((a, b) =>
@@ -390,7 +396,7 @@ async function processVolumeData(
       await db.volumes.add(metadataWithThumbnail);
       await db.volume_ocr.add({
         volume_uuid: mokuroData.volume_uuid,
-        pages: mokuroData.pages
+        pages: remappedPages
       });
       await db.volume_files.add({
         volume_uuid: mokuroData.volume_uuid,
