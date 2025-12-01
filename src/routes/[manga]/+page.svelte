@@ -213,7 +213,17 @@
   });
 
   // Subscribe to provider manager status for reactive authentication state
-  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
+  let providerStatus = $state<{
+    hasAnyAuthenticated: boolean;
+    currentProviderType: string | null;
+    providers: Record<string, { isAuthenticated?: boolean; isReadOnly?: boolean } | null>;
+    needsAttention: boolean;
+  }>({
+    hasAnyAuthenticated: false,
+    currentProviderType: null,
+    providers: {},
+    needsAttention: false
+  });
   $effect(() => {
     return providerManager.status.subscribe((value) => {
       console.log('[Series Page] Provider status updated:', value.hasAnyAuthenticated, value);
@@ -227,6 +237,12 @@
   });
   let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
   let isCloudReady = $derived(hasAnyProvider && cacheHasLoaded);
+
+  // Check if current provider is WebDAV and in read-only mode
+  let isReadOnlyMode = $derived(
+    providerStatus.currentProviderType === 'webdav' &&
+      providerStatus.providers['webdav']?.isReadOnly === true
+  );
 
   // Get active provider's display name
   let providerDisplayName = $derived.by(() => {
@@ -371,7 +387,8 @@
         storageKey: 'deleteStatsPreference',
         defaultValue: false
       },
-      hasCloudBackups
+      // Don't show cloud delete option in read-only mode
+      hasCloudBackups && !isReadOnlyMode
         ? {
             label: `Also delete from ${providerDisplayName}?`,
             storageKey: 'deleteCloudPreference',
@@ -584,8 +601,8 @@
 
     <!-- Actions Row: All buttons -->
     <div class="flex flex-row items-stretch justify-end gap-2">
-      <!-- Cloud buttons -->
-      {#if isCloudReady && !allBackedUp}
+      <!-- Cloud buttons - hidden in read-only mode -->
+      {#if isCloudReady && !allBackedUp && !isReadOnlyMode}
         <Button color="light" onclick={backupSeries} class="!min-w-0 self-stretch">
           <CloudArrowUpOutline class="me-2 h-4 w-4 shrink-0" />
           <span class="break-words"
@@ -619,7 +636,7 @@
         <DotsVerticalOutline class="h-5 w-5" />
       </Button>
       <Dropdown triggeredBy="#series-menu" placement="bottom-end">
-        {#if isCloudReady && anyBackedUp}
+        {#if isCloudReady && anyBackedUp && !isReadOnlyMode}
           <DropdownItem
             onclick={onDeleteFromCloud}
             class="flex w-full items-center text-red-500 hover:!text-red-500 dark:hover:!text-red-500"

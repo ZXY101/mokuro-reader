@@ -45,6 +45,7 @@
   let cloudFiles = $state<Map<string, CloudVolumeWithProvider[]>>(new Map());
   let hasAuthenticatedProvider = $state(false);
   let isFetchingCloud = $state(false);
+  let isReadOnlyMode = $state(false);
 
   // Subscribe to cloud state for grid view
   $effect(() => {
@@ -57,6 +58,9 @@
       }),
       providerManager.status.subscribe((value) => {
         hasAuthenticatedProvider = value.hasAnyAuthenticated;
+        // Check if current provider is WebDAV and in read-only mode
+        isReadOnlyMode =
+          value.currentProviderType === 'webdav' && value.providers['webdav']?.isReadOnly === true;
       })
     ];
     return () => unsubscribers.forEach((unsub) => unsub());
@@ -245,7 +249,8 @@
         storageKey: 'deleteStatsPreference',
         defaultValue: false
       },
-      hasCloudBackup
+      // Don't show cloud delete option in read-only mode
+      hasCloudBackup && !isReadOnlyMode
         ? {
             label: `Also delete from ${providerDisplayName}?`,
             storageKey: 'deleteCloudPreference',
@@ -372,7 +377,7 @@
           <FileLinesOutline class="me-2 h-5 w-5 flex-shrink-0" />
           <span class="flex-1 text-left">View text</span>
         </DropdownItem>
-        {#if hasAuthenticatedProvider}
+        {#if hasAuthenticatedProvider && !isReadOnlyMode}
           {#if isCloudLoading}
             <DropdownItem class="flex w-full items-center opacity-50" disabled>
               <span class="me-2 h-5 w-5 flex-shrink-0 animate-spin">⏳</span>
