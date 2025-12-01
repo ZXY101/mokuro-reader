@@ -111,15 +111,6 @@
     return () => URL.revokeObjectURL(url);
   });
 
-  // Get current reading speed
-  let currentSpeed = $derived.by(() => {
-    const readingSpeed = $personalizedReadingSpeed;
-    if (readingSpeed.isPersonalized && readingSpeed.charsPerMinute > 0) {
-      return readingSpeed.charsPerMinute;
-    }
-    return 100; // Default
-  });
-
   // Calculate estimated time remaining for incomplete volumes
   let estimatedMinutesLeft = $derived.by(() => {
     // Don't show estimate for completed volumes

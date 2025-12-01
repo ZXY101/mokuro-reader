@@ -194,7 +194,33 @@
   }
 
   function handleShortcuts(event: KeyboardEvent & { currentTarget: EventTarget & Window }) {
+    // Ignore shortcuts when user is in a text input, editable field, text box, or UI overlay
+    const target = event.target as HTMLElement;
+    if (
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.isContentEditable ||
+      target.closest('#settings') || // Settings drawer
+      target.closest('[data-popover]') || // Page number popover and other popovers
+      target.closest('.textBox') // OCR text boxes (even when not editable)
+    ) {
+      return;
+    }
+
     const action = event.code || event.key;
+
+    // For letter keys and nav keys, ignore if any modifier key is pressed
+    // (e.g., Ctrl+C for copy, Shift+Arrow for text selection)
+    const isLetterKey = action.startsWith('Key');
+    const isNavKey = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(
+      action
+    );
+    if (
+      (isLetterKey || isNavKey) &&
+      (event.ctrlKey || event.altKey || event.metaKey || event.shiftKey)
+    ) {
+      return;
+    }
 
     // Keys that should prevent default browser scrolling behavior
     const scrollKeys = [
@@ -348,9 +374,14 @@
       });
     }
 
+    // Prevent scrollbars from appearing when in reader mode
+    document.documentElement.style.overflow = 'hidden';
+
     return () => {
       // Stop activity tracker when component unmounts
       activityTracker.stop();
+      // Restore overflow when leaving reader
+      document.documentElement.style.overflow = '';
     };
   });
 
@@ -546,36 +577,19 @@
   let imageCache = new ImageCache();
   let cachedImageUrl1 = $state<string | null>(null);
   let cachedImageUrl2 = $state<string | null>(null);
-  let filesArray = $state<File[]>([]);
-  let lastVolumeUuid = $state<string>('');
-
-  // Update files array when volume changes (not on every volumeData update)
-  $effect(() => {
-    const files = volumeData?.files;
-    const volumeUuid = volume?.volume_uuid;
-
-    // Only recreate filesArray when the volume UUID actually changes
-    if (volumeUuid && volumeUuid !== lastVolumeUuid) {
-      lastVolumeUuid = volumeUuid;
-      if (files) {
-        filesArray = Object.values(files);
-      } else {
-        filesArray = [];
-      }
-    } else if (files && filesArray.length === 0) {
-      // Initial load: filesArray is empty but we have files
-      filesArray = Object.values(files);
-    }
-  });
 
   // Update cache when page or volume data changes
   $effect(() => {
     const currentIndex = index;
+    const files = volumeData?.files;
+    const pgs = pages;
 
-    if (filesArray.length > 0 && currentIndex >= 0) {
-      // Try to get current page image synchronously first (instant if already cached)
+    if (files && pgs.length > 0 && currentIndex >= 0) {
+      // Update cache first (non-blocking - preloads in background)
+      imageCache.updateCache(files, pgs, currentIndex);
+
+      // Try to get current page image synchronously (instant if already cached)
       const syncUrl1 = imageCache.getImageSync(currentIndex);
-
       if (syncUrl1) {
         cachedImageUrl1 = syncUrl1;
       } else {
@@ -586,11 +600,8 @@
         });
       }
 
-      // Update cache (non-blocking - preloads in background)
-      imageCache.updateCache(filesArray, currentIndex);
-
       // Try to get next page image if showing second page
-      if (showSecondPage() && currentIndex + 1 < filesArray.length) {
+      if (showSecondPage()) {
         const syncUrl2 = imageCache.getImageSync(currentIndex + 1);
         if (syncUrl2) {
           cachedImageUrl2 = syncUrl2;
@@ -797,10 +808,8 @@
   <QuickActions
     {left}
     {right}
-    src1={volumeData.files ? Object.values(volumeData.files)[index] : undefined}
-    src2={!useSinglePage && volumeData.files
-      ? Object.values(volumeData.files)[index + 1]
-      : undefined}
+    src1={imageCache.getFile(index)}
+    src2={!useSinglePage ? imageCache.getFile(index + 1) : undefined}
   />
   <SettingsButton />
   <Cropper />
@@ -899,18 +908,18 @@
             in:pageIn={{ direction: pageDirection }}
             out:pageOut={{ direction: pageDirection }}
           >
-            {#if volumeData && volumeData.files}
+            {#if volumeData?.files}
               {#if showSecondPage()}
                 <MangaPage
                   page={pages[index + 1]}
-                  src={Object.values(volumeData.files)[index + 1]}
+                  src={imageCache.getFile(index + 1)!}
                   cachedUrl={cachedImageUrl2}
                   volumeUuid={volume.volume_uuid}
                 />
               {/if}
               <MangaPage
                 page={pages[index]}
-                src={Object.values(volumeData.files)[index]}
+                src={imageCache.getFile(index)!}
                 cachedUrl={cachedImageUrl1}
                 volumeUuid={volume.volume_uuid}
               />

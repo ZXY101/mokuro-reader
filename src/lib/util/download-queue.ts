@@ -24,6 +24,7 @@ import {
   incrementPoolUsers,
   decrementPoolUsers
 } from './file-processing-pool';
+import { normalizeFilename, remapPagePaths } from './misc';
 
 export interface QueueItem {
   volumeUuid: string;
@@ -341,6 +342,7 @@ async function processVolumeData(
 
   // Convert image entries to File objects
   // Create File objects directly from ArrayBuffers with proper MIME types
+  // Normalize filenames to decode URL-encoded Unicode characters
   const files: Record<string, File> = {};
   for (const entry of entries) {
     if (!entry.filename.endsWith('.mokuro') && !entry.filename.includes('__MACOSX')) {
@@ -352,14 +354,23 @@ async function processVolumeData(
         png: 'image/png',
         gif: 'image/gif',
         webp: 'image/webp',
-        bmp: 'image/bmp'
+        bmp: 'image/bmp',
+        avif: 'image/avif',
+        tif: 'image/tiff',
+        tiff: 'image/tiff'
       };
       const mimeType = mimeTypes[extension] || 'application/octet-stream';
 
+      // Normalize filename to handle URL-encoded Unicode characters
+      const normalizedFilename = normalizeFilename(entry.filename);
+
       // Create File directly from ArrayBuffer with proper MIME type
-      files[entry.filename] = new File([entry.data], entry.filename, { type: mimeType });
+      files[normalizedFilename] = new File([entry.data], normalizedFilename, { type: mimeType });
     }
   }
+
+  // Remap page img_path values if image formats have changed (e.g., png->webp)
+  const remappedPages = remapPagePaths(mokuroData.pages, files);
 
   // Generate thumbnail from first image
   const fileNames = Object.keys(files).sort((a, b) =>
@@ -385,7 +396,7 @@ async function processVolumeData(
       await db.volumes.add(metadataWithThumbnail);
       await db.volume_ocr.add({
         volume_uuid: mokuroData.volume_uuid,
-        pages: mokuroData.pages
+        pages: remappedPages
       });
       await db.volume_files.add({
         volume_uuid: mokuroData.volume_uuid,
@@ -603,21 +614,25 @@ async function processDownload(item: QueueItem, processId: string): Promise<void
  * When a download completes, processQueue() is called again to start the next item
  */
 async function processQueue(): Promise<void> {
-  // CRITICAL: Take queue snapshot BEFORE any await points
-  // This prevents race conditions where multiple processQueue() calls interleave
-  const queue = get(queueStore);
-  const queuedItems = queue.filter((item) => item.status === 'queued');
+  // Check if there are queued items and initialize pool if needed
+  // Take initial snapshot just to check if we need to initialize
+  const initialQueue = get(queueStore);
+  const hasQueuedItems = initialQueue.some((item) => item.status === 'queued');
 
   // Mark processing as started and register as pool user if we have queued items
-  if (queuedItems.length > 0 && !processingStarted) {
+  if (hasQueuedItems && !processingStarted) {
     processingStarted = true;
     incrementPoolUsers();
 
     // Pre-initialize the pool BEFORE processing any items
-    // This prevents the race condition where multiple downloads wait for pool initialization
-    // and then resume in scrambled order
     await getFileProcessingPool();
   }
+
+  // CRITICAL: Re-fetch queue state AFTER any await points
+  // This prevents race conditions where multiple processQueue() calls interleave
+  // and process the same item using stale snapshots
+  const queue = get(queueStore);
+  const queuedItems = queue.filter((item) => item.status === 'queued');
 
   // Process only the FIRST queued item to preserve ordering
   // When it completes, it will call processQueue() again to process the next item
