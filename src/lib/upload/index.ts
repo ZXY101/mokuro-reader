@@ -1,9 +1,14 @@
 import { db } from '$lib/catalog/db';
 import type { VolumeData, VolumeMetadata } from '$lib/types';
 import { showSnackbar } from '$lib/util/snackbar';
-import { promptImageOnlyImport, type SeriesImportInfo } from '$lib/util/modals';
+import {
+  promptImageOnlyImport,
+  promptImportMismatch,
+  type SeriesImportInfo,
+  type ImportMismatchInfo
+} from '$lib/util/modals';
 import { requestPersistentStorage } from '$lib/util/upload';
-import { normalizeFilename, remapPagePaths } from '$lib/util/misc';
+import { normalizeFilename, remapPagePaths, comparePagePathsToFiles } from '$lib/util/misc';
 import { getMimeType, ZipReaderStream } from '@zip.js/zip.js';
 import { generateThumbnail } from '$lib/catalog/thumbnails';
 import { calculateCumulativeCharCounts } from '$lib/catalog/migration';
@@ -581,7 +586,19 @@ async function processOrphanedImages(
   }
 }
 
-export async function processFiles(_files: File[]) {
+export interface ProcessFilesResult {
+  success: boolean;
+  failedVolumes: ImportMismatchInfo[];
+}
+
+export interface ProcessFilesOptions {
+  onMismatchDismiss?: () => void;
+}
+
+export async function processFiles(
+  _files: File[],
+  options?: ProcessFilesOptions
+): Promise<ProcessFilesResult> {
   const volumesByPath: Record<string, Partial<VolumeMetadata>> = {};
   const volumesDataByPath: Record<string, Partial<VolumeData>> = {};
   const pendingImagesByPath: Record<string, Record<string, File>> = {};
@@ -604,6 +621,51 @@ export async function processFiles(_files: File[]) {
   // Process orphaned images (images without .mokuro files) as image-only volumes
   await processOrphanedImages(pendingImagesByPath, volumesByPath);
 
+  // Check for volumes that failed to import due to file count/path mismatches
+  const failedVolumes = Object.entries(volumesDataByPath);
+  const mismatchInfos: ImportMismatchInfo[] = [];
+
+  if (failedVolumes.length > 0) {
+    for (const [path, volumeData] of failedVolumes) {
+      const metadata = volumesByPath[path];
+      const volumeName = metadata?.volume_title || path.split('/').pop() || 'Unknown';
+
+      // Get expected page paths from mokuro data
+      const expectedPaths = volumeData.pages?.map((p) => p.img_path) ?? [];
+      // Get actual file names
+      const actualFiles = Object.keys(volumeData.files ?? {});
+
+      // Compare to find mismatches
+      const matchResult = comparePagePathsToFiles(expectedPaths, actualFiles);
+
+      console.error('[Import] Volume failed due to file mismatch:', {
+        path,
+        volumeName,
+        expectedCount: expectedPaths.length,
+        actualCount: actualFiles.length,
+        matched: matchResult.matched,
+        missingFiles: matchResult.missingFiles,
+        extraFiles: matchResult.extraFiles
+      });
+
+      mismatchInfos.push({
+        volumeName,
+        expectedCount: expectedPaths.length,
+        actualCount: actualFiles.length,
+        missingFiles: matchResult.missingFiles,
+        extraFiles: matchResult.extraFiles
+      });
+    }
+
+    // Show the mismatch modal
+    if (mismatchInfos.length > 0) {
+      promptImportMismatch(mismatchInfos, options?.onMismatchDismiss);
+      db.processThumbnails(5);
+      return { success: false, failedVolumes: mismatchInfos };
+    }
+  }
+
   showSnackbar('Files uploaded successfully');
   db.processThumbnails(5);
+  return { success: true, failedVolumes: [] };
 }

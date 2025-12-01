@@ -84,3 +84,35 @@ export function promptImageOnlyImport(
     onCancel
   });
 }
+
+// Import mismatch modal - shows when mokuro pages don't match downloaded files
+export type ImportMismatchInfo = {
+  volumeName: string;
+  expectedCount: number;
+  actualCount: number;
+  missingFiles: string[]; // Pages in mokuro that couldn't be matched
+  extraFiles: string[]; // Downloaded files that don't match any mokuro page
+};
+
+type ImportMismatchModal = {
+  open: boolean;
+  volumes: ImportMismatchInfo[]; // Support multiple failed volumes
+  onDismiss?: () => void;
+};
+
+export const importMismatchModalStore = writable<ImportMismatchModal | undefined>(undefined);
+
+/**
+ * Show import mismatch modal for one or more failed volumes
+ */
+export function promptImportMismatch(
+  info: ImportMismatchInfo | ImportMismatchInfo[],
+  onDismiss?: () => void
+) {
+  const volumes = Array.isArray(info) ? info : [info];
+  importMismatchModalStore.set({
+    open: true,
+    volumes,
+    onDismiss
+  });
+}
