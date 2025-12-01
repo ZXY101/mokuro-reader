@@ -100,6 +100,8 @@ export interface ProviderStatus {
   hasStoredCredentials: boolean;
   needsAttention: boolean;
   statusMessage: string;
+  /** Whether the provider is in read-only mode (e.g., WebDAV without write permissions) */
+  isReadOnly?: boolean;
 }
 
 /**
