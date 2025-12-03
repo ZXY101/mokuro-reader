@@ -1,5 +1,5 @@
 ---
-'z-reader': patch
+'mokuro-reader': patch
 ---
 
 Add changesets workflow, release notes, and fix cross-site imports
