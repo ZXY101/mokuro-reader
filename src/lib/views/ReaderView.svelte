@@ -77,9 +77,7 @@
 </script>
 
 {#if cachedVolumeSettings}
-  {#if $settings.showTimer}
-    <Timer bind:count {volumeId} />
-  {/if}
+  <Timer bind:count {volumeId} visible={$settings.showTimer} />
   {#key volumeId}
     <Reader volumeSettings={cachedVolumeSettings} />
   {/key}
