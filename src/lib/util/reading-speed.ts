@@ -124,7 +124,10 @@ export function getEffectiveReadingTime(
   },
   idleTimeoutMs: number
 ): number {
-  const pageTurnMinutes = calculateTimeFromPageTurns(volumeData.recentPageTurns || [], idleTimeoutMs);
+  const pageTurnMinutes = calculateTimeFromPageTurns(
+    volumeData.recentPageTurns || [],
+    idleTimeoutMs
+  );
 
   // Return whichever is greater
   return Math.max(pageTurnMinutes, volumeData.timeReadInMinutes || 0);
@@ -353,7 +356,7 @@ export function calculateReadingSpeed(
   let confidence: 'high' | 'medium' | 'low' | 'none';
   if (totalMinutes >= ESTIMATION_MINUTES * 0.75) confidence = 'high';
   else if (totalMinutes >= ESTIMATION_MINUTES * 0.5) confidence = 'medium';
-  else if (totalMinutes >= 5) confidence = 'low';
+  else if (totalMinutes >= 30) confidence = 'low';
   else confidence = 'none';
 
   return {

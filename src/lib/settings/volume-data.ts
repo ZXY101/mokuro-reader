@@ -214,7 +214,10 @@ export function parseVolumesFromJson(storedData: string): Volumes {
   try {
     const parsed = JSON.parse(storedData);
     return Object.fromEntries(
-      Object.entries(parsed).map(([key, value]) => [key, VolumeData.fromJSON(value)])
+      Object.entries(parsed)
+        // Filter out entries with empty/invalid volume IDs (bug cleanup)
+        .filter(([key]) => key && key.length > 0)
+        .map(([key, value]) => [key, VolumeData.fromJSON(value)])
     );
   } catch {
     return {};
@@ -476,6 +479,12 @@ export function updateProgress(
 }
 
 export function startCount(volume: string) {
+  // Guard against null/undefined/empty volume IDs
+  if (!volume) {
+    console.warn('[startCount] Called with empty volume ID, skipping timer');
+    return undefined;
+  }
+
   return setInterval(() => {
     _volumesInternal.update((prev) => {
       const currentVolume = prev[volume] || new VolumeData();
