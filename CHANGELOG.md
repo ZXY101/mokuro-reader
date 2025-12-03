@@ -1,26 +1,17 @@
 # Changelog
 
-## 1.0.4
+## [1.0.4] - 2025-12-03
 
-### Patch Changes
+### Added
 
-- [#260](https://github.com/Gnathonic/mokuro-reader/pull/260) [`afb794b`](https://github.com/Gnathonic/mokuro-reader/commit/afb794b9e20f8e44e3e8a72478d9f566a22036d5) Thanks [@Gnathonic](https://github.com/Gnathonic)! - Add changesets workflow, release notes, and fix cross-site imports
+- Update banner now shows version diff (e.g., v1.0.3 → v1.0.4)
+- Expandable "what's new" section in update banner fetches release notes from GitHub
+- Link to full release notes on GitHub
 
-  ### New Features
-  - Add changesets for versioning and changelog generation
-  - CI now requires changeset on PRs (or `no-changeset` label to skip)
-  - Automatic GitHub Releases when version PR is merged
-  - Update banner now shows version diff (e.g., v1.0.3 → v1.0.4)
-  - Expandable "what's new" section fetches release notes from GitHub
-  - Link to full release notes on GitHub
-  - Version now sourced from package.json (single source of truth)
-  - GitHub repo auto-detected from deployment URL (skips updates on dev builds)
+### Fixed
 
-  ### Bug Fixes
-  - Fix cross-site imports via `/upload?manga=X&volume=Y` URLs (regression from hash router migration)
-  - Add catch-all route to handle legacy URL paths
-  - Fix hash-based navigation when on legacy paths
-  - Cross-site imports now use global progress tracker instead of dedicated page
+- Fix cross-site imports via `/upload?manga=X&volume=Y` URLs (regression from hash router migration)
+- Cross-site imports now use global progress tracker instead of dedicated page
 
 All notable changes to this project will be documented in this file.
 
