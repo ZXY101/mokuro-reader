@@ -1,0 +1,89 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create Release Pull Request
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          title: 'chore: version packages'
+          commit: 'chore: version packages'
+          version: npm run changeset:version
+          publish: echo "Skipping npm publish for private package"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Check if this is a version commit (Version PR was merged)
+      - name: Check for version commit
+        id: version_check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          # Check if tag already exists
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "Tag v$VERSION already exists"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event.head_commit.message }}" == "chore: version packages"* ]]; then
+            echo "Version commit detected, will create release for v$VERSION"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          else
+            echo "Not a version commit"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          fi
+
+      # Create and push tag
+      - name: Create and push tag
+        if: steps.version_check.outputs.should_release == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version_check.outputs.version }}"
+          git push origin "v${{ steps.version_check.outputs.version }}"
+
+      # Extract release notes from CHANGELOG.md for this version
+      - name: Extract release notes
+        if: steps.version_check.outputs.should_release == 'true'
+        id: release_notes
+        run: |
+          VERSION="${{ steps.version_check.outputs.version }}"
+          # Extract content between this version header and the next version header
+          NOTES=$(awk "/^## $VERSION/,/^## \[?[0-9]/" CHANGELOG.md | head -n -1 | tail -n +2)
+          # Use a delimiter for multiline output
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # Create GitHub Release
+      - name: Create GitHub Release
+        if: steps.version_check.outputs.should_release == 'true'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version_check.outputs.version }}
+          name: v${{ steps.version_check.outputs.version }}
+          body: ${{ steps.release_notes.outputs.notes }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
