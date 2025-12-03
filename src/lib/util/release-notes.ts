@@ -12,11 +12,15 @@ export interface ReleaseInfo {
 export const latestRelease = writable<ReleaseInfo | null>(null);
 export const releaseError = writable<string | null>(null);
 
-const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 const CACHE_KEY = 'mokuro-latest-release';
 const CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
 export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
+  // Skip for dev builds (no configured repo)
+  if (!GITHUB_REPO) {
+    return null;
+  }
+
   // Check cache first
   const cached = getCachedRelease();
   if (cached) {
@@ -25,7 +29,7 @@ export async function fetchLatestRelease(): Promise<ReleaseInfo | null> {
   }
 
   try {
-    const response = await fetch(GITHUB_API, {
+    const response = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/releases/latest`, {
       headers: { Accept: 'application/vnd.github.v3+json' }
     });
 
