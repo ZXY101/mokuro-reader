@@ -86,6 +86,50 @@ function calculateTurnStats(
   };
 }
 
+/**
+ * Calculate reading time in minutes from page turns.
+ * Filters out idle periods exceeding the timeout.
+ */
+export function calculateTimeFromPageTurns(turns: PageTurn[], idleTimeoutMs: number): number {
+  if (!turns || turns.length < 2) return 0;
+
+  let totalMs = 0;
+
+  for (let i = 1; i < turns.length; i++) {
+    const prevTurn = turns[i - 1];
+    const currTurn = turns[i];
+
+    // Skip legacy 2-tuple format
+    if (prevTurn.length < 3 || currTurn.length < 3) continue;
+
+    const gap = currTurn[0] - prevTurn[0];
+
+    // Skip idle periods
+    if (gap > idleTimeoutMs) continue;
+
+    totalMs += gap;
+  }
+
+  return Math.floor(totalMs / 60000);
+}
+
+/**
+ * Get the effective reading time for a volume.
+ * Returns max of page-turn-derived time and legacy timeReadInMinutes.
+ */
+export function getEffectiveReadingTime(
+  volumeData: {
+    timeReadInMinutes: number;
+    recentPageTurns?: PageTurn[];
+  },
+  idleTimeoutMs: number
+): number {
+  const pageTurnMinutes = calculateTimeFromPageTurns(volumeData.recentPageTurns || [], idleTimeoutMs);
+
+  // Return whichever is greater
+  return Math.max(pageTurnMinutes, volumeData.timeReadInMinutes || 0);
+}
+
 export interface ReadingSpeedResult {
   charsPerMinute: number;
   isPersonalized: boolean;
