@@ -94,3 +94,43 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  changeset:
+    name: Changeset Check
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check for changeset
+        run: |
+          # Check if PR has changeset files
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+
+          if echo "$CHANGED_FILES" | grep -q "^\.changeset/.*\.md$"; then
+            echo "✅ Changeset found"
+            exit 0
+          fi
+
+          # Check for skip label
+          if gh pr view ${{ github.event.pull_request.number }} --json labels -q '.labels[].name' | grep -q "no-changeset"; then
+            echo "⏭️ Skipping changeset check (no-changeset label)"
+            exit 0
+          fi
+
+          echo "❌ No changeset found. Please run 'npm run changeset' to add one."
+          echo "   Or add the 'no-changeset' label to skip this check."
+          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
