@@ -351,7 +351,7 @@
   }
 
   function onDoubleTap(event: MouseEvent) {
-    if ($panzoomStore && $settings.mobile) {
+    if ($panzoomStore) {
       const { clientX, clientY } = event;
       const { scale } = $panzoomStore.getTransform();
 
