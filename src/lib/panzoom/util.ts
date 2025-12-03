@@ -21,6 +21,7 @@ export function initPanzoom(node: HTMLElement) {
     minZoom: 0.1,
     zoomDoubleClickSpeed: 1,
     enableTextSelection: true,
+    onDoubleClick: () => false, // Allow dblclick events to propagate to Reader's onDoubleTap handler
     beforeMouseDown: (e) => {
       const target = e.target as HTMLElement;
       // Check if the target is a text box or a child of a text box
