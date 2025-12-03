@@ -34,6 +34,7 @@ export class WebDAVProvider implements SyncProvider {
 
   private client: WebDAVClient | null = null;
   private initPromise: Promise<void>;
+  private _isReadOnly: boolean = false;
 
   constructor() {
     if (browser) {
@@ -55,6 +56,29 @@ export class WebDAVProvider implements SyncProvider {
     return this.client !== null;
   }
 
+  /**
+   * Check if the WebDAV connection is read-only (no write permissions)
+   */
+  get isReadOnly(): boolean {
+    return this._isReadOnly;
+  }
+
+  /**
+   * Mark the provider as read-only (called when a write operation fails with permission error)
+   * Also triggers a status update to refresh the UI
+   */
+  markAsReadOnly(): void {
+    if (!this._isReadOnly) {
+      console.log('📖 WebDAV marked as read-only due to write operation failure');
+      this._isReadOnly = true;
+
+      // Trigger status update to refresh UI (import dynamically to avoid circular deps)
+      import('../../provider-manager').then(({ providerManager }) => {
+        providerManager.updateStatus();
+      });
+    }
+  }
+
   getStatus(): ProviderStatus {
     // Only serverUrl is required - username/password are optional for some servers
     const hasCredentials = !!(browser && localStorage.getItem(STORAGE_KEYS.SERVER_URL));
@@ -65,10 +89,13 @@ export class WebDAVProvider implements SyncProvider {
       hasStoredCredentials: hasCredentials,
       needsAttention: false,
       statusMessage: isConnected
-        ? 'Connected to WebDAV'
+        ? this._isReadOnly
+          ? 'Connected to WebDAV (read-only)'
+          : 'Connected to WebDAV'
         : hasCredentials
           ? 'Configured (not connected)'
-          : 'Not configured'
+          : 'Not configured',
+      isReadOnly: this._isReadOnly
     };
   }
 
@@ -106,6 +133,16 @@ export class WebDAVProvider implements SyncProvider {
 
       // Ensure mokuro folder exists
       await this.ensureMokuroFolder();
+
+      // Check write permissions via OPTIONS request
+      this._isReadOnly = !(await this.checkWritePermissions(
+        normalizedUrl,
+        username || '',
+        password || ''
+      ));
+      if (this._isReadOnly) {
+        console.log('📖 WebDAV server is read-only (no PUT/DELETE/MKCOL permissions)');
+      }
 
       // Store credentials in localStorage (username/password are optional)
       if (browser) {
@@ -251,6 +288,155 @@ export class WebDAVProvider implements SyncProvider {
     }
   }
 
+  /**
+   * Check if the server allows write operations
+   * Returns true if write is allowed (or if we can't determine)
+   *
+   * Uses tiered approach:
+   * 1. Try PROPFIND with DAV:current-user-privilege-set (most accurate for ACL-enabled servers)
+   * 2. Fall back to OPTIONS request to check Allow header
+   * 3. If both are inconclusive → assume write access
+   * 4. Actual write operations will mark as read-only if they fail with permission errors
+   */
+  private async checkWritePermissions(
+    baseUrl: string,
+    username: string,
+    password: string
+  ): Promise<boolean> {
+    const url = `${baseUrl}${MOKURO_FOLDER}/`;
+    const headers: HeadersInit = {
+      'Content-Type': 'application/xml'
+    };
+
+    if (username || password) {
+      headers['Authorization'] = 'Basic ' + btoa(`${username}:${password}`);
+    }
+
+    // Try PROPFIND with current-user-privilege-set first (RFC 3744 - WebDAV ACL)
+    try {
+      console.log('[WebDAV] Checking user privileges via PROPFIND for:', url);
+
+      const propfindBody = `<?xml version="1.0" encoding="utf-8"?>
+<D:propfind xmlns:D="DAV:">
+  <D:prop>
+    <D:current-user-privilege-set/>
+  </D:prop>
+</D:propfind>`;
+
+      const response = await fetch(url, {
+        method: 'PROPFIND',
+        headers: {
+          ...headers,
+          Depth: '0'
+        },
+        body: propfindBody
+      });
+
+      console.log('[WebDAV] PROPFIND response status:', response.status);
+
+      if (response.ok || response.status === 207) {
+        const text = await response.text();
+        console.log('[WebDAV] PROPFIND response:', text.substring(0, 500));
+
+        // Check if the property returned 404 (server doesn't support ACL extension)
+        // This is different from having no privileges - it means we can't determine from PROPFIND
+        if (text.includes('current-user-privilege-set') && text.includes('404')) {
+          console.log(
+            '[WebDAV] Server does not support ACL (current-user-privilege-set returned 404), falling back to OPTIONS'
+          );
+          // Fall through to OPTIONS check
+        } else {
+          // Server supports ACL - check for actual privileges
+          // Look for privilege elements like <D:write/>, <D:read/>, <D:all/>, etc.
+          const hasWritePrivilege =
+            text.includes('<D:write') ||
+            text.includes('<write') ||
+            text.includes(':write/>') ||
+            text.includes('<D:all') ||
+            text.includes('<all') ||
+            text.includes(':all/>');
+
+          const hasReadPrivilege =
+            text.includes('<D:read') || text.includes('<read') || text.includes(':read/>');
+
+          // Only consider read-only if we found privileges and read is present but write is not
+          if (hasReadPrivilege && !hasWritePrivilege) {
+            console.log(
+              '[WebDAV] PROPFIND indicates read-only access (has read but no write privileges)'
+            );
+            return false;
+          }
+
+          if (hasWritePrivilege) {
+            console.log('[WebDAV] PROPFIND confirms write access');
+            return true;
+          }
+
+          // If we got a response but couldn't parse privileges clearly, fall through to OPTIONS
+          console.log('[WebDAV] PROPFIND response unclear, falling back to OPTIONS');
+        }
+      }
+    } catch (error) {
+      console.log('[WebDAV] PROPFIND failed, falling back to OPTIONS:', error);
+    }
+
+    // Fall back to OPTIONS request
+    try {
+      console.log('[WebDAV] Checking write permissions via OPTIONS for:', url);
+
+      const response = await fetch(url, {
+        method: 'OPTIONS',
+        headers: { Authorization: headers['Authorization'] || '' }
+      });
+
+      console.log('[WebDAV] OPTIONS response status:', response.status);
+
+      if (!response.ok) {
+        // If OPTIONS fails, assume full access (fail open for usability)
+        console.warn('[WebDAV] OPTIONS request failed, assuming full write access');
+        return true;
+      }
+
+      const allowHeader = response.headers.get('Allow');
+      console.log('[WebDAV] Allow header:', allowHeader);
+
+      // If Allow header is missing or empty, assume full access
+      // Not all servers return an Allow header on OPTIONS
+      if (!allowHeader || allowHeader.trim() === '') {
+        console.log('[WebDAV] No Allow header present, assuming full write access');
+        return true;
+      }
+
+      const allowedMethods = allowHeader
+        .split(',')
+        .map((m) => m.trim().toUpperCase())
+        .filter((m) => m.length > 0);
+
+      // If the header exists but has no valid methods, assume full access
+      if (allowedMethods.length === 0) {
+        console.log('[WebDAV] Allow header empty, assuming full write access');
+        return true;
+      }
+
+      // Need PUT for uploads, DELETE for deletions, MKCOL for creating folders
+      const hasPut = allowedMethods.includes('PUT');
+      const hasDelete = allowedMethods.includes('DELETE');
+      const hasMkcol = allowedMethods.includes('MKCOL');
+
+      const hasWrite = hasPut && hasDelete && hasMkcol;
+
+      console.log(
+        `[WebDAV] Permissions: PUT=${hasPut}, DELETE=${hasDelete}, MKCOL=${hasMkcol}, hasWrite=${hasWrite}`
+      );
+
+      return hasWrite;
+    } catch (error) {
+      // If we can't check, assume full access (fail open for usability)
+      console.warn('[WebDAV] Failed to check write permissions:', error);
+      return true;
+    }
+  }
+
   // GENERIC FILE OPERATIONS
 
   async listCloudVolumes(): Promise<import('../../provider-interface').CloudFileMetadata[]> {
@@ -354,8 +540,31 @@ export class WebDAVProvider implements SyncProvider {
       console.log(`✅ Uploaded ${path} to WebDAV`);
       return fullPath;
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Check for permission errors - mark as read-only
+      // 401 = Unauthorized (read-only token), 403 = Forbidden, 405 = Method Not Allowed
+      if (
+        errorMessage.includes('401') ||
+        errorMessage.includes('403') ||
+        errorMessage.includes('405') ||
+        errorMessage.includes('Unauthorized') ||
+        errorMessage.includes('Forbidden') ||
+        errorMessage.includes('Method Not Allowed') ||
+        errorMessage.includes('Permission denied')
+      ) {
+        this.markAsReadOnly();
+        throw new ProviderError(
+          'Write permission denied - server is read-only',
+          'webdav',
+          'PERMISSION_DENIED',
+          false,
+          false
+        );
+      }
+
       throw new ProviderError(
-        `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to upload file: ${errorMessage}`,
         'webdav',
         'UPLOAD_FAILED',
         false,
@@ -438,8 +647,31 @@ export class WebDAVProvider implements SyncProvider {
       await this.client.deleteFile(file.fileId);
       console.log(`✅ Deleted ${file.path} from WebDAV`);
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+      // Check for permission errors - mark as read-only
+      // 401 = Unauthorized (read-only token), 403 = Forbidden, 405 = Method Not Allowed
+      if (
+        errorMessage.includes('401') ||
+        errorMessage.includes('403') ||
+        errorMessage.includes('405') ||
+        errorMessage.includes('Unauthorized') ||
+        errorMessage.includes('Forbidden') ||
+        errorMessage.includes('Method Not Allowed') ||
+        errorMessage.includes('Permission denied')
+      ) {
+        this.markAsReadOnly();
+        throw new ProviderError(
+          'Delete permission denied - server is read-only',
+          'webdav',
+          'PERMISSION_DENIED',
+          false,
+          false
+        );
+      }
+
       throw new ProviderError(
-        `Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        `Failed to delete file: ${errorMessage}`,
         'webdav',
         'DELETE_FAILED',
         false,

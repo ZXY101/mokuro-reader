@@ -8,7 +8,8 @@
   import { promptExtraction } from '$lib/util/modals';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
   import type { VolumeMetadata } from '$lib/types';
-  import { deleteVolume, volumes, progress } from '$lib/settings';
+  import { deleteVolume, volumes, progress, settings } from '$lib/settings';
+  import { getEffectiveReadingTime } from '$lib/util/reading-speed';
   import { nav, routeParams, navigateBack } from '$lib/util/hash-router';
   import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
   import {
@@ -33,13 +34,18 @@
   let mangaStats = $derived.by(() => {
     if (!manga || manga.length === 0 || !$volumes) return null;
 
+    const idleTimeoutMs = $settings.inactivityTimeoutMinutes * 60 * 1000;
+
     return manga
       .map((vol) => vol.volume_uuid)
       .reduce(
         (stats, volumeId) => {
-          const timeReadInMinutes = $volumes[volumeId]?.timeReadInMinutes || 0;
-          const chars = $volumes[volumeId]?.chars || 0;
-          const completed = $volumes[volumeId]?.completed ? 1 : 0;
+          const volumeData = $volumes[volumeId];
+          const timeReadInMinutes = volumeData
+            ? getEffectiveReadingTime(volumeData, idleTimeoutMs)
+            : 0;
+          const chars = volumeData?.chars || 0;
+          const completed = volumeData?.completed ? 1 : 0;
 
           stats.timeReadInMinutes = stats.timeReadInMinutes + timeReadInMinutes;
           stats.chars = stats.chars + chars;
@@ -213,7 +219,17 @@
   });
 
   // Subscribe to provider manager status for reactive authentication state
-  let providerStatus = $state({ hasAnyAuthenticated: false, providers: {}, needsAttention: false });
+  let providerStatus = $state<{
+    hasAnyAuthenticated: boolean;
+    currentProviderType: string | null;
+    providers: Record<string, { isAuthenticated?: boolean; isReadOnly?: boolean } | null>;
+    needsAttention: boolean;
+  }>({
+    hasAnyAuthenticated: false,
+    currentProviderType: null,
+    providers: {},
+    needsAttention: false
+  });
   $effect(() => {
     return providerManager.status.subscribe((value) => {
       console.log('[Series Page] Provider status updated:', value.hasAnyAuthenticated, value);
@@ -227,6 +243,12 @@
   });
   let hasAnyProvider = $derived(providerStatus.hasAnyAuthenticated);
   let isCloudReady = $derived(hasAnyProvider && cacheHasLoaded);
+
+  // Check if current provider is WebDAV and in read-only mode
+  let isReadOnlyMode = $derived(
+    providerStatus.currentProviderType === 'webdav' &&
+      providerStatus.providers['webdav']?.isReadOnly === true
+  );
 
   // Get active provider's display name
   let providerDisplayName = $derived.by(() => {
@@ -371,7 +393,8 @@
         storageKey: 'deleteStatsPreference',
         defaultValue: false
       },
-      hasCloudBackups
+      // Don't show cloud delete option in read-only mode
+      hasCloudBackups && !isReadOnlyMode
         ? {
             label: `Also delete from ${providerDisplayName}?`,
             storageKey: 'deleteCloudPreference',
@@ -584,8 +607,8 @@
 
     <!-- Actions Row: All buttons -->
     <div class="flex flex-row items-stretch justify-end gap-2">
-      <!-- Cloud buttons -->
-      {#if isCloudReady && !allBackedUp}
+      <!-- Cloud buttons - hidden in read-only mode -->
+      {#if isCloudReady && !allBackedUp && !isReadOnlyMode}
         <Button color="light" onclick={backupSeries} class="!min-w-0 self-stretch">
           <CloudArrowUpOutline class="me-2 h-4 w-4 shrink-0" />
           <span class="break-words"
@@ -619,7 +642,7 @@
         <DotsVerticalOutline class="h-5 w-5" />
       </Button>
       <Dropdown triggeredBy="#series-menu" placement="bottom-end">
-        {#if isCloudReady && anyBackedUp}
+        {#if isCloudReady && anyBackedUp && !isReadOnlyMode}
           <DropdownItem
             onclick={onDeleteFromCloud}
             class="flex w-full items-center text-red-500 hover:!text-red-500 dark:hover:!text-red-500"
@@ -648,7 +671,7 @@
 
     {#if viewMode === 'list'}
       <Listgroup active class="h-full w-full flex-1">
-        {#if hasDuplicates && hasAnyProvider}
+        {#if hasDuplicates && hasAnyProvider && !isReadOnlyMode}
           <div
             class="mb-4 flex items-center justify-between rounded bg-red-50 px-4 py-2 dark:bg-red-900/20"
           >

@@ -6,9 +6,9 @@
   import type { ProviderType, StorageQuota } from '$lib/util/sync/provider-interface';
   import { backupQueue } from '$lib/util/backup-queue';
   import { tokenManager } from '$lib/util/sync/providers/google-drive';
-  import { Badge, Button, Radio, Toggle, Spinner } from 'flowbite-svelte';
+  import { Alert, Badge, Button, Radio, Toggle, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
-  import { GoogleSolid } from 'flowbite-svelte-icons';
+  import { GoogleSolid, InfoCircleSolid } from 'flowbite-svelte-icons';
   import { catalog } from '$lib/catalog';
   import type { VolumeMetadata } from '$lib/types';
 
@@ -33,6 +33,7 @@
   );
   let megaAuth = $derived($providerStatusStore.providers['mega']?.isAuthenticated || false);
   let webdavAuth = $derived($providerStatusStore.providers['webdav']?.isAuthenticated || false);
+  let webdavIsReadOnly = $derived($providerStatusStore.providers['webdav']?.isReadOnly || false);
 
   // Use active_cloud_provider key (via currentProviderType) for UI state
   // This properly clears on logout unlike hasStoredCredentials
@@ -677,6 +678,16 @@
             <Button color="red" onclick={handleLogout}>Log out</Button>
           </div>
 
+          {#if currentProvider === 'webdav' && webdavIsReadOnly}
+            <Alert color="yellow" class="mb-4">
+              {#snippet icon()}
+                <InfoCircleSolid class="h-5 w-5" />
+              {/snippet}
+              <span class="font-medium">Read-only mode:</span> Your WebDAV server only allows read access.
+              Upload, backup, and sync features are disabled.
+            </Alert>
+          {/if}
+
           <div class="flex flex-col gap-4">
             <!-- Provider-specific instructions -->
             {#if currentProvider === 'google-drive'}
@@ -841,32 +852,40 @@
               </div>
             {/if}
 
-            <!-- Sync read progress button -->
-            <Button
-              color="dark"
-              onclick={currentProvider === 'google-drive' ? performSync : handleProviderSync}
-            >
-              Sync read progress
-            </Button>
+            {#if cacheIsFetching}
+              <!-- Loading state while cache is being populated -->
+              <div class="flex items-center justify-center gap-3 py-4">
+                <Spinner size="6" />
+                <span class="text-gray-400">Loading cloud data...</span>
+              </div>
+            {:else if !(currentProvider === 'webdav' && webdavIsReadOnly)}
+              <!-- Sync read progress button -->
+              <Button
+                color="dark"
+                onclick={currentProvider === 'google-drive' ? performSync : handleProviderSync}
+              >
+                Sync read progress
+              </Button>
 
-            <!-- Backup all series button -->
-            <Button
-              color="purple"
-              onclick={() =>
-                promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
-            >
-              Backup all series to cloud
-            </Button>
+              <!-- Backup all series button -->
+              <Button
+                color="purple"
+                onclick={() =>
+                  promptConfirmation('Backup all series to cloud storage?', backupAllSeries)}
+              >
+                Backup all series to cloud
+              </Button>
 
-            <!-- Profile sync button -->
-            <Button color="blue" onclick={syncProfiles} disabled={isSyncingProfiles}>
-              {#if isSyncingProfiles}
-                <Spinner size="4" class="mr-2" />
-                Syncing profiles...
-              {:else}
-                Sync profiles
-              {/if}
-            </Button>
+              <!-- Profile sync button -->
+              <Button color="blue" onclick={syncProfiles} disabled={isSyncingProfiles}>
+                {#if isSyncingProfiles}
+                  <Spinner size="4" class="mr-2" />
+                  Syncing profiles...
+                {:else}
+                  Sync profiles
+                {/if}
+              </Button>
+            {/if}
 
             <!-- Storage quota section -->
             <div class="mt-4 rounded-lg bg-gray-800 p-4">

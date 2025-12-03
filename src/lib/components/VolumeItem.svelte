@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { deleteVolume, progress, volumes } from '$lib/settings';
+  import { deleteVolume, progress, volumes, settings } from '$lib/settings';
   import { personalizedReadingSpeed } from '$lib/settings/reading-speed';
+  import { getEffectiveReadingTime } from '$lib/util/reading-speed';
   import type { VolumeMetadata, Page } from '$lib/types';
   import { promptConfirmation, showSnackbar } from '$lib/util';
   import { getCurrentPage, getProgressDisplay, isVolumeComplete } from '$lib/util/volume-helpers';
@@ -45,6 +46,7 @@
   let cloudFiles = $state<Map<string, CloudVolumeWithProvider[]>>(new Map());
   let hasAuthenticatedProvider = $state(false);
   let isFetchingCloud = $state(false);
+  let isReadOnlyMode = $state(false);
 
   // Subscribe to cloud state for grid view
   $effect(() => {
@@ -57,6 +59,9 @@
       }),
       providerManager.status.subscribe((value) => {
         hasAuthenticatedProvider = value.hasAnyAuthenticated;
+        // Check if current provider is WebDAV and in read-only mode
+        isReadOnlyMode =
+          value.currentProviderType === 'webdav' && value.providers['webdav']?.isReadOnly === true;
       })
     ];
     return () => unsubscribers.forEach((unsub) => unsub());
@@ -83,7 +88,11 @@
   let isBackedUp = $derived(cloudFile !== undefined);
 
   // Time statistics
-  let timeReadMinutes = $derived(volumeData?.timeReadInMinutes || 0);
+  let timeReadMinutes = $derived.by(() => {
+    if (!volumeData) return 0;
+    const idleTimeoutMs = $settings.inactivityTimeoutMinutes * 60 * 1000;
+    return getEffectiveReadingTime(volumeData, idleTimeoutMs);
+  });
   let charsRead = $derived(volumeData?.chars || 0);
   let totalChars = $state<number | undefined>(undefined);
 
@@ -245,7 +254,8 @@
         storageKey: 'deleteStatsPreference',
         defaultValue: false
       },
-      hasCloudBackup
+      // Don't show cloud delete option in read-only mode
+      hasCloudBackup && !isReadOnlyMode
         ? {
             label: `Also delete from ${providerDisplayName}?`,
             storageKey: 'deleteCloudPreference',
@@ -372,7 +382,7 @@
           <FileLinesOutline class="me-2 h-5 w-5 flex-shrink-0" />
           <span class="flex-1 text-left">View text</span>
         </DropdownItem>
-        {#if hasAuthenticatedProvider}
+        {#if hasAuthenticatedProvider && !isReadOnlyMode}
           {#if isCloudLoading}
             <DropdownItem class="flex w-full items-center opacity-50" disabled>
               <span class="me-2 h-5 w-5 flex-shrink-0 animate-spin">⏳</span>

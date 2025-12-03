@@ -666,14 +666,14 @@ ctx.addEventListener('message', async (event) => {
           }
         );
       } else if (provider === 'webdav') {
-        if (!credentials.webdavUrl || !credentials.webdavUsername || !credentials.webdavPassword) {
-          throw new Error('Missing WebDAV credentials');
+        if (!credentials.webdavUrl) {
+          throw new Error('Missing WebDAV URL');
         }
         arrayBuffer = await downloadFromWebDAV(
           fileId,
           credentials.webdavUrl,
-          credentials.webdavUsername,
-          credentials.webdavPassword,
+          credentials.webdavUsername ?? '',
+          credentials.webdavPassword ?? '',
           (loaded, total) => {
             const progressMessage: DownloadProgressMessage = {
               type: 'progress',
@@ -801,16 +801,16 @@ ctx.addEventListener('message', async (event) => {
           }
         );
       } else if (provider === 'webdav') {
-        if (!credentials.webdavUrl || !credentials.webdavUsername || !credentials.webdavPassword) {
-          throw new Error('Missing WebDAV credentials');
+        if (!credentials.webdavUrl) {
+          throw new Error('Missing WebDAV URL');
         }
         fileId = await uploadToWebDAV(
           cbzData,
           filename,
           seriesTitle,
           credentials.webdavUrl,
-          credentials.webdavUsername,
-          credentials.webdavPassword,
+          credentials.webdavUsername ?? '',
+          credentials.webdavPassword ?? '',
           (loaded, total) => {
             const uploadProgress = (loaded / total) * 100; // 0-100% upload
             const progressMessage: UploadProgressMessage = {
