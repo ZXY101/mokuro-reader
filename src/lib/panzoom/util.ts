@@ -35,7 +35,9 @@ export function initPanzoom(node: HTMLElement) {
     },
     // Disable library's wheel zoom - we handle it ourselves for symmetric zoom
     beforeWheel: () => true,
-    onTouch: (e) => e.touches.length > 1,
+    // Let panzoom handle all touch events including pinch-zoom
+    // Our swipe detection uses velocity + multi-touch cooldown to avoid conflicts
+    pinchSpeed: 1,
     // Panzoom typing is wrong here
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
@@ -74,6 +76,9 @@ export function initPanzoom(node: HTMLElement) {
 
   pz.on('pan', () => keepInBounds());
   pz.on('zoom', () => keepInBounds());
+  pz.on('transform', () => keepInBounds());
+  pz.on('panend', () => keepInBounds());
+  pz.on('zoomend', () => keepInBounds());
 
   // Wheel handler is registered at window level in Reader.svelte
   // to capture events from all UI elements and prevent browser zoom
@@ -207,9 +212,28 @@ export function keepInBounds() {
   }
 
   const transform = pz.getTransform();
-
-  const { x, y, scale } = transform;
+  let { x, y, scale } = transform;
   const { innerWidth, innerHeight } = window;
+
+  // Enforce minimum zoom level (can't zoom out past fit-to-screen)
+  const fitScaleX = innerWidth / container.offsetWidth;
+  const fitScaleY = innerHeight / container.offsetHeight;
+  const fitScale = Math.min(fitScaleX, fitScaleY);
+  // Large images (fitScale < 1): can zoom out to fit
+  // Small images (fitScale > 1): can't zoom out past 100%
+  const minScale = Math.min(fitScale, 1.0);
+  const maxScale = 10;
+
+  if (scale < minScale) {
+    // Zoom back to minimum, centered
+    const zoomMultiplier = minScale / scale;
+    pz.zoomTo(innerWidth / 2, innerHeight / 2, zoomMultiplier);
+    scale = minScale;
+  } else if (scale > maxScale) {
+    const zoomMultiplier = maxScale / scale;
+    pz.zoomTo(innerWidth / 2, innerHeight / 2, zoomMultiplier);
+    scale = maxScale;
+  }
 
   const width = container.offsetWidth * scale;
   const height = container.offsetHeight * scale;
