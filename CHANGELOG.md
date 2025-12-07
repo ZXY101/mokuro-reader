@@ -4,11 +4,12 @@
 
 ### Fixed
 
-- Normalize wheel zoom across browsers and platforms (consistent zoom steps in Firefox/Chrome)
-- Handle empty series name in mokuro file import
-- Stop timer when navigating between volumes
-- Improve text box interactions in reader (better double-click handling)
-- Remove double linebreaks when copying OCR text (fixes Yomitan sentence capture)
+- Consistent wheel zoom step sizes between Chrome and Firefox with platform-aware speed adjustment
+- Handle mokuro files with empty series name (falls back to volume name)
+- Stop timer when paging into next/previous volume
+- Double-clicking text boxes no longer triggers zoom
+- Crop image popup now works on first page load without needing to page first
+- Copying text from OCR boxes no longer has double linebreaks (fixes Yomitan Anki sentence capture)
 
 ### Reverted
 
