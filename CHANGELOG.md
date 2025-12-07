@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.6
+
+### Fixed
+
+- Consistent wheel zoom step sizes between Chrome and Firefox with platform-aware speed adjustment
+- Velocity-based swipe detection that works reliably on high-refresh/high-DPI devices
+- Pinch-zoom no longer triggers accidental page turns
+- Pan-while-pinch support (move two fingers together to pan while zooming)
+- Zoom bounds enforcement during pinch gestures
+- Handle mokuro files with empty series name (falls back to volume name)
+- Stop timer when paging into next/previous volume
+- Double-clicking text boxes no longer triggers zoom
+- Crop image popup now works on first page load without needing to page first
+- Window resize and fullscreen now properly reset to fit-to-page mode
+- Copying text from OCR boxes no longer has double linebreaks (fixes Yomitan Anki sentence capture)
+
+### Added
+
+- New "Swipe sensitivity" setting (Low/Medium/High)
+
 ## 1.0.5
 
 ### Patch Changes
