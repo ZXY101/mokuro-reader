@@ -1,5 +1,5 @@
 ---
-'mokuro-reader': minor
+'mokuro-reader': patch
 ---
 
 Improved mobile touch gestures
