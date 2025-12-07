@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.6.1
+
+### Fixed
+
+- OCR text boxes now show on mobile touch devices (regression from linebreak fix)
+
 ## 1.0.6
 
 ### Fixed
