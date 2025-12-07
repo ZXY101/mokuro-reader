@@ -1,30 +1,19 @@
 # Changelog
 
-## 1.0.6.1
-
-### Fixed
-
-- OCR text boxes now show on mobile touch devices (regression from linebreak fix)
-
-## 1.0.6
+## [1.0.5.8] - 2025-12-07
 
 ### Fixed
 
 - Consistent wheel zoom step sizes between Chrome and Firefox with platform-aware speed adjustment
-- Velocity-based swipe detection that works reliably on high-refresh/high-DPI devices
-- Pinch-zoom no longer triggers accidental page turns
-- Pan-while-pinch support (move two fingers together to pan while zooming)
-- Zoom bounds enforcement during pinch gestures
 - Handle mokuro files with empty series name (falls back to volume name)
 - Stop timer when paging into next/previous volume
 - Double-clicking text boxes no longer triggers zoom
 - Crop image popup now works on first page load without needing to page first
-- Window resize and fullscreen now properly reset to fit-to-page mode
 - Copying text from OCR boxes no longer has double linebreaks (fixes Yomitan Anki sentence capture)
 
-### Added
+### Reverted
 
-- New "Swipe sensitivity" setting (Low/Medium/High)
+- Rolled back mobile swipe/pinch-zoom changes from 1.0.6 that broke textbox touch visibility
 
 ## 1.0.5
 
@@ -44,13 +33,6 @@
 
 - Fix cross-site imports via `/upload?manga=X&volume=Y` URLs (regression from hash router migration)
 - Cross-site imports now use global progress tracker instead of dedicated page
-
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
 
 ## [1.0.3] - 2025-12-03
 

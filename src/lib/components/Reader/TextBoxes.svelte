@@ -109,8 +109,6 @@
   let needsWrapping = $state<Set<number>>(new Set());
   // Track which textboxes have been processed
   let processedTextBoxes = $state<Set<number>>(new Set());
-  // Track which textbox is currently touched (for mobile visibility)
-  let touchedIndex = $state<number | null>(null);
 
   // Calculate optimal font size for a textbox using binary search
   // Two-phase approach: scale up until overflow, then find the goldilocks size
@@ -207,13 +205,11 @@
     };
   }
 
-  // Handle hover/touch events for textboxes
-  // - Calculates resize on demand for auto font sizing
-  // - Tracks touched state for mobile visibility
+  // Handle hover event to calculate resize on demand (only for auto font sizing)
   function handleTextBoxHover(element: HTMLDivElement, params: [number, string]) {
     const [index, initialFontSize] = params;
 
-    const processAutoSize = () => {
+    const onMouseEnter = () => {
       // Skip if already processed, OCR is hidden, or using manual font size
       if (processedTextBoxes.has(index) || display !== 'block' || $settings.fontSize !== 'auto')
         return;
@@ -249,49 +245,11 @@
       });
     };
 
-    const onMouseEnter = () => {
-      processAutoSize();
-    };
-
-    const onTouchStart = () => {
-      touchedIndex = index;
-      processAutoSize();
-    };
-
-    const onTouchEnd = (e: TouchEvent) => {
-      // Keep visible if touch ended on this element (tap)
-      // Clear if touch moved away
-      const touch = e.changedTouches[0];
-      if (touch) {
-        const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (!element.contains(elementAtPoint)) {
-          touchedIndex = null;
-        }
-      }
-    };
-
-    // Clear touched state when touching elsewhere
-    const onDocumentTouchStart = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      if (touch) {
-        const elementAtPoint = document.elementFromPoint(touch.clientX, touch.clientY);
-        if (!element.contains(elementAtPoint) && touchedIndex === index) {
-          touchedIndex = null;
-        }
-      }
-    };
-
     element.addEventListener('mouseenter', onMouseEnter);
-    element.addEventListener('touchstart', onTouchStart, { passive: true });
-    element.addEventListener('touchend', onTouchEnd, { passive: true });
-    document.addEventListener('touchstart', onDocumentTouchStart, { passive: true });
 
     return {
       destroy() {
         element.removeEventListener('mouseenter', onMouseEnter);
-        element.removeEventListener('touchstart', onTouchStart);
-        element.removeEventListener('touchend', onTouchEnd);
-        document.removeEventListener('touchstart', onDocumentTouchStart);
       }
     };
   }
@@ -355,7 +313,6 @@
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
     class:originalMode={isOriginalMode}
-    class:touched={touchedIndex === index}
     style:width={isOriginalMode ? undefined : useMinDimensions ? undefined : width}
     style:height={isOriginalMode ? undefined : useMinDimensions ? undefined : height}
     style:min-width={isOriginalMode ? undefined : useMinDimensions ? width : undefined}
@@ -367,8 +324,7 @@
     style:display
     style:border
     style:writing-mode={writingMode}
-    role="textbox"
-    tabindex="0"
+    role="none"
     oncontextmenu={(e) => onContextMenu(e, lines)}
     ondblclick={(e) => onDoubleTap(e, lines)}
     {contenteditable}
@@ -400,11 +356,9 @@
   }
 
   .textBox:focus,
-  .textBox:hover,
-  .textBox.touched {
+  .textBox:hover {
     background: rgb(255, 255, 255);
     border: 1px solid rgba(0, 0, 0, 0);
-    outline: none; /* Text appearing is the focus indicator */
   }
 
   .textBox span {
@@ -425,8 +379,7 @@
   }
 
   .textBox:focus span,
-  .textBox:hover span,
-  .textBox.touched span {
+  .textBox:hover span {
     visibility: visible;
   }
 
