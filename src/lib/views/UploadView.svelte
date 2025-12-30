@@ -69,7 +69,8 @@
         '.tif',
         '.tiff',
         '.gif',
-        '.bmp'
+        '.bmp',
+        '.jxl'
       ];
 
       // Filter to just images
