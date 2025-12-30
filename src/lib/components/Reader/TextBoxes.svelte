@@ -1,8 +1,8 @@
 <script lang="ts">
   import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
-  import { settings } from '$lib/settings';
-  import { imageToWebp, showCropper, updateLastCard } from '$lib/anki-connect';
+  import { settings, volumes } from '$lib/settings';
+  import { imageToWebp, showCropper, updateLastCard, type VolumeMetadata } from '$lib/anki-connect';
 
   interface Props {
     page: Page;
@@ -102,6 +102,11 @@
   let contenteditable = $derived($settings.textEditable);
 
   let triggerMethod = $derived($settings.ankiConnectSettings.triggerMethod || 'both');
+  let ankiTags = $derived($settings.ankiConnectSettings.tags);
+  let volumeMetadata = $derived<VolumeMetadata>({
+    seriesTitle: $volumes[volumeUuid]?.series_title,
+    volumeTitle: $volumes[volumeUuid]?.volume_title
+  });
 
   // Track adjusted font sizes for each textbox
   let adjustedFontSizes = $state<Map<number, string>>(new Map());
@@ -287,12 +292,12 @@
           getImageUrlFromElement(event.target as HTMLElement) ||
           (src ? URL.createObjectURL(src) : null);
         if (url) {
-          showCropper(url, sentence);
+          showCropper(url, sentence, ankiTags, volumeMetadata);
         }
       } else if (src) {
         promptConfirmation('Add image to last created anki card?', async () => {
           const imageData = await imageToWebp(src, $settings);
-          updateLastCard(imageData, sentence);
+          updateLastCard(imageData, sentence, ankiTags, volumeMetadata);
         });
       }
     }

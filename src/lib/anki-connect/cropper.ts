@@ -1,21 +1,30 @@
 import { showSnackbar } from '$lib/util';
 import { writable } from 'svelte/store';
-import { blobToBase64, imageResize } from '.';
+import { blobToBase64, imageResize, type VolumeMetadata } from '.';
 import type { Settings } from '$lib/settings/settings';
 
 type CropperModal = {
   open: boolean;
   image?: string;
   sentence?: string;
+  tags?: string;
+  metadata?: VolumeMetadata;
 };
 
 export const cropperStore = writable<CropperModal | undefined>(undefined);
 
-export function showCropper(image: string, sentence?: string) {
+export function showCropper(
+  image: string,
+  sentence?: string,
+  tags?: string,
+  metadata?: VolumeMetadata
+) {
   cropperStore.set({
     open: true,
     image,
-    sentence
+    sentence,
+    tags,
+    metadata
   });
 }
 

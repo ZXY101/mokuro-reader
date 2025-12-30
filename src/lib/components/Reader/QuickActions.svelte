@@ -1,6 +1,6 @@
 <script lang="ts">
   import { toggleFullScreen, zoomFitToScreen } from '$lib/panzoom';
-  import { settings } from '$lib/settings';
+  import { settings, volumes } from '$lib/settings';
   import {
     ArrowLeftOutline,
     ArrowRightOutline,
@@ -9,7 +9,7 @@
     ZoomOutOutline,
     PlusOutline
   } from 'flowbite-svelte-icons';
-  import { imageToWebp, showCropper, updateLastCard } from '$lib/anki-connect';
+  import { imageToWebp, showCropper, updateLastCard, type VolumeMetadata } from '$lib/anki-connect';
   import { promptConfirmation } from '$lib/util';
 
   interface Props {
@@ -17,9 +17,16 @@
     right: (_e: any, ingoreTimeOut?: boolean) => void;
     src1: File | undefined;
     src2: File | undefined;
+    volumeUuid: string;
   }
 
-  let { left, right, src1, src2 }: Props = $props();
+  let { left, right, src1, src2, volumeUuid }: Props = $props();
+
+  let ankiTags = $derived($settings.ankiConnectSettings.tags);
+  let volumeMetadata = $derived<VolumeMetadata>({
+    seriesTitle: $volumes[volumeUuid]?.series_title,
+    volumeTitle: $volumes[volumeUuid]?.volume_title
+  });
 
   let open = $state(false);
 
@@ -41,11 +48,11 @@
   async function onUpdateCard(src: File | undefined) {
     if ($settings.ankiConnectSettings.enabled && src) {
       if ($settings.ankiConnectSettings.cropImage) {
-        showCropper(URL.createObjectURL(src));
+        showCropper(URL.createObjectURL(src), undefined, ankiTags, volumeMetadata);
       } else {
         promptConfirmation('Add image to last created anki card?', async () => {
           const imageData = await imageToWebp(src, $settings);
-          updateLastCard(imageData);
+          updateLastCard(imageData, undefined, ankiTags, volumeMetadata);
         });
       }
     }

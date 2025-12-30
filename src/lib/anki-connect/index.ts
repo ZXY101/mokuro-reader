@@ -5,6 +5,51 @@ import { get } from 'svelte/store';
 
 export * from './cropper';
 
+// Dynamic tag templates that can be used in ankiTags
+export const DYNAMIC_TAGS = [
+  { tag: '{series}', description: 'Series title' },
+  { tag: '{volume}', description: 'Volume title' }
+] as const;
+
+// Default tags template when none specified
+export const DEFAULT_ANKI_TAGS = '{series}';
+
+export type VolumeMetadata = {
+  seriesTitle?: string;
+  volumeTitle?: string;
+};
+
+/**
+ * Resolves dynamic tag templates in a tags string
+ * e.g., "{series} mining" -> "One_Piece mining"
+ */
+export function resolveDynamicTags(tags: string, metadata: VolumeMetadata): string {
+  if (!tags) return '';
+
+  let resolved = tags;
+
+  // Replace {series} with sanitized series title
+  if (metadata.seriesTitle) {
+    // Anki tags can't have spaces, replace with underscores
+    const sanitized = metadata.seriesTitle.replace(/\s+/g, '_');
+    resolved = resolved.replace(/\{series\}/g, sanitized);
+  } else {
+    // Remove the tag if no series title available
+    resolved = resolved.replace(/\{series\}/g, '');
+  }
+
+  // Replace {volume} with sanitized volume title
+  if (metadata.volumeTitle) {
+    const sanitized = metadata.volumeTitle.replace(/\s+/g, '_');
+    resolved = resolved.replace(/\{volume\}/g, sanitized);
+  } else {
+    resolved = resolved.replace(/\{volume\}/g, '');
+  }
+
+  // Clean up any double spaces and trim
+  return resolved.replace(/\s+/g, ' ').trim();
+}
+
 export async function ankiConnect(action: string, params: Record<string, any>) {
   try {
     const res = await fetch('http://127.0.0.1:8765', {
@@ -106,7 +151,12 @@ export async function imageResize(
   });
 }
 
-export async function updateLastCard(imageData: string | null | undefined, sentence?: string) {
+export async function updateLastCard(
+  imageData: string | null | undefined,
+  sentence?: string,
+  tags?: string,
+  metadata?: VolumeMetadata
+) {
   const { overwriteImage, enabled, grabSentence, pictureField, sentenceField } =
     get(settings).ankiConnectSettings;
 
@@ -133,24 +183,35 @@ export async function updateLastCard(imageData: string | null | undefined, sente
     fields[pictureField] = '';
   }
 
+  // Resolve dynamic tags with volume metadata
+  const resolvedTags = tags && metadata ? resolveDynamicTags(tags, metadata) : tags;
+
   if (imageData) {
-    ankiConnect('updateNoteFields', {
-      note: {
-        id,
-        fields,
-        picture: {
-          filename: `mokuro_${id}.webp`,
-          data: imageData.split(';base64,')[1],
-          fields: [pictureField]
+    try {
+      await ankiConnect('updateNoteFields', {
+        note: {
+          id,
+          fields,
+          picture: {
+            filename: `mokuro_${id}.webp`,
+            data: imageData.split(';base64,')[1],
+            fields: [pictureField]
+          }
         }
-      }
-    })
-      .then(() => {
-        showSnackbar('Card updated!');
-      })
-      .catch((e) => {
-        showSnackbar(e);
       });
+
+      // Add tags if provided (after resolving dynamic templates)
+      if (resolvedTags && resolvedTags.length > 0) {
+        await ankiConnect('addTags', {
+          notes: [id],
+          tags: resolvedTags
+        });
+      }
+
+      showSnackbar('Card updated!');
+    } catch (e) {
+      showSnackbar(String(e));
+    }
   } else {
     showSnackbar('Something went wrong');
   }

@@ -39,6 +39,7 @@ export type AnkiConnectSettings = {
   overwriteImage: boolean;
   grabSentence: boolean;
   triggerMethod: 'rightClick' | 'doubleTap' | 'both';
+  tags: string;
 };
 
 export type TimeSchedule = {
@@ -158,7 +159,8 @@ const defaultSettings: Settings = {
     heightField: 0,
     widthField: 0,
     qualityField: 1,
-    triggerMethod: 'both'
+    triggerMethod: 'both',
+    tags: '{series}'
   },
   catalogSettings: {
     stackingPreset: 'default',

@@ -2,6 +2,7 @@
   import { page } from '$app/stores';
   import { settings, updateAnkiSetting } from '$lib/settings';
   import { AccordionItem, Helper, Input, Label, Select, Toggle } from 'flowbite-svelte';
+  import { DYNAMIC_TAGS, DEFAULT_ANKI_TAGS } from '$lib/anki-connect';
 
   let disabled = $derived(!$settings.ankiConnectSettings.enabled);
 
@@ -18,6 +19,7 @@
   let qualityField = $state($settings.ankiConnectSettings.qualityField);
 
   let triggerMethod = $state($settings.ankiConnectSettings.triggerMethod);
+  let ankiTags = $state($settings.ankiConnectSettings.tags);
 
   const triggerOptions = [
     { value: 'rightClick', name: 'Right click (long press on mobile)' },
@@ -25,6 +27,11 @@
     { value: 'both', name: 'Both' },
     { value: 'neither', name: 'Neither' }
   ];
+
+  function insertTag(tag: string) {
+    ankiTags = ankiTags ? `${ankiTags} ${tag}`.trim() : tag;
+    updateAnkiSetting('tags', ankiTags);
+  }
 </script>
 
 <AccordionItem>
@@ -92,6 +99,30 @@
           bind:value={triggerMethod}
         />
       </Label>
+    </div>
+    <div>
+      <Label class="text-gray-900 dark:text-white">Tags:</Label>
+      <Input
+        {disabled}
+        type="text"
+        placeholder={DEFAULT_ANKI_TAGS}
+        bind:value={ankiTags}
+        onchange={() => updateAnkiSetting('tags', ankiTags)}
+      />
+      <div class="mt-2 flex flex-wrap gap-2">
+        {#each DYNAMIC_TAGS as { tag, description }}
+          <button
+            type="button"
+            {disabled}
+            onclick={() => insertTag(tag)}
+            class="inline-flex items-center rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+            title={description}
+          >
+            {tag}
+          </button>
+        {/each}
+      </div>
+      <Helper class="mt-1">Click to insert. Spaces in names become underscores.</Helper>
     </div>
     <hr />
     <h4 class="text-gray-900 dark:text-white">Quality Settings</h4>

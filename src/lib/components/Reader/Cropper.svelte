@@ -48,7 +48,12 @@
       try {
         const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
         console.log('[Cropper] Got cropped image, updating card');
-        updateLastCard(imageData, $cropperStore.sentence);
+        updateLastCard(
+          imageData,
+          $cropperStore.sentence,
+          $cropperStore.tags,
+          $cropperStore.metadata
+        );
         close();
       } catch (error) {
         console.error('[Cropper] Error during crop:', error);
