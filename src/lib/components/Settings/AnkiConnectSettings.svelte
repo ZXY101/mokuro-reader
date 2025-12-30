@@ -7,6 +7,7 @@
   let disabled = $derived(!$settings.ankiConnectSettings.enabled);
 
   let enabled = $state($settings.ankiConnectSettings.enabled);
+  let url = $state($settings.ankiConnectSettings.url);
   let cropImage = $state($settings.ankiConnectSettings.cropImage);
   let grabSentence = $state($settings.ankiConnectSettings.grabSentence);
   let overwriteImage = $state($settings.ankiConnectSettings.overwriteImage);
@@ -20,6 +21,16 @@
 
   let triggerMethod = $state($settings.ankiConnectSettings.triggerMethod);
   let ankiTags = $state($settings.ankiConnectSettings.tags);
+  let cardMode = $state($settings.ankiConnectSettings.cardMode);
+  let deckName = $state($settings.ankiConnectSettings.deckName);
+  let modelName = $state($settings.ankiConnectSettings.modelName);
+
+  let isCreateMode = $derived(cardMode === 'create');
+
+  const cardModeOptions = [
+    { value: 'update', name: 'Update last card (within 5 min)' },
+    { value: 'create', name: 'Create new card' }
+  ];
 
   const triggerOptions = [
     { value: 'rightClick', name: 'Right click (long press on mobile)' },
@@ -50,6 +61,17 @@
       <Toggle bind:checked={enabled} onchange={() => updateAnkiSetting('enabled', enabled)}
         >AnkiConnect Integration Enabled</Toggle
       >
+    </div>
+    <div>
+      <Label class="text-gray-900 dark:text-white">AnkiConnect URL:</Label>
+      <Input
+        {disabled}
+        type="text"
+        placeholder="http://127.0.0.1:8765"
+        bind:value={url}
+        onchange={() => updateAnkiSetting('url', url)}
+      />
+      <Helper class="mt-1">Use a custom URL to connect to AnkiConnect on another device</Helper>
     </div>
     <div>
       <Label class="text-gray-900 dark:text-white">Picture field:</Label>
@@ -94,12 +116,55 @@
       <Label class="text-gray-900 dark:text-white">
         Trigger method:
         <Select
+          {disabled}
           onchange={() => updateAnkiSetting('triggerMethod', triggerMethod)}
           items={triggerOptions}
           bind:value={triggerMethod}
         />
       </Label>
     </div>
+    <div>
+      <Label class="text-gray-900 dark:text-white">
+        Card mode:
+        <Select
+          {disabled}
+          onchange={() => updateAnkiSetting('cardMode', cardMode)}
+          items={cardModeOptions}
+          bind:value={cardMode}
+        />
+      </Label>
+      <Helper class="mt-1">
+        {#if isCreateMode}
+          Creates a new card in the specified deck
+        {:else}
+          Updates the most recently created card (must be within 5 minutes)
+        {/if}
+      </Helper>
+    </div>
+    {#if isCreateMode}
+      <div>
+        <Label class="text-gray-900 dark:text-white">Deck name:</Label>
+        <Input
+          {disabled}
+          type="text"
+          placeholder="Default"
+          bind:value={deckName}
+          onchange={() => updateAnkiSetting('deckName', deckName)}
+        />
+        <Helper class="mt-1">The deck where new cards will be created</Helper>
+      </div>
+      <div>
+        <Label class="text-gray-900 dark:text-white">Note type (model):</Label>
+        <Input
+          {disabled}
+          type="text"
+          placeholder="Basic"
+          bind:value={modelName}
+          onchange={() => updateAnkiSetting('modelName', modelName)}
+        />
+        <Helper class="mt-1">The note type to use for new cards (e.g., Basic, Cloze)</Helper>
+      </div>
+    {/if}
     <div>
       <Label class="text-gray-900 dark:text-white">Tags:</Label>
       <Input

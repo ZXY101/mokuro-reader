@@ -9,7 +9,7 @@
     ZoomOutOutline,
     PlusOutline
   } from 'flowbite-svelte-icons';
-  import { imageToWebp, showCropper, updateLastCard, type VolumeMetadata } from '$lib/anki-connect';
+  import { imageToWebp, showCropper, sendToAnki, type VolumeMetadata } from '$lib/anki-connect';
   import { promptConfirmation } from '$lib/util';
 
   interface Props {
@@ -50,9 +50,9 @@
       if ($settings.ankiConnectSettings.cropImage) {
         showCropper(URL.createObjectURL(src), undefined, ankiTags, volumeMetadata);
       } else {
-        promptConfirmation('Add image to last created anki card?', async () => {
+        promptConfirmation('Send image to Anki?', async () => {
           const imageData = await imageToWebp(src, $settings);
-          updateLastCard(imageData, undefined, ankiTags, volumeMetadata);
+          sendToAnki(imageData, undefined, ankiTags, volumeMetadata);
         });
       }
     }

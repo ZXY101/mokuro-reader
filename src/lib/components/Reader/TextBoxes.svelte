@@ -2,7 +2,7 @@
   import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
   import { settings, volumes } from '$lib/settings';
-  import { imageToWebp, showCropper, updateLastCard, type VolumeMetadata } from '$lib/anki-connect';
+  import { imageToWebp, showCropper, sendToAnki, type VolumeMetadata } from '$lib/anki-connect';
 
   interface Props {
     page: Page;
@@ -295,9 +295,9 @@
           showCropper(url, sentence, ankiTags, volumeMetadata);
         }
       } else if (src) {
-        promptConfirmation('Add image to last created anki card?', async () => {
+        promptConfirmation('Send image to Anki?', async () => {
           const imageData = await imageToWebp(src, $settings);
-          updateLastCard(imageData, sentence, ankiTags, volumeMetadata);
+          sendToAnki(imageData, sentence, ankiTags, volumeMetadata);
         });
       }
     }

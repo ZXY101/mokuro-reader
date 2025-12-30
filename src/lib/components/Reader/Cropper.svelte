@@ -1,6 +1,6 @@
 <script lang="ts">
   import { currentView } from '$lib/util/hash-router';
-  import { cropperStore, getCroppedImg, type Pixels, updateLastCard } from '$lib/anki-connect';
+  import { cropperStore, getCroppedImg, type Pixels, sendToAnki } from '$lib/anki-connect';
   import { settings } from '$lib/settings';
   import { Button, Modal, Spinner } from 'flowbite-svelte';
   import { onMount } from 'svelte';
@@ -47,13 +47,8 @@
       loading = true;
       try {
         const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
-        console.log('[Cropper] Got cropped image, updating card');
-        updateLastCard(
-          imageData,
-          $cropperStore.sentence,
-          $cropperStore.tags,
-          $cropperStore.metadata
-        );
+        console.log('[Cropper] Got cropped image, sending to Anki');
+        sendToAnki(imageData, $cropperStore.sentence, $cropperStore.tags, $cropperStore.metadata);
         close();
       } catch (error) {
         console.error('[Cropper] Error during crop:', error);

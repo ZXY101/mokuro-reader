@@ -51,8 +51,10 @@ export function resolveDynamicTags(tags: string, metadata: VolumeMetadata): stri
 }
 
 export async function ankiConnect(action: string, params: Record<string, any>) {
+  const url = get(settings).ankiConnectSettings.url || 'http://127.0.0.1:8765';
+
   try {
-    const res = await fetch('http://127.0.0.1:8765', {
+    const res = await fetch(url, {
       method: 'POST',
       body: JSON.stringify({ action, params, version: 6 })
     });
@@ -151,6 +153,63 @@ export async function imageResize(
   });
 }
 
+export async function createCard(
+  imageData: string | null | undefined,
+  sentence?: string,
+  tags?: string,
+  metadata?: VolumeMetadata
+) {
+  const { enabled, grabSentence, pictureField, sentenceField, deckName, modelName } =
+    get(settings).ankiConnectSettings;
+
+  if (!enabled) {
+    return;
+  }
+
+  showSnackbar('Creating new card...', 10000);
+
+  // Resolve dynamic tags with volume metadata
+  const resolvedTags = tags && metadata ? resolveDynamicTags(tags, metadata) : tags;
+  const tagList = resolvedTags ? resolvedTags.split(' ').filter((t) => t.length > 0) : [];
+
+  const fields: Record<string, string> = {};
+
+  if (grabSentence && sentence) {
+    fields[sentenceField] = sentence;
+  }
+
+  if (imageData) {
+    const timestamp = Date.now();
+    try {
+      const result = await ankiConnect('addNote', {
+        note: {
+          deckName,
+          modelName,
+          fields,
+          tags: tagList,
+          picture: [
+            {
+              filename: `mokuro_${timestamp}.webp`,
+              data: imageData.split(';base64,')[1],
+              fields: [pictureField]
+            }
+          ]
+        }
+      });
+
+      if (result) {
+        showSnackbar('Card created!');
+      } else {
+        showSnackbar('Error: Failed to create card');
+      }
+    } catch (e) {
+      showSnackbar(String(e));
+    }
+  } else {
+    showSnackbar('Something went wrong');
+  }
+}
+
 export async function updateLastCard(
   imageData: string | null | undefined,
   sentence?: string,
@@ -214,5 +273,24 @@ export async function updateLastCard(
     }
   } else {
     showSnackbar('Something went wrong');
+  }
+}
+
+/**
+ * Main entry point for sending data to Anki.
+ * Dispatches to either createCard or updateLastCard based on settings.
+ */
+export async function sendToAnki(
+  imageData: string | null | undefined,
+  sentence?: string,
+  tags?: string,
+  metadata?: VolumeMetadata
+) {
+  const { cardMode } = get(settings).ankiConnectSettings;
+
+  if (cardMode === 'create') {
+    return createCard(imageData, sentence, tags, metadata);
+  } else {
+    return updateLastCard(imageData, sentence, tags, metadata);
   }
 }
