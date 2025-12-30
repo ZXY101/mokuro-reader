@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { getItems, processFiles } from '$lib/upload';
+  import Loader from '$lib/components/Loader.svelte';
+  import { getItems } from '$lib/upload';
+  import { importFiles } from '$lib/import';
   import { normalizeFilename, promptConfirmation, showSnackbar } from '$lib/util';
   import { nav } from '$lib/util/hash-router';
   import { progressTrackerStore } from '$lib/util/progress-tracker';
@@ -117,8 +119,8 @@
         progress: 95
       });
 
-      // Process files
-      await processFiles(files);
+      // Process files using unified import
+      await importFiles(files);
 
       progressTrackerStore.updateProcess(processId, {
         status: 'Complete',

@@ -8,9 +8,11 @@
     page: Page;
     src?: File;
     volumeUuid: string;
+    /** Force text visibility (for placeholder/missing pages) */
+    forceVisible?: boolean;
   }
 
-  let { page, src, volumeUuid }: Props = $props();
+  let { page, src, volumeUuid, forceVisible = false }: Props = $props();
 
   interface TextBoxData {
     left: string;
@@ -320,6 +322,7 @@
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
     class:originalMode={isOriginalMode}
+    class:forceVisible
     style:width={isOriginalMode ? undefined : useMinDimensions ? undefined : width}
     style:height={isOriginalMode ? undefined : useMinDimensions ? undefined : height}
     style:min-width={isOriginalMode ? undefined : useMinDimensions ? width : undefined}
@@ -387,6 +390,15 @@
 
   .textBox:focus p,
   .textBox:hover p {
+    visibility: visible;
+  }
+
+  /* Force visibility for placeholder/missing pages */
+  .textBox.forceVisible {
+    background: rgb(255, 255, 255);
+  }
+
+  .textBox.forceVisible p {
     visibility: visible;
   }
 
