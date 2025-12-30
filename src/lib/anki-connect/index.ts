@@ -77,6 +77,9 @@ export async function getCardInfo(id: string) {
 
 export async function getLastCardId() {
   const notesToday = await ankiConnect('findNotes', { query: 'added:1' });
+  if (!notesToday || !Array.isArray(notesToday)) {
+    return undefined;
+  }
   const id = notesToday.sort().at(-1);
   return id;
 }
@@ -155,12 +158,16 @@ export async function imageResize(
 
 export async function createCard(
   imageData: string | null | undefined,
+  selectedText?: string,
   sentence?: string,
   tags?: string,
   metadata?: VolumeMetadata
 ) {
-  const { enabled, grabSentence, pictureField, sentenceField, deckName, modelName } =
+  const { enabled, pictureField, sentenceField, grabSentence, deckName, modelName } =
     get(settings).ankiConnectSettings;
+
+  // Front field is always "Front" for Basic note type
+  const frontField = 'Front';
 
   if (!enabled) {
     return;
@@ -168,45 +175,68 @@ export async function createCard(
 
   showSnackbar('Creating new card...', 10000);
 
+  // Resolve dynamic templates in deck name (e.g., "Mining::{series}" -> "Mining::One_Piece")
+  const resolvedDeckName = metadata ? resolveDynamicTags(deckName, metadata) : deckName;
+
   // Resolve dynamic tags with volume metadata
   const resolvedTags = tags && metadata ? resolveDynamicTags(tags, metadata) : tags;
   const tagList = resolvedTags ? resolvedTags.split(' ').filter((t) => t.length > 0) : [];
 
+  // Build fields object
   const fields: Record<string, string> = {};
 
-  if (grabSentence && sentence) {
+  // Front field gets the selected text (required)
+  if (selectedText) {
+    fields[frontField] = selectedText;
+  }
+
+  // Sentence field gets the full sentence context (if enabled and different from front)
+  if (grabSentence && sentence && frontField !== sentenceField) {
     fields[sentenceField] = sentence;
   }
 
-  if (imageData) {
-    const timestamp = Date.now();
-    try {
-      const result = await ankiConnect('addNote', {
-        note: {
-          deckName,
-          modelName,
-          fields,
-          tags: tagList,
-          picture: [
-            {
-              filename: `mokuro_${timestamp}.webp`,
-              data: imageData.split(';base64,')[1],
-              fields: [pictureField]
-            }
-          ]
-        }
-      });
+  if (!imageData) {
+    showSnackbar('Error: No image data');
+    return;
+  }
 
-      if (result) {
-        showSnackbar('Card created!');
-      } else {
-        showSnackbar('Error: Failed to create card');
+  const timestamp = Date.now();
+  const notePayload: Record<string, any> = {
+    deckName: resolvedDeckName,
+    modelName,
+    fields,
+    tags: tagList,
+    options: {
+      allowDuplicate: true
+    },
+    picture: [
+      {
+        filename: `mokuro_${timestamp}.webp`,
+        data: imageData.split(';base64,')[1],
+        fields: [pictureField]
       }
-    } catch (e) {
-      showSnackbar(String(e));
-    }
+    ]
+  };
+
+  console.log('[AnkiConnect] Creating card with payload:', {
+    deckName: resolvedDeckName,
+    modelName,
+    fields,
+    tags: tagList,
+    pictureField
+  });
+
+  // Create deck if it doesn't exist
+  await ankiConnect('createDeck', { deck: resolvedDeckName });
+
+  const result = await ankiConnect('addNote', { note: notePayload });
+
+  if (result) {
+    showSnackbar('Card created!');
   } else {
-    showSnackbar('Something went wrong');
+    // ankiConnect already showed the error via showSnackbar
+    // If result is null/undefined without an error, show generic message
+    showSnackbar('Error: Failed to create card (check deck/model names)');
   }
 }
 
@@ -226,6 +256,11 @@ export async function updateLastCard(
   showSnackbar('Updating last card...', 10000);
 
   const id = await getLastCardId();
+
+  if (!id) {
+    showSnackbar('Error: Could not find recent card (connection failed or no cards today)');
+    return;
+  }
 
   if (getCardAgeInMin(id) >= 5) {
     showSnackbar('Error: Card created over 5 minutes ago');
@@ -279,9 +314,16 @@ export async function updateLastCard(
 /**
  * Main entry point for sending data to Anki.
  * Dispatches to either createCard or updateLastCard based on settings.
+ *
+ * @param imageData - Base64 image data
+ * @param selectedText - The selected/highlighted text (for Front field)
+ * @param sentence - The full sentence/context (for Sentence field)
+ * @param tags - Tags to add to the card
+ * @param metadata - Volume metadata for dynamic tag resolution
  */
 export async function sendToAnki(
   imageData: string | null | undefined,
+  selectedText?: string,
   sentence?: string,
   tags?: string,
   metadata?: VolumeMetadata
@@ -289,7 +331,7 @@ export async function sendToAnki(
   const { cardMode } = get(settings).ankiConnectSettings;
 
   if (cardMode === 'create') {
-    return createCard(imageData, sentence, tags, metadata);
+    return createCard(imageData, selectedText, sentence, tags, metadata);
   } else {
     return updateLastCard(imageData, sentence, tags, metadata);
   }

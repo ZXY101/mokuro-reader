@@ -157,7 +157,7 @@ const defaultSettings: Settings = {
     enabled: false,
     url: 'http://127.0.0.1:8765',
     cropImage: false,
-    grabSentence: false,
+    grabSentence: true,
     overwriteImage: true,
     pictureField: 'Picture',
     sentenceField: 'Sentence',

@@ -43,6 +43,12 @@
     ankiTags = ankiTags ? `${ankiTags} ${tag}`.trim() : tag;
     updateAnkiSetting('tags', ankiTags);
   }
+
+  function insertDeckTag(tag: string) {
+    // For deck names, append without spaces (use :: for hierarchy)
+    deckName = deckName ? `${deckName}${tag}` : tag;
+    updateAnkiSetting('deckName', deckName);
+  }
 </script>
 
 <AccordionItem>
@@ -90,6 +96,7 @@
         bind:value={sentenceField}
         onchange={() => updateAnkiSetting('sentenceField', sentenceField)}
       />
+      <Helper class="mt-1">Field for the full sentence context</Helper>
     </div>
     <div>
       <Toggle
@@ -151,7 +158,20 @@
           bind:value={deckName}
           onchange={() => updateAnkiSetting('deckName', deckName)}
         />
-        <Helper class="mt-1">The deck where new cards will be created</Helper>
+        <div class="mt-2 flex flex-wrap gap-2">
+          {#each DYNAMIC_TAGS as { tag, description }}
+            <button
+              type="button"
+              {disabled}
+              onclick={() => insertDeckTag(tag)}
+              class="inline-flex items-center rounded bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              title={description}
+            >
+              {tag}
+            </button>
+          {/each}
+        </div>
+        <Helper class="mt-1">Supports dynamic tags. Use :: for subdecks.</Helper>
       </div>
       <div>
         <Label class="text-gray-900 dark:text-white">Note type (model):</Label>

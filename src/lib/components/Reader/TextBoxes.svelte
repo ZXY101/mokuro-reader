@@ -283,22 +283,23 @@
     return null;
   }
 
+  function getSelectedText(): string {
+    // Get actual selected text from the DOM
+    const selection = window.getSelection();
+    return selection?.toString().trim() || '';
+  }
+
   async function onUpdateCard(event: Event, lines: string[]) {
     if ($settings.ankiConnectSettings.enabled) {
-      const sentence = lines.join(' ');
-      if ($settings.ankiConnectSettings.cropImage) {
-        // Get image URL from rendered page, fallback to creating from src
-        const url =
-          getImageUrlFromElement(event.target as HTMLElement) ||
-          (src ? URL.createObjectURL(src) : null);
-        if (url) {
-          showCropper(url, sentence, ankiTags, volumeMetadata);
-        }
-      } else if (src) {
-        promptConfirmation('Send image to Anki?', async () => {
-          const imageData = await imageToWebp(src, $settings);
-          sendToAnki(imageData, sentence, ankiTags, volumeMetadata);
-        });
+      const selectedText = getSelectedText();
+      const fullSentence = lines.join(' ');
+
+      // Always show the modal for review/editing
+      const url =
+        getImageUrlFromElement(event.target as HTMLElement) ||
+        (src ? URL.createObjectURL(src) : null);
+      if (url) {
+        showCropper(url, selectedText || fullSentence, fullSentence, ankiTags, volumeMetadata);
       }
     }
   }
