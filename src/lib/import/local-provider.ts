@@ -16,10 +16,10 @@ import { parseFilePath } from './types';
  * Provider status for local imports (always ready)
  */
 interface LocalProviderStatus {
-	isAuthenticated: boolean;
-	hasStoredCredentials: boolean;
-	needsAttention: boolean;
-	statusMessage: string;
+  isAuthenticated: boolean;
+  hasStoredCredentials: boolean;
+  needsAttention: boolean;
+  statusMessage: string;
 }
 
 /**
@@ -29,73 +29,73 @@ interface LocalProviderStatus {
  * All cloud-related operations throw errors since they're not applicable.
  */
 class LocalImportProvider {
-	readonly type = 'local-import' as const;
-	readonly name = 'Local Import';
+  readonly type = 'local-import' as const;
+  readonly name = 'Local Import';
 
-	/**
-	 * Local imports don't need worker downloads - files are already local.
-	 * Archives are decompressed using workers, but that's separate from "download".
-	 */
-	readonly supportsWorkerDownload = false;
+  /**
+   * Local imports don't need worker downloads - files are already local.
+   * Archives are decompressed using workers, but that's separate from "download".
+   */
+  readonly supportsWorkerDownload = false;
 
-	/**
-	 * Concurrency limits for local processing.
-	 * These are CPU/memory bound, not network bound.
-	 */
-	readonly uploadConcurrencyLimit = 4;
-	readonly downloadConcurrencyLimit = 4;
+  /**
+   * Concurrency limits for local processing.
+   * These are CPU/memory bound, not network bound.
+   */
+  readonly uploadConcurrencyLimit = 4;
+  readonly downloadConcurrencyLimit = 4;
 
-	/**
-	 * Local imports are always "authenticated" (no auth needed)
-	 */
-	isAuthenticated(): boolean {
-		return true;
-	}
+  /**
+   * Local imports are always "authenticated" (no auth needed)
+   */
+  isAuthenticated(): boolean {
+    return true;
+  }
 
-	/**
-	 * Get provider status (always ready)
-	 */
-	getStatus(): LocalProviderStatus {
-		return {
-			isAuthenticated: true,
-			hasStoredCredentials: true,
-			needsAttention: false,
-			statusMessage: 'Ready to import'
-		};
-	}
+  /**
+   * Get provider status (always ready)
+   */
+  getStatus(): LocalProviderStatus {
+    return {
+      isAuthenticated: true,
+      hasStoredCredentials: true,
+      needsAttention: false,
+      statusMessage: 'Ready to import'
+    };
+  }
 
-	// ========================================
-	// UNSUPPORTED OPERATIONS
-	// These throw errors since local imports don't use cloud operations
-	// ========================================
+  // ========================================
+  // UNSUPPORTED OPERATIONS
+  // These throw errors since local imports don't use cloud operations
+  // ========================================
 
-	async login(): Promise<void> {
-		throw new Error('Local import provider does not support login');
-	}
+  async login(): Promise<void> {
+    throw new Error('Local import provider does not support login');
+  }
 
-	async logout(): Promise<void> {
-		throw new Error('Local import provider does not support logout');
-	}
+  async logout(): Promise<void> {
+    throw new Error('Local import provider does not support logout');
+  }
 
-	async listCloudVolumes(): Promise<never> {
-		throw new Error('Local import provider does not support cloud operations');
-	}
+  async listCloudVolumes(): Promise<never> {
+    throw new Error('Local import provider does not support cloud operations');
+  }
 
-	async uploadFile(_path: string, _blob: Blob): Promise<never> {
-		throw new Error('Local import provider does not support cloud operations');
-	}
+  async uploadFile(_path: string, _blob: Blob): Promise<never> {
+    throw new Error('Local import provider does not support cloud operations');
+  }
 
-	async downloadFile(_file: unknown): Promise<never> {
-		throw new Error('Local import provider does not support cloud operations');
-	}
+  async downloadFile(_file: unknown): Promise<never> {
+    throw new Error('Local import provider does not support cloud operations');
+  }
 
-	async deleteFile(_file: unknown): Promise<never> {
-		throw new Error('Local import provider does not support cloud operations');
-	}
+  async deleteFile(_file: unknown): Promise<never> {
+    throw new Error('Local import provider does not support cloud operations');
+  }
 
-	async getStorageQuota(): Promise<never> {
-		throw new Error('Local import provider does not support cloud operations');
-	}
+  async getStorageQuota(): Promise<never> {
+    throw new Error('Local import provider does not support cloud operations');
+  }
 }
 
 /**
@@ -113,7 +113,7 @@ export const localImportProvider = new LocalImportProvider();
  * @returns true if worker decompression is needed
  */
 export function requiresWorkerDecompression(source: PairedSource): boolean {
-	return source.source.type === 'archive';
+  return source.source.type === 'archive';
 }
 
 /**
@@ -126,12 +126,12 @@ export function requiresWorkerDecompression(source: PairedSource): boolean {
  * @returns Display title (e.g., "vol1")
  */
 function extractDisplayTitle(basePath: string): string {
-	if (!basePath) {
-		return 'Untitled';
-	}
+  if (!basePath) {
+    return 'Untitled';
+  }
 
-	const { filename } = parseFilePath(basePath);
-	return filename || basePath || 'Untitled';
+  const { filename } = parseFilePath(basePath);
+  return filename || basePath || 'Untitled';
 }
 
 /**
@@ -143,12 +143,12 @@ function extractDisplayTitle(basePath: string): string {
  * @returns Queue item ready for processing
  */
 export function createLocalQueueItem(source: PairedSource): ImportQueueItem {
-	return {
-		id: source.id,
-		source,
-		provider: 'local-import',
-		status: 'queued',
-		progress: 0,
-		displayTitle: extractDisplayTitle(source.basePath)
-	};
+  return {
+    id: source.id,
+    source,
+    provider: 'local-import',
+    status: 'queued',
+    progress: 0,
+    displayTitle: extractDisplayTitle(source.basePath)
+  };
 }

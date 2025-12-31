@@ -9,35 +9,35 @@
 
 // Types
 export type {
-	FileEntry,
-	CategorizedFile,
-	PairedSource,
-	SourceDescriptor,
-	DirectorySource,
-	ArchiveSource,
-	TocDirectorySource,
-	ExpectedPairing,
-	ExpectedPairingDetail,
-	DecompressedVolume,
-	ProcessedVolume,
-	ProcessedMetadata,
-	ProcessedPage,
-	ImportProvider,
-	ImportQueueItem
+  FileEntry,
+  CategorizedFile,
+  PairedSource,
+  SourceDescriptor,
+  DirectorySource,
+  ArchiveSource,
+  TocDirectorySource,
+  ExpectedPairing,
+  ExpectedPairingDetail,
+  DecompressedVolume,
+  ProcessedVolume,
+  ProcessedMetadata,
+  ProcessedPage,
+  ImportProvider,
+  ImportQueueItem
 } from './types';
 
 // Type utilities
 export {
-	IMAGE_EXTENSIONS,
-	IMAGE_MIME_TYPES,
-	ARCHIVE_EXTENSIONS,
-	isImageExtension,
-	isArchiveExtension,
-	isMokuroExtension,
-	getImageMimeType,
-	parseFilePath,
-	categorizeFile,
-	isSystemFile
+  IMAGE_EXTENSIONS,
+  IMAGE_MIME_TYPES,
+  ARCHIVE_EXTENSIONS,
+  isImageExtension,
+  isArchiveExtension,
+  isMokuroExtension,
+  getImageMimeType,
+  parseFilePath,
+  categorizeFile,
+  isSystemFile
 } from './types';
 
 // Pairing
@@ -48,20 +48,20 @@ export { decideImportRouting, type ImportDecision } from './routing';
 
 // Local Provider
 export {
-	localImportProvider,
-	requiresWorkerDecompression,
-	createLocalQueueItem
+  localImportProvider,
+  requiresWorkerDecompression,
+  createLocalQueueItem
 } from './local-provider';
 
 // Processing
 export {
-	processVolume,
-	parseMokuroFile,
-	matchImagesToPages,
-	extractVolumeInfo,
-	type ParsedMokuro,
-	type ImageMatchResult,
-	type VolumeInfo
+  processVolume,
+  parseMokuroFile,
+  matchImagesToPages,
+  extractVolumeInfo,
+  type ParsedMokuro,
+  type ImageMatchResult,
+  type VolumeInfo
 } from './processing';
 
 // Database
@@ -69,11 +69,11 @@ export { saveVolume, volumeExists, deleteVolume } from './database';
 
 // Import Service (main entry point)
 export {
-	importFiles,
-	importQueue,
-	currentImport,
-	isImporting,
-	clearCompletedImports,
-	cancelQueuedImports,
-	type ImportResult
+  importFiles,
+  importQueue,
+  currentImport,
+  isImporting,
+  clearCompletedImports,
+  cancelQueuedImports,
+  type ImportResult
 } from './import-service';

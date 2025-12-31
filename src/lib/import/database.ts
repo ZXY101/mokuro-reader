@@ -20,8 +20,8 @@ import type { VolumeMetadata } from '$lib/types';
  * @returns True if the volume exists
  */
 export async function volumeExists(volumeUuid: string): Promise<boolean> {
-	const existing = await db.volumes.where('volume_uuid').equals(volumeUuid).first();
-	return existing !== undefined;
+  const existing = await db.volumes.where('volume_uuid').equals(volumeUuid).first();
+  return existing !== undefined;
 }
 
 /**
@@ -34,63 +34,64 @@ export async function volumeExists(volumeUuid: string): Promise<boolean> {
  * @throws If the volume already exists or if the transaction fails
  */
 export async function saveVolume(volume: ProcessedVolume): Promise<void> {
-	const { metadata, ocrData, fileData } = volume;
+  const { metadata, ocrData, fileData } = volume;
 
-	// Check for duplicates
-	if (await volumeExists(metadata.volumeUuid)) {
-		throw new Error(`Volume ${metadata.volumeUuid} already exists in database`);
-	}
+  // Check for duplicates
+  if (await volumeExists(metadata.volumeUuid)) {
+    throw new Error(`Volume ${metadata.volumeUuid} already exists in database`);
+  }
 
-	// Request persistent storage
-	await requestPersistentStorage();
+  // Request persistent storage
+  await requestPersistentStorage();
 
-	// Sort files by name for consistent ordering
-	const sortedFiles = Object.fromEntries(
-		Object.entries(fileData.files).sort(([aKey], [bKey]) =>
-			aKey.localeCompare(bKey, undefined, { numeric: true, sensitivity: 'base' })
-		)
-	);
+  // Sort files by name for consistent ordering
+  const sortedFiles = Object.fromEntries(
+    Object.entries(fileData.files).sort(([aKey], [bKey]) =>
+      aKey.localeCompare(bKey, undefined, { numeric: true, sensitivity: 'base' })
+    )
+  );
 
-	// Calculate page_char_counts from pages
-	const pageCharCounts = ocrData.pages.map((page) => page.cumulativeChars);
+  // Calculate page_char_counts from pages
+  const pageCharCounts = ocrData.pages.map((page) => page.cumulativeChars);
 
-	// Convert ProcessedMetadata to VolumeMetadata format
-	const volumeMetadata: VolumeMetadata = {
-		mokuro_version: metadata.mokuroVersion || '',
-		series_title: metadata.series,
-		series_uuid: metadata.seriesUuid,
-		volume_title: metadata.volume,
-		volume_uuid: metadata.volumeUuid,
-		page_count: metadata.pageCount,
-		character_count: metadata.chars,
-		page_char_counts: pageCharCounts,
-		thumbnail: metadata.thumbnail instanceof Blob
-			? new File([metadata.thumbnail], 'thumbnail.jpg', { type: 'image/jpeg' })
-			: undefined,
-		thumbnail_width: metadata.thumbnailWidth,
-		thumbnail_height: metadata.thumbnailHeight,
-		missing_pages: metadata.missingPages,
-		missing_page_paths: metadata.missingPagePaths
-	};
+  // Convert ProcessedMetadata to VolumeMetadata format
+  const volumeMetadata: VolumeMetadata = {
+    mokuro_version: metadata.mokuroVersion || '',
+    series_title: metadata.series,
+    series_uuid: metadata.seriesUuid,
+    volume_title: metadata.volume,
+    volume_uuid: metadata.volumeUuid,
+    page_count: metadata.pageCount,
+    character_count: metadata.chars,
+    page_char_counts: pageCharCounts,
+    thumbnail:
+      metadata.thumbnail instanceof Blob
+        ? new File([metadata.thumbnail], 'thumbnail.jpg', { type: 'image/jpeg' })
+        : undefined,
+    thumbnail_width: metadata.thumbnailWidth,
+    thumbnail_height: metadata.thumbnailHeight,
+    missing_pages: metadata.missingPages,
+    missing_page_paths: metadata.missingPagePaths
+  };
 
-	// Write to all 3 tables atomically
-	await db.transaction('rw', [db.volumes, db.volume_ocr, db.volume_files], async () => {
-		// Write metadata
-		await db.volumes.add(volumeMetadata);
+  // Write to all 3 tables atomically
+  await db.transaction('rw', [db.volumes, db.volume_ocr, db.volume_files], async () => {
+    // Write metadata
+    await db.volumes.add(volumeMetadata);
 
-		// Write OCR data (strip cumulativeChars as it's stored in page_char_counts)
-		const pagesForDb = ocrData.pages.map(({ cumulativeChars, ...page }) => page);
-		await db.volume_ocr.add({
-			volume_uuid: ocrData.volume_uuid,
-			pages: pagesForDb as any // Cast to any since Page type is stricter
-		});
+    // Write OCR data (strip cumulativeChars as it's stored in page_char_counts)
+    const pagesForDb = ocrData.pages.map(({ cumulativeChars, ...page }) => page);
+    await db.volume_ocr.add({
+      volume_uuid: ocrData.volume_uuid,
+      pages: pagesForDb as any // Cast to any since Page type is stricter
+    });
 
-		// Write files
-		await db.volume_files.add({
-			volume_uuid: fileData.volume_uuid,
-			files: sortedFiles
-		});
-	});
+    // Write files
+    await db.volume_files.add({
+      volume_uuid: fileData.volume_uuid,
+      files: sortedFiles
+    });
+  });
 }
 
 /**
@@ -101,9 +102,9 @@ export async function saveVolume(volume: ProcessedVolume): Promise<void> {
  * @param volumeUuid - The volume UUID to delete
  */
 export async function deleteVolume(volumeUuid: string): Promise<void> {
-	await db.transaction('rw', [db.volumes, db.volume_ocr, db.volume_files], async () => {
-		await db.volumes.delete(volumeUuid);
-		await db.volume_ocr.delete(volumeUuid);
-		await db.volume_files.delete(volumeUuid);
-	});
+  await db.transaction('rw', [db.volumes, db.volume_ocr, db.volume_files], async () => {
+    await db.volumes.delete(volumeUuid);
+    await db.volume_ocr.delete(volumeUuid);
+    await db.volume_files.delete(volumeUuid);
+  });
 }

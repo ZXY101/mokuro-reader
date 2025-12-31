@@ -33,7 +33,7 @@
 
     <!-- Missing Files List -->
     <div class="max-h-48 overflow-y-auto rounded-lg border dark:border-gray-600">
-      <div class="p-2 text-xs font-mono text-gray-700 dark:text-gray-300">
+      <div class="p-2 font-mono text-xs text-gray-700 dark:text-gray-300">
         {#each $missingFilesModalStore?.info?.missingFiles ?? [] as file}
           <div class="truncate py-0.5">{file}</div>
         {/each}

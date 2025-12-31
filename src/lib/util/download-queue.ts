@@ -304,7 +304,10 @@ function entriesToDecompressedVolume(
       // Image file - determine MIME type
       const mimeType = getImageMimeType(extension);
       if (mimeType) {
-        imageFiles.set(normalizedFilename, new File([entry.data], normalizedFilename, { type: mimeType }));
+        imageFiles.set(
+          normalizedFilename,
+          new File([entry.data], normalizedFilename, { type: mimeType })
+        );
       }
     }
   }

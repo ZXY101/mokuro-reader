@@ -16,10 +16,10 @@ import type { PairedSource } from './types';
  * Result of the routing decision
  */
 export interface ImportDecision {
-	/** Item to process immediately (null if using queue) */
-	directProcess: PairedSource | null;
-	/** Items to send to queue (empty if processing directly) */
-	queuedItems: PairedSource[];
+  /** Item to process immediately (null if using queue) */
+  directProcess: PairedSource | null;
+  /** Items to send to queue (empty if processing directly) */
+  queuedItems: PairedSource[];
 }
 
 /**
@@ -29,25 +29,25 @@ export interface ImportDecision {
  * @returns Decision on whether to process directly or queue
  */
 export function decideImportRouting(pairings: PairedSource[]): ImportDecision {
-	// Empty input - nothing to do
-	if (pairings.length === 0) {
-		return {
-			directProcess: null,
-			queuedItems: []
-		};
-	}
+  // Empty input - nothing to do
+  if (pairings.length === 0) {
+    return {
+      directProcess: null,
+      queuedItems: []
+    };
+  }
 
-	// Single item - process directly
-	if (pairings.length === 1) {
-		return {
-			directProcess: pairings[0],
-			queuedItems: []
-		};
-	}
+  // Single item - process directly
+  if (pairings.length === 1) {
+    return {
+      directProcess: pairings[0],
+      queuedItems: []
+    };
+  }
 
-	// Multiple items - queue all
-	return {
-		directProcess: null,
-		queuedItems: [...pairings]
-	};
+  // Multiple items - queue all
+  return {
+    directProcess: null,
+    queuedItems: [...pairings]
+  };
 }

@@ -293,7 +293,7 @@ describe('export data integrity', () => {
     const filesData = compressVolumeCalls[0].filesData as { filename: string }[];
     expect(filesData).toHaveLength(2);
 
-    const filenames = filesData.map(f => f.filename);
+    const filenames = filesData.map((f) => f.filename);
     expect(filenames).toContain('page1.jpg');
     expect(filenames).toContain('page3.jpg');
     expect(filenames).not.toContain('page2.jpg'); // placeholder excluded

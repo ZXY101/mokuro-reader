@@ -39,9 +39,7 @@ export async function zipManga(
  * @param volumeOrUuid Either a VolumeMetadata object or a volume UUID string
  * @returns Promise resolving to metadata (null for image-only) and files data
  */
-export async function prepareVolumeData(
-  volumeOrUuid: VolumeMetadata | string
-): Promise<{
+export async function prepareVolumeData(volumeOrUuid: VolumeMetadata | string): Promise<{
   metadata: MokuroMetadata | null;
   filesData: { filename: string; data: Uint8Array }[];
 }> {

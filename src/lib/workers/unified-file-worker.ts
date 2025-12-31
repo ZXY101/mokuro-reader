@@ -2,7 +2,13 @@
 // Combines functionality from universal-download-worker and upload-worker
 // Handles all cloud providers: Google Drive, WebDAV, MEGA
 
-import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader, getMimeType, BlobReader } from '@zip.js/zip.js';
+import {
+  Uint8ArrayReader,
+  Uint8ArrayWriter,
+  ZipReader,
+  getMimeType,
+  BlobReader
+} from '@zip.js/zip.js';
 import { File as MegaFile, Storage } from 'megajs';
 import { compressVolume, type MokuroMetadata } from '$lib/util/compress-volume';
 
@@ -339,17 +345,31 @@ interface ExtractFilter {
  */
 const EXCLUDED_SYSTEM_PATTERNS = new Set([
   // macOS
-  '__MACOSX', '.DS_Store', '.Trashes', '.Spotlight-V100', '.fseventsd',
-  '.TemporaryItems', '.Trash',
+  '__MACOSX',
+  '.DS_Store',
+  '.Trashes',
+  '.Spotlight-V100',
+  '.fseventsd',
+  '.TemporaryItems',
+  '.Trash',
   // Windows
-  'System Volume Information', '$RECYCLE.BIN', 'Thumbs.db',
-  'desktop.ini', 'Desktop.ini', 'RECYCLER', 'RECYCLED',
+  'System Volume Information',
+  '$RECYCLE.BIN',
+  'Thumbs.db',
+  'desktop.ini',
+  'Desktop.ini',
+  'RECYCLER',
+  'RECYCLED',
   // Linux
-  '.Trash-1000', '.thumbnails', '.directory',
+  '.Trash-1000',
+  '.thumbnails',
+  '.directory',
   // Cloud storage
-  '.dropbox', '.dropbox.cache',
+  '.dropbox',
+  '.dropbox.cache',
   // Version control
-  '.git', '.svn'
+  '.git',
+  '.svn'
 ]);
 
 const EXCLUDED_EXTENSIONS = new Set(['bak', 'tmp', 'temp']);
@@ -432,7 +452,7 @@ async function decompressCbz(
   const entries = await zipReader.getEntries();
 
   // Categorize entries
-  const toExtract: { entry: typeof entries[0]; filename: string }[] = [];
+  const toExtract: { entry: (typeof entries)[0]; filename: string }[] = [];
   const toList: string[] = [];
 
   for (const entry of entries) {
@@ -873,7 +893,8 @@ ctx.addEventListener('message', async (event) => {
       console.log(`Worker: Sent complete message for ${fileName}`);
     } else if (message.mode === 'decompress-only') {
       // ========== DECOMPRESS ONLY MODE ==========
-      const { fileId, fileName, blob, metadata, filter, listOnly, listAllExtractFiltered } = message;
+      const { fileId, fileName, blob, metadata, filter, listOnly, listAllExtractFiltered } =
+        message;
 
       // Decompress with optional filter (for selective extraction)
       // If listOnly, returns file list without extracting content
@@ -910,8 +931,19 @@ ctx.addEventListener('message', async (event) => {
       }
 
       // Categorize entries
-      const toExtract: { entry: typeof entries[0]; volumeId: string }[] = [];
-      const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif', 'tif', 'tiff', 'jxl']);
+      const toExtract: { entry: (typeof entries)[0]; volumeId: string }[] = [];
+      const IMAGE_EXTS = new Set([
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'gif',
+        'bmp',
+        'avif',
+        'tif',
+        'tiff',
+        'jxl'
+      ]);
 
       for (const entry of entries) {
         if (entry.directory) continue;
@@ -938,7 +970,7 @@ ctx.addEventListener('message', async (event) => {
       // Extract in parallel batches
       let extracted = 0;
       const totalFiles = toExtract.length;
-      const skipped = entries.filter(e => !e.directory).length - toExtract.length;
+      const skipped = entries.filter((e) => !e.directory).length - toExtract.length;
 
       for (let i = 0; i < toExtract.length; i += EXTRACT_CONCURRENCY) {
         const batch = toExtract.slice(i, i + EXTRACT_CONCURRENCY);
@@ -959,15 +991,18 @@ ctx.addEventListener('message', async (event) => {
         // Send each result immediately with transferable
         for (const result of results) {
           if (result) {
-            ctx.postMessage({
-              type: 'stream-entry',
-              fileId,
-              volumeId: result.volumeId,
-              entry: {
-                filename: result.filename,
-                data: result.data
-              }
-            }, [result.data]);
+            ctx.postMessage(
+              {
+                type: 'stream-entry',
+                fileId,
+                volumeId: result.volumeId,
+                entry: {
+                  filename: result.filename,
+                  data: result.data
+                }
+              },
+              [result.data]
+            );
             extracted++;
           }
         }
@@ -992,7 +1027,9 @@ ctx.addEventListener('message', async (event) => {
         skipped
       });
 
-      console.log(`Worker: Stream extraction complete - ${extracted} files extracted, ${skipped} skipped`);
+      console.log(
+        `Worker: Stream extraction complete - ${extracted} files extracted, ${skipped} skipped`
+      );
     } else if (message.mode === 'compress-and-upload') {
       // ========== COMPRESS AND UPLOAD MODE ==========
       const { provider, volumeTitle, seriesTitle, metadata, filesData, credentials } = message;

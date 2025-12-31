@@ -1,6 +1,7 @@
 # Import Test Fixtures
 
 This directory contains real file structures used for:
+
 1. **Automated testing** of the import pairing logic
 2. **Documentation** showing correct file organization for users
 
@@ -21,6 +22,7 @@ fixtures/
 ## Test Case Format
 
 Each test case has:
+
 - `input/` - The files as they would be dropped/selected
 - `expected.json` - The expected pairing output
 
