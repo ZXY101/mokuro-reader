@@ -419,6 +419,26 @@ async function processArchiveContents(
 			};
 
 			try {
+				// Check for missing files before processing (same as directory flow)
+				if (decompressed.mokuroFile) {
+					const mokuroData = await parseMokuroFile(decompressed.mokuroFile);
+					const matchResult = matchImagesToPages(mokuroData.pages, decompressed.imageFiles);
+
+					if (matchResult.missing.length > 0) {
+						// Show warning modal and wait for user decision
+						const shouldContinue = await promptForMissingFiles({
+							volumeName: mokuroData.volume || pairing.basePath,
+							missingFiles: matchResult.missing,
+							totalPages: mokuroData.pages.length
+						});
+
+						if (!shouldContinue) {
+							lastError = `Import cancelled - ${matchResult.missing.length} missing files`;
+							continue; // Skip this volume, continue with next
+						}
+					}
+				}
+
 				// Process the volume
 				const processed = await processVolume(decompressed);
 
