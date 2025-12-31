@@ -1,8 +1,8 @@
 <script lang="ts">
   import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
-  import { settings } from '$lib/settings';
-  import { imageToWebp, showCropper, updateLastCard } from '$lib/anki-connect';
+  import { settings, volumes } from '$lib/settings';
+  import { imageToWebp, showCropper, sendToAnki, type VolumeMetadata } from '$lib/anki-connect';
 
   interface Props {
     page: Page;
@@ -102,6 +102,11 @@
   let contenteditable = $derived($settings.textEditable);
 
   let triggerMethod = $derived($settings.ankiConnectSettings.triggerMethod || 'both');
+  let ankiTags = $derived($settings.ankiConnectSettings.tags);
+  let volumeMetadata = $derived<VolumeMetadata>({
+    seriesTitle: $volumes[volumeUuid]?.series_title,
+    volumeTitle: $volumes[volumeUuid]?.volume_title
+  });
 
   // Track adjusted font sizes for each textbox
   let adjustedFontSizes = $state<Map<number, string>>(new Map());
@@ -122,8 +127,15 @@
     const minFontSize = 8; // Minimum font size in px
     const maxFontSize = 200; // Maximum font size to try when scaling up
 
-    // Convert to px for consistent handling
-    const originalInPx = unit === 'pt' ? originalSize * 1.333 : originalSize;
+    // Convert to px for consistent handling, rounding to integer
+    // Integer font sizes ensure the binary search always makes progress
+    let originalInPx = Math.round(unit === 'pt' ? originalSize * 1.333 : originalSize);
+
+    // Guard against invalid font sizes that would cause infinite loops
+    // (0, negative, NaN, or Infinity would break the binary search)
+    if (!Number.isFinite(originalInPx) || originalInPx < minFontSize) {
+      originalInPx = minFontSize;
+    }
 
     // Check if content overflows at a given font size
     const isOverflowingAt = (size: number) => {
@@ -271,22 +283,23 @@
     return null;
   }
 
+  function getSelectedText(): string {
+    // Get actual selected text from the DOM
+    const selection = window.getSelection();
+    return selection?.toString().trim() || '';
+  }
+
   async function onUpdateCard(event: Event, lines: string[]) {
     if ($settings.ankiConnectSettings.enabled) {
-      const sentence = lines.join(' ');
-      if ($settings.ankiConnectSettings.cropImage) {
-        // Get image URL from rendered page, fallback to creating from src
-        const url =
-          getImageUrlFromElement(event.target as HTMLElement) ||
-          (src ? URL.createObjectURL(src) : null);
-        if (url) {
-          showCropper(url, sentence);
-        }
-      } else if (src) {
-        promptConfirmation('Add image to last created anki card?', async () => {
-          const imageData = await imageToWebp(src, $settings);
-          updateLastCard(imageData, sentence);
-        });
+      const selectedText = getSelectedText();
+      const fullSentence = lines.join(' ');
+
+      // Always show the modal for review/editing
+      const url =
+        getImageUrlFromElement(event.target as HTMLElement) ||
+        (src ? URL.createObjectURL(src) : null);
+      if (url) {
+        showCropper(url, selectedText || fullSentence, fullSentence, ankiTags, volumeMetadata);
       }
     }
   }
@@ -329,9 +342,9 @@
     ondblclick={(e) => onDoubleTap(e, lines)}
     {contenteditable}
   >
-    <span
-      >{#each lines as line, i}{line}{#if i < lines.length - 1}<br />{/if}{/each}</span
-    >
+    <p>
+      {#each lines as line, i}{line}{#if i < lines.length - 1}<br />{/if}{/each}
+    </p>
   </div>
 {/each}
 
@@ -361,7 +374,7 @@
     border: 1px solid rgba(0, 0, 0, 0);
   }
 
-  .textBox span {
+  .textBox p {
     visibility: hidden;
     /* Word wrapping controlled dynamically by JavaScript */
     letter-spacing: 0.1em;
@@ -378,8 +391,8 @@
     text-size-adjust: 100%;
   }
 
-  .textBox:focus span,
-  .textBox:hover span {
+  .textBox:focus p,
+  .textBox:hover p {
     visibility: visible;
   }
 
@@ -389,7 +402,7 @@
     white-space: nowrap;
   }
 
-  .textBox.originalMode span {
+  .textBox.originalMode p {
     white-space: nowrap;
   }
 </style>

@@ -6,9 +6,6 @@ import { get, writable } from 'svelte/store';
 let pz: PanZoom | undefined;
 let container: HTMLElement | undefined;
 
-// Flag to skip bounds checking during programmatic zoom (resize, fit-to-screen, etc.)
-let skipBoundsCheck = false;
-
 export const panzoomStore = writable<PanZoom | undefined>(undefined);
 
 // Session-only store to track fullscreen state across volume navigation
@@ -38,9 +35,7 @@ export function initPanzoom(node: HTMLElement) {
     },
     // Disable library's wheel zoom - we handle it ourselves for symmetric zoom
     beforeWheel: () => true,
-    // Let panzoom handle all touch events including pinch-zoom
-    // Our swipe detection uses velocity + multi-touch cooldown to avoid conflicts
-    pinchSpeed: 1,
+    onTouch: (e) => e.touches.length > 1,
     // Panzoom typing is wrong here
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-expect-error
@@ -79,8 +74,6 @@ export function initPanzoom(node: HTMLElement) {
 
   pz.on('pan', () => keepInBounds());
   pz.on('zoom', () => keepInBounds());
-  pz.on('panend', () => keepInBounds());
-  pz.on('zoomend', () => keepInBounds());
 
   // Wheel handler is registered at window level in Reader.svelte
   // to capture events from all UI elements and prevent browser zoom
@@ -138,18 +131,15 @@ export function panAlign(alignX: PanX, alignY: PanY) {
 }
 
 export function zoomOriginal() {
-  skipBoundsCheck = true;
   pz?.moveTo(0, 0);
   pz?.zoomTo(0, 0, 1 / pz.getTransform().scale);
   panAlign('center', 'center');
-  skipBoundsCheck = false;
 }
 
 export function zoomFitToWidth() {
   if (!pz || !container) {
     return;
   }
-  skipBoundsCheck = true;
   const { innerWidth } = window;
 
   const scale = (1 / pz.getTransform().scale) * (innerWidth / container.offsetWidth);
@@ -157,14 +147,12 @@ export function zoomFitToWidth() {
   pz.moveTo(0, 0);
   pz.zoomTo(0, 0, scale);
   panAlign('center', 'top');
-  skipBoundsCheck = false;
 }
 
 export function zoomFitToScreen() {
   if (!pz || !container) {
     return;
   }
-  skipBoundsCheck = true;
   const { innerWidth, innerHeight } = window;
   const scaleX = innerWidth / container.offsetWidth;
   const scaleY = innerHeight / container.offsetHeight;
@@ -172,7 +160,6 @@ export function zoomFitToScreen() {
   pz.moveTo(0, 0);
   pz.zoomTo(0, 0, scale);
   panAlign('center', 'center');
-  skipBoundsCheck = false;
 }
 
 export function keepZoomStart() {
@@ -201,7 +188,6 @@ export function zoomDefaultWithLayoutWait() {
   // Double RAF ensures browser has completed layout reflow
   // First RAF: waits for current layout calculations to finish
   // Second RAF: ensures next paint frame has correct dimensions
-  // skipBoundsCheck is set by the individual zoom functions
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
       zoomDefault();
@@ -210,7 +196,7 @@ export function zoomDefaultWithLayoutWait() {
 }
 
 export function keepInBounds() {
-  if (!pz || !container || skipBoundsCheck) {
+  if (!pz || !container) {
     return;
   }
 
@@ -221,29 +207,9 @@ export function keepInBounds() {
   }
 
   const transform = pz.getTransform();
-  let { x, y, scale } = transform;
+
+  const { x, y, scale } = transform;
   const { innerWidth, innerHeight } = window;
-
-  // Enforce minimum zoom level (can't zoom out past fit-to-screen)
-  // This is needed for pinch-zoom; wheel zoom has its own limits in handleWheel
-  const fitScaleX = innerWidth / container.offsetWidth;
-  const fitScaleY = innerHeight / container.offsetHeight;
-  const fitScale = Math.min(fitScaleX, fitScaleY);
-  // Large images (fitScale < 1): can zoom out to fit
-  // Small images (fitScale > 1): can't zoom out past 100%
-  const minScale = Math.min(fitScale, 1.0);
-  const maxScale = 10;
-
-  if (scale < minScale) {
-    // Zoom back to minimum, centered
-    const zoomMultiplier = minScale / scale;
-    pz.zoomTo(innerWidth / 2, innerHeight / 2, zoomMultiplier);
-    scale = minScale;
-  } else if (scale > maxScale) {
-    const zoomMultiplier = maxScale / scale;
-    pz.zoomTo(innerWidth / 2, innerHeight / 2, zoomMultiplier);
-    scale = maxScale;
-  }
 
   const width = container.offsetWidth * scale;
   const height = container.offsetHeight * scale;
