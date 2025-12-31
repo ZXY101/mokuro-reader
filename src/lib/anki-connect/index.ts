@@ -182,22 +182,26 @@ export async function createCard(
   const resolvedTags = tags && metadata ? resolveDynamicTags(tags, metadata) : tags;
   const tagList = resolvedTags ? resolvedTags.split(' ').filter((t) => t.length > 0) : [];
 
-  // Build fields object
-  const fields: Record<string, string> = {};
-
-  // Front field gets the selected text (required)
-  if (selectedText) {
-    fields[frontField] = selectedText;
-  }
-
-  // Sentence field gets the full sentence context (if enabled and different from front)
-  if (grabSentence && sentence && frontField !== sentenceField) {
-    fields[sentenceField] = sentence;
+  // Validate required Front field
+  if (!selectedText || selectedText.trim().length === 0) {
+    showSnackbar('Error: Front field is required');
+    return;
   }
 
   if (!imageData) {
     showSnackbar('Error: No image data');
     return;
+  }
+
+  // Build fields object
+  const fields: Record<string, string> = {};
+
+  // Front field gets the selected text (required)
+  fields[frontField] = selectedText;
+
+  // Sentence field gets the full sentence context (if enabled and different from front)
+  if (grabSentence && sentence && frontField !== sentenceField) {
+    fields[sentenceField] = sentence;
   }
 
   const timestamp = Date.now();
@@ -282,7 +286,7 @@ export async function updateLastCard(
 
   if (imageData) {
     try {
-      await ankiConnect('updateNoteFields', {
+      const updateResult = await ankiConnect('updateNoteFields', {
         note: {
           id,
           fields,
@@ -294,12 +298,23 @@ export async function updateLastCard(
         }
       });
 
+      // ankiConnect returns undefined on error (after showing snackbar)
+      if (updateResult === undefined) {
+        return;
+      }
+
       // Add tags if provided (after resolving dynamic templates)
       if (resolvedTags && resolvedTags.length > 0) {
-        await ankiConnect('addTags', {
+        const tagResult = await ankiConnect('addTags', {
           notes: [id],
           tags: resolvedTags
         });
+
+        if (tagResult === undefined) {
+          // Tag addition failed - ankiConnect already showed error
+          showSnackbar('Card updated, but tags failed');
+          return;
+        }
       }
 
       showSnackbar('Card updated!');
