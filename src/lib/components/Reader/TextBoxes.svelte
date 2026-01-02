@@ -18,7 +18,6 @@
     width: string;
     height: string;
     fontSize: string;
-    vertical: boolean;
     writingMode: string;
     lines: string[];
     area: number;
@@ -83,7 +82,6 @@
           width: `${width}px`,
           height: `${height}px`,
           fontSize,
-          vertical,
           writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
           lines: processedLines,
           area,
@@ -315,9 +313,18 @@
       onUpdateCard(event, lines);
     }
   }
+
+  function onCopy(event: Event, lines: string[]) {
+    event.preventDefault();
+    const unformatted = document
+      .getSelection()
+      .toString()
+      .replace(/[\n\r\t]/gm, '');
+    event.clipboardData.setData('text/plain', unformatted);
+  }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, vertical, writingMode, useMinDimensions, isOriginalMode }, index (`${volumeUuid}-textBox-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions, isOriginalMode }, index (`${volumeUuid}-textBox-${index}`)}
   <div
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
@@ -336,10 +343,11 @@
     role="none"
     oncontextmenu={(e) => onContextMenu(e, lines)}
     ondblclick={(e) => onDoubleTap(e, lines)}
+    oncopy={(e) => onCopy(e, lines)}
     {contenteditable}
   >
-    <p style:height={vertical ? 0 : undefined} style:width={vertical ? undefined : 0}>
-      {#each lines as line, i}{line}{#if i < lines.length - 1}<wbr />{/if}{/each}
+    <p>
+      {#each lines as line, i}{line}{#if i < lines.length - 1}<br />{/if}{/each}
     </p>
   </div>
 {/each}
