@@ -18,6 +18,7 @@
     width: string;
     height: string;
     fontSize: string;
+    vertical: boolean;
     writingMode: string;
     lines: string[];
     area: number;
@@ -82,6 +83,7 @@
           width: `${width}px`,
           height: `${height}px`,
           fontSize,
+          vertical,
           writingMode: vertical ? 'vertical-rl' : 'horizontal-tb',
           lines: processedLines,
           area,
@@ -315,7 +317,7 @@
   }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions, isOriginalMode }, index (`${volumeUuid}-textBox-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, vertical, writingMode, useMinDimensions, isOriginalMode }, index (`${volumeUuid}-textBox-${index}`)}
   <div
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
@@ -336,8 +338,8 @@
     ondblclick={(e) => onDoubleTap(e, lines)}
     {contenteditable}
   >
-    <p>
-      {#each lines as line, i}{line}{#if i < lines.length - 1}<br />{/if}{/each}
+    <p style:height={vertical ? 0 : undefined} style:width={vertical ? undefined : 0}>
+      {#each lines as line, i}{line}{#if i < lines.length - 1}<wbr />{/if}{/each}
     </p>
   </div>
 {/each}
