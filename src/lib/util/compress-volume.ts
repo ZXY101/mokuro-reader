@@ -29,15 +29,29 @@ export async function compressVolume(
   filesData: { filename: string; data: Uint8Array }[],
   onProgress?: (completed: number, total: number) => void
 ): Promise<Uint8Array> {
-  // Create zip writer with Uint8Array output
-  const zipWriter = new ZipWriter(new Uint8ArrayWriter());
+  // Create zip writer with compatibility options:
+  // - bufferedWrite: true - writes sizes in header (not data descriptor after data)
+  // - extendedTimestamp: false - reduces per-entry overhead, improves compatibility
+  const zipWriter = new ZipWriter(new Uint8ArrayWriter(), {
+    bufferedWrite: true,
+    extendedTimestamp: false
+  });
 
-  // Total items to add: all files + mokuro file (if present)
-  const totalItems = filesData.length + (metadata ? 1 : 0);
+  // Total items to add: folder + all files + mokuro file (if present)
+  const totalItems = filesData.length + (metadata ? 1 : 0) + 1;
   let completedItems = 0;
 
-  // Add image files inside a folder
+  // Add explicit folder entry first (required by some CBZ readers)
   const folderName = volumeTitle;
+  await zipWriter.add(`${folderName}/`, new Uint8ArrayReader(new Uint8Array(0)), {
+    directory: true
+  });
+  completedItems++;
+  if (onProgress) {
+    onProgress(completedItems, totalItems);
+  }
+
+  // Add image files inside the folder
   for (const { filename, data } of filesData) {
     // Extract just the basename to avoid nested folders from original CBZ structure
     const basename = filename.split('/').pop() || filename;
