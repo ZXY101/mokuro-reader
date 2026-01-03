@@ -121,6 +121,11 @@ async function addVolumeToArchive(zipWriter: ZipWriter<Uint8Array>, volume: Volu
   // Create folder name for images (same as mokuro file name without extension)
   const folderName = `${volume.volume_title}`;
 
+  // Add explicit folder entry first (required by some CBZ readers)
+  const folderPromise = zipWriter.add(`${folderName}/`, new BlobReader(new Blob([])), {
+    directory: true
+  });
+
   // Add image files inside the folder, excluding placeholders
   const imagePromises = volumeFiles?.files
     ? Object.entries(volumeFiles.files)
@@ -134,7 +139,7 @@ async function addVolumeToArchive(zipWriter: ZipWriter<Uint8Array>, volume: Volu
 
   // Only add mokuro file for volumes that had mokuro data
   if (isImageOnly) {
-    return imagePromises;
+    return [folderPromise, ...imagePromises];
   }
 
   // Create mokuro data in the old format for compatibility
@@ -150,6 +155,7 @@ async function addVolumeToArchive(zipWriter: ZipWriter<Uint8Array>, volume: Volu
 
   // Add mokuro data file in the root directory (for both ZIP and CBZ)
   return [
+    folderPromise,
     ...imagePromises,
     zipWriter.add(`${volume.volume_title}.mokuro`, new TextReader(JSON.stringify(mokuroData)))
   ];
@@ -171,7 +177,11 @@ export async function createArchiveBlob(volumes: VolumeMetadata[]): Promise<Blob
   }
 
   // For multiple volumes, create a single ZIP containing all volumes
-  const zipWriter = new ZipWriter(new Uint8ArrayWriter());
+  // Use compatibility options for better CBZ reader support
+  const zipWriter = new ZipWriter(new Uint8ArrayWriter(), {
+    bufferedWrite: true,
+    extendedTimestamp: false
+  });
 
   // Add each volume to the archive
   const volumePromises = volumes.map((volume) => addVolumeToArchive(zipWriter, volume));
