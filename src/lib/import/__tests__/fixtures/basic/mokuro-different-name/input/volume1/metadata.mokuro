@@ -1,0 +1,91 @@
+{
+  "version": "0.2.0",
+  "title": "Test Manga",
+  "title_uuid": "dd0cb5be-02e7-46ee-a872-820ecd84f084",
+  "volume": "Volume 1",
+  "volume_uuid": "15213b62-b83d-4bba-8318-74f136beb1f4",
+  "pages": [
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ1"
+          ]
+        }
+      ],
+      "img_path": "page001.jpg"
+    },
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ2"
+          ]
+        }
+      ],
+      "img_path": "page002.jpg"
+    }
+  ]
+}

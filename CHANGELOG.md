@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.0] - Unreleased
+
+### Added
+
+- Anki tags with dynamic template support (e.g., `mokuro::{series}::{volume}`)
+- Custom AnkiConnect URL configuration (default: `http://127.0.0.1:8765`)
+- Card creation mode setting: QuickActions only, floating textbox button, or both
+- Visual textbox picker for QuickActions Anki card creation
+- Validation and error handling for AnkiConnect card creation
+
 ## [1.0.7] - 2025-12-17
 
 ### Added

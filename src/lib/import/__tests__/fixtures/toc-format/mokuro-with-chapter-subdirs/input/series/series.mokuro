@@ -1,0 +1,173 @@
+{
+  "version": "0.2.0",
+  "title": "Test Series",
+  "title_uuid": "57a65434-32bf-46a8-9af4-3efa52fc8151",
+  "volume": "Full",
+  "volume_uuid": "121edcf8-2af3-4fbd-a59a-53a3656646bf",
+  "pages": [
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ1"
+          ]
+        }
+      ],
+      "img_path": "page001.jpg"
+    },
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ2"
+          ]
+        }
+      ],
+      "img_path": "page002.jpg"
+    },
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ3"
+          ]
+        }
+      ],
+      "img_path": "page003.jpg"
+    },
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ4"
+          ]
+        }
+      ],
+      "img_path": "page004.jpg"
+    }
+  ]
+}

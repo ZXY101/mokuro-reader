@@ -1,0 +1,91 @@
+{
+  "version": "0.2.0",
+  "title": "Test Series",
+  "title_uuid": "a0eb1646-5191-42d2-ae62-cd2fc6386b1a",
+  "volume": "Volume 1",
+  "volume_uuid": "cb6cf550-cdc2-4ee1-bbc8-8b9b4cebcb8e",
+  "pages": [
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ1"
+          ]
+        }
+      ],
+      "img_path": "page001.jpg"
+    },
+    {
+      "version": "0.1.7",
+      "img_width": 600,
+      "img_height": 849,
+      "blocks": [
+        {
+          "box": [
+            100,
+            100,
+            200,
+            200
+          ],
+          "vertical": true,
+          "font_size": 30,
+          "lines_coords": [
+            [
+              [
+                100,
+                100
+              ],
+              [
+                200,
+                100
+              ],
+              [
+                200,
+                200
+              ],
+              [
+                100,
+                200
+              ]
+            ]
+          ],
+          "lines": [
+            "テストページ2"
+          ]
+        }
+      ],
+      "img_path": "page002.jpg"
+    }
+  ]
+}

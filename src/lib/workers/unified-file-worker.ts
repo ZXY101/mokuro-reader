@@ -2,7 +2,13 @@
 // Combines functionality from universal-download-worker and upload-worker
 // Handles all cloud providers: Google Drive, WebDAV, MEGA
 
-import { Uint8ArrayReader, Uint8ArrayWriter, ZipReader, getMimeType } from '@zip.js/zip.js';
+import {
+  Uint8ArrayReader,
+  Uint8ArrayWriter,
+  ZipReader,
+  getMimeType,
+  BlobReader
+} from '@zip.js/zip.js';
 import { File as MegaFile, Storage } from 'megajs';
 import { compressVolume, type MokuroMetadata } from '$lib/util/compress-volume';
 
@@ -52,8 +58,33 @@ interface DecompressOnlyMessage {
   mode: 'decompress-only';
   fileId: string;
   fileName: string;
-  blob: ArrayBuffer;
+  blob: Blob; // File/Blob for streaming - avoids loading entire file into ArrayBuffer
   metadata?: VolumeMetadata;
+  /** Optional filter - only extract files matching these extensions or paths */
+  filter?: {
+    /** Extract only files with these extensions (e.g., ['mokuro']) */
+    extensions?: string[];
+    /** Extract only files matching these path prefixes */
+    pathPrefixes?: string[];
+  };
+  /** If true, return file list without extracting content (for planning extraction) */
+  listOnly?: boolean;
+  /** If true, list ALL files but only extract content for files matching filter */
+  listAllExtractFiltered?: boolean;
+}
+
+/** Message for streaming extraction - extracts one volume at a time */
+interface StreamExtractMessage {
+  mode: 'stream-extract';
+  fileId: string;
+  fileName: string;
+  blob: Blob;
+  /** Volume definitions - which path prefixes belong to which volume */
+  volumes: Array<{
+    id: string;
+    pathPrefix: string;
+    mokuroPath?: string; // If known, extract this mokuro file for this volume
+  }>;
 }
 
 // Upload messages
@@ -78,6 +109,7 @@ interface CompressAndReturnMessage {
 type WorkerMessage =
   | DownloadAndDecompressMessage
   | DecompressOnlyMessage
+  | StreamExtractMessage
   | CompressAndUploadMessage
   | CompressAndReturnMessage;
 
@@ -236,16 +268,12 @@ async function downloadFromWebDAV(
   // Always send final progress update at 100%
   onProgress(receivedLength, contentLength || receivedLength);
 
-  // Combine chunks into a single ArrayBuffer
-  const combinedLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-  const combined = new Uint8Array(combinedLength);
-  let offset = 0;
-  for (const chunk of chunks) {
-    combined.set(chunk, offset);
-    offset += chunk.length;
-  }
-
-  return combined.buffer;
+  // Use Blob to combine chunks - avoids allocating a second copy of the entire file
+  const blob = new Blob(chunks as BlobPart[]);
+  const buffer = await blob.arrayBuffer();
+  // Clear chunks array to free memory
+  chunks.length = 0;
+  return buffer;
 }
 
 /**
@@ -282,17 +310,13 @@ async function downloadFromMega(
           onProgress(loaded, totalSize);
         });
 
-        stream.on('end', () => {
-          // Combine all chunks into a single ArrayBuffer
-          const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-          const combined = new Uint8Array(totalLength);
-          let offset = 0;
-          for (const chunk of chunks) {
-            combined.set(chunk, offset);
-            offset += chunk.length;
-          }
-
-          resolve(combined.buffer);
+        stream.on('end', async () => {
+          // Use Blob to combine chunks - avoids allocating a second copy of the entire file
+          const blob = new Blob(chunks as BlobPart[]);
+          const buffer = await blob.arrayBuffer();
+          // Clear chunks array to free memory before resolving
+          chunks.length = 0;
+          resolve(buffer);
         });
 
         stream.on('error', (error: Error) => {
@@ -309,42 +333,188 @@ async function downloadFromMega(
   });
 }
 
-/**
- * Decompress a CBZ file from ArrayBuffer into entries
- * Keeps everything in memory without creating intermediate Blob objects
- */
-async function decompressCbz(arrayBuffer: ArrayBuffer): Promise<DecompressedEntry[]> {
-  console.log(`Worker: Decompressing CBZ...`);
+/** Filter options for selective extraction */
+interface ExtractFilter {
+  extensions?: string[];
+  pathPrefixes?: string[];
+}
 
-  // Create a zip reader directly from ArrayBuffer
-  const zipReader = new ZipReader(new Uint8ArrayReader(new Uint8Array(arrayBuffer)));
+/**
+ * System files and directories that should never be extracted.
+ * These are commonly found in archives created on various operating systems.
+ */
+const EXCLUDED_SYSTEM_PATTERNS = new Set([
+  // macOS
+  '__MACOSX',
+  '.DS_Store',
+  '.Trashes',
+  '.Spotlight-V100',
+  '.fseventsd',
+  '.TemporaryItems',
+  '.Trash',
+  // Windows
+  'System Volume Information',
+  '$RECYCLE.BIN',
+  'Thumbs.db',
+  'desktop.ini',
+  'Desktop.ini',
+  'RECYCLER',
+  'RECYCLED',
+  // Linux
+  '.Trash-1000',
+  '.thumbnails',
+  '.directory',
+  // Cloud storage
+  '.dropbox',
+  '.dropbox.cache',
+  // Version control
+  '.git',
+  '.svn'
+]);
+
+const EXCLUDED_EXTENSIONS = new Set(['bak', 'tmp', 'temp']);
+
+/**
+ * Check if a path contains any system files/directories that should be excluded.
+ */
+function isSystemFile(path: string): boolean {
+  const normalizedPath = path.replace(/\\/g, '/');
+  const segments = normalizedPath.split('/');
+
+  for (const segment of segments) {
+    if (!segment) continue;
+    if (segment.startsWith('._')) return true;
+    if (segment.endsWith('~')) return true;
+    if (EXCLUDED_SYSTEM_PATTERNS.has(segment)) return true;
+  }
+
+  const filename = segments[segments.length - 1] || '';
+  const lastDot = filename.lastIndexOf('.');
+  if (lastDot >= 0) {
+    const ext = filename.slice(lastDot + 1).toLowerCase();
+    if (EXCLUDED_EXTENSIONS.has(ext)) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Check if a filename matches the filter criteria
+ */
+function matchesFilter(filename: string, filter?: ExtractFilter): boolean {
+  if (!filter) return true;
+
+  // Check extension filter
+  if (filter.extensions && filter.extensions.length > 0) {
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    if (filter.extensions.includes(ext)) return true;
+  }
+
+  // Check path prefix filter
+  if (filter.pathPrefixes && filter.pathPrefixes.length > 0) {
+    for (const prefix of filter.pathPrefixes) {
+      if (filename.startsWith(prefix + '/') || filename === prefix) return true;
+    }
+  }
+
+  // If both filters are specified, match either; if only one, that one must match
+  if (filter.extensions?.length && filter.pathPrefixes?.length) {
+    return false; // Neither matched
+  }
+  if (filter.extensions?.length) return false; // Extension filter didn't match
+  if (filter.pathPrefixes?.length) return false; // Path filter didn't match
+
+  return true; // No filters = match all
+}
+
+/**
+ * Decompress a CBZ file from Blob or ArrayBuffer into entries
+ * Uses BlobReader for streaming - handles large files (>2GB) without loading into ArrayBuffer
+ * Optional filter allows extracting only specific files (e.g., mokuro files first, then images per volume)
+ * If listOnly is true, returns file list without extracting content (for planning extraction)
+ */
+// Concurrency limit for parallel extraction - higher = faster but more memory
+const EXTRACT_CONCURRENCY = 16;
+
+async function decompressCbz(
+  data: Blob | ArrayBuffer,
+  filter?: ExtractFilter,
+  listOnly?: boolean,
+  listAllExtractFiltered?: boolean
+): Promise<DecompressedEntry[]> {
+  // Convert ArrayBuffer to Blob if needed (for downloaded data)
+  const blob = data instanceof Blob ? data : new Blob([data]);
+
+  // Use BlobReader for streaming - doesn't require loading entire file into memory at once
+  const zipReader = new ZipReader(new BlobReader(blob));
 
   // Get all entries from the zip file
   const entries = await zipReader.getEntries();
 
-  // Process each entry
-  const decompressedEntries: DecompressedEntry[] = [];
+  // Categorize entries
+  const toExtract: { entry: (typeof entries)[0]; filename: string }[] = [];
+  const toList: string[] = [];
 
   for (const entry of entries) {
-    // Skip directories
     if (entry.directory) continue;
+    // Skip system files (macOS, Windows, Linux metadata)
+    if (isSystemFile(entry.filename)) continue;
 
-    try {
-      // Decompress directly to Uint8Array without creating intermediate Blob
-      const uint8Array = await entry.getData!(new Uint8ArrayWriter());
+    const matchesFilterCriteria = matchesFilter(entry.filename, filter);
 
-      decompressedEntries.push({
-        filename: entry.filename,
-        data: uint8Array.buffer as ArrayBuffer
-      });
-    } catch (entryError) {
-      console.error(`Worker: Error extracting entry ${entry.filename}:`, entryError);
+    if (!listAllExtractFiltered && !matchesFilterCriteria) {
+      continue;
+    }
+
+    if (listOnly) {
+      toList.push(entry.filename);
+    } else if (listAllExtractFiltered) {
+      if (matchesFilterCriteria) {
+        toExtract.push({ entry, filename: entry.filename });
+      } else {
+        toList.push(entry.filename);
+      }
+    } else {
+      toExtract.push({ entry, filename: entry.filename });
+    }
+  }
+
+  // Build results
+  const decompressedEntries: DecompressedEntry[] = [];
+
+  // Add list-only entries (no extraction needed)
+  for (const filename of toList) {
+    decompressedEntries.push({ filename, data: new ArrayBuffer(0) });
+  }
+
+  // Extract entries in parallel batches
+  if (toExtract.length > 0) {
+    // Process in batches for controlled concurrency
+    for (let i = 0; i < toExtract.length; i += EXTRACT_CONCURRENCY) {
+      const batch = toExtract.slice(i, i + EXTRACT_CONCURRENCY);
+
+      const results = await Promise.all(
+        batch.map(async ({ entry, filename }) => {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const uint8Array = await (entry as any).getData(new Uint8ArrayWriter());
+            return { filename, data: uint8Array.buffer as ArrayBuffer };
+          } catch (err) {
+            console.error(`Worker: Error extracting ${filename}:`, err);
+            return null;
+          }
+        })
+      );
+
+      for (const result of results) {
+        if (result) {
+          decompressedEntries.push(result);
+        }
+      }
     }
   }
 
   await zipReader.close();
-
-  console.log(`Worker: Decompressed ${decompressedEntries.length} files`);
   return decompressedEntries;
 }
 
@@ -723,11 +893,13 @@ ctx.addEventListener('message', async (event) => {
       console.log(`Worker: Sent complete message for ${fileName}`);
     } else if (message.mode === 'decompress-only') {
       // ========== DECOMPRESS ONLY MODE ==========
-      const { fileId, fileName, blob, metadata } = message;
-      console.log(`Worker: Received pre-downloaded data for ${fileName}`);
+      const { fileId, fileName, blob, metadata, filter, listOnly, listAllExtractFiltered } =
+        message;
 
-      // Decompress the ArrayBuffer
-      const entries = await decompressCbz(blob);
+      // Decompress with optional filter (for selective extraction)
+      // If listOnly, returns file list without extracting content
+      // If listAllExtractFiltered, lists all files but only extracts content for filtered ones
+      const entries = await decompressCbz(blob, filter, listOnly, listAllExtractFiltered);
 
       // Send completion message
       const completeMessage: DownloadCompleteMessage = {
@@ -744,6 +916,120 @@ ctx.addEventListener('message', async (event) => {
       ctx.postMessage(completeMessage, transferables);
 
       console.log(`Worker: Sent complete message for ${fileName}`);
+    } else if (message.mode === 'stream-extract') {
+      // ========== STREAM EXTRACT MODE ==========
+      // Extracts in parallel batches, sending each immediately to prevent memory exhaustion
+      const { fileId, fileName, blob, volumes } = message;
+
+      const zipReader = new ZipReader(new BlobReader(blob));
+      const entries = await zipReader.getEntries();
+
+      // Build a set of path prefixes for quick matching
+      const volumePrefixes = new Map<string, string>(); // prefix -> volumeId
+      for (const vol of volumes) {
+        volumePrefixes.set(vol.pathPrefix, vol.id);
+      }
+
+      // Categorize entries
+      const toExtract: { entry: (typeof entries)[0]; volumeId: string }[] = [];
+      const IMAGE_EXTS = new Set([
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'gif',
+        'bmp',
+        'avif',
+        'tif',
+        'tiff',
+        'jxl'
+      ]);
+
+      for (const entry of entries) {
+        if (entry.directory) continue;
+        // Skip system files (macOS, Windows, Linux metadata)
+        if (isSystemFile(entry.filename)) continue;
+
+        // Check if this entry belongs to any of the requested volumes
+        let matchedVolumeId: string | null = null;
+        for (const [prefix, volId] of volumePrefixes) {
+          if (entry.filename.startsWith(prefix + '/') || entry.filename === prefix) {
+            matchedVolumeId = volId;
+            break;
+          }
+        }
+
+        if (!matchedVolumeId) continue;
+
+        const ext = entry.filename.split('.').pop()?.toLowerCase() || '';
+        if (!IMAGE_EXTS.has(ext)) continue;
+
+        toExtract.push({ entry, volumeId: matchedVolumeId });
+      }
+
+      // Extract in parallel batches
+      let extracted = 0;
+      const totalFiles = toExtract.length;
+      const skipped = entries.filter((e) => !e.directory).length - toExtract.length;
+
+      for (let i = 0; i < toExtract.length; i += EXTRACT_CONCURRENCY) {
+        const batch = toExtract.slice(i, i + EXTRACT_CONCURRENCY);
+
+        const results = await Promise.all(
+          batch.map(async ({ entry, volumeId }) => {
+            try {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const uint8Array = await (entry as any).getData(new Uint8ArrayWriter());
+              return { filename: entry.filename, data: uint8Array.buffer as ArrayBuffer, volumeId };
+            } catch (err) {
+              console.error(`Worker: Error extracting ${entry.filename}:`, err);
+              return null;
+            }
+          })
+        );
+
+        // Send each result immediately with transferable
+        for (const result of results) {
+          if (result) {
+            ctx.postMessage(
+              {
+                type: 'stream-entry',
+                fileId,
+                volumeId: result.volumeId,
+                entry: {
+                  filename: result.filename,
+                  data: result.data
+                }
+              },
+              [result.data]
+            );
+            extracted++;
+          }
+        }
+
+        // Progress update after each batch
+        ctx.postMessage({
+          type: 'progress',
+          fileId,
+          loaded: extracted,
+          total: totalFiles
+        });
+      }
+
+      await zipReader.close();
+
+      // Send completion message
+      ctx.postMessage({
+        type: 'stream-complete',
+        fileId,
+        fileName,
+        extracted,
+        skipped
+      });
+
+      console.log(
+        `Worker: Stream extraction complete - ${extracted} files extracted, ${skipped} skipped`
+      );
     } else if (message.mode === 'compress-and-upload') {
       // ========== COMPRESS AND UPLOAD MODE ==========
       const { provider, volumeTitle, seriesTitle, metadata, filesData, credentials } = message;
