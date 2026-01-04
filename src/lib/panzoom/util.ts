@@ -131,10 +131,22 @@ export function panAlign(alignX: PanX, alignY: PanY) {
   pz.resume();
 }
 
+/**
+ * Pan to the start of the page based on reading direction and zoom level.
+ * For RTL manga, pans to top-right; for LTR, pans to top-left.
+ * At lower zoom levels where the page fits, this centers the page.
+ * At higher zoom levels, this positions at the reading start corner.
+ */
+export function panToPageStart() {
+  const volumeId = get(routeParams).volume ?? '';
+  const isRightToLeft = get(effectiveVolumeSettings)[volumeId]?.rightToLeft ?? false;
+  panAlign(isRightToLeft ? 'right' : 'left', 'top');
+}
+
 export function zoomOriginal() {
   pz?.moveTo(0, 0);
   pz?.zoomTo(0, 0, 1 / pz.getTransform().scale);
-  panAlign('center', 'center');
+  panToPageStart();
 }
 
 export function zoomFitToWidth() {
@@ -163,21 +175,10 @@ export function zoomFitToScreen() {
   panAlign('center', 'center');
 }
 
-export function keepZoomStart() {
-  panAlign('center', 'top');
-}
-
-export function keepZoomTopCorner() {
-  const volumeId = get(routeParams).volume ?? '';
-
-  const isRightToLeft = get(effectiveVolumeSettings)[volumeId]?.rightToLeft ?? false;
-
-  panAlign(isRightToLeft ? 'right' : 'left', 'top');
-}
-
 export function zoomDefault() {
-  const zoomDefault = get(settings).zoomDefault;
-  switch (zoomDefault) {
+  // Cast to string to handle legacy values from localStorage (keepZoomStart, keepZoomTopCorner)
+  const mode = get(settings).zoomDefault as string;
+  switch (mode) {
     case 'zoomFitToScreen':
       zoomFitToScreen();
       return;
@@ -187,11 +188,10 @@ export function zoomDefault() {
     case 'zoomOriginal':
       zoomOriginal();
       return;
-    case 'keepZoomStart':
-      keepZoomStart();
-      return;
-    case 'keepZoomTopCorner':
-      keepZoomTopCorner();
+    case 'keepZoom':
+    case 'keepZoomStart': // Legacy fallback
+    case 'keepZoomTopCorner': // Legacy fallback
+      panToPageStart();
       return;
   }
 }
