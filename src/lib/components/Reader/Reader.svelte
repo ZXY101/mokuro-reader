@@ -848,7 +848,7 @@
     const currentMode = $settings.zoomDefault;
     let nextMode: typeof currentMode;
 
-    // Rotate through: fitToScreen -> fitToWidth -> original -> keepZoom -> keepZoomStart -> fitToScreen
+    // Rotate through: fitToScreen -> fitToWidth -> original -> keepZoom -> keepZoomStart -> keepZoomTopCorner -> fitToScreen
     if (currentMode === 'zoomFitToScreen') {
       nextMode = 'zoomFitToWidth';
     } else if (currentMode === 'zoomFitToWidth') {
@@ -857,6 +857,8 @@
       nextMode = 'keepZoom';
     } else if (currentMode === 'keepZoom') {
       nextMode = 'keepZoomStart';
+    } else if (currentMode === 'keepZoomStart') {
+      nextMode = 'keepZoomTopCorner';
     } else {
       nextMode = 'zoomFitToScreen';
     }
@@ -869,7 +871,8 @@
       zoomFitToWidth: 'Fit to Width',
       zoomOriginal: 'Original Size',
       keepZoom: 'Keep Zoom',
-      keepZoomStart: 'Keep Zoom, Pan to Top'
+      keepZoomStart: 'Keep Zoom, Pan to Top Center',
+      keepZoomTopCorner: 'Keep Zoom, Pan to Top Corner'
     };
     showNotification(labels[nextMode], `zoommode-${nextMode}`);
   }
