@@ -4,15 +4,24 @@
   import { settings, volumes } from '$lib/settings';
   import { imageToWebp, showCropper, sendToAnki, type VolumeMetadata } from '$lib/anki-connect';
 
+  interface ContextMenuData {
+    x: number;
+    y: number;
+    lines: string[];
+    imgElement: HTMLElement | null;
+  }
+
   interface Props {
     page: Page;
     src?: File;
     volumeUuid: string;
     /** Force text visibility (for placeholder/missing pages) */
     forceVisible?: boolean;
+    /** Callback when context menu should be shown */
+    onContextMenu?: (data: ContextMenuData) => void;
   }
 
-  let { page, src, volumeUuid, forceVisible = false }: Props = $props();
+  let { page, src, volumeUuid, forceVisible = false, onContextMenu }: Props = $props();
 
   interface TextBoxData {
     left: string;
@@ -103,7 +112,11 @@
   let border = $derived($settings.textBoxBorders ? '1px solid red' : 'none');
   let contenteditable = $derived($settings.textEditable);
 
-  let triggerMethod = $derived($settings.ankiConnectSettings.triggerMethod || 'both');
+  // Double-tap trigger: enabled if triggerMethod is 'doubleTap' or 'both' (legacy)
+  let doubleTapEnabled = $derived(
+    $settings.ankiConnectSettings.triggerMethod === 'doubleTap' ||
+      $settings.ankiConnectSettings.triggerMethod === 'both'
+  );
   let ankiTags = $derived($settings.ankiConnectSettings.tags);
   let volumeMetadata = $derived<VolumeMetadata>({
     seriesTitle: $volumes[volumeUuid]?.series_title,
@@ -306,20 +319,31 @@
     }
   }
 
-  function onContextMenu(event: Event, lines: string[]) {
-    if (triggerMethod === 'both' || triggerMethod === 'rightClick') {
-      event.preventDefault();
-      onUpdateCard(event, lines);
-    }
+  function handleContextMenu(event: MouseEvent, lines: string[]) {
+    event.preventDefault();
+    onContextMenu?.({
+      x: event.clientX,
+      y: event.clientY,
+      lines,
+      imgElement: event.target as HTMLElement
+    });
   }
 
   function onDoubleTap(event: Event, lines: string[]) {
     // Always stop propagation to prevent zoom from triggering
     event.stopPropagation();
-    if (triggerMethod === 'both' || triggerMethod === 'doubleTap') {
+    if (doubleTapEnabled) {
       event.preventDefault();
       onUpdateCard(event, lines);
     }
+  }
+
+  function onCopy(event: ClipboardEvent) {
+    // Strip line breaks from copied text (Ctrl+C default behavior)
+    const selection = window.getSelection()?.toString() || '';
+    const stripped = selection.replace(/[\n\r\t]/g, '');
+    event.clipboardData?.setData('text/plain', stripped);
+    event.preventDefault();
   }
 </script>
 
@@ -341,8 +365,9 @@
     style:border
     style:writing-mode={writingMode}
     role="none"
-    oncontextmenu={(e) => onContextMenu(e, lines)}
+    oncontextmenu={(e) => handleContextMenu(e, lines)}
     ondblclick={(e) => onDoubleTap(e, lines)}
+    oncopy={onCopy}
     {contenteditable}
   >
     <p>

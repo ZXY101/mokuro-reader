@@ -19,7 +19,6 @@
   let widthField = $state($settings.ankiConnectSettings.widthField);
   let qualityField = $state($settings.ankiConnectSettings.qualityField);
 
-  let triggerMethod = $state($settings.ankiConnectSettings.triggerMethod);
   let ankiTags = $state($settings.ankiConnectSettings.tags);
   let cardMode = $state($settings.ankiConnectSettings.cardMode);
   let deckName = $state($settings.ankiConnectSettings.deckName);
@@ -32,12 +31,15 @@
     { value: 'create', name: 'Create new card' }
   ];
 
-  const triggerOptions = [
-    { value: 'rightClick', name: 'Right click (long press on mobile)' },
-    { value: 'doubleTap', name: 'Double tap' },
-    { value: 'both', name: 'Both' },
-    { value: 'neither', name: 'Neither' }
-  ];
+  let doubleTapEnabled = $state(
+    $settings.ankiConnectSettings.triggerMethod === 'doubleTap' ||
+      $settings.ankiConnectSettings.triggerMethod === 'both'
+  );
+
+  function updateDoubleTap(enabled: boolean) {
+    // Map toggle to triggerMethod for backwards compatibility
+    updateAnkiSetting('triggerMethod', enabled ? 'doubleTap' : 'neither');
+  }
 
   function insertTag(tag: string) {
     ankiTags = ankiTags ? `${ankiTags} ${tag}`.trim() : tag;
@@ -120,15 +122,12 @@
       >
     </div>
     <div>
-      <Label class="text-gray-900 dark:text-white">
-        Trigger method:
-        <Select
-          {disabled}
-          onchange={() => updateAnkiSetting('triggerMethod', triggerMethod)}
-          items={triggerOptions}
-          bind:value={triggerMethod}
-        />
-      </Label>
+      <Toggle
+        {disabled}
+        bind:checked={doubleTapEnabled}
+        onchange={() => updateDoubleTap(doubleTapEnabled)}>Double-tap to capture</Toggle
+      >
+      <Helper class="mt-1">Right-click any text box for more options</Helper>
     </div>
     <div>
       <Label class="text-gray-900 dark:text-white">

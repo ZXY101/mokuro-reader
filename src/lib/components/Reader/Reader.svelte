@@ -28,6 +28,8 @@
   import { clamp, debounce, fireExstaticEvent, resetScrollPosition } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
+  import TextBoxContextMenu from './TextBoxContextMenu.svelte';
+  import { showCropper, type VolumeMetadata } from '$lib/anki-connect';
   import {
     BackwardStepSolid,
     CaretLeftSolid,
@@ -744,6 +746,58 @@
   let notificationKey = $state<string>('');
   let notificationTimeout: number | undefined = undefined;
 
+  // Context menu state (rendered outside panzoom for correct positioning)
+  interface ContextMenuData {
+    x: number;
+    y: number;
+    lines: string[];
+    imgElement: HTMLElement | null;
+  }
+  let showContextMenu = $state(false);
+  let contextMenuData = $state<ContextMenuData | null>(null);
+
+  function handleTextBoxContextMenu(data: ContextMenuData) {
+    contextMenuData = data;
+    showContextMenu = true;
+  }
+
+  function handleContextMenuAddToAnki(selection: string) {
+    if (!contextMenuData || !volume) return;
+
+    const volumeMetadata: VolumeMetadata = {
+      seriesTitle: volume.series_title,
+      volumeTitle: volume.volume_title
+    };
+
+    // Get the image URL from the element or current page
+    const imgElement = contextMenuData.imgElement;
+    let url: string | null = null;
+
+    if (imgElement) {
+      // Traverse up to find the MangaPage div with background-image
+      let current: HTMLElement | null = imgElement;
+      while (current) {
+        const bgImage = getComputedStyle(current).backgroundImage;
+        if (bgImage && bgImage !== 'none') {
+          const match = bgImage.match(/url\(["']?(.+?)["']?\)/);
+          if (match) {
+            url = match[1];
+            break;
+          }
+        }
+        current = current.parentElement;
+      }
+    }
+
+    if (url) {
+      const fullSentence = contextMenuData.lines.join(' ');
+      // Use selection for card front if provided, otherwise use full sentence
+      const cardFront = selection || fullSentence;
+      const ankiTags = $settings.ankiConnectSettings.tags || '';
+      showCropper(url, cardFront, fullSentence, ankiTags, volumeMetadata);
+    }
+  }
+
   function showNotification(message: string, key: string) {
     notificationMessage = message;
     notificationKey = key;
@@ -956,6 +1010,7 @@
                   cachedUrl={cachedImageUrl2}
                   volumeUuid={volume.volume_uuid}
                   forceVisible={missingPagePaths.has(pages[index + 1]?.img_path)}
+                  onContextMenu={handleTextBoxContextMenu}
                 />
               {/if}
               <MangaPage
@@ -964,6 +1019,7 @@
                 cachedUrl={cachedImageUrl1}
                 volumeUuid={volume.volume_uuid}
                 forceVisible={missingPagePaths.has(pages[index]?.img_path)}
+                onContextMenu={handleTextBoxContextMenu}
               />
             {:else}
               <div class="flex h-screen w-screen items-center justify-center">
@@ -975,6 +1031,20 @@
       </div>
     </Panzoom>
   </div>
+
+  {#if showContextMenu && contextMenuData}
+    <TextBoxContextMenu
+      x={contextMenuData.x}
+      y={contextMenuData.y}
+      lines={contextMenuData.lines}
+      ankiEnabled={$settings.ankiConnectSettings.enabled}
+      onCopy={() => {}}
+      onCopyRaw={() => {}}
+      onAddToAnki={handleContextMenuAddToAnki}
+      onClose={() => (showContextMenu = false)}
+    />
+  {/if}
+
   {#if !$settings.mobile}
     <button
       aria-label="Previous page (left edge)"

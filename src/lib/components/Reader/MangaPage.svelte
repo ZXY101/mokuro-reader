@@ -2,6 +2,13 @@
   import type { Page } from '$lib/types';
   import TextBoxes from './TextBoxes.svelte';
 
+  interface ContextMenuData {
+    x: number;
+    y: number;
+    lines: string[];
+    imgElement: HTMLElement | null;
+  }
+
   interface Props {
     page: Page;
     src: File;
@@ -9,9 +16,11 @@
     volumeUuid: string;
     /** Force text visibility (for placeholder/missing pages) */
     forceVisible?: boolean;
+    /** Callback when context menu should be shown */
+    onContextMenu?: (data: ContextMenuData) => void;
   }
 
-  let { page, src, cachedUrl, volumeUuid, forceVisible = false }: Props = $props();
+  let { page, src, cachedUrl, volumeUuid, forceVisible = false, onContextMenu }: Props = $props();
 
   let url = $state('');
 
@@ -50,5 +59,5 @@
   style:background-position="center"
   class="relative"
 >
-  <TextBoxes {page} {src} {volumeUuid} {forceVisible} />
+  <TextBoxes {page} {src} {volumeUuid} {forceVisible} {onContextMenu} />
 </div>
