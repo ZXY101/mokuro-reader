@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.2.0] - Unreleased
+
+### Added
+
+- **Volume editor modal** - Edit volume metadata, reading stats, and cover image directly from the series page
+- **Inline series rename** - Rename series titles directly in the series view header
+- **Import preparation modal** - Shows progress spinner with status while scanning and analyzing dropped files before they appear in the import queue
+
+### Fixed
+
+- **Flat archive imports** - Archives with images at root level now properly pair with external mokuro files ([#131](https://github.com/Gnathonic/mokuro-reader/issues/131), [#125](https://github.com/Gnathonic/mokuro-reader/issues/125))
+
 ## [1.1.2] - Unreleased
 
 ### Added
