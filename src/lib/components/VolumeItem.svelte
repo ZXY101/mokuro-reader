@@ -12,7 +12,8 @@
     FileLinesOutline,
     DotsVerticalOutline,
     CloudArrowUpOutline,
-    ImageOutline
+    ImageOutline,
+    ExclamationCircleOutline
   } from 'flowbite-svelte-icons';
   import { db } from '$lib/catalog/db';
   import { nav, routeParams } from '$lib/util/hash-router';
@@ -41,6 +42,9 @@
 
   // Check if this is an image-only volume (no mokuro OCR data)
   let isImageOnly = $derived(volume.mokuro_version === '');
+
+  // Check if this volume has missing pages (imported with placeholders)
+  let missingPages = $derived(volume.missing_pages);
 
   // Cloud backup state (for grid view menu)
   let cloudFiles = $state<Map<string, CloudVolumeWithProvider[]>>(new Map());
@@ -330,6 +334,12 @@
                   Image Only
                 </Badge>
               {/if}
+              {#if missingPages}
+                <Badge color="yellow" class="text-xs">
+                  <ExclamationCircleOutline class="me-1 inline h-3 w-3" />
+                  Missing {missingPages} page{missingPages > 1 ? 's' : ''}
+                </Badge>
+              {/if}
             </div>
             <div class="flex flex-wrap items-center gap-x-3">
               <p>{progressDisplay}</p>
@@ -443,6 +453,12 @@
             <Badge color="blue" class="w-fit text-xs">
               <ImageOutline class="me-1 inline h-3 w-3" />
               Image Only
+            </Badge>
+          {/if}
+          {#if missingPages}
+            <Badge color="yellow" class="w-fit text-xs">
+              <ExclamationCircleOutline class="me-1 inline h-3 w-3" />
+              Missing {missingPages} page{missingPages > 1 ? 's' : ''}
             </Badge>
           {/if}
         </div>

@@ -28,6 +28,8 @@
   import { clamp, debounce, fireExstaticEvent, resetScrollPosition } from '$lib/util';
   import { Input, Popover, Range, Spinner } from 'flowbite-svelte';
   import MangaPage from './MangaPage.svelte';
+  import TextBoxContextMenu from './TextBoxContextMenu.svelte';
+  import { showCropper, type VolumeMetadata } from '$lib/anki-connect';
   import {
     BackwardStepSolid,
     CaretLeftSolid,
@@ -461,6 +463,9 @@
   let page = $derived($progress?.[volume?.volume_uuid || 0] || 1);
   let index = $derived(page - 1);
 
+  // Set of missing page paths for checking if current page is a placeholder
+  let missingPagePaths = $derived(new Set(volume?.missing_page_paths || []));
+
   // Track page direction for animations (set in changePage function before page changes)
   let pageDirection = $state<'forward' | 'backward'>('forward');
 
@@ -741,6 +746,58 @@
   let notificationKey = $state<string>('');
   let notificationTimeout: number | undefined = undefined;
 
+  // Context menu state (rendered outside panzoom for correct positioning)
+  interface ContextMenuData {
+    x: number;
+    y: number;
+    lines: string[];
+    imgElement: HTMLElement | null;
+  }
+  let showContextMenu = $state(false);
+  let contextMenuData = $state<ContextMenuData | null>(null);
+
+  function handleTextBoxContextMenu(data: ContextMenuData) {
+    contextMenuData = data;
+    showContextMenu = true;
+  }
+
+  function handleContextMenuAddToAnki(selection: string) {
+    if (!contextMenuData || !volume) return;
+
+    const volumeMetadata: VolumeMetadata = {
+      seriesTitle: volume.series_title,
+      volumeTitle: volume.volume_title
+    };
+
+    // Get the image URL from the element or current page
+    const imgElement = contextMenuData.imgElement;
+    let url: string | null = null;
+
+    if (imgElement) {
+      // Traverse up to find the MangaPage div with background-image
+      let current: HTMLElement | null = imgElement;
+      while (current) {
+        const bgImage = getComputedStyle(current).backgroundImage;
+        if (bgImage && bgImage !== 'none') {
+          const match = bgImage.match(/url\(["']?(.+?)["']?\)/);
+          if (match) {
+            url = match[1];
+            break;
+          }
+        }
+        current = current.parentElement;
+      }
+    }
+
+    if (url) {
+      const fullSentence = contextMenuData.lines.join(' ');
+      // Use selection for card front if provided, otherwise use full sentence
+      const cardFront = selection || fullSentence;
+      const ankiTags = $settings.ankiConnectSettings.tags || '';
+      showCropper(url, cardFront, fullSentence, ankiTags, volumeMetadata);
+    }
+  }
+
   function showNotification(message: string, key: string) {
     notificationMessage = message;
     notificationKey = key;
@@ -791,15 +848,13 @@
     const currentMode = $settings.zoomDefault;
     let nextMode: typeof currentMode;
 
-    // Rotate through: fitToScreen -> fitToWidth -> original -> keepZoom -> keepZoomStart -> fitToScreen
+    // Rotate through: fitToScreen -> fitToWidth -> original -> keepZoom -> fitToScreen
     if (currentMode === 'zoomFitToScreen') {
       nextMode = 'zoomFitToWidth';
     } else if (currentMode === 'zoomFitToWidth') {
       nextMode = 'zoomOriginal';
     } else if (currentMode === 'zoomOriginal') {
       nextMode = 'keepZoom';
-    } else if (currentMode === 'keepZoom') {
-      nextMode = 'keepZoomStart';
     } else {
       nextMode = 'zoomFitToScreen';
     }
@@ -811,8 +866,7 @@
       zoomFitToScreen: 'Fit to Screen',
       zoomFitToWidth: 'Fit to Width',
       zoomOriginal: 'Original Size',
-      keepZoom: 'Keep Zoom',
-      keepZoomStart: 'Keep Zoom, Pan to Top'
+      keepZoom: 'Keep Zoom'
     };
     showNotification(labels[nextMode], `zoommode-${nextMode}`);
   }
@@ -844,6 +898,9 @@
     {right}
     src1={imageCache.getFile(index)}
     src2={!useSinglePage ? imageCache.getFile(index + 1) : undefined}
+    volumeUuid={volume.volume_uuid}
+    page1={pages[index]}
+    page2={!useSinglePage ? pages[index + 1] : undefined}
   />
   <SettingsButton />
   <Cropper />
@@ -949,6 +1006,8 @@
                   src={imageCache.getFile(index + 1)!}
                   cachedUrl={cachedImageUrl2}
                   volumeUuid={volume.volume_uuid}
+                  forceVisible={missingPagePaths.has(pages[index + 1]?.img_path)}
+                  onContextMenu={handleTextBoxContextMenu}
                 />
               {/if}
               <MangaPage
@@ -956,6 +1015,8 @@
                 src={imageCache.getFile(index)!}
                 cachedUrl={cachedImageUrl1}
                 volumeUuid={volume.volume_uuid}
+                forceVisible={missingPagePaths.has(pages[index]?.img_path)}
+                onContextMenu={handleTextBoxContextMenu}
               />
             {:else}
               <div class="flex h-screen w-screen items-center justify-center">
@@ -967,6 +1028,21 @@
       </div>
     </Panzoom>
   </div>
+
+  {#if showContextMenu && contextMenuData}
+    <TextBoxContextMenu
+      x={contextMenuData.x}
+      y={contextMenuData.y}
+      lines={contextMenuData.lines}
+      ankiEnabled={$settings.ankiConnectSettings.enabled}
+      textBoxElement={contextMenuData.imgElement}
+      onCopy={() => {}}
+      onCopyRaw={() => {}}
+      onAddToAnki={handleContextMenuAddToAnki}
+      onClose={() => (showContextMenu = false)}
+    />
+  {/if}
+
   {#if !$settings.mobile}
     <button
       aria-label="Previous page (left edge)"

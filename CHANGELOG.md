@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.1.2] - Unreleased
+
+### Added
+
+- **Pan to page start on page turn** - New panning behavior that positions at the top corner based on reading direction (top-right for RTL, top-left for LTR). Thanks [@Zipeks](https://github.com/Zipeks)!
+
+### Changed
+
+- **Simplified zoom options** - Removed redundant "Keep zoom, pan to top center" and "Keep zoom, pan to top corner" options. "Original size" and "Keep zoom" now use pan-to-page-start behavior.
+
+## [1.1.1] - Unreleased
+
+### Added
+
+- **AnkiConnect test button** - Validate your connection with clear error messages for network/CORS issues
+- **Custom text box menu toggle** - Disable to use browser's native right-click menu instead
+
+### Fixed
+
+- **Context menu mobile support** - Buttons now respond to taps, clipboard works on mobile, menu positions to avoid overlapping text
+
+## [1.1.0] - 2026-01-04
+
+### Added
+
+- **Context menu for OCR text boxes** - Right-click/long-press for quick copy and Anki card creation
+- **Copy text without linebreaks** - Copied text automatically strips linebreaks for cleaner pasting - thanks [@Daxterapid](https://github.com/Daxterapid)
+- **Partial volume imports** - Import volumes even when some images are missing, with placeholder pages and a confirmation prompt showing what's missing
+- **Import progress tracking** - File imports now show progress in the progress tracker
+- **Anki textbox targeting** - Pick which text box to capture when creating cards from QuickActions
+- **AnkiConnect custom URL** - Configure non-default AnkiConnect endpoints
+- **AnkiConnect card modes** - Choose between updating last card or creating new cards
+- **Anki dynamic tags** - Template tags like `{series}`, `{volume}` for automatic organization
+
+### Fixed
+
+- **CBZ export compatibility** - Exported files now work in more third-party readers
+- **iOS Safari imports** - Fixed UUID generation and file picker issues
+- **Import compatibility** - Better handling of various internal folder layouts
+
 ## [1.0.7] - 2025-12-17
 
 ### Added
