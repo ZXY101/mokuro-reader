@@ -102,8 +102,8 @@
       seriesUuid = data.metadata.series_uuid;
       seriesTitle = data.metadata.series_title;
       volumeTitle = data.metadata.volume_title;
-      characterCount = data.metadata.character_count;
-      pageCount = data.metadata.page_count;
+      characterCount = data.metadata.character_count || 0;
+      pageCount = data.metadata.page_count || 0;
       missingPagePaths = data.metadata.missing_page_paths || [];
 
       progress = data.stats.progress || 0;
