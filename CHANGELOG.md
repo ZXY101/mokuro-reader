@@ -9,6 +9,7 @@
 - **Inline series rename** - Rename series directly from the series page header
 - **Missing pages display** - Volume editor shows which pages were missing during import
 - **Import preparation modal** - Shows progress spinner with status while scanning and analyzing dropped files before they appear in the import queue
+- **Series merge** - Merge multiple series together with conflict detection and preview. Thanks [@ChristopherFritz](https://github.com/ChristopherFritz)!
 
 ### Fixed
 
