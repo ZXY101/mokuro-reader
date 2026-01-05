@@ -203,3 +203,47 @@ export function promptVolumeEditor(volumeUuid: string, onSave?: () => void, onCa
 export function closeVolumeEditor() {
   volumeEditorModalStore.set(undefined);
 }
+
+// Import preparing modal - shows progress while scanning/analyzing dropped files
+export type ImportPreparingPhase = 'scanning' | 'analyzing' | 'preparing';
+
+type ImportPreparingModal = {
+  open: boolean;
+  phase: ImportPreparingPhase;
+  filesScanned?: number;
+  totalFiles?: number;
+  volumesFound?: number;
+};
+
+export const importPreparingModalStore = writable<ImportPreparingModal | undefined>(undefined);
+
+/**
+ * Show import preparing modal with current phase
+ */
+export function showImportPreparing(
+  phase: ImportPreparingPhase,
+  details?: Partial<ImportPreparingModal>
+) {
+  importPreparingModalStore.set({
+    open: true,
+    phase,
+    ...details
+  });
+}
+
+/**
+ * Update import preparing modal with new details
+ */
+export function updateImportPreparing(details: Partial<ImportPreparingModal>) {
+  importPreparingModalStore.update((current) => {
+    if (!current) return current;
+    return { ...current, ...details };
+  });
+}
+
+/**
+ * Close import preparing modal
+ */
+export function closeImportPreparing() {
+  importPreparingModalStore.set(undefined);
+}

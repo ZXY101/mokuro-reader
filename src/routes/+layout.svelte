@@ -12,6 +12,7 @@
   import WebDAVErrorModal from '$lib/components/WebDAVErrorModal.svelte';
   import MissingFilesModal from '$lib/components/MissingFilesModal.svelte';
   import VolumeEditorModal from '$lib/components/VolumeEditorModal.svelte';
+  import ImportPreparingModal from '$lib/components/ImportPreparingModal.svelte';
   import ProgressTracker from '$lib/components/ProgressTracker.svelte';
   import NightModeFilter from '$lib/components/NightModeFilter.svelte';
   import GlobalDropZone from '$lib/components/GlobalDropZone.svelte';
@@ -111,6 +112,7 @@
     <WebDAVErrorModal />
     <MissingFilesModal />
     <VolumeEditorModal />
+    <ImportPreparingModal />
     <ProgressTracker />
     <NightModeFilter />
     <GlobalDropZone />
