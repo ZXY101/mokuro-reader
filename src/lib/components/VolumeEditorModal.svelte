@@ -45,6 +45,7 @@
   // Volume stats (read-only, from metadata)
   let characterCount = $state(0);
   let pageCount = $state(0);
+  let missingPagePaths = $state<string[]>([]);
 
   // Derived characters read based on progress
   let chars = $derived(
@@ -101,6 +102,7 @@
       volumeTitle = data.metadata.volume_title;
       characterCount = data.metadata.character_count;
       pageCount = data.metadata.page_count;
+      missingPagePaths = data.metadata.missing_page_paths || [];
 
       progress = data.stats.progress || 0;
       timeReadInMinutes = data.stats.timeReadInMinutes || 0;
@@ -413,6 +415,23 @@
             </div>
           </div>
         </div>
+
+        <!-- Missing Pages Section (only shown if there are missing pages) -->
+        {#if missingPagePaths.length > 0}
+          <div class="rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-600 dark:bg-yellow-900/20">
+            <h4 class="mb-2 font-medium text-yellow-800 dark:text-yellow-200">
+              Missing Pages ({missingPagePaths.length})
+            </h4>
+            <p class="mb-2 text-sm text-yellow-700 dark:text-yellow-300">
+              The following pages were not found in the archive and have been replaced with placeholders:
+            </p>
+            <ul class="max-h-32 overflow-y-auto text-sm text-yellow-600 dark:text-yellow-400">
+              {#each missingPagePaths as path}
+                <li class="font-mono">{path}</li>
+              {/each}
+            </ul>
+          </div>
+        {/if}
 
         <!-- Actions -->
         <div class="flex justify-end gap-2">
