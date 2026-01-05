@@ -1,6 +1,21 @@
 # Changelog
 
-## [1.1.2] - Unreleased
+## [1.2.0] - Unreleased
+
+### Added
+
+- **Volume editor modal** - Edit volume metadata, series assignment, reading progress, and cover image from the catalog
+- **Cover cropping** - Crop any page from the volume to use as cover, with free-form selection
+- **Inline series rename** - Rename series directly from the series page header
+- **Missing pages display** - Volume editor shows which pages were missing during import
+- **Import preparation modal** - Shows progress spinner with status while scanning and analyzing dropped files before they appear in the import queue
+- **Series merge** - Merge multiple series together with conflict detection and preview. Thanks [@ChristopherFritz](https://github.com/ChristopherFritz)!
+
+### Fixed
+
+- **Flat archive imports** - Archives with images at root level now properly pair with external mokuro files ([#131](https://github.com/Gnathonic/mokuro-reader/issues/131), [#125](https://github.com/Gnathonic/mokuro-reader/issues/125))
+
+## [1.1.2] - 2025-01-04
 
 ### Added
 
@@ -10,7 +25,7 @@
 
 - **Simplified zoom options** - Removed redundant "Keep zoom, pan to top center" and "Keep zoom, pan to top corner" options. "Original size" and "Keep zoom" now use pan-to-page-start behavior.
 
-## [1.1.1] - Unreleased
+## [1.1.1] - 2025-01-04
 
 ### Added
 

@@ -36,6 +36,12 @@ import {
 import { promptImageOnlyImport, type SeriesImportInfo } from '$lib/util/modals';
 import { extractSeriesName } from '$lib/upload/image-only-fallback';
 import { generateUUID } from '$lib/util/uuid';
+import {
+  extractArchiveByVolumes,
+  decompressArchive,
+  type VolumeExtractDef,
+  type ExtractFilter as ArchiveExtractFilter
+} from './archive-extraction';
 
 // ============================================
 // QUEUE STORE
@@ -148,6 +154,9 @@ interface RawDecompressedArchive {
  * Optional filter allows extracting only specific files (mokuro first, then images per volume)
  * If listOnly is true, returns file list without extracting content (for planning)
  * If listAllExtractFiltered is true, lists ALL files but only extracts content for filtered ones
+ *
+ * In test environment (no Worker available), uses direct extraction.
+ * In browser, uses Worker pool for off-main-thread processing.
  */
 async function decompressArchiveRaw(
   archiveFile: File,
@@ -157,6 +166,37 @@ async function decompressArchiveRaw(
   listAllExtractFiltered?: boolean
 ): Promise<RawDecompressedArchive> {
   onProgress?.(listOnly ? 'Scanning...' : 'Decompressing...', 10);
+
+  // Check if we're in a test environment (vitest with jsdom)
+  // In tests, use direct extraction instead of workers
+  // Check multiple indicators since environment detection varies
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const globalProcess = (globalThis as any).process;
+  const isTestEnvironment =
+    globalProcess?.env?.NODE_ENV === 'test' ||
+    globalProcess?.env?.VITEST === 'true' ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).__vitest__ !== undefined;
+
+  if (isTestEnvironment) {
+    // Direct extraction for test environment
+    const archiveFilter: ArchiveExtractFilter | undefined = filter
+      ? { extensions: filter.extensions, pathPrefixes: filter.pathPrefixes }
+      : undefined;
+
+    const entries = await decompressArchive(
+      archiveFile,
+      archiveFilter,
+      listOnly,
+      listAllExtractFiltered,
+      (extracted, total) => {
+        const pct = Math.round((extracted / total) * 40) + 10;
+        onProgress?.(listOnly ? 'Scanning...' : 'Decompressing...', pct);
+      }
+    );
+
+    return { entries };
+  }
 
   // Get the worker pool
   const pool = await getFileProcessingPool();
@@ -206,35 +246,43 @@ async function decompressArchiveRaw(
 }
 
 /**
- * Volume definition for multi-volume extraction
- */
-interface VolumeExtractDef {
-  id: string;
-  pathPrefix: string;
-}
-
-/**
  * Stream extract images for ALL volumes in a single archive pass
  * Opens the archive ONCE, extracts images for all volumes, groups by volume ID
  * Much faster than opening archive N times for N volumes
+ *
+ * In test environment (no Worker available), uses direct extraction.
+ * In browser, uses Worker for off-main-thread processing.
  */
 async function streamExtractAllVolumes(
   archiveFile: File,
   volumes: VolumeExtractDef[],
   onProgress?: (status: string, progress: number) => void
 ): Promise<Map<string, Map<string, File>>> {
-  // Map of volumeId → (relativePath → File)
+  // Check if we're in a test environment (vitest with jsdom)
+  // In tests, use direct extraction instead of workers
+  // Check multiple indicators since environment detection varies
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const globalProcess = (globalThis as any).process;
+  const isTestEnvironment =
+    globalProcess?.env?.NODE_ENV === 'test' ||
+    globalProcess?.env?.VITEST === 'true' ||
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).__vitest__ !== undefined;
+
+  if (isTestEnvironment) {
+    // Direct extraction for test environment
+    return extractArchiveByVolumes(archiveFile, volumes, (extracted, total) => {
+      const pct = Math.round((extracted / total) * 100);
+      onProgress?.(`Extracting... ${pct}%`, pct);
+    });
+  }
+
+  // Worker-based extraction for browser
   const allVolumeFiles = new Map<string, Map<string, File>>();
 
   // Initialize maps for each volume
   for (const vol of volumes) {
     allVolumeFiles.set(vol.id, new Map());
-  }
-
-  // Build prefix → volumeId lookup
-  const prefixToVolume = new Map<string, { id: string; prefix: string }>();
-  for (const vol of volumes) {
-    prefixToVolume.set(vol.pathPrefix, { id: vol.id, prefix: vol.pathPrefix });
   }
 
   return new Promise((resolve, reject) => {
@@ -794,9 +842,15 @@ export interface ImportResult {
  * - Processing and saving volumes
  *
  * @param files - Array of File objects from drag-drop or file picker
+ * @param options - Optional callbacks for preparation progress
  * @returns Import result with success/failure counts
  */
-export async function importFiles(files: File[]): Promise<ImportResult> {
+export interface ImportOptions {
+  /** Called when pairing is complete with the number of volumes found */
+  onPreparing?: (volumesFound: number) => void;
+}
+
+export async function importFiles(files: File[], options?: ImportOptions): Promise<ImportResult> {
   const result: ImportResult = {
     success: true,
     imported: 0,
@@ -846,6 +900,9 @@ export async function importFiles(files: File[]): Promise<ImportResult> {
       showSnackbar('No volumes to import');
       return result;
     }
+
+    // Notify caller that preparation is complete
+    options?.onPreparing?.(allPairings.length);
 
     // Decide routing
     const routing = decideImportRouting(allPairings);

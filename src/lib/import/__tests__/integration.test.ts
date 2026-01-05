@@ -114,16 +114,11 @@ vi.mock('$lib/util/modals', () => ({
   })
 }));
 
-// Mock the worker pool - return entries directly without actual worker
+// Worker pool mock - only needed for non-archive operations
+// Archive operations now use direct extraction in test environment (detected via __vitest__)
 vi.mock('$lib/util/file-processing-pool', () => ({
   getFileProcessingPool: vi.fn().mockResolvedValue({
-    addTask: vi.fn().mockImplementation((task) => {
-      // Simulate immediate completion with empty entries
-      // Archive decompression would happen here in real scenario
-      setTimeout(() => {
-        task.onComplete({ entries: [] }, () => {});
-      }, 0);
-    })
+    addTask: vi.fn()
   }),
   incrementPoolUsers: vi.fn(),
   decrementPoolUsers: vi.fn()
@@ -319,12 +314,21 @@ describe('importFiles integration', () => {
       const fixture = await loadFixture('edge-cases', 'case-insensitive-matching');
       const files = fixtureToFiles(fixture);
 
+      console.log(
+        'Test files:',
+        files.map((f) => `${f.name} (${f.size} bytes)`)
+      );
+
       const result = await importFiles(files);
 
-      // Worker mock returns empty entries, so archive appears empty
-      // The pairing works (mokuro pairs with archive), but decompression returns nothing
-      expect(result.success).toBe(false);
-      expect(result.errors).toContain('No importable volumes found in archive');
+      console.log('Import result:', JSON.stringify(result, null, 2));
+      console.log('Saved volumes:', savedVolumes.length);
+
+      // External mokuro pairs with flat archive (images at root level)
+      // Tests the fix for root-level basePath matching
+      expect(result.success).toBe(true);
+      expect(result.imported).toBe(1);
+      expect(savedVolumes).toHaveLength(1);
     });
 
     it('returns early for empty file list', async () => {
@@ -436,9 +440,8 @@ describe('importFiles with archives', () => {
     importQueue.set([]);
   });
 
-  // Archive tests are limited since we mock the worker pool to return empty entries
-  // These test that archives are recognized and routed correctly, but actual
-  // decompression/processing requires a real worker
+  // Archive tests now use direct extraction in test environment
+  // This tests the full archive import pipeline without mocking
 
   it('pairs archive with external mokuro file', async () => {
     const fixture = await loadFixture('internal-mokuro', 'archive-with-external-mokuro');
@@ -446,10 +449,10 @@ describe('importFiles with archives', () => {
 
     const result = await importFiles(files);
 
-    // Worker mock returns empty entries, so archive appears empty
-    // This tests the error handling path
-    expect(result.success).toBe(false);
-    expect(result.errors).toContain('No importable volumes found in archive');
+    // External mokuro pairs with archive and imports successfully
+    expect(result.success).toBe(true);
+    expect(result.imported).toBe(1);
+    expect(savedVolumes).toHaveLength(1);
   });
 
   it('handles standalone archive (internal mokuro)', async () => {
@@ -458,8 +461,9 @@ describe('importFiles with archives', () => {
 
     const result = await importFiles(files);
 
-    // Worker mock returns empty entries, so archive appears empty
-    expect(result.success).toBe(false);
-    expect(result.errors).toContain('No importable volumes found in archive');
+    // Archive with internal mokuro imports successfully
+    expect(result.success).toBe(true);
+    expect(result.imported).toBe(1);
+    expect(savedVolumes).toHaveLength(1);
   });
 });

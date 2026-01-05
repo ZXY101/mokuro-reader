@@ -2,6 +2,11 @@
   import { scanFiles } from '$lib/upload';
   import { importFiles } from '$lib/import';
   import { showSnackbar } from '$lib/util/snackbar';
+  import {
+    showImportPreparing,
+    updateImportPreparing,
+    closeImportPreparing
+  } from '$lib/util/modals';
 
   let isDragging = $state(false);
   let dragCounter = 0; // Track enter/leave for nested elements
@@ -41,6 +46,9 @@
       return;
     }
 
+    // Show preparing modal immediately
+    showImportPreparing('scanning');
+
     // Collect all entries synchronously - DataTransfer is only valid during the event
     // Once we await, subsequent items may become inaccessible
     const directoryEntries: FileSystemEntry[] = [];
@@ -62,10 +70,17 @@
       }
     }
 
+    // Update with direct files count
+    if (directFiles.length > 0) {
+      updateImportPreparing({ filesScanned: directFiles.length });
+    }
+
     // Now process directories asynchronously (safe since we already have the entries)
     const filePromises: Promise<File | undefined>[] = [];
     for (const entry of directoryEntries) {
       await scanFiles(entry, filePromises);
+      // Update count as we scan
+      updateImportPreparing({ filesScanned: directFiles.length + filePromises.length });
     }
 
     // Combine direct files with scanned files
@@ -78,15 +93,24 @@
     }
 
     if (files.length === 0) {
+      closeImportPreparing();
       showSnackbar('No supported files found', 3000);
       return;
     }
 
-    showSnackbar(`Importing ${files.length} file(s)...`, 3000);
+    // Move to analyzing phase
+    updateImportPreparing({ phase: 'analyzing', totalFiles: files.length });
 
     try {
-      await importFiles(files);
+      // Import files with preparation callback
+      await importFiles(files, {
+        onPreparing: (volumesFound) => {
+          updateImportPreparing({ phase: 'preparing', volumesFound });
+        }
+      });
+      closeImportPreparing();
     } catch (error) {
+      closeImportPreparing();
       console.error('Error processing dropped files:', error);
       showSnackbar('Failed to import files', 3000);
     }

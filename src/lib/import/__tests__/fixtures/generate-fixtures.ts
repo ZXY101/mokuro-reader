@@ -33,6 +33,25 @@ const TINY_CBZ = Buffer.from(
 );
 
 /**
+ * Create a CBZ with images only (no mokuro file) (async)
+ */
+async function createCbzImagesOnly(pageCount: number): Promise<Buffer> {
+  const blobWriter = new BlobWriter('application/zip');
+  const zipWriter = new ZipWriter(blobWriter);
+
+  // Add image files only
+  for (let i = 1; i <= pageCount; i++) {
+    const filename = `page${String(i).padStart(3, '0')}.jpg`;
+    await zipWriter.add(filename, new Uint8ArrayReader(new Uint8Array(TINY_PNG)));
+  }
+
+  await zipWriter.close();
+  const blob = await blobWriter.getData();
+  const arrayBuffer = await blob.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
  * Create a CBZ with mokuro file inside (async)
  */
 async function createCbzWithMokuro(
@@ -320,77 +339,8 @@ createFixture(
 // ============================================
 // INTERNAL MOKURO FIXTURES
 // ============================================
-
-// 1. standalone-archive (no external mokuro)
-createFixture(
-  'internal-mokuro',
-  'standalone-archive',
-  {
-    'manga.cbz': TINY_CBZ
-  },
-  createExpected(1, [
-    {
-      sourceType: 'archive',
-      hasMokuro: false, // null - expected inside archive
-      basePathContains: 'manga',
-      imageOnly: false
-    }
-  ])
-);
-
-// 2. archive-with-external-mokuro
-createFixture(
-  'internal-mokuro',
-  'archive-with-external-mokuro',
-  {
-    'manga.mokuro': createMokuro('Test Manga', 'Volume 1', 1),
-    'manga.cbz': TINY_CBZ
-  },
-  createExpected(1, [
-    {
-      sourceType: 'archive',
-      hasMokuro: true,
-      basePathContains: 'manga',
-      imageOnly: false
-    }
-  ])
-);
-
-// 3. mixed-external-and-internal
-// Multi-pass order: same-dir images (vol3) → same-name archive (vol1) → standalone (vol2)
-createFixture(
-  'internal-mokuro',
-  'mixed-external-and-internal',
-  {
-    'vol1.mokuro': createMokuro('Test Manga', 'Volume 1', 1),
-    'vol1.cbz': TINY_CBZ,
-    'vol2.cbz': TINY_CBZ, // No external mokuro
-    'vol3/vol3.mokuro': createMokuro('Test Manga', 'Volume 3', 2),
-    'vol3/page001.jpg': TINY_PNG,
-    'vol3/page002.jpg': TINY_PNG
-  },
-  createExpected(3, [
-    {
-      sourceType: 'directory',
-      hasMokuro: true,
-      basePathContains: 'vol3',
-      imageOnly: false,
-      fileCount: 2
-    },
-    {
-      sourceType: 'archive',
-      hasMokuro: true,
-      basePathContains: 'vol1',
-      imageOnly: false
-    },
-    {
-      sourceType: 'archive',
-      hasMokuro: false,
-      basePathContains: 'vol2',
-      imageOnly: false
-    }
-  ])
-);
+// NOTE: Most internal-mokuro fixtures are generated in createAsyncFixtures()
+// because they require proper CBZ generation. See below.
 
 // ============================================
 // MULTIPLE VOLUMES FIXTURES
@@ -676,23 +626,7 @@ createFixture(
   ])
 );
 
-// 8. case-insensitive-matching
-createFixture(
-  'edge-cases',
-  'case-insensitive-matching',
-  {
-    'Manga.mokuro': createMokuro('Test Manga', 'Volume 1', 1),
-    'manga.cbz': TINY_CBZ
-  },
-  createExpected(1, [
-    {
-      sourceType: 'archive',
-      hasMokuro: true,
-      basePathContains: 'manga',
-      imageOnly: false
-    }
-  ])
-);
+// 8. case-insensitive-matching - moved to async fixtures (needs proper CBZ generation)
 
 // 9. unicode-names
 createFixture(
@@ -1079,6 +1013,66 @@ async function createAsyncFixtures(): Promise<void> {
         sourceType: 'archive',
         hasMokuro: false,
         basePathContains: 'catalog',
+        imageOnly: false
+      }
+    ])
+  );
+
+  // 8. case-insensitive-matching
+  // Tests that external mokuro pairs with flat archive (images at root level)
+  const flatCbz = await createCbzImagesOnly(1);
+  createFixture(
+    'edge-cases',
+    'case-insensitive-matching',
+    {
+      'Manga.mokuro': createMokuro('Test Manga', 'Volume 1', 1),
+      'manga.cbz': flatCbz
+    },
+    createExpected(1, [
+      {
+        sourceType: 'archive',
+        hasMokuro: true,
+        basePathContains: 'manga',
+        imageOnly: false
+      }
+    ])
+  );
+
+  // 9. standalone-archive (internal mokuro fixtures)
+  // CBZ with mokuro file inside - no external mokuro
+  const standaloneArchiveCbz = await createCbzWithMokuro('Test Manga', 'Volume 1', 1);
+  createFixture(
+    'internal-mokuro',
+    'standalone-archive',
+    {
+      'manga.cbz': standaloneArchiveCbz
+    },
+    createExpected(1, [
+      {
+        sourceType: 'archive',
+        hasMokuro: false, // null externally - mokuro is inside archive
+        basePathContains: 'manga',
+        imageOnly: false
+      }
+    ])
+  );
+
+  // 10. archive-with-external-mokuro
+  // CBZ with images only + external mokuro file
+  // This tests the fix for flat archives with external mokuro pairing
+  const imagesOnlyCbz = await createCbzImagesOnly(1);
+  createFixture(
+    'internal-mokuro',
+    'archive-with-external-mokuro',
+    {
+      'manga.mokuro': createMokuro('Test Manga', 'Volume 1', 1),
+      'manga.cbz': imagesOnlyCbz
+    },
+    createExpected(1, [
+      {
+        sourceType: 'archive',
+        hasMokuro: true,
+        basePathContains: 'manga',
         imageOnly: false
       }
     ])
