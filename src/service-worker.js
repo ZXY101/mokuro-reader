@@ -89,7 +89,10 @@ self.addEventListener('fetch', (event) => {
     } catch {
       const cachedResponse = await cache.match(event.request);
       // Return cached response or a basic offline response
-      return cachedResponse || new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+      return (
+        cachedResponse ||
+        new Response('Offline', { status: 503, statusText: 'Service Unavailable' })
+      );
     }
   }
 
