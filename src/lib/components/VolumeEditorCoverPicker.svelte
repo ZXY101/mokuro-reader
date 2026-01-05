@@ -3,6 +3,7 @@
   import { Button, Modal, Spinner, Fileupload } from 'flowbite-svelte';
   import { getVolumeFiles } from '$lib/util/volume-editor';
   import { showSnackbar } from '$lib/util';
+  import { IMAGE_MIME_TYPES } from '$lib/import/types';
   import Cropper from 'cropperjs';
   import 'cropperjs/dist/cropper.css';
 
@@ -59,10 +60,10 @@
     }
   }
 
-  const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jxl'];
+  const validImageMimeTypes = new Set(Object.values(IMAGE_MIME_TYPES));
 
   function isValidImageFile(file: File): boolean {
-    return validImageTypes.includes(file.type) || file.type.startsWith('image/');
+    return validImageMimeTypes.has(file.type) || file.type.startsWith('image/');
   }
 
   function handleFileUpload(event: Event) {

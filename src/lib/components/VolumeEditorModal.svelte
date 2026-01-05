@@ -17,6 +17,7 @@
   import type { VolumeMetadata } from '$lib/types';
   import { VolumeData } from '$lib/settings/volume-data';
   import VolumeEditorCoverPicker from './VolumeEditorCoverPicker.svelte';
+  import { IMAGE_MIME_TYPES } from '$lib/import/types';
 
   let open = $state(false);
   let loading = $state(true);
@@ -234,10 +235,10 @@
     }
   }
 
-  const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jxl'];
+  const validImageMimeTypes = new Set(Object.values(IMAGE_MIME_TYPES));
 
   function isValidImageFile(file: File): boolean {
-    return validImageTypes.includes(file.type) || file.type.startsWith('image/');
+    return validImageMimeTypes.has(file.type) || file.type.startsWith('image/');
   }
 
   function handleCoverSelected(file: File) {
