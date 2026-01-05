@@ -48,9 +48,7 @@
   let missingPagePaths = $state<string[]>([]);
 
   // Derived characters read based on progress
-  let chars = $derived(
-    pageCount > 0 ? Math.round((progress / pageCount) * characterCount) : 0
-  );
+  let chars = $derived(pageCount > 0 ? Math.round((progress / pageCount) * characterCount) : 0);
 
   // Sync time fields to/from timeReadInMinutes
   function updateTimeFromMinutes(totalMinutes: number) {
@@ -59,6 +57,9 @@
   }
 
   function updateMinutesFromTime() {
+    // Ensure non-negative values
+    timeHours = Math.max(0, Math.floor(timeHours) || 0);
+    timeMinutes = Math.max(0, Math.min(59, Math.floor(timeMinutes) || 0));
     timeReadInMinutes = timeHours * 60 + timeMinutes;
   }
 
@@ -233,12 +234,23 @@
     }
   }
 
+  const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jxl'];
+
+  function isValidImageFile(file: File): boolean {
+    return validImageTypes.includes(file.type) || file.type.startsWith('image/');
+  }
+
   function handleCoverSelected(file: File) {
     showCoverPicker = false;
     saveCover(file);
   }
 
   async function saveCover(file: File) {
+    if (!isValidImageFile(file)) {
+      showSnackbar('Please select a valid image file');
+      return;
+    }
+
     try {
       saving = true;
       await updateVolumeCover(volumeUuid, file);
@@ -274,7 +286,6 @@
     }
     closeVolumeEditor();
   }
-
 </script>
 
 <Modal bind:open size="lg" onclose={handleClose}>
@@ -295,7 +306,11 @@
               class="flex h-[175px] w-[125px] items-center justify-center overflow-hidden rounded-lg border border-gray-900 bg-black"
             >
               {#if thumbnailUrl}
-                <img src={thumbnailUrl} alt="Cover" class="max-h-[175px] max-w-[125px] object-contain" />
+                <img
+                  src={thumbnailUrl}
+                  alt="Cover"
+                  class="max-h-[175px] max-w-[125px] object-contain"
+                />
               {:else}
                 <span class="text-sm text-gray-400">No cover</span>
               {/if}
@@ -418,12 +433,15 @@
 
         <!-- Missing Pages Section (only shown if there are missing pages) -->
         {#if missingPagePaths.length > 0}
-          <div class="rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-600 dark:bg-yellow-900/20">
+          <div
+            class="rounded-lg border border-yellow-300 bg-yellow-50 p-4 dark:border-yellow-600 dark:bg-yellow-900/20"
+          >
             <h4 class="mb-2 font-medium text-yellow-800 dark:text-yellow-200">
               Missing Pages ({missingPagePaths.length})
             </h4>
             <p class="mb-2 text-sm text-yellow-700 dark:text-yellow-300">
-              The following pages were not found in the archive and have been replaced with placeholders:
+              The following pages were not found in the archive and have been replaced with
+              placeholders:
             </p>
             <ul class="max-h-32 overflow-y-auto text-sm text-yellow-600 dark:text-yellow-400">
               {#each missingPagePaths as path}

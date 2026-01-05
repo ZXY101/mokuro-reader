@@ -2,6 +2,7 @@
   import { onMount, onDestroy } from 'svelte';
   import { Button, Modal, Spinner, Fileupload } from 'flowbite-svelte';
   import { getVolumeFiles } from '$lib/util/volume-editor';
+  import { showSnackbar } from '$lib/util';
   import Cropper from 'cropperjs';
   import 'cropperjs/dist/cropper.css';
 
@@ -58,10 +59,21 @@
     }
   }
 
+  const validImageTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jxl'];
+
+  function isValidImageFile(file: File): boolean {
+    return validImageTypes.includes(file.type) || file.type.startsWith('image/');
+  }
+
   function handleFileUpload(event: Event) {
     const input = event.target as HTMLInputElement;
     if (input.files && input.files[0]) {
-      onSelect(input.files[0]);
+      const file = input.files[0];
+      if (!isValidImageFile(file)) {
+        showSnackbar('Please select a valid image file');
+        return;
+      }
+      onSelect(file);
       handleClose();
     }
   }
@@ -205,7 +217,9 @@
       <!-- Cropper View -->
       <h3 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Crop Cover</h3>
 
-      <div class="cropper-container relative mb-4 h-[400px] w-full overflow-hidden rounded-lg bg-gray-900">
+      <div
+        class="cropper-container relative mb-4 h-[400px] w-full overflow-hidden rounded-lg bg-gray-900"
+      >
         <img
           src={cropImage}
           alt="Crop preview"
@@ -251,7 +265,7 @@
           <div class="py-4 text-center text-gray-500">No pages found</div>
         {:else}
           <div
-            class="grid max-h-[300px] grid-cols-5 gap-2 overflow-y-auto rounded-lg border border-gray-200 p-2 dark:border-gray-700 sm:grid-cols-6 md:grid-cols-8"
+            class="grid max-h-[300px] grid-cols-5 gap-2 overflow-y-auto rounded-lg border border-gray-200 p-2 sm:grid-cols-6 md:grid-cols-8 dark:border-gray-700"
           >
             {#each pages as page, index}
               <button
@@ -268,7 +282,7 @@
                   loading="lazy"
                 />
                 <span
-                  class="absolute bottom-0 left-0 right-0 bg-black/50 py-0.5 text-center text-xs text-white"
+                  class="absolute right-0 bottom-0 left-0 bg-black/50 py-0.5 text-center text-xs text-white"
                 >
                   {index + 1}
                 </span>
