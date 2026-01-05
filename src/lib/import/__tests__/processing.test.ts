@@ -371,6 +371,54 @@ describe('processVolume', () => {
     expect(result.metadata.thumbnailHeight).toBeGreaterThan(0);
   });
 
+  it('prefers cover image for thumbnail when available', async () => {
+    const mokuroFile = createMokuroFile({
+      pages: [
+        { img_path: 'page001.jpg', blocks: [] },
+        { img_path: 'cover.jpg', blocks: [] },
+        { img_path: 'page002.jpg', blocks: [] }
+      ]
+    });
+    const input = createDecompressedVolume({
+      mokuroFile,
+      imageFiles: createImageFiles(['page001.jpg', 'cover.jpg', 'page002.jpg'])
+    });
+
+    await processVolume(input);
+
+    // Check that generateThumbnail was called with the cover image
+    const { generateThumbnail } = await import('$lib/catalog/thumbnails');
+    expect(generateThumbnail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'cover.jpg'
+      })
+    );
+  });
+
+  it('uses case-insensitive cover detection', async () => {
+    const mokuroFile = createMokuroFile({
+      pages: [
+        { img_path: 'page001.jpg', blocks: [] },
+        { img_path: 'COVER_IMAGE.png', blocks: [] },
+        { img_path: 'page002.jpg', blocks: [] }
+      ]
+    });
+    const input = createDecompressedVolume({
+      mokuroFile,
+      imageFiles: createImageFiles(['page001.jpg', 'COVER_IMAGE.png', 'page002.jpg'])
+    });
+
+    await processVolume(input);
+
+    // Check that generateThumbnail was called with the cover image
+    const { generateThumbnail } = await import('$lib/catalog/thumbnails');
+    expect(generateThumbnail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'COVER_IMAGE.png'
+      })
+    );
+  });
+
   it('handles missing images gracefully', async () => {
     const mokuroFile = createMokuroFile({
       pages: [
