@@ -180,3 +180,26 @@ export function promptMissingFiles(
     onCancel
   });
 }
+
+// Volume editor modal - for editing volume metadata, stats, and cover
+type VolumeEditorModal = {
+  open: boolean;
+  volumeUuid: string;
+  onSave?: () => void;
+  onCancel?: () => void;
+};
+
+export const volumeEditorModalStore = writable<VolumeEditorModal | undefined>(undefined);
+
+export function promptVolumeEditor(volumeUuid: string, onSave?: () => void, onCancel?: () => void) {
+  volumeEditorModalStore.set({
+    open: true,
+    volumeUuid,
+    onSave,
+    onCancel
+  });
+}
+
+export function closeVolumeEditor() {
+  volumeEditorModalStore.set(undefined);
+}
