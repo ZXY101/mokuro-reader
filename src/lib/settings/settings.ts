@@ -19,12 +19,7 @@ export type FontSize =
   | '48'
   | '60';
 
-export type ZoomModes =
-  | 'zoomFitToScreen'
-  | 'zoomFitToWidth'
-  | 'zoomOriginal'
-  | 'keepZoom'
-  | 'keepZoomStart';
+export type ZoomModes = 'zoomFitToScreen' | 'zoomFitToWidth' | 'zoomOriginal' | 'keepZoom';
 
 export type PageTransition = 'none' | 'crossfade' | 'vertical' | 'pageTurn' | 'swipe';
 

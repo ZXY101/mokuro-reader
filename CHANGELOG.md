@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.2] - Unreleased
+
+### Added
+
+- **Pan to page start on page turn** - New panning behavior that positions at the top corner based on reading direction (top-right for RTL, top-left for LTR). Thanks [@Zipeks](https://github.com/Zipeks)!
+
+### Changed
+
+- **Simplified zoom options** - Removed redundant "Keep zoom, pan to top center" and "Keep zoom, pan to top corner" options. "Original size" and "Keep zoom" now use pan-to-page-start behavior.
+
 ## [1.1.1] - Unreleased
 
 ### Added
