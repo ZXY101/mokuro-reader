@@ -13,8 +13,10 @@
     DotsVerticalOutline,
     CloudArrowUpOutline,
     ImageOutline,
-    ExclamationCircleOutline
+    ExclamationCircleOutline,
+    EditOutline
   } from 'flowbite-svelte-icons';
+  import { promptVolumeEditor } from '$lib/util/modals';
   import { db } from '$lib/catalog/db';
   import { nav, routeParams } from '$lib/util/hash-router';
   import BackupButton from './BackupButton.svelte';
@@ -275,6 +277,11 @@
     if (seriesId) nav.toVolumeText(seriesId, volume_uuid);
   }
 
+  function onEditClicked(e: Event) {
+    e.stopPropagation();
+    promptVolumeEditor(volume_uuid);
+  }
+
   async function onBackupClicked(e: Event) {
     e.stopPropagation();
 
@@ -357,6 +364,13 @@
             >
               <FileLinesOutline class="z-10 text-blue-400 hover:text-blue-500" />
             </button>
+            <button
+              onclick={onEditClicked}
+              class="flex items-center justify-center"
+              title="Edit volume"
+            >
+              <EditOutline class="z-10 text-gray-400 hover:text-gray-300" />
+            </button>
             <button onclick={onDeleteClicked} class="flex items-center justify-center">
               <TrashBinSolid class="poin z-10 text-red-400 hover:text-red-500" />
             </button>
@@ -385,6 +399,13 @@
         <DotsVerticalOutline class="h-4 w-4 text-white" />
       </button>
       <Dropdown triggeredBy="#volume-menu-{volume_uuid}" placement="bottom-end">
+        <DropdownItem
+          onclick={onEditClicked}
+          class="flex w-full items-center text-gray-700 dark:text-gray-200"
+        >
+          <EditOutline class="me-2 h-5 w-5 flex-shrink-0" />
+          <span class="flex-1 text-left">Edit</span>
+        </DropdownItem>
         <DropdownItem
           onclick={onViewTextClicked}
           class="flex w-full items-center text-gray-700 dark:text-gray-200"

@@ -11,6 +11,7 @@ import {
 } from '@zip.js/zip.js';
 import { File as MegaFile, Storage } from 'megajs';
 import { compressVolume, type MokuroMetadata } from '$lib/util/compress-volume';
+import { matchFileToVolume } from '$lib/import/archive-extraction';
 
 // Define the worker context
 const ctx: Worker = self as any;
@@ -950,15 +951,8 @@ ctx.addEventListener('message', async (event) => {
         // Skip system files (macOS, Windows, Linux metadata)
         if (isSystemFile(entry.filename)) continue;
 
-        // Check if this entry belongs to any of the requested volumes
-        let matchedVolumeId: string | null = null;
-        for (const [prefix, volId] of volumePrefixes) {
-          if (entry.filename.startsWith(prefix + '/') || entry.filename === prefix) {
-            matchedVolumeId = volId;
-            break;
-          }
-        }
-
+        // Match file to volume using shared logic
+        const matchedVolumeId = matchFileToVolume(entry.filename, volumePrefixes);
         if (!matchedVolumeId) continue;
 
         const ext = entry.filename.split('.').pop()?.toLowerCase() || '';

@@ -47,6 +47,8 @@ https://github.com/ZXY101/mokuro-reader/assets/39561296/45a214a8-3f69-461c-87d7-
 
 ### 🔧 Power Features
 
+- **Volume Editor** - Edit metadata, reading progress, and cover (with cropping) directly from the catalog
+- **Series Management** - Rename or merge series from the series page
 - **Context Menu for Text Boxes** - Right-click or long-press OCR text boxes for quick copy and Anki card creation
 - **Copy Without Linebreaks** - Copied text automatically strips linebreaks for cleaner pasting
 - **Text Analysis Tools** - Dedicated text pages for both volumes and series for analysis by browser extensions
