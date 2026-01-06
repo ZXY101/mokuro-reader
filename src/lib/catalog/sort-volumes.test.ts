@@ -1,17 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { VolumeMetadata } from '$lib/types';
-
-// Import the sortVolumes function - we need to extract it from index.ts
-// For now, we'll copy the function here for testing
-function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
-  if (a.volume_title < b.volume_title) {
-    return -1;
-  }
-  if (a.volume_title > b.volume_title) {
-    return 1;
-  }
-  return 0;
-}
+import { sortVolumes } from './sort-volumes';
 
 // Helper function to create mock volume metadata
 function createMockVolume(title: string): VolumeMetadata {
@@ -28,26 +17,23 @@ function createMockVolume(title: string): VolumeMetadata {
 }
 
 describe('sortVolumes', () => {
-  it('should sort Japanese volumes with numbers correctly (current behavior)', () => {
+  it('should sort Japanese volumes with numbers correctly', () => {
     const volumes = [
       createMockVolume('からかい上手の高木さん　１'),
-      createMockVolume('からかい上手の高木さん　２'),
-      createMockVolume('からかい上手の高木さん　10')
+      createMockVolume('からかい上手の高木さん　10'),
+      createMockVolume('からかい上手の高木さん　２')
     ];
 
-    // Shuffle the array to test actual sorting
-    const shuffled = [volumes[2], volumes[0], volumes[1]]; // 10, 1, 2
-    const sorted = shuffled.sort(sortVolumes);
+    const sorted = volumes.sort(sortVolumes);
 
-    // Current implementation uses string comparison, so "10" comes before "2"
     expect(sorted.map((v) => v.volume_title)).toEqual([
-      'からかい上手の高木さん　10', // This comes first alphabetically!
       'からかい上手の高木さん　１',
-      'からかい上手の高木さん　２'
+      'からかい上手の高木さん　２',
+      'からかい上手の高木さん　10'
     ]);
   });
 
-  it('should demonstrate the alphabetical sorting issue with numbers', () => {
+  it('should sort English volumes with natural number ordering', () => {
     const volumes = [
       createMockVolume('Volume 1'),
       createMockVolume('Volume 2'),
@@ -58,13 +44,51 @@ describe('sortVolumes', () => {
 
     const sorted = volumes.sort(sortVolumes);
 
-    // String comparison puts "10" and "11" before "2" and "3"
+    // Natural sorting correctly orders numbers
     expect(sorted.map((v) => v.volume_title)).toEqual([
       'Volume 1',
-      'Volume 10', // This should come after Volume 9 in natural order
-      'Volume 11', // This should come after Volume 9 in natural order
       'Volume 2',
-      'Volume 3'
+      'Volume 3',
+      'Volume 10',
+      'Volume 11'
+    ]);
+  });
+
+  it('should handle fixed-width numbers (zero-padded)', () => {
+    const volumes = [
+      createMockVolume('Chapter 01'),
+      createMockVolume('Chapter 02'),
+      createMockVolume('Chapter 10'),
+      createMockVolume('Chapter 11'),
+      createMockVolume('Chapter 03')
+    ];
+
+    const sorted = volumes.sort(sortVolumes);
+    expect(sorted.map((v) => v.volume_title)).toEqual([
+      'Chapter 01',
+      'Chapter 02',
+      'Chapter 03',
+      'Chapter 10',
+      'Chapter 11'
+    ]);
+  });
+
+  it('should handle mixed number formats', () => {
+    const volumes = [
+      createMockVolume('Vol 1'),
+      createMockVolume('Vol 02'),
+      createMockVolume('Vol 10'),
+      createMockVolume('Vol 3'),
+      createMockVolume('Vol 011')
+    ];
+
+    const sorted = volumes.sort(sortVolumes);
+    expect(sorted.map((v) => v.volume_title)).toEqual([
+      'Vol 1',
+      'Vol 02',
+      'Vol 3',
+      'Vol 10',
+      'Vol 011'
     ]);
   });
 
@@ -84,5 +108,24 @@ describe('sortVolumes', () => {
 
     const sorted = volumes.sort(sortVolumes);
     expect(sorted.map((v) => v.volume_title)).toEqual(['Alpha', 'Bravo', 'Charlie']);
+  });
+
+  it('should handle complex mixed scenarios', () => {
+    const volumes = [
+      createMockVolume('Series A Vol 2'),
+      createMockVolume('Series A Vol 10'),
+      createMockVolume('Series A Vol 1'),
+      createMockVolume('Series B Vol 1'),
+      createMockVolume('Series A Vol 3')
+    ];
+
+    const sorted = volumes.sort(sortVolumes);
+    expect(sorted.map((v) => v.volume_title)).toEqual([
+      'Series A Vol 1',
+      'Series A Vol 2',
+      'Series A Vol 3',
+      'Series A Vol 10',
+      'Series B Vol 1'
+    ]);
   });
 });

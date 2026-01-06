@@ -6,16 +6,7 @@ import { deriveSeriesFromVolumes } from '$lib/catalog/catalog';
 import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
 import { generatePlaceholders } from '$lib/catalog/placeholders';
 import { routeParams } from '$lib/util/hash-router';
-
-function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
-  if (a.volume_title < b.volume_title) {
-    return -1;
-  }
-  if (a.volume_title > b.volume_title) {
-    return 1;
-  }
-  return 0;
-}
+import { sortVolumes } from '$lib/catalog/sort-volumes';
 
 // Single source of truth from the database
 export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
