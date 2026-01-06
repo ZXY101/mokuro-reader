@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.2.1] - 2025-01-05
+
+### Added
+
+- **Placeholder series pages** - Click cloud-only series to view their volumes and download options instead of triggering immediate download
+
+### Fixed
+
+- **Placeholder series navigation** - Series page now properly displays when navigating to placeholder-only series
+- **Download transition** - Downloading volumes in a placeholder series no longer breaks the page
+
 ## [1.2.0] - 2025-01-05
 
 ### Added
