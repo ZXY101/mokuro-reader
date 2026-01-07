@@ -2,13 +2,14 @@
   import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
   import { settings, volumes } from '$lib/settings';
-  import { imageToWebp, showCropper, sendToAnki, type VolumeMetadata } from '$lib/anki-connect';
+  import { showCropper, expandTextBoxBounds, type VolumeMetadata } from '$lib/anki-connect';
 
   interface ContextMenuData {
     x: number;
     y: number;
     lines: string[];
     imgElement: HTMLElement | null;
+    textBox?: [number, number, number, number]; // [xmin, ymin, xmax, ymax] for initial crop
   }
 
   interface Props {
@@ -313,22 +314,7 @@
 
       // Get the original block's bounding box for initial crop
       const block = page.blocks[blockIndex];
-      let textBox: [number, number, number, number] | undefined;
-
-      if (block?.box) {
-        const [xmin, ymin, xmax, ymax] = block.box;
-
-        // Expand by 20% of page dimensions on each side, clamped to page bounds
-        const expandX = page.img_width * 0.2;
-        const expandY = page.img_height * 0.2;
-
-        textBox = [
-          Math.max(0, xmin - expandX),
-          Math.max(0, ymin - expandY),
-          Math.min(page.img_width, xmax + expandX),
-          Math.min(page.img_height, ymax + expandY)
-        ];
-      }
+      const textBox = block ? expandTextBoxBounds(block, page) : undefined;
 
       // Always show the modal for review/editing
       const url =
@@ -348,16 +334,22 @@
     }
   }
 
-  function handleContextMenu(event: MouseEvent, lines: string[]) {
+  function handleContextMenu(event: MouseEvent, lines: string[], blockIndex: number) {
     // Only show custom context menu if enabled in settings
     if (!$settings.textBoxContextMenu) return;
 
     event.preventDefault();
+
+    // Get text box bounds with padding
+    const block = page.blocks[blockIndex];
+    const textBox = block ? expandTextBoxBounds(block, page) : undefined;
+
     onContextMenu?.({
       x: event.clientX,
       y: event.clientY,
       lines,
-      imgElement: event.target as HTMLElement
+      imgElement: event.target as HTMLElement,
+      textBox
     });
   }
 
@@ -397,7 +389,7 @@
     style:border
     style:writing-mode={writingMode}
     role="none"
-    oncontextmenu={(e) => handleContextMenu(e, lines)}
+    oncontextmenu={(e) => handleContextMenu(e, lines, blockIndex)}
     ondblclick={(e) => onDoubleTap(e, lines, blockIndex)}
     oncopy={onCopy}
     {contenteditable}
