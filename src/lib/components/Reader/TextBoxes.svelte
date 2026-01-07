@@ -34,11 +34,12 @@
     area: number;
     useMinDimensions: boolean;
     isOriginalMode: boolean;
+    blockIndex: number; // Original index in page.blocks
   }
 
   let textBoxes = $derived(
     page.blocks
-      .map((block) => {
+      .map((block, blockIndex) => {
         const { img_height, img_width } = page;
         const { box, font_size, lines, vertical } = block;
 
@@ -97,7 +98,8 @@
           lines: processedLines,
           area,
           useMinDimensions: $settings.fontSize !== 'auto' && !isOriginalMode,
-          isOriginalMode
+          isOriginalMode,
+          blockIndex
         };
 
         return textBox;
@@ -304,17 +306,44 @@
     return selection?.toString().trim() || '';
   }
 
-  async function onUpdateCard(event: Event, lines: string[]) {
+  async function onUpdateCard(event: Event, lines: string[], blockIndex: number) {
     if ($settings.ankiConnectSettings.enabled) {
       const selectedText = getSelectedText();
       const fullSentence = lines.join(' ');
+
+      // Get the original block's bounding box for initial crop
+      const block = page.blocks[blockIndex];
+      let textBox: [number, number, number, number] | undefined;
+
+      if (block?.box) {
+        const [xmin, ymin, xmax, ymax] = block.box;
+
+        // Expand by 20% of page dimensions on each side, clamped to page bounds
+        const expandX = page.img_width * 0.2;
+        const expandY = page.img_height * 0.2;
+
+        textBox = [
+          Math.max(0, xmin - expandX),
+          Math.max(0, ymin - expandY),
+          Math.min(page.img_width, xmax + expandX),
+          Math.min(page.img_height, ymax + expandY)
+        ];
+      }
 
       // Always show the modal for review/editing
       const url =
         getImageUrlFromElement(event.target as HTMLElement) ||
         (src ? URL.createObjectURL(src) : null);
       if (url) {
-        showCropper(url, selectedText || fullSentence, fullSentence, ankiTags, volumeMetadata);
+        showCropper(
+          url,
+          selectedText || fullSentence,
+          fullSentence,
+          ankiTags,
+          volumeMetadata,
+          undefined,
+          textBox
+        );
       }
     }
   }
@@ -332,12 +361,12 @@
     });
   }
 
-  function onDoubleTap(event: Event, lines: string[]) {
+  function onDoubleTap(event: Event, lines: string[], blockIndex: number) {
     // Always stop propagation to prevent zoom from triggering
     event.stopPropagation();
     if (doubleTapEnabled) {
       event.preventDefault();
-      onUpdateCard(event, lines);
+      onUpdateCard(event, lines, blockIndex);
     }
   }
 
@@ -350,7 +379,7 @@
   }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions, isOriginalMode }, index (`${volumeUuid}-textBox-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions, isOriginalMode, blockIndex }, index (`${volumeUuid}-textBox-${index}`)}
   <div
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
@@ -369,7 +398,7 @@
     style:writing-mode={writingMode}
     role="none"
     oncontextmenu={(e) => handleContextMenu(e, lines)}
-    ondblclick={(e) => onDoubleTap(e, lines)}
+    ondblclick={(e) => onDoubleTap(e, lines, blockIndex)}
     oncopy={onCopy}
     {contenteditable}
   >

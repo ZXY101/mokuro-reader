@@ -12,6 +12,7 @@ type CropperModal = {
   tags?: string;
   metadata?: VolumeMetadata;
   pages?: Page[]; // Available pages with textboxes for visual selection
+  textBox?: [number, number, number, number]; // [xmin, ymin, xmax, ymax] for initial crop
 };
 
 export const cropperStore = writable<CropperModal | undefined>(undefined);
@@ -22,7 +23,8 @@ export function showCropper(
   sentence?: string,
   tags?: string,
   metadata?: VolumeMetadata,
-  pages?: Page[]
+  pages?: Page[],
+  textBox?: [number, number, number, number]
 ) {
   cropperStore.set({
     open: true,
@@ -31,7 +33,8 @@ export function showCropper(
     sentence,
     tags,
     metadata,
-    pages
+    pages,
+    textBox
   });
 }
 

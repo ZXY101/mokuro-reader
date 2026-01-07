@@ -120,6 +120,9 @@
         cropper.destroy();
       }
 
+      // Get text box bounds if available
+      const textBox = $cropperStore?.textBox;
+
       cropper = new CropperJS(img, {
         viewMode: 1,
         dragMode: 'move',
@@ -133,6 +136,16 @@
         toggleDragModeOnDblclick: false,
         aspectRatio: NaN, // Free-form cropping
         ready() {
+          // Set initial crop to text box bounds if available
+          if (textBox && cropper) {
+            const [xmin, ymin, xmax, ymax] = textBox;
+            cropper.setData({
+              x: xmin,
+              y: ymin,
+              width: xmax - xmin,
+              height: ymax - ymin
+            });
+          }
           updatePixels();
         },
         crop() {
@@ -303,6 +316,51 @@
 
   .cropper-container :global(.cropper-container) {
     height: 100% !important;
+  }
+
+  /* Make resize handles larger and easier to grab */
+  .cropper-container :global(.cropper-point) {
+    width: 20px !important;
+    height: 20px !important;
+    opacity: 1 !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-nw) {
+    top: -10px !important;
+    left: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-ne) {
+    top: -10px !important;
+    right: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-sw) {
+    bottom: -10px !important;
+    left: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-se) {
+    bottom: -10px !important;
+    right: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-n),
+  .cropper-container :global(.cropper-point.point-s) {
+    width: 40px !important;
+    left: 50% !important;
+    margin-left: -20px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-e),
+  .cropper-container :global(.cropper-point.point-w) {
+    height: 40px !important;
+    top: 50% !important;
+    margin-top: -20px !important;
+  }
+
+  .cropper-container :global(.cropper-line) {
+    background-color: rgba(59, 130, 246, 0.5) !important;
   }
 
   .textbox-zone {
