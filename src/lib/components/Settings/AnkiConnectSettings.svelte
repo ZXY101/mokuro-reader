@@ -157,12 +157,9 @@
       <Toggle
         {disabled}
         bind:checked={cropImage}
-        onchange={() => updateAnkiSetting('cropImage', cropImage)}>Preset to text box</Toggle
+        onchange={() => updateAnkiSetting('cropImage', cropImage)}>Preset crop to text box</Toggle
       >
-      <Helper class="mt-1"
-        >When enabled, the crop region starts at the selected text box. When disabled, it starts
-        with the full image.</Helper
-      >
+      <Helper class="mt-1">Ideal for quick single-panel captures</Helper>
     </div>
     <div>
       <Toggle
