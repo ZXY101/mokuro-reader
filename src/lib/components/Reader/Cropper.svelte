@@ -3,15 +3,15 @@
   import { cropperStore, getCroppedImg, type Pixels, sendToAnki } from '$lib/anki-connect';
   import { settings } from '$lib/settings';
   import { Button, Helper, Input, Label, Modal, Spinner, Textarea } from 'flowbite-svelte';
-  import { onMount } from 'svelte';
-  import Cropper from 'svelte-easy-crop';
+  import { onMount, onDestroy } from 'svelte';
+  import CropperJS from 'cropperjs';
+  import 'cropperjs/dist/cropper.css';
   import type { Page } from '$lib/types';
 
   let open = $state(false);
   let pixels: Pixels | undefined = undefined;
   let loading = $state(false);
-  let crop = $state({ x: 0, y: 0 });
-  let zoom = $state(1);
+  let cropper: CropperJS | null = null;
 
   // Editable fields
   let editableSelectedText = $state('');
@@ -107,7 +107,63 @@
     selectedBlockIndex = zone.blockIndex;
   }
 
+  onDestroy(() => {
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
+  });
+
+  function initCropper(img: HTMLImageElement) {
+    const setup = () => {
+      if (cropper) {
+        cropper.destroy();
+      }
+
+      cropper = new CropperJS(img, {
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 1,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+        aspectRatio: NaN, // Free-form cropping
+        ready() {
+          updatePixels();
+        },
+        crop() {
+          updatePixels();
+        }
+      });
+    };
+
+    if (img.complete && img.naturalWidth > 0) {
+      setup();
+    } else {
+      img.onload = setup;
+    }
+  }
+
+  function updatePixels() {
+    if (!cropper) return;
+    const data = cropper.getData(true);
+    pixels = {
+      x: data.x,
+      y: data.y,
+      width: data.width,
+      height: data.height
+    };
+  }
+
   function close() {
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
     loading = false;
     editableSelectedText = '';
     editableSentence = '';
@@ -150,12 +206,6 @@
       }
     }
   }
-
-  function onCropComplete(detail: any) {
-    // In v4, the callback receives the detail directly (not as e.detail)
-    // This fires continuously as the user adjusts the crop area
-    pixels = detail.pixels;
-  }
 </script>
 
 <Modal
@@ -166,14 +216,12 @@
   {#if $cropperStore?.image && !loading}
     <div class="flex flex-col gap-3">
       {#if cropEnabled}
-        <div class="relative h-[30svh] w-full sm:h-[40svh]">
-          <Cropper
-            zoomSpeed={0.5}
-            maxZoom={10}
-            image={$cropperStore?.image}
-            bind:crop
-            bind:zoom
-            oncropcomplete={onCropComplete}
+        <div class="cropper-container">
+          <img
+            src={$cropperStore?.image}
+            alt="Crop preview"
+            class="cropper-image block max-w-full"
+            use:initCropper
           />
         </div>
       {:else}
@@ -245,6 +293,18 @@
 </Modal>
 
 <style>
+  .cropper-container {
+    position: relative;
+    height: 50dvh;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background: #111827;
+  }
+
+  .cropper-container :global(.cropper-container) {
+    height: 100% !important;
+  }
+
   .textbox-zone {
     position: absolute;
     border: 2px solid red;
