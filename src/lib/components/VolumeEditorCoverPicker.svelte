@@ -210,16 +210,40 @@
   function handleReset() {
     cropper?.reset();
   }
+
+  // Handle backdrop mousedown - dismiss on mousedown outside content, not mouseup
+  function handleBackdropMousedown(ev: MouseEvent & { currentTarget: HTMLDialogElement }) {
+    const dlg = ev.currentTarget;
+    if (ev.target === dlg) {
+      const rect = dlg.getBoundingClientRect();
+      const clickedInContent =
+        ev.clientX >= rect.left &&
+        ev.clientX <= rect.right &&
+        ev.clientY >= rect.top &&
+        ev.clientY <= rect.bottom;
+
+      if (!clickedInContent) {
+        handleClose();
+      }
+    }
+  }
 </script>
 
-<Modal bind:open size="xl" onclose={handleClose}>
+<Modal
+  bind:open
+  size="xl"
+  onclose={handleClose}
+  class="cover-picker-modal"
+  outsideclose={false}
+  onmousedown={handleBackdropMousedown}
+>
   <div class="p-2">
     {#if showCropper && cropImage}
       <!-- Cropper View -->
       <h3 class="mb-4 text-xl font-semibold text-gray-900 dark:text-white">Crop Cover</h3>
 
       <div
-        class="cropper-container relative mb-4 h-[400px] w-full overflow-hidden rounded-lg bg-gray-900"
+        class="cropper-container relative mb-4 h-[70dvh] w-full overflow-hidden rounded-lg bg-gray-900"
       >
         <img
           src={cropImage}
@@ -266,7 +290,7 @@
           <div class="py-4 text-center text-gray-500">No pages found</div>
         {:else}
           <div
-            class="grid max-h-[300px] grid-cols-5 gap-2 overflow-y-auto rounded-lg border border-gray-200 p-2 sm:grid-cols-6 md:grid-cols-8 dark:border-gray-700"
+            class="grid max-h-[70dvh] grid-cols-5 gap-2 overflow-y-auto rounded-lg border border-gray-200 p-2 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 dark:border-gray-700"
           >
             {#each pages as page, index}
               <button
@@ -308,5 +332,11 @@
 <style>
   .cropper-container :global(.cropper-container) {
     height: 100% !important;
+  }
+
+  /* Expand modal width */
+  :global(.cover-picker-modal) {
+    max-width: calc(100vw - 3rem) !important;
+    width: calc(100vw - 3rem) !important;
   }
 </style>

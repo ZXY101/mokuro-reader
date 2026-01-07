@@ -9,8 +9,8 @@
     ZoomOutOutline,
     PlusOutline
   } from 'flowbite-svelte-icons';
-  import { imageToWebp, showCropper, sendToAnki, type VolumeMetadata } from '$lib/anki-connect';
-  import { promptConfirmation } from '$lib/util';
+  import type { VolumeMetadata } from '$lib/anki-connect';
+  import { showTextBoxPicker } from './text-box-picker';
   import type { Page } from '$lib/types';
 
   interface Props {
@@ -49,10 +49,9 @@
   }
 
   async function onUpdateCard(src: File | undefined, page?: Page) {
-    if ($settings.ankiConnectSettings.enabled && src) {
-      // QuickActions doesn't have text selection, so pass empty strings
-      // The modal will show clickable text zones from the page for selection
-      showCropper(URL.createObjectURL(src), '', '', ankiTags, volumeMetadata, page ? [page] : []);
+    if ($settings.ankiConnectSettings.enabled && src && page) {
+      // Show text box picker first, then cropper
+      showTextBoxPicker(URL.createObjectURL(src), page, ankiTags, volumeMetadata);
     }
     open = false;
   }

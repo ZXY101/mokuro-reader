@@ -2,75 +2,25 @@
   import { currentView } from '$lib/util/hash-router';
   import { cropperStore, getCroppedImg, type Pixels, sendToAnki } from '$lib/anki-connect';
   import { settings } from '$lib/settings';
-  import { Button, Helper, Input, Label, Modal, Spinner, Textarea } from 'flowbite-svelte';
-  import { onMount } from 'svelte';
-  import Cropper from 'svelte-easy-crop';
-  import type { Page } from '$lib/types';
+  import { Button, Helper, Input, Label, Modal, Spinner } from 'flowbite-svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import CropperJS from 'cropperjs';
+  import 'cropperjs/dist/cropper.css';
 
   let open = $state(false);
   let pixels: Pixels | undefined = undefined;
   let loading = $state(false);
-  let crop = $state({ x: 0, y: 0 });
-  let zoom = $state(1);
+  let cropper: CropperJS | null = null;
 
   // Editable fields
   let editableSelectedText = $state('');
   let editableSentence = $state('');
 
-  // Track whether we opened with no pre-selected text (show textbox picker)
-  let openedWithoutText = $state(false);
-
-  // Track which block is currently selected (for highlighting)
-  let selectedBlockIndex = $state<number | null>(null);
-
-  // Track whether crop image is enabled
+  // Track whether crop image is enabled (preset to text box vs full image)
   let cropEnabled = $derived($settings.ankiConnectSettings.cropImage);
   let cardMode = $derived($settings.ankiConnectSettings.cardMode);
   let grabSentence = $derived($settings.ankiConnectSettings.grabSentence);
   let sentenceField = $derived($settings.ankiConnectSettings.sentenceField);
-
-  // Get available pages for selection
-  let pages = $derived($cropperStore?.pages || []);
-
-  // Flatten blocks from all pages with their position info for rendering
-  interface TextBoxZone {
-    left: string;
-    top: string;
-    width: string;
-    height: string;
-    text: string;
-    blockIndex: number;
-  }
-
-  let textBoxZones = $derived.by(() => {
-    const zones: TextBoxZone[] = [];
-    // Use first page only (each image corresponds to one page)
-    const page = pages[0];
-    if (!page) return zones;
-
-    const { img_width, img_height, blocks } = page;
-    if (!img_width || !img_height) return zones;
-
-    blocks.forEach((block, index) => {
-      const [xmin, ymin, xmax, ymax] = block.box;
-      // Convert to percentages for responsive positioning
-      zones.push({
-        left: `${(xmin / img_width) * 100}%`,
-        top: `${(ymin / img_height) * 100}%`,
-        width: `${((xmax - xmin) / img_width) * 100}%`,
-        height: `${((ymax - ymin) / img_height) * 100}%`,
-        text: block.lines.join(' '),
-        blockIndex: index
-      });
-    });
-
-    return zones;
-  });
-
-  // Show textbox picker when in create mode, no text selected, and pages available
-  let showTextboxPicker = $derived(
-    cardMode === 'create' && openedWithoutText && textBoxZones.length > 0
-  );
 
   // Close modal on navigation (hash route change)
   let previousViewType = $state($currentView.type);
@@ -92,49 +42,121 @@
         if (value.open) {
           editableSelectedText = value.selectedText || '';
           editableSentence = value.sentence || '';
-          // Track if we opened without pre-selected text
-          openedWithoutText = !value.selectedText;
-          selectedBlockIndex = null;
+
+          // On mobile, blur the auto-focused input to prevent keyboard from appearing
+          // and causing layout issues with the cropper
+          if ($settings.mobile) {
+            requestAnimationFrame(() => {
+              if (document.activeElement instanceof HTMLElement) {
+                document.activeElement.blur();
+              }
+            });
+          }
         }
       }
     });
   });
 
-  // Select a textbox zone to populate both Front and Sentence fields
-  function selectTextboxZone(zone: TextBoxZone) {
-    editableSelectedText = zone.text;
-    editableSentence = zone.text;
-    selectedBlockIndex = zone.blockIndex;
+  onDestroy(() => {
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
+  });
+
+  function initCropper(img: HTMLImageElement) {
+    const setup = () => {
+      if (cropper) {
+        cropper.destroy();
+      }
+
+      // Get text box bounds if available
+      const textBox = $cropperStore?.textBox;
+
+      cropper = new CropperJS(img, {
+        viewMode: 1,
+        dragMode: 'move',
+        autoCropArea: 1,
+        restore: false,
+        guides: true,
+        center: true,
+        highlight: false,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: false,
+        aspectRatio: NaN, // Free-form cropping
+        ready() {
+          // When "Preset to text box" is enabled and textBox bounds available, use them
+          // Otherwise, preset to full image (autoCropArea: 1 already does this)
+          if (cropEnabled && textBox && cropper) {
+            const [xmin, ymin, xmax, ymax] = textBox;
+            cropper.setData({
+              x: xmin,
+              y: ymin,
+              width: xmax - xmin,
+              height: ymax - ymin
+            });
+          }
+          updatePixels();
+        },
+        crop() {
+          updatePixels();
+        }
+      });
+    };
+
+    if (img.complete && img.naturalWidth > 0) {
+      setup();
+    } else {
+      img.onload = setup;
+    }
+  }
+
+  function updatePixels() {
+    if (!cropper) return;
+    const data = cropper.getData(true);
+    pixels = {
+      x: data.x,
+      y: data.y,
+      width: data.width,
+      height: data.height
+    };
+  }
+
+  // Handle backdrop mousedown - dismiss on mousedown outside content, not mouseup
+  function handleBackdropMousedown(ev: MouseEvent & { currentTarget: HTMLDialogElement }) {
+    const dlg = ev.currentTarget;
+    if (ev.target === dlg) {
+      const rect = dlg.getBoundingClientRect();
+      const clickedInContent =
+        ev.clientX >= rect.left &&
+        ev.clientX <= rect.right &&
+        ev.clientY >= rect.top &&
+        ev.clientY <= rect.bottom;
+
+      if (!clickedInContent) {
+        close();
+      }
+    }
   }
 
   function close() {
+    if (cropper) {
+      cropper.destroy();
+      cropper = null;
+    }
     loading = false;
     editableSelectedText = '';
     editableSentence = '';
-    openedWithoutText = false;
-    selectedBlockIndex = null;
     cropperStore.set({ open: false });
   }
 
   async function onSend() {
-    if ($cropperStore?.image) {
+    if ($cropperStore?.image && pixels) {
       loading = true;
       try {
-        let imageData: string | null | undefined;
-
-        if (cropEnabled && pixels) {
-          // Crop the image if crop mode is enabled
-          imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
-        } else {
-          // Use full image - fetch and convert to base64
-          const response = await fetch($cropperStore.image);
-          const blob = await response.blob();
-          imageData = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-        }
+        // Always use the cropped region from the cropper
+        const imageData = await getCroppedImg($cropperStore.image, pixels, $settings);
 
         sendToAnki(
           imageData,
@@ -150,58 +172,25 @@
       }
     }
   }
-
-  function onCropComplete(detail: any) {
-    // In v4, the callback receives the detail directly (not as e.detail)
-    // This fires continuously as the user adjusts the crop area
-    pixels = detail.pixels;
-  }
 </script>
 
 <Modal
   title={cardMode === 'create' ? 'Create Anki Card' : 'Update Anki Card'}
   bind:open
   onclose={close}
+  outsideclose={false}
+  onmousedown={handleBackdropMousedown}
 >
   {#if $cropperStore?.image && !loading}
     <div class="flex flex-col gap-3">
-      {#if cropEnabled}
-        <div class="relative h-[30svh] w-full sm:h-[40svh]">
-          <Cropper
-            zoomSpeed={0.5}
-            maxZoom={10}
-            image={$cropperStore?.image}
-            bind:crop
-            bind:zoom
-            oncropcomplete={onCropComplete}
-          />
-        </div>
-      {:else}
-        <div class="image-container flex justify-center">
-          <div class="relative inline-block">
-            <img src={$cropperStore?.image} alt="Preview" class="max-h-[30svh] object-contain" />
-            {#if showTextboxPicker}
-              <!-- Clickable text box zones overlaid on the image -->
-              {#each textBoxZones as zone}
-                <button
-                  type="button"
-                  onclick={() => selectTextboxZone(zone)}
-                  class="textbox-zone"
-                  class:selected={selectedBlockIndex === zone.blockIndex}
-                  style:left={zone.left}
-                  style:top={zone.top}
-                  style:width={zone.width}
-                  style:height={zone.height}
-                  title={zone.text}
-                ></button>
-              {/each}
-            {/if}
-          </div>
-        </div>
-        {#if showTextboxPicker}
-          <Helper class="text-center">Click a text box on the image to select it</Helper>
-        {/if}
-      {/if}
+      <div class="cropper-container">
+        <img
+          src={$cropperStore?.image}
+          alt="Crop preview"
+          class="cropper-image block max-w-full"
+          use:initCropper
+        />
+      </div>
 
       <div>
         <Label class="text-gray-900 dark:text-white">
@@ -222,8 +211,7 @@
       {#if grabSentence && sentenceField !== 'Front'}
         <div>
           <Label class="text-gray-900 dark:text-white">{sentenceField}:</Label>
-          <Textarea
-            rows={2}
+          <Input
             bind:value={editableSentence}
             placeholder="Full sentence context..."
             class="mt-1"
@@ -245,23 +233,80 @@
 </Modal>
 
 <style>
-  .textbox-zone {
-    position: absolute;
-    border: 2px solid red;
-    background: transparent;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    padding: 0;
+  .cropper-container {
+    position: relative;
+    height: 50dvh;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background: #111827;
   }
 
-  .textbox-zone:hover {
-    background: rgba(255, 0, 0, 0.15);
-    border-color: #ff4444;
+  .cropper-container :global(.cropper-container) {
+    height: 100% !important;
   }
 
-  .textbox-zone.selected {
-    background: rgba(0, 128, 255, 0.25);
-    border-color: #0080ff;
-    border-width: 3px;
+  /* Make resize handles larger and easier to grab */
+  .cropper-container :global(.cropper-point) {
+    width: 20px !important;
+    height: 20px !important;
+    opacity: 1 !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-nw) {
+    top: -10px !important;
+    left: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-ne) {
+    top: -10px !important;
+    right: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-sw) {
+    bottom: -10px !important;
+    left: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-se) {
+    bottom: -10px !important;
+    right: -10px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-n) {
+    width: 40px !important;
+    height: 20px !important;
+    top: -10px !important;
+    left: 50% !important;
+    margin-left: -20px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-s) {
+    width: 40px !important;
+    height: 20px !important;
+    bottom: -10px !important;
+    top: auto !important;
+    left: 50% !important;
+    margin-left: -20px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-e) {
+    height: 40px !important;
+    width: 20px !important;
+    right: -10px !important;
+    left: auto !important;
+    top: 50% !important;
+    margin-top: -20px !important;
+  }
+
+  .cropper-container :global(.cropper-point.point-w) {
+    height: 40px !important;
+    width: 20px !important;
+    left: -10px !important;
+    top: 50% !important;
+    margin-top: -20px !important;
+  }
+
+  .cropper-container :global(.cropper-line) {
+    background-color: rgba(59, 130, 246, 0.5) !important;
   }
 </style>

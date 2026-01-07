@@ -2,13 +2,14 @@
   import { clamp, promptConfirmation } from '$lib/util';
   import type { Page } from '$lib/types';
   import { settings, volumes } from '$lib/settings';
-  import { imageToWebp, showCropper, sendToAnki, type VolumeMetadata } from '$lib/anki-connect';
+  import { showCropper, expandTextBoxBounds, type VolumeMetadata } from '$lib/anki-connect';
 
   interface ContextMenuData {
     x: number;
     y: number;
     lines: string[];
     imgElement: HTMLElement | null;
+    textBox?: [number, number, number, number]; // [xmin, ymin, xmax, ymax] for initial crop
   }
 
   interface Props {
@@ -34,11 +35,12 @@
     area: number;
     useMinDimensions: boolean;
     isOriginalMode: boolean;
+    blockIndex: number; // Original index in page.blocks
   }
 
   let textBoxes = $derived(
     page.blocks
-      .map((block) => {
+      .map((block, blockIndex) => {
         const { img_height, img_width } = page;
         const { box, font_size, lines, vertical } = block;
 
@@ -97,7 +99,8 @@
           lines: processedLines,
           area,
           useMinDimensions: $settings.fontSize !== 'auto' && !isOriginalMode,
-          isOriginalMode
+          isOriginalMode,
+          blockIndex
         };
 
         return textBox;
@@ -304,40 +307,58 @@
     return selection?.toString().trim() || '';
   }
 
-  async function onUpdateCard(event: Event, lines: string[]) {
+  async function onUpdateCard(event: Event, lines: string[], blockIndex: number) {
     if ($settings.ankiConnectSettings.enabled) {
       const selectedText = getSelectedText();
       const fullSentence = lines.join(' ');
+
+      // Get the original block's bounding box for initial crop
+      const block = page.blocks[blockIndex];
+      const textBox = block ? expandTextBoxBounds(block, page) : undefined;
 
       // Always show the modal for review/editing
       const url =
         getImageUrlFromElement(event.target as HTMLElement) ||
         (src ? URL.createObjectURL(src) : null);
       if (url) {
-        showCropper(url, selectedText || fullSentence, fullSentence, ankiTags, volumeMetadata);
+        showCropper(
+          url,
+          selectedText || fullSentence,
+          fullSentence,
+          ankiTags,
+          volumeMetadata,
+          undefined,
+          textBox
+        );
       }
     }
   }
 
-  function handleContextMenu(event: MouseEvent, lines: string[]) {
+  function handleContextMenu(event: MouseEvent, lines: string[], blockIndex: number) {
     // Only show custom context menu if enabled in settings
     if (!$settings.textBoxContextMenu) return;
 
     event.preventDefault();
+
+    // Get text box bounds with padding
+    const block = page.blocks[blockIndex];
+    const textBox = block ? expandTextBoxBounds(block, page) : undefined;
+
     onContextMenu?.({
       x: event.clientX,
       y: event.clientY,
       lines,
-      imgElement: event.target as HTMLElement
+      imgElement: event.target as HTMLElement,
+      textBox
     });
   }
 
-  function onDoubleTap(event: Event, lines: string[]) {
+  function onDoubleTap(event: Event, lines: string[], blockIndex: number) {
     // Always stop propagation to prevent zoom from triggering
     event.stopPropagation();
     if (doubleTapEnabled) {
       event.preventDefault();
-      onUpdateCard(event, lines);
+      onUpdateCard(event, lines, blockIndex);
     }
   }
 
@@ -350,7 +371,7 @@
   }
 </script>
 
-{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions, isOriginalMode }, index (`${volumeUuid}-textBox-${index}`)}
+{#each textBoxes as { fontSize, height, left, lines, top, width, writingMode, useMinDimensions, isOriginalMode, blockIndex }, index (`${volumeUuid}-textBox-${index}`)}
   <div
     use:handleTextBoxHover={[index, fontSize]}
     class="textBox"
@@ -368,8 +389,8 @@
     style:border
     style:writing-mode={writingMode}
     role="none"
-    oncontextmenu={(e) => handleContextMenu(e, lines)}
-    ondblclick={(e) => onDoubleTap(e, lines)}
+    oncontextmenu={(e) => handleContextMenu(e, lines, blockIndex)}
+    ondblclick={(e) => onDoubleTap(e, lines, blockIndex)}
     oncopy={onCopy}
     {contenteditable}
   >
