@@ -32,7 +32,6 @@
   import { onMount } from 'svelte';
   import { get } from 'svelte/store';
   import { browser } from '$app/environment';
-  import { getCharCount } from '$lib/util/count-chars';
 
   // Calculate manga stats locally to avoid circular dependency
   let mangaStats = $derived.by(() => {
@@ -61,42 +60,46 @@
       );
   });
 
-  // Track Japanese character counts per volume (calculated from pages)
-  let volumeJapaneseChars = $state<Map<string, number>>(new Map());
-
-  // Calculate Japanese character counts from pages data when manga list changes
-  $effect(() => {
-    if (!manga || manga.length === 0) return;
-
-    const fetchCharCounts = async () => {
-      const charCounts = new Map<string, number>();
-
-      for (const vol of manga) {
-        const volumeOcr = await db.volume_ocr.get(vol.volume_uuid);
-        if (volumeOcr?.pages) {
-          const { charCount } = getCharCount(volumeOcr.pages);
-          charCounts.set(vol.volume_uuid, charCount);
-        }
-      }
-
-      volumeJapaneseChars = charCounts;
-    };
-
-    fetchCharCounts();
-  });
-
-  // Calculate total Japanese characters in series
+  // Calculate total Japanese characters in series (from metadata - no async needed)
   let totalSeriesChars = $derived.by(() => {
     if (!manga || manga.length === 0) return 0;
     return manga.reduce((total, vol) => {
-      return total + (volumeJapaneseChars.get(vol.volume_uuid) || 0);
+      // Use character_count from metadata, or last element of page_char_counts
+      const volTotal =
+        vol.character_count ||
+        (vol.page_char_counts?.length > 0
+          ? vol.page_char_counts[vol.page_char_counts.length - 1]
+          : 0);
+      return total + volTotal;
+    }, 0);
+  });
+
+  // Calculate chars read in series (from metadata + progress)
+  let charsReadInSeries = $derived.by(() => {
+    if (!manga || manga.length === 0) return 0;
+    return manga.reduce((total, vol) => {
+      const volumeData = $volumes?.[vol.volume_uuid];
+      const currentPage = volumeData?.progress || 0;
+      if (currentPage <= 0 || !vol.page_char_counts?.length) return total;
+
+      // If volume is completed, use full character count
+      // (completion can trigger on second-to-last page, so progress may be short)
+      if (volumeData?.completed) {
+        return total + (vol.page_char_counts[vol.page_char_counts.length - 1] || 0);
+      }
+
+      // page_char_counts is cumulative: [50, 120, 200] means page 3 has 200 total chars through it
+      // currentPage is 1-indexed, so page 1 = index 0, page N = index N-1
+      const charIndex = Math.min(currentPage, vol.page_char_counts.length) - 1;
+      const charsRead = vol.page_char_counts[charIndex] || 0;
+      return total + charsRead;
     }, 0);
   });
 
   let estimatedMinutesLeft = $derived.by(() => {
-    if (!mangaStats || !totalSeriesChars) return null;
+    if (!totalSeriesChars) return null;
 
-    const charsRemaining = totalSeriesChars - mangaStats.chars;
+    const charsRemaining = totalSeriesChars - charsReadInSeries;
     if (charsRemaining <= 0) return null;
 
     // Get personalized reading speed
@@ -117,6 +120,13 @@
     const mins = minutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   }
+
+  // Compact character formatter with 3 significant digits
+  const charFormatter = new Intl.NumberFormat('en', {
+    notation: 'compact',
+    maximumSignificantDigits: 3
+  });
+  const formatCharCount = (chars: number) => charFormatter.format(chars || 0);
 
   // View mode state (persisted to localStorage)
   type ViewMode = 'list' | 'grid';
@@ -701,9 +711,12 @@
         <Badge color="gray" class="!min-w-0 bg-gray-100 break-words dark:bg-gray-700"
           >Volumes: {mangaStats.completed} / {manga.length}</Badge
         >
-        <Badge color="gray" class="!min-w-0 bg-gray-100 break-words dark:bg-gray-700"
-          >Characters: {mangaStats.chars}</Badge
-        >
+        <Badge color="gray" class="!min-w-0 bg-gray-100 break-words dark:bg-gray-700">
+          Characters: {formatCharCount(charsReadInSeries)}
+          {#if totalSeriesChars > 0}
+            / {formatCharCount(totalSeriesChars)}
+          {/if}
+        </Badge>
         <Badge color="gray" class="!min-w-0 bg-gray-100 break-words dark:bg-gray-700"
           >Time Read: {formatTime(mangaStats.timeReadInMinutes)}</Badge
         >

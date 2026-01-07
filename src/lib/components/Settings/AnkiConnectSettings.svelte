@@ -157,8 +157,9 @@
       <Toggle
         {disabled}
         bind:checked={cropImage}
-        onchange={() => updateAnkiSetting('cropImage', cropImage)}>Crop image</Toggle
+        onchange={() => updateAnkiSetting('cropImage', cropImage)}>Preset crop to text box</Toggle
       >
+      <Helper class="mt-1">Ideal for quick single-panel captures</Helper>
     </div>
     <div>
       <Toggle

@@ -37,6 +37,7 @@
     ForwardStepSolid
   } from 'flowbite-svelte-icons';
   import Cropper from './Cropper.svelte';
+  import TextBoxPicker from './TextBoxPicker.svelte';
   import SettingsButton from './SettingsButton.svelte';
   import { getCharCount } from '$lib/util/count-chars';
   import QuickActions from './QuickActions.svelte';
@@ -752,6 +753,7 @@
     y: number;
     lines: string[];
     imgElement: HTMLElement | null;
+    textBox?: [number, number, number, number]; // [xmin, ymin, xmax, ymax] for initial crop
   }
   let showContextMenu = $state(false);
   let contextMenuData = $state<ContextMenuData | null>(null);
@@ -794,7 +796,15 @@
       // Use selection for card front if provided, otherwise use full sentence
       const cardFront = selection || fullSentence;
       const ankiTags = $settings.ankiConnectSettings.tags || '';
-      showCropper(url, cardFront, fullSentence, ankiTags, volumeMetadata);
+      showCropper(
+        url,
+        cardFront,
+        fullSentence,
+        ankiTags,
+        volumeMetadata,
+        undefined,
+        contextMenuData.textBox
+      );
     }
   }
 
@@ -904,6 +914,7 @@
   />
   <SettingsButton />
   <Cropper />
+  <TextBoxPicker />
   <Popover placement="bottom" trigger="click" triggeredBy="#page-num" class="z-20 w-full max-w-xs">
     <div class="flex flex-col gap-3">
       <div class="z-10 flex flex-row items-center gap-5">

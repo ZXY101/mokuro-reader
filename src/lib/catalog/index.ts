@@ -7,16 +7,6 @@ import { unifiedCloudManager } from '$lib/util/sync/unified-cloud-manager';
 import { generatePlaceholders } from '$lib/catalog/placeholders';
 import { routeParams } from '$lib/util/hash-router';
 
-function sortVolumes(a: VolumeMetadata, b: VolumeMetadata) {
-  if (a.volume_title < b.volume_title) {
-    return -1;
-  }
-  if (a.volume_title > b.volume_title) {
-    return 1;
-  }
-  return 0;
-}
-
 // Single source of truth from the database
 export const volumes = readable<Record<string, VolumeMetadata>>({}, (set) => {
   const subscription = liveQuery(async () => {
@@ -81,7 +71,7 @@ export const currentSeries = derived([routeParams, catalog], ([$routeParams, $ca
     series = $catalog.find((s) => s.series_uuid === $routeParams.manga);
   }
 
-  return (series?.volumes || []).sort(sortVolumes);
+  return series?.volumes || [];
 });
 
 export const currentVolume = derived([routeParams, volumes], ([$routeParams, $volumes]) => {
