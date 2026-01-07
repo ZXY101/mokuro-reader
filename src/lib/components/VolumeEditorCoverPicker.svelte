@@ -210,9 +210,33 @@
   function handleReset() {
     cropper?.reset();
   }
+
+  // Handle backdrop mousedown - dismiss on mousedown outside content, not mouseup
+  function handleBackdropMousedown(ev: MouseEvent & { currentTarget: HTMLDialogElement }) {
+    const dlg = ev.currentTarget;
+    if (ev.target === dlg) {
+      const rect = dlg.getBoundingClientRect();
+      const clickedInContent =
+        ev.clientX >= rect.left &&
+        ev.clientX <= rect.right &&
+        ev.clientY >= rect.top &&
+        ev.clientY <= rect.bottom;
+
+      if (!clickedInContent) {
+        handleClose();
+      }
+    }
+  }
 </script>
 
-<Modal bind:open size="xl" onclose={handleClose} class="cover-picker-modal">
+<Modal
+  bind:open
+  size="xl"
+  onclose={handleClose}
+  class="cover-picker-modal"
+  outsideclose={false}
+  onmousedown={handleBackdropMousedown}
+>
   <div class="p-2">
     {#if showCropper && cropImage}
       <!-- Cropper View -->

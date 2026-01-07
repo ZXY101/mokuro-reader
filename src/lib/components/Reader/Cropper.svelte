@@ -172,6 +172,23 @@
     };
   }
 
+  // Handle backdrop mousedown - dismiss on mousedown outside content, not mouseup
+  function handleBackdropMousedown(ev: MouseEvent & { currentTarget: HTMLDialogElement }) {
+    const dlg = ev.currentTarget;
+    if (ev.target === dlg) {
+      const rect = dlg.getBoundingClientRect();
+      const clickedInContent =
+        ev.clientX >= rect.left &&
+        ev.clientX <= rect.right &&
+        ev.clientY >= rect.top &&
+        ev.clientY <= rect.bottom;
+
+      if (!clickedInContent) {
+        close();
+      }
+    }
+  }
+
   function close() {
     if (cropper) {
       cropper.destroy();
@@ -225,6 +242,8 @@
   title={cardMode === 'create' ? 'Create Anki Card' : 'Update Anki Card'}
   bind:open
   onclose={close}
+  outsideclose={false}
+  onmousedown={handleBackdropMousedown}
 >
   {#if $cropperStore?.image && !loading}
     <div class="flex flex-col gap-3">
